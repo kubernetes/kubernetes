@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// AWSElasticBlockStoreVolumeSourceApplyConfiguration represents an declarative configuration of the AWSElasticBlockStoreVolumeSource type for use
+// AWSElasticBlockStoreVolumeSourceApplyConfiguration represents a declarative configuration of the AWSElasticBlockStoreVolumeSource type for use
 // with apply.
 type AWSElasticBlockStoreVolumeSourceApplyConfiguration struct {
 	VolumeID  *string `json:"volumeID,omitempty"`
@@ -27,7 +27,7 @@ type AWSElasticBlockStoreVolumeSourceApplyConfiguration struct {
 	ReadOnly  *bool   `json:"readOnly,omitempty"`
 }
 
-// AWSElasticBlockStoreVolumeSourceApplyConfiguration constructs an declarative configuration of the AWSElasticBlockStoreVolumeSource type for use with
+// AWSElasticBlockStoreVolumeSourceApplyConfiguration constructs a declarative configuration of the AWSElasticBlockStoreVolumeSource type for use with
 // apply.
 func AWSElasticBlockStoreVolumeSource() *AWSElasticBlockStoreVolumeSourceApplyConfiguration {
 	return &AWSElasticBlockStoreVolumeSourceApplyConfiguration{}

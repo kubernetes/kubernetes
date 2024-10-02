@@ -2,14 +2,14 @@
 
 package v1
 
-// OperandVersionApplyConfiguration represents an declarative configuration of the OperandVersion type for use
+// OperandVersionApplyConfiguration represents a declarative configuration of the OperandVersion type for use
 // with apply.
 type OperandVersionApplyConfiguration struct {
 	Name    *string `json:"name,omitempty"`
 	Version *string `json:"version,omitempty"`
 }
 
-// OperandVersionApplyConfiguration constructs an declarative configuration of the OperandVersion type for use with
+// OperandVersionApplyConfiguration constructs a declarative configuration of the OperandVersion type for use with
 // apply.
 func OperandVersion() *OperandVersionApplyConfiguration {
 	return &OperandVersionApplyConfiguration{}

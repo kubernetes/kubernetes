@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PortStatusApplyConfiguration represents an declarative configuration of the PortStatus type for use
+// PortStatusApplyConfiguration represents a declarative configuration of the PortStatus type for use
 // with apply.
 type PortStatusApplyConfiguration struct {
 	Port     *int32       `json:"port,omitempty"`
@@ -30,7 +30,7 @@ type PortStatusApplyConfiguration struct {
 	Error    *string      `json:"error,omitempty"`
 }
 
-// PortStatusApplyConfiguration constructs an declarative configuration of the PortStatus type for use with
+// PortStatusApplyConfiguration constructs a declarative configuration of the PortStatus type for use with
 // apply.
 func PortStatus() *PortStatusApplyConfiguration {
 	return &PortStatusApplyConfiguration{}

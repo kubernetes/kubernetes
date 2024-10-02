@@ -298,7 +298,7 @@ func (fakeAuthProviderConfigPersister) Persist(map[string]string) error {
 
 var fakeAuthProviderConfigPersisterError = errors.New("fakeAuthProviderConfigPersisterError")
 
-func TestAnonymousConfig(t *testing.T) {
+func TestAnonymousAuthConfig(t *testing.T) {
 	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
 	f.Funcs(
 		func(r *runtime.Codec, f fuzz.Continue) {

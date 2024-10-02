@@ -27,20 +27,22 @@ var imagesKind = v1.SchemeGroupVersion.WithKind("Image")
 
 // Get takes name of the image, and returns the corresponding image object, and an error if there is any.
 func (c *FakeImages) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Image, err error) {
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(imagesResource, name), &v1.Image{})
+		Invokes(testing.NewRootGetActionWithOptions(imagesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
 
 // List takes label and field selectors, and returns the list of Images that match those selectors.
 func (c *FakeImages) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ImageList, err error) {
+	emptyResult := &v1.ImageList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(imagesResource, imagesKind, opts), &v1.ImageList{})
+		Invokes(testing.NewRootListActionWithOptions(imagesResource, imagesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeImages) List(ctx context.Context, opts metav1.ListOptions) (result 
 // Watch returns a watch.Interface that watches the requested images.
 func (c *FakeImages) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(imagesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(imagesResource, opts))
 }
 
 // Create takes the representation of a image and creates it.  Returns the server's representation of the image, and an error, if there is any.
 func (c *FakeImages) Create(ctx context.Context, image *v1.Image, opts metav1.CreateOptions) (result *v1.Image, err error) {
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(imagesResource, image), &v1.Image{})
+		Invokes(testing.NewRootCreateActionWithOptions(imagesResource, image, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
 
 // Update takes the representation of a image and updates it. Returns the server's representation of the image, and an error, if there is any.
 func (c *FakeImages) Update(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (result *v1.Image, err error) {
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(imagesResource, image), &v1.Image{})
+		Invokes(testing.NewRootUpdateActionWithOptions(imagesResource, image, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeImages) UpdateStatus(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (*v1.Image, error) {
+func (c *FakeImages) UpdateStatus(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (result *v1.Image, err error) {
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(imagesResource, "status", image), &v1.Image{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(imagesResource, "status", image, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
@@ -102,7 +107,7 @@ func (c *FakeImages) Delete(ctx context.Context, name string, opts metav1.Delete
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeImages) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(imagesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(imagesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ImageList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeImages) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 
 // Patch applies the patch and returns the patched image.
 func (c *FakeImages) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Image, err error) {
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagesResource, name, pt, data, subresources...), &v1.Image{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
@@ -131,10 +137,11 @@ func (c *FakeImages) Apply(ctx context.Context, image *configv1.ImageApplyConfig
 	if name == nil {
 		return nil, fmt.Errorf("image.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagesResource, *name, types.ApplyPatchType, data), &v1.Image{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }
@@ -153,10 +160,11 @@ func (c *FakeImages) ApplyStatus(ctx context.Context, image *configv1.ImageApply
 	if name == nil {
 		return nil, fmt.Errorf("image.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Image{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagesResource, *name, types.ApplyPatchType, data, "status"), &v1.Image{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Image), err
 }

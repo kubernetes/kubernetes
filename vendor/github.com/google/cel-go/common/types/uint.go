@@ -80,6 +80,18 @@ func (i Uint) ConvertToNative(typeDesc reflect.Type) (any, error) {
 			return 0, err
 		}
 		return reflect.ValueOf(v).Convert(typeDesc).Interface(), nil
+	case reflect.Uint8:
+		v, err := uint64ToUint8Checked(uint64(i))
+		if err != nil {
+			return 0, err
+		}
+		return reflect.ValueOf(v).Convert(typeDesc).Interface(), nil
+	case reflect.Uint16:
+		v, err := uint64ToUint16Checked(uint64(i))
+		if err != nil {
+			return 0, err
+		}
+		return reflect.ValueOf(v).Convert(typeDesc).Interface(), nil
 	case reflect.Uint64:
 		return reflect.ValueOf(i).Convert(typeDesc).Interface(), nil
 	case reflect.Ptr:

@@ -22,6 +22,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -30,6 +31,11 @@ import (
 // Funcs returns the fuzzer functions for the apps api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(r *apps.ControllerRevision, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// match the fuzzer default content for runtime.Object
+			r.Data = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
+		},
 		func(s *apps.StatefulSet, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 

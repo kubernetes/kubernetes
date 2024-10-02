@@ -6,13 +6,13 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// PolicyMatchExactRepositoryApplyConfiguration represents an declarative configuration of the PolicyMatchExactRepository type for use
+// PolicyMatchExactRepositoryApplyConfiguration represents a declarative configuration of the PolicyMatchExactRepository type for use
 // with apply.
 type PolicyMatchExactRepositoryApplyConfiguration struct {
 	Repository *v1alpha1.IdentityRepositoryPrefix `json:"repository,omitempty"`
 }
 
-// PolicyMatchExactRepositoryApplyConfiguration constructs an declarative configuration of the PolicyMatchExactRepository type for use with
+// PolicyMatchExactRepositoryApplyConfiguration constructs a declarative configuration of the PolicyMatchExactRepository type for use with
 // apply.
 func PolicyMatchExactRepository() *PolicyMatchExactRepositoryApplyConfiguration {
 	return &PolicyMatchExactRepositoryApplyConfiguration{}

@@ -67,6 +67,7 @@ func (in *IDRange) DeepCopy() *IDRange {
 func (in *PodSecurityPolicyReview) DeepCopyInto(out *PodSecurityPolicyReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return
@@ -139,6 +140,7 @@ func (in *PodSecurityPolicyReviewStatus) DeepCopy() *PodSecurityPolicyReviewStat
 func (in *PodSecurityPolicySelfSubjectReview) DeepCopyInto(out *PodSecurityPolicySelfSubjectReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return
@@ -183,6 +185,7 @@ func (in *PodSecurityPolicySelfSubjectReviewSpec) DeepCopy() *PodSecurityPolicyS
 func (in *PodSecurityPolicySubjectReview) DeepCopyInto(out *PodSecurityPolicySubjectReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return

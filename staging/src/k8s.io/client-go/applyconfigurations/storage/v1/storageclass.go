@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// StorageClassApplyConfiguration represents an declarative configuration of the StorageClass type for use
+// StorageClassApplyConfiguration represents a declarative configuration of the StorageClass type for use
 // with apply.
 type StorageClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -43,7 +43,7 @@ type StorageClassApplyConfiguration struct {
 	AllowedTopologies                []applyconfigurationscorev1.TopologySelectorTermApplyConfiguration `json:"allowedTopologies,omitempty"`
 }
 
-// StorageClass constructs an declarative configuration of the StorageClass type for use with
+// StorageClass constructs a declarative configuration of the StorageClass type for use with
 // apply.
 func StorageClass(name string) *StorageClassApplyConfiguration {
 	b := &StorageClassApplyConfiguration{}
@@ -313,4 +313,10 @@ func (b *StorageClassApplyConfiguration) WithAllowedTopologies(values ...*applyc
 		b.AllowedTopologies = append(b.AllowedTopologies, *values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *StorageClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

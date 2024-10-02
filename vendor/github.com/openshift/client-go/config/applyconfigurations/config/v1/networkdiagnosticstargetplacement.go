@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// NetworkDiagnosticsTargetPlacementApplyConfiguration represents an declarative configuration of the NetworkDiagnosticsTargetPlacement type for use
+// NetworkDiagnosticsTargetPlacementApplyConfiguration represents a declarative configuration of the NetworkDiagnosticsTargetPlacement type for use
 // with apply.
 type NetworkDiagnosticsTargetPlacementApplyConfiguration struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	Tolerations  []v1.Toleration   `json:"tolerations,omitempty"`
 }
 
-// NetworkDiagnosticsTargetPlacementApplyConfiguration constructs an declarative configuration of the NetworkDiagnosticsTargetPlacement type for use with
+// NetworkDiagnosticsTargetPlacementApplyConfiguration constructs a declarative configuration of the NetworkDiagnosticsTargetPlacement type for use with
 // apply.
 func NetworkDiagnosticsTargetPlacement() *NetworkDiagnosticsTargetPlacementApplyConfiguration {
 	return &NetworkDiagnosticsTargetPlacementApplyConfiguration{}

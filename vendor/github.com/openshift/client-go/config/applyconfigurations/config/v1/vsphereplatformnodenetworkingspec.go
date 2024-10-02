@@ -2,7 +2,7 @@
 
 package v1
 
-// VSpherePlatformNodeNetworkingSpecApplyConfiguration represents an declarative configuration of the VSpherePlatformNodeNetworkingSpec type for use
+// VSpherePlatformNodeNetworkingSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformNodeNetworkingSpec type for use
 // with apply.
 type VSpherePlatformNodeNetworkingSpecApplyConfiguration struct {
 	NetworkSubnetCIDR        []string `json:"networkSubnetCidr,omitempty"`
@@ -10,7 +10,7 @@ type VSpherePlatformNodeNetworkingSpecApplyConfiguration struct {
 	ExcludeNetworkSubnetCIDR []string `json:"excludeNetworkSubnetCidr,omitempty"`
 }
 
-// VSpherePlatformNodeNetworkingSpecApplyConfiguration constructs an declarative configuration of the VSpherePlatformNodeNetworkingSpec type for use with
+// VSpherePlatformNodeNetworkingSpecApplyConfiguration constructs a declarative configuration of the VSpherePlatformNodeNetworkingSpec type for use with
 // apply.
 func VSpherePlatformNodeNetworkingSpec() *VSpherePlatformNodeNetworkingSpecApplyConfiguration {
 	return &VSpherePlatformNodeNetworkingSpecApplyConfiguration{}

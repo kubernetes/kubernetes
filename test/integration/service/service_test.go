@@ -19,18 +19,28 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
@@ -38,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy tests that Services no longer default
@@ -45,7 +56,7 @@ import (
 // the internalTrafficPolicy field was being defaulted in older versions. New versions stop defaulting the
 // field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -89,7 +100,7 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 // but drops the field on read. This test exists due to historic reasons where the internalTrafficPolicy field was being defaulted
 // in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -136,7 +147,7 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 // field was being defaulted in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons
 // we still accept the field.
 func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -197,7 +208,7 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 // Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy tests that removing externalIPs from a
 // ClusterIP Service results in the externalTrafficPolicy field being dropped.
 func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -285,10 +296,10 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// Setup components, like kube-apiserver and EndpointSlice controller.
 	////////////////////////////////////////////////////////////////////////////
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
 
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -556,4 +567,465 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 		t.Fatalf("Error waiting for EndpointSlices to have no hints: %v", err)
 	}
 	logsBuffer.Reset()
+}
+
+func Test_TrafficDistribution_FeatureGateEnableDisable(t *testing.T) {
+
+	////////////////////////////////////////////////////////////////////////////
+	// Start kube-apiserver with ServiceTrafficDistribution feature-gate
+	// enabled.
+	////////////////////////////////////////////////////////////////////////////
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
+
+	sharedEtcd := framework.SharedEtcd()
+	server1 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+
+	client1, err := clientset.NewForConfig(server1.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Create a Service and set `trafficDistribution: PreferLocal` field.
+	//
+	// Assert that the field is present in the created Service.
+	////////////////////////////////////////////////////////////////////////////
+
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
+	ns := framework.CreateNamespaceOrDie(client1, "test-service-traffic-distribution", t)
+
+	trafficDist := corev1.ServiceTrafficDistributionPreferClose
+	svcToCreate := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-service",
+			Namespace: ns.GetName(),
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app": "v1",
+			},
+			Ports: []corev1.ServicePort{
+				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
+			},
+			TrafficDistribution: &trafficDist,
+		},
+	}
+	svc, err := client1.CoreV1().Services(ns.Name).Create(ctx, svcToCreate, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test service: %v", err)
+	}
+
+	if diff := cmp.Diff(svcToCreate.Spec.TrafficDistribution, svc.Spec.TrafficDistribution); diff != "" {
+		t.Fatalf("Unexpected diff found in service .spec.trafficDistribution after creation: (-want, +got)\n:%v", diff)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Restart the kube-apiserver with ServiceTrafficDistribution feature-gate
+	// disabled. Update the test service.
+	//
+	// Assert that updating the service does not drop the field since it was
+	// being used previously.
+	////////////////////////////////////////////////////////////////////////////
+
+	server1.TearDownFn()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, false)
+	server2 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+	defer server2.TearDownFn()
+	client2, err := clientset.NewForConfig(server2.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	svcToUpdate := svcToCreate.DeepCopy()
+	svcToUpdate.Spec.Selector = map[string]string{"app": "v2"}
+	svc, err = client2.CoreV1().Services(ns.Name).Update(ctx, svcToUpdate, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test service: %v", err)
+	}
+
+	if diff := cmp.Diff(svcToUpdate.Spec.TrafficDistribution, svc.Spec.TrafficDistribution); diff != "" {
+		t.Fatalf("Unexpected diff found in service .spec.trafficDistribution after update: (-want, +got)\n:%v", diff)
+	}
+}
+
+func Test_ServiceClusterIPSelector(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	// create headless service
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-headless",
+			Namespace: ns.Name,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: corev1.ClusterIPNone,
+			Type:      corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	// informer to watch only non-headless services
+	kubeInformers := informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+		options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", corev1.ClusterIPNone).String()
+	}))
+
+	serviceInformer := kubeInformers.Core().V1().Services().Informer()
+	serviceLister := kubeInformers.Core().V1().Services().Lister()
+	serviceHasSynced := serviceInformer.HasSynced
+	if _, err = serviceInformer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				svc := obj.(*corev1.Service)
+				t.Logf("Added Service %#v", svc)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldSvc := oldObj.(*corev1.Service)
+				newSvc := newObj.(*corev1.Service)
+				t.Logf("Updated Service %#v to %#v", oldSvc, newSvc)
+			},
+			DeleteFunc: func(obj interface{}) {
+				svc := obj.(*corev1.Service)
+				t.Logf("Deleted Service %#v", svc)
+			},
+		},
+	); err != nil {
+		t.Fatalf("Error adding service informer handler: %v", err)
+	}
+	kubeInformers.Start(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), serviceHasSynced)
+	svcs, err := serviceLister.List(labels.Everything())
+	if err != nil {
+		t.Fatalf("Error listing services: %v", err)
+	}
+	// only the kubernetes.default service expected
+	if len(svcs) != 1 || svcs[0].Name != "kubernetes" {
+		t.Fatalf("expected 1 services, got %d", len(svcs))
+	}
+
+	// create a new service with ClusterIP
+	service2 := service.DeepCopy()
+	service2.Spec.ClusterIP = ""
+	service2.Name = "test-clusterip"
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		svc, err := serviceLister.Services(service2.Namespace).Get(service2.Name)
+		if svc == nil || err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Error waiting for test service test-clusterip: %v", err)
+	}
+
+	// mutate the Service to drop the ClusterIP, theoretically ClusterIP is inmutable but ...
+	service.Spec.ExternalName = "test"
+	service.Spec.Type = corev1.ServiceTypeExternalName
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		svc, err := serviceLister.Services(service.Namespace).Get(service.Name)
+		if svc == nil || err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Error waiting for test service without ClusterIP: %v", err)
+	}
+
+	// mutate the Service to get the ClusterIP again
+	service.Spec.ExternalName = ""
+	service.Spec.ClusterIP = ""
+	service.Spec.Type = corev1.ServiceTypeClusterIP
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		svc, err := serviceLister.Services(service.Namespace).Get(service.Name)
+		if svc == nil || err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Error waiting for test service with ClusterIP: %v", err)
+	}
+}
+
+// Repro https://github.com/kubernetes/kubernetes/issues/123853
+func Test_ServiceWatchUntil(t *testing.T) {
+	svcReadyTimeout := 30 * time.Second
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-watchuntil", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	testSvcName := "test-service-" + utilrand.String(5)
+	testSvcLabels := map[string]string{"test-service-static": "true"}
+	testSvcLabelsFlat := "test-service-static=true"
+
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = testSvcLabelsFlat
+			return client.CoreV1().Services(ns.Name).Watch(ctx, options)
+		},
+	}
+
+	svcList, err := client.CoreV1().Services("").List(ctx, metav1.ListOptions{LabelSelector: testSvcLabelsFlat})
+	if err != nil {
+		t.Fatalf("failed to list Services: %v", err)
+	}
+	// create  service
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   testSvcName,
+			Labels: testSvcLabels,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: "LoadBalancer",
+			Ports: []corev1.ServicePort{{
+				Name:       "http",
+				Protocol:   corev1.ProtocolTCP,
+				Port:       int32(80),
+				TargetPort: intstr.FromInt32(80),
+			}},
+			LoadBalancerClass: ptr.To[string]("example.com/internal-vip"),
+		},
+	}
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	ctxUntil, cancel := context.WithTimeout(ctx, svcReadyTimeout)
+	defer cancel()
+	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if svc, ok := event.Object.(*corev1.Service); ok {
+			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
+				svc.ObjectMeta.Namespace == ns.Name &&
+				svc.Labels["test-service-static"] == "true"
+			if !found {
+				t.Logf("observed Service %v in namespace %v with labels: %v & ports %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels, svc.Spec.Ports)
+				return false, nil
+			}
+			t.Logf("Found Service %v in namespace %v with labels: %v & ports %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels, svc.Spec.Ports)
+			return found, nil
+		}
+		t.Logf("Observed event: %+v", event.Object)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Error service not found: %v", err)
+	}
+
+	t.Log("patching the ServiceStatus")
+	lbStatus := corev1.LoadBalancerStatus{
+		Ingress: []corev1.LoadBalancerIngress{{IP: "203.0.113.1"}},
+	}
+	lbStatusJSON, err := json.Marshal(lbStatus)
+	if err != nil {
+		t.Fatalf("Error marshalling status: %v", err)
+	}
+	_, err = client.CoreV1().Services(ns.Name).Patch(ctx, testSvcName, types.MergePatchType,
+		[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":{"loadBalancer":`+string(lbStatusJSON)+`}}`),
+		metav1.PatchOptions{}, "status")
+	if err != nil {
+		t.Fatalf("Could not patch service status: %v", err)
+	}
+
+	t.Log("watching for the Service to be patched")
+	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
+	defer cancel()
+
+	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if svc, ok := event.Object.(*corev1.Service); ok {
+			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
+				svc.ObjectMeta.Namespace == ns.Name &&
+				svc.Annotations["patchedstatus"] == "true"
+			if !found {
+				t.Logf("observed Service %v in namespace %v with annotations: %v & LoadBalancer: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+				return false, nil
+			}
+			t.Logf("Found Service %v in namespace %v with annotations: %v & LoadBalancer: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+			return found, nil
+		}
+		t.Logf("Observed event: %+v", event.Object)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to locate Service %v in namespace %v", service.ObjectMeta.Name, ns)
+	}
+	t.Logf("Service %s has service status patched", testSvcName)
+
+	t.Log("updating the ServiceStatus")
+
+	var statusToUpdate, updatedStatus *corev1.Service
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		statusToUpdate, err = client.CoreV1().Services(ns.Name).Get(ctx, testSvcName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, metav1.Condition{
+			Type:    "StatusUpdate",
+			Status:  metav1.ConditionTrue,
+			Reason:  "E2E",
+			Message: "Set from e2e test",
+		})
+
+		updatedStatus, err = client.CoreV1().Services(ns.Name).UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
+		return err
+	})
+	if err != nil {
+		t.Fatalf("\n\n Failed to UpdateStatus. %v\n\n", err)
+	}
+	t.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+	t.Log("watching for the Service to be updated")
+	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
+	defer cancel()
+	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if svc, ok := event.Object.(*corev1.Service); ok {
+			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
+				svc.ObjectMeta.Namespace == ns.Name &&
+				svc.Annotations["patchedstatus"] == "true"
+			if !found {
+				t.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+				return false, nil
+			}
+			for _, cond := range svc.Status.Conditions {
+				if cond.Type == "StatusUpdate" &&
+					cond.Reason == "E2E" &&
+					cond.Message == "Set from e2e test" {
+					t.Logf("Found Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
+					return found, nil
+				} else {
+					t.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+					return false, nil
+				}
+			}
+		}
+		t.Logf("Observed event: %+v", event.Object)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to locate Service %v in namespace %v", service.ObjectMeta.Name, ns)
+	}
+	t.Logf("Service %s has service status updated", testSvcName)
+
+	t.Log("patching the service")
+	servicePatchPayload, err := json.Marshal(corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"test-service": "patched",
+			},
+		},
+	})
+
+	_, err = client.CoreV1().Services(ns.Name).Patch(ctx, testSvcName, types.StrategicMergePatchType, []byte(servicePatchPayload), metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("failed to patch service. %v", err)
+	}
+
+	t.Log("watching for the Service to be patched")
+	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
+	defer cancel()
+	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if svc, ok := event.Object.(*corev1.Service); ok {
+			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
+				svc.ObjectMeta.Namespace == ns.Name &&
+				svc.Labels["test-service"] == "patched"
+			if !found {
+				t.Logf("observed Service %v in namespace %v with labels: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels)
+				return false, nil
+			}
+			t.Logf("Found Service %v in namespace %v with labels: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels)
+			return found, nil
+		}
+		t.Logf("Observed event: %+v", event.Object)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to locate Service %v in namespace %v", service.ObjectMeta.Name, ns)
+	}
+
+	t.Logf("Service %s patched", testSvcName)
+
+	t.Log("deleting the service")
+	err = client.CoreV1().Services(ns.Name).Delete(ctx, testSvcName, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("failed to delete the Service. %v", err)
+	}
+
+	t.Log("watching for the Service to be deleted")
+	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
+	defer cancel()
+	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			if svc, ok := event.Object.(*corev1.Service); ok {
+				found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
+					svc.ObjectMeta.Namespace == ns.Name &&
+					svc.Labels["test-service-static"] == "true"
+				if !found {
+					t.Logf("observed Service %v in namespace %v with labels: %v & annotations: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels, svc.Annotations)
+					return false, nil
+				}
+				t.Logf("Found Service %v in namespace %v with labels: %v & annotations: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Labels, svc.Annotations)
+				return found, nil
+			}
+		default:
+			t.Logf("Observed event: %+v", event.Type)
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to delete Service %v in namespace %v", service.ObjectMeta.Name, ns)
+	}
+	t.Logf("Service %s deleted", testSvcName)
 }

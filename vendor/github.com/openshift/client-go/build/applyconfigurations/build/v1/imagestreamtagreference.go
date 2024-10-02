@@ -2,14 +2,14 @@
 
 package v1
 
-// ImageStreamTagReferenceApplyConfiguration represents an declarative configuration of the ImageStreamTagReference type for use
+// ImageStreamTagReferenceApplyConfiguration represents a declarative configuration of the ImageStreamTagReference type for use
 // with apply.
 type ImageStreamTagReferenceApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 	Name      *string `json:"name,omitempty"`
 }
 
-// ImageStreamTagReferenceApplyConfiguration constructs an declarative configuration of the ImageStreamTagReference type for use with
+// ImageStreamTagReferenceApplyConfiguration constructs a declarative configuration of the ImageStreamTagReference type for use with
 // apply.
 func ImageStreamTagReference() *ImageStreamTagReferenceApplyConfiguration {
 	return &ImageStreamTagReferenceApplyConfiguration{}

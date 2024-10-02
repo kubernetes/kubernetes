@@ -2,13 +2,13 @@
 
 package v1alpha1
 
-// DNSNameResolverStatusApplyConfiguration represents an declarative configuration of the DNSNameResolverStatus type for use
+// DNSNameResolverStatusApplyConfiguration represents a declarative configuration of the DNSNameResolverStatus type for use
 // with apply.
 type DNSNameResolverStatusApplyConfiguration struct {
 	ResolvedNames []DNSNameResolverResolvedNameApplyConfiguration `json:"resolvedNames,omitempty"`
 }
 
-// DNSNameResolverStatusApplyConfiguration constructs an declarative configuration of the DNSNameResolverStatus type for use with
+// DNSNameResolverStatusApplyConfiguration constructs a declarative configuration of the DNSNameResolverStatus type for use with
 // apply.
 func DNSNameResolverStatus() *DNSNameResolverStatusApplyConfiguration {
 	return &DNSNameResolverStatusApplyConfiguration{}

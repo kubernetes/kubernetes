@@ -2,7 +2,7 @@
 
 package v1
 
-// BuildVolumeApplyConfiguration represents an declarative configuration of the BuildVolume type for use
+// BuildVolumeApplyConfiguration represents a declarative configuration of the BuildVolume type for use
 // with apply.
 type BuildVolumeApplyConfiguration struct {
 	Name   *string                              `json:"name,omitempty"`
@@ -10,7 +10,7 @@ type BuildVolumeApplyConfiguration struct {
 	Mounts []BuildVolumeMountApplyConfiguration `json:"mounts,omitempty"`
 }
 
-// BuildVolumeApplyConfiguration constructs an declarative configuration of the BuildVolume type for use with
+// BuildVolumeApplyConfiguration constructs a declarative configuration of the BuildVolume type for use with
 // apply.
 func BuildVolume() *BuildVolumeApplyConfiguration {
 	return &BuildVolumeApplyConfiguration{}

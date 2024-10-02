@@ -2,7 +2,7 @@
 
 package v1
 
-// VSpherePlatformVCenterSpecApplyConfiguration represents an declarative configuration of the VSpherePlatformVCenterSpec type for use
+// VSpherePlatformVCenterSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformVCenterSpec type for use
 // with apply.
 type VSpherePlatformVCenterSpecApplyConfiguration struct {
 	Server      *string  `json:"server,omitempty"`
@@ -10,7 +10,7 @@ type VSpherePlatformVCenterSpecApplyConfiguration struct {
 	Datacenters []string `json:"datacenters,omitempty"`
 }
 
-// VSpherePlatformVCenterSpecApplyConfiguration constructs an declarative configuration of the VSpherePlatformVCenterSpec type for use with
+// VSpherePlatformVCenterSpecApplyConfiguration constructs a declarative configuration of the VSpherePlatformVCenterSpec type for use with
 // apply.
 func VSpherePlatformVCenterSpec() *VSpherePlatformVCenterSpecApplyConfiguration {
 	return &VSpherePlatformVCenterSpecApplyConfiguration{}

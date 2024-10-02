@@ -2,7 +2,7 @@
 
 package v1
 
-// OIDCClientConfigApplyConfiguration represents an declarative configuration of the OIDCClientConfig type for use
+// OIDCClientConfigApplyConfiguration represents a declarative configuration of the OIDCClientConfig type for use
 // with apply.
 type OIDCClientConfigApplyConfiguration struct {
 	ComponentName      *string                                `json:"componentName,omitempty"`
@@ -12,7 +12,7 @@ type OIDCClientConfigApplyConfiguration struct {
 	ExtraScopes        []string                               `json:"extraScopes,omitempty"`
 }
 
-// OIDCClientConfigApplyConfiguration constructs an declarative configuration of the OIDCClientConfig type for use with
+// OIDCClientConfigApplyConfiguration constructs a declarative configuration of the OIDCClientConfig type for use with
 // apply.
 func OIDCClientConfig() *OIDCClientConfigApplyConfiguration {
 	return &OIDCClientConfigApplyConfiguration{}

@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// NetworkDiagnosticsApplyConfiguration represents an declarative configuration of the NetworkDiagnostics type for use
+// NetworkDiagnosticsApplyConfiguration represents a declarative configuration of the NetworkDiagnostics type for use
 // with apply.
 type NetworkDiagnosticsApplyConfiguration struct {
 	Mode            *v1.NetworkDiagnosticsMode                           `json:"mode,omitempty"`
@@ -14,7 +14,7 @@ type NetworkDiagnosticsApplyConfiguration struct {
 	TargetPlacement *NetworkDiagnosticsTargetPlacementApplyConfiguration `json:"targetPlacement,omitempty"`
 }
 
-// NetworkDiagnosticsApplyConfiguration constructs an declarative configuration of the NetworkDiagnostics type for use with
+// NetworkDiagnosticsApplyConfiguration constructs a declarative configuration of the NetworkDiagnostics type for use with
 // apply.
 func NetworkDiagnostics() *NetworkDiagnosticsApplyConfiguration {
 	return &NetworkDiagnosticsApplyConfiguration{}

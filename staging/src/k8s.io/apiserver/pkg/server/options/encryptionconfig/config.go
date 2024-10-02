@@ -130,7 +130,7 @@ func init() {
 	configScheme := runtime.NewScheme()
 	utilruntime.Must(apiserver.AddToScheme(configScheme))
 	utilruntime.Must(apiserverv1.AddToScheme(configScheme))
-	codecs = serializer.NewCodecFactory(configScheme)
+	codecs = serializer.NewCodecFactory(configScheme, serializer.EnableStrict)
 	envelopemetrics.RegisterMetrics()
 	storagevalue.RegisterMetrics()
 	metrics.RegisterMetrics()

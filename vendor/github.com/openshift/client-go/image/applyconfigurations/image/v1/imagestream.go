@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageStreamApplyConfiguration represents an declarative configuration of the ImageStream type for use
+// ImageStreamApplyConfiguration represents a declarative configuration of the ImageStream type for use
 // with apply.
 type ImageStreamApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ImageStreamApplyConfiguration struct {
 	Status                           *ImageStreamStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ImageStream constructs an declarative configuration of the ImageStream type for use with
+// ImageStream constructs a declarative configuration of the ImageStream type for use with
 // apply.
 func ImageStream(name, namespace string) *ImageStreamApplyConfiguration {
 	b := &ImageStreamApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *ImageStreamApplyConfiguration) WithSpec(value *ImageStreamSpecApplyConf
 func (b *ImageStreamApplyConfiguration) WithStatus(value *ImageStreamStatusApplyConfiguration) *ImageStreamApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImageStreamApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

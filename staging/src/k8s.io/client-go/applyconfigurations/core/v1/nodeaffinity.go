@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// NodeAffinityApplyConfiguration represents an declarative configuration of the NodeAffinity type for use
+// NodeAffinityApplyConfiguration represents a declarative configuration of the NodeAffinity type for use
 // with apply.
 type NodeAffinityApplyConfiguration struct {
 	RequiredDuringSchedulingIgnoredDuringExecution  *NodeSelectorApplyConfiguration             `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
 	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTermApplyConfiguration `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
 }
 
-// NodeAffinityApplyConfiguration constructs an declarative configuration of the NodeAffinity type for use with
+// NodeAffinityApplyConfiguration constructs a declarative configuration of the NodeAffinity type for use with
 // apply.
 func NodeAffinity() *NodeAffinityApplyConfiguration {
 	return &NodeAffinityApplyConfiguration{}

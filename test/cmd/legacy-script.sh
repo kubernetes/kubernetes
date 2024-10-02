@@ -526,6 +526,14 @@ runTests() {
     record_command run_ambiguous_shortname_tests
   fi
 
+  ################
+  # Explain crd  #
+  ################
+
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_explain_crd_with_additional_properties_tests
+  fi
+
   #########################
   # Assert categories     #
   #########################
@@ -1038,6 +1046,7 @@ runTests() {
     record_command run_kubectl_debug_baseline_tests
     record_command run_kubectl_debug_restricted_tests
     record_command run_kubectl_debug_netadmin_tests
+    record_command run_kubectl_debug_custom_profile_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests

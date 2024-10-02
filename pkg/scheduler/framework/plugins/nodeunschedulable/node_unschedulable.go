@@ -48,10 +48,10 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *NodeUnschedulable) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by

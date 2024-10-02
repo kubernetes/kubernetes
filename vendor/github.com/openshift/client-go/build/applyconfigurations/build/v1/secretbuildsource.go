@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// SecretBuildSourceApplyConfiguration represents an declarative configuration of the SecretBuildSource type for use
+// SecretBuildSourceApplyConfiguration represents a declarative configuration of the SecretBuildSource type for use
 // with apply.
 type SecretBuildSourceApplyConfiguration struct {
 	Secret         *v1.LocalObjectReference `json:"secret,omitempty"`
 	DestinationDir *string                  `json:"destinationDir,omitempty"`
 }
 
-// SecretBuildSourceApplyConfiguration constructs an declarative configuration of the SecretBuildSource type for use with
+// SecretBuildSourceApplyConfiguration constructs a declarative configuration of the SecretBuildSource type for use with
 // apply.
 func SecretBuildSource() *SecretBuildSourceApplyConfiguration {
 	return &SecretBuildSourceApplyConfiguration{}

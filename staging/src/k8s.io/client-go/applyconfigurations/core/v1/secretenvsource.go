@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// SecretEnvSourceApplyConfiguration represents an declarative configuration of the SecretEnvSource type for use
+// SecretEnvSourceApplyConfiguration represents a declarative configuration of the SecretEnvSource type for use
 // with apply.
 type SecretEnvSourceApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
 	Optional                               *bool `json:"optional,omitempty"`
 }
 
-// SecretEnvSourceApplyConfiguration constructs an declarative configuration of the SecretEnvSource type for use with
+// SecretEnvSourceApplyConfiguration constructs a declarative configuration of the SecretEnvSource type for use with
 // apply.
 func SecretEnvSource() *SecretEnvSourceApplyConfiguration {
 	return &SecretEnvSourceApplyConfiguration{}

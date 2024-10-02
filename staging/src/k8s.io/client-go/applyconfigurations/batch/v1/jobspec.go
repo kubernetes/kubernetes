@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// JobSpecApplyConfiguration represents an declarative configuration of the JobSpec type for use
+// JobSpecApplyConfiguration represents a declarative configuration of the JobSpec type for use
 // with apply.
 type JobSpecApplyConfiguration struct {
 	Parallelism             *int32                                    `json:"parallelism,omitempty"`
@@ -45,7 +45,7 @@ type JobSpecApplyConfiguration struct {
 	ManagedBy               *string                                   `json:"managedBy,omitempty"`
 }
 
-// JobSpecApplyConfiguration constructs an declarative configuration of the JobSpec type for use with
+// JobSpecApplyConfiguration constructs a declarative configuration of the JobSpec type for use with
 // apply.
 func JobSpec() *JobSpecApplyConfiguration {
 	return &JobSpecApplyConfiguration{}

@@ -50,8 +50,8 @@ func (m *Visitor) visitStructural(s *Structural) bool {
 			s.Properties[k] = v
 		}
 	}
-	if s.Generic.AdditionalProperties != nil && s.Generic.AdditionalProperties.Structural != nil {
-		m.visitStructural(s.Generic.AdditionalProperties.Structural)
+	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
+		m.visitStructural(s.AdditionalProperties.Structural)
 	}
 	if s.ValueValidation != nil {
 		for i := range s.ValueValidation.AllOf {
@@ -86,8 +86,8 @@ func (m *Visitor) visitNestedValueValidation(vv *NestedValueValidation) bool {
 			vv.Properties[k] = v
 		}
 	}
-	if vv.ForbiddenGenerics.AdditionalProperties != nil && vv.ForbiddenGenerics.AdditionalProperties.Structural != nil {
-		m.visitStructural(vv.ForbiddenGenerics.AdditionalProperties.Structural)
+	if vv.AdditionalProperties != nil {
+		m.visitNestedValueValidation(vv.AdditionalProperties)
 	}
 	for i := range vv.ValueValidation.AllOf {
 		m.visitNestedValueValidation(&vv.ValueValidation.AllOf[i])

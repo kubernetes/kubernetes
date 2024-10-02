@@ -18,7 +18,7 @@ package clusterinfo
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -60,7 +60,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	fullPath := path.Join(dir, file) + extension
+	fullPath := filepath.Join(dir, file) + extension
 	defer os.RemoveAll(dir)
 
 	_, _, buf, _ := genericiooptions.NewTestIOStreams()

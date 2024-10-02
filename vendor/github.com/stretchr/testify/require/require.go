@@ -1,7 +1,4 @@
-/*
-* CODE GENERATED AUTOMATICALLY WITH github.com/stretchr/testify/_codegen
-* THIS FILE MUST NOT BE EDITED BY HAND
- */
+// Code generated with github.com/stretchr/testify/_codegen; DO NOT EDIT.
 
 package require
 
@@ -235,7 +232,7 @@ func EqualExportedValuesf(t TestingT, expected interface{}, actual interface{}, 
 	t.FailNow()
 }
 
-// EqualValues asserts that two objects are equal or convertable to the same types
+// EqualValues asserts that two objects are equal or convertible to the same types
 // and equal.
 //
 //	assert.EqualValues(t, uint32(123), int32(123))
@@ -249,7 +246,7 @@ func EqualValues(t TestingT, expected interface{}, actual interface{}, msgAndArg
 	t.FailNow()
 }
 
-// EqualValuesf asserts that two objects are equal or convertable to the same types
+// EqualValuesf asserts that two objects are equal or convertible to the same types
 // and equal.
 //
 //	assert.EqualValuesf(t, uint32(123), int32(123), "error message %s", "formatted")
@@ -1546,6 +1543,32 @@ func NotErrorIsf(t TestingT, err error, target error, msg string, args ...interf
 	t.FailNow()
 }
 
+// NotImplements asserts that an object does not implement the specified interface.
+//
+//	assert.NotImplements(t, (*MyInterface)(nil), new(MyObject))
+func NotImplements(t TestingT, interfaceObject interface{}, object interface{}, msgAndArgs ...interface{}) {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if assert.NotImplements(t, interfaceObject, object, msgAndArgs...) {
+		return
+	}
+	t.FailNow()
+}
+
+// NotImplementsf asserts that an object does not implement the specified interface.
+//
+//	assert.NotImplementsf(t, (*MyInterface)(nil), new(MyObject), "error message %s", "formatted")
+func NotImplementsf(t TestingT, interfaceObject interface{}, object interface{}, msg string, args ...interface{}) {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	if assert.NotImplementsf(t, interfaceObject, object, msg, args...) {
+		return
+	}
+	t.FailNow()
+}
+
 // NotNil asserts that the specified object is not nil.
 //
 //	assert.NotNil(t, err)
@@ -1658,10 +1681,12 @@ func NotSamef(t TestingT, expected interface{}, actual interface{}, msg string, 
 	t.FailNow()
 }
 
-// NotSubset asserts that the specified list(array, slice...) contains not all
-// elements given in the specified subset(array, slice...).
+// NotSubset asserts that the specified list(array, slice...) or map does NOT
+// contain all elements given in the specified subset list(array, slice...) or
+// map.
 //
-//	assert.NotSubset(t, [1, 3, 4], [1, 2], "But [1, 3, 4] does not contain [1, 2]")
+//	assert.NotSubset(t, [1, 3, 4], [1, 2])
+//	assert.NotSubset(t, {"x": 1, "y": 2}, {"z": 3})
 func NotSubset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1672,10 +1697,12 @@ func NotSubset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...i
 	t.FailNow()
 }
 
-// NotSubsetf asserts that the specified list(array, slice...) contains not all
-// elements given in the specified subset(array, slice...).
+// NotSubsetf asserts that the specified list(array, slice...) or map does NOT
+// contain all elements given in the specified subset list(array, slice...) or
+// map.
 //
-//	assert.NotSubsetf(t, [1, 3, 4], [1, 2], "But [1, 3, 4] does not contain [1, 2]", "error message %s", "formatted")
+//	assert.NotSubsetf(t, [1, 3, 4], [1, 2], "error message %s", "formatted")
+//	assert.NotSubsetf(t, {"x": 1, "y": 2}, {"z": 3}, "error message %s", "formatted")
 func NotSubsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1880,10 +1907,11 @@ func Samef(t TestingT, expected interface{}, actual interface{}, msg string, arg
 	t.FailNow()
 }
 
-// Subset asserts that the specified list(array, slice...) contains all
-// elements given in the specified subset(array, slice...).
+// Subset asserts that the specified list(array, slice...) or map contains all
+// elements given in the specified subset list(array, slice...) or map.
 //
-//	assert.Subset(t, [1, 2, 3], [1, 2], "But [1, 2, 3] does contain [1, 2]")
+//	assert.Subset(t, [1, 2, 3], [1, 2])
+//	assert.Subset(t, {"x": 1, "y": 2}, {"x": 1})
 func Subset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1894,10 +1922,11 @@ func Subset(t TestingT, list interface{}, subset interface{}, msgAndArgs ...inte
 	t.FailNow()
 }
 
-// Subsetf asserts that the specified list(array, slice...) contains all
-// elements given in the specified subset(array, slice...).
+// Subsetf asserts that the specified list(array, slice...) or map contains all
+// elements given in the specified subset list(array, slice...) or map.
 //
-//	assert.Subsetf(t, [1, 2, 3], [1, 2], "But [1, 2, 3] does contain [1, 2]", "error message %s", "formatted")
+//	assert.Subsetf(t, [1, 2, 3], [1, 2], "error message %s", "formatted")
+//	assert.Subsetf(t, {"x": 1, "y": 2}, {"x": 1}, "error message %s", "formatted")
 func Subsetf(t TestingT, list interface{}, subset interface{}, msg string, args ...interface{}) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()

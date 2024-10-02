@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// IBMCloudPlatformStatusApplyConfiguration represents an declarative configuration of the IBMCloudPlatformStatus type for use
+// IBMCloudPlatformStatusApplyConfiguration represents a declarative configuration of the IBMCloudPlatformStatus type for use
 // with apply.
 type IBMCloudPlatformStatusApplyConfiguration struct {
 	Location          *string                                     `json:"location,omitempty"`
@@ -17,7 +17,7 @@ type IBMCloudPlatformStatusApplyConfiguration struct {
 	ServiceEndpoints  []IBMCloudServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
 }
 
-// IBMCloudPlatformStatusApplyConfiguration constructs an declarative configuration of the IBMCloudPlatformStatus type for use with
+// IBMCloudPlatformStatusApplyConfiguration constructs a declarative configuration of the IBMCloudPlatformStatus type for use with
 // apply.
 func IBMCloudPlatformStatus() *IBMCloudPlatformStatusApplyConfiguration {
 	return &IBMCloudPlatformStatusApplyConfiguration{}

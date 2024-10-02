@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// VolumeMountApplyConfiguration represents an declarative configuration of the VolumeMount type for use
+// VolumeMountApplyConfiguration represents a declarative configuration of the VolumeMount type for use
 // with apply.
 type VolumeMountApplyConfiguration struct {
 	Name              *string                   `json:"name,omitempty"`
@@ -34,7 +34,7 @@ type VolumeMountApplyConfiguration struct {
 	SubPathExpr       *string                   `json:"subPathExpr,omitempty"`
 }
 
-// VolumeMountApplyConfiguration constructs an declarative configuration of the VolumeMount type for use with
+// VolumeMountApplyConfiguration constructs a declarative configuration of the VolumeMount type for use with
 // apply.
 func VolumeMount() *VolumeMountApplyConfiguration {
 	return &VolumeMountApplyConfiguration{}

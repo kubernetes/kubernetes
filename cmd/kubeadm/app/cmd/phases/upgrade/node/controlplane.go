@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -79,10 +78,8 @@ func runControlPlane() func(c workflow.RunData) error {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 
-		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
-			if err := upgrade.PerformAddonsUpgrade(client, cfg, data.OutputWriter()); err != nil {
-				return errors.Wrap(err, "failed to perform addons upgrade")
-			}
+		if err := upgrade.PerformAddonsUpgrade(client, cfg, data.PatchesDir(), data.OutputWriter()); err != nil {
+			return errors.Wrap(err, "failed to perform addons upgrade")
 		}
 
 		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")

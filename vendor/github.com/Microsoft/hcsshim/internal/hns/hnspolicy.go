@@ -56,9 +56,10 @@ type PaPolicy struct {
 
 type OutboundNatPolicy struct {
 	Policy
-	VIP          string   `json:"VIP,omitempty"`
-	Exceptions   []string `json:"ExceptionList,omitempty"`
-	Destinations []string `json:",omitempty"`
+	VIP              string   `json:"VIP,omitempty"`
+	Exceptions       []string `json:"ExceptionList,omitempty"`
+	Destinations     []string `json:",omitempty"`
+	MaxPortPoolUsage uint16   `json:",omitempty"`
 }
 
 type ProxyPolicy struct {

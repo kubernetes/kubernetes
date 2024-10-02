@@ -67,26 +67,3 @@ func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaS
 	}
 	return nil
 }
-
-func UpdateReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*apps.ReplicaSet, error) {
-	var rs *apps.ReplicaSet
-	var updateErr error
-	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		var err error
-		if rs, err = c.AppsV1().ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(rs)
-		if rs, err = c.AppsV1().ReplicaSets(namespace).UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{}); err == nil {
-			logf("Updating replica set %q", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if wait.Interrupted(pollErr) {
-		pollErr = fmt.Errorf("couldn't apply the provided update to replicaset %q: %v", name, updateErr)
-	}
-	return rs, pollErr
-}

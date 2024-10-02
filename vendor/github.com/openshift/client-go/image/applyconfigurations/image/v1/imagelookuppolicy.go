@@ -2,13 +2,13 @@
 
 package v1
 
-// ImageLookupPolicyApplyConfiguration represents an declarative configuration of the ImageLookupPolicy type for use
+// ImageLookupPolicyApplyConfiguration represents a declarative configuration of the ImageLookupPolicy type for use
 // with apply.
 type ImageLookupPolicyApplyConfiguration struct {
 	Local *bool `json:"local,omitempty"`
 }
 
-// ImageLookupPolicyApplyConfiguration constructs an declarative configuration of the ImageLookupPolicy type for use with
+// ImageLookupPolicyApplyConfiguration constructs a declarative configuration of the ImageLookupPolicy type for use with
 // apply.
 func ImageLookupPolicy() *ImageLookupPolicyApplyConfiguration {
 	return &ImageLookupPolicyApplyConfiguration{}

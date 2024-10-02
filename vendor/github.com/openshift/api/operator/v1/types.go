@@ -127,8 +127,17 @@ type OperatorStatus struct {
 	// readyReplicas indicates how many replicas are ready and at the desired state
 	ReadyReplicas int32 `json:"readyReplicas"`
 
+	// latestAvailableRevision is the deploymentID of the most recent deployment
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self >= oldSelf",message="must only increase"
+	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitempty"`
+
 	// generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=group
+	// +listMapKey=resource
+	// +listMapKey=namespace
+	// +listMapKey=name
 	// +optional
 	Generations []GenerationStatus `json:"generations,omitempty"`
 }
@@ -136,12 +145,16 @@ type OperatorStatus struct {
 // GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
 type GenerationStatus struct {
 	// group is the group of the thing you're tracking
+	// +kubebuilder:validation:Required
 	Group string `json:"group"`
 	// resource is the resource type of the thing you're tracking
+	// +kubebuilder:validation:Required
 	Resource string `json:"resource"`
 	// namespace is where the thing you're tracking is
+	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
 	// name is the name of the thing you're tracking
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// lastGeneration is the last generation of the workload controller involved
 	LastGeneration int64 `json:"lastGeneration"`
@@ -202,10 +215,6 @@ type StaticPodOperatorSpec struct {
 // node status must be tracked.
 type StaticPodOperatorStatus struct {
 	OperatorStatus `json:",inline"`
-
-	// latestAvailableRevision is the deploymentID of the most recent deployment
-	// +optional
-	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitempty"`
 
 	// latestAvailableRevisionReason describe the detailed reason for the most recent deployment
 	// +optional

@@ -39,7 +39,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -108,334 +108,334 @@ func Test_platformApplyDefaults(t *testing.T) {
 	}
 }
 
-func Test_getLocalDetector(t *testing.T) {
+func Test_getLocalDetectors(t *testing.T) {
 	cases := []struct {
-		name         string
-		mode         proxyconfigapi.LocalMode
-		config       *proxyconfigapi.KubeProxyConfiguration
-		family       v1.IPFamily
-		expected     proxyutiliptables.LocalTrafficDetector
-		nodePodCIDRs []string
-		errExpected  bool
+		name            string
+		config          *proxyconfigapi.KubeProxyConfiguration
+		primaryIPFamily v1.IPFamily
+		nodePodCIDRs    []string
+		expected        map[v1.IPFamily]proxyutil.LocalTrafficDetector
 	}{
 		// LocalModeClusterCIDR
 		{
-			name:        "LocalModeClusterCIDR, IPv4 cluster",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14")),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, single-stack IPv4 cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		{
-			name:        "LocalModeClusterCIDR, IPv6 cluster",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			family:      v1.IPv6Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002:0:0:1234::/64")),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, single-stack IPv6 cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
+			},
 		},
 		{
-			name:        "LocalModeClusterCIDR, IPv6 cluster with IPv6 config",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			family:      v1.IPv6Protocol,
-			expected:    proxyutiliptables.NewNoOpLocalDetector(),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			// This will output a warning that there is no IPv6 CIDR but it
+			// will still use the provided IPv4 CIDR for IPv4.
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		{
-			name:        "LocalModeClusterCIDR, IPv4 cluster with IPv6 config",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			family:      v1.IPv4Protocol,
-			expected:    proxyutiliptables.NewNoOpLocalDetector(),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			// This will output a warning that there is no IPv4 CIDR but it
+			// will still use the provided IPv6 CIDR for IPv6.
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
+			},
 		},
 		{
-			name:        "LocalModeClusterCIDR, IPv4 kube-proxy in dual-stack IPv6-primary cluster",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64,10.0.0.0/14"},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14")),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, dual-stack IPv4-primary cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
+			},
 		},
 		{
-			name:        "LocalModeClusterCIDR, no ClusterCIDR",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			family:      v1.IPv4Protocol,
-			expected:    proxyutiliptables.NewNoOpLocalDetector(),
-			errExpected: false,
+			name: "LocalModeClusterCIDR, dual-stack IPv6-primary cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
+			},
+		},
+		{
+			name: "LocalModeClusterCIDR, IPv4-primary kube-proxy / IPv6-primary config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/14"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002:0:0:1234::/64"),
+			},
+		},
+		{
+			name: "LocalModeClusterCIDR, no ClusterCIDR",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{""},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		// LocalModeNodeCIDR
 		{
-			name:         "LocalModeNodeCIDR, IPv4 cluster",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			family:       v1.IPv4Protocol,
-			expected:     resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24")),
-			nodePodCIDRs: []string{"10.0.0.0/24"},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, single-stack IPv4 cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			nodePodCIDRs:    []string{"10.0.0.0/24"},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 cluster",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			family:       v1.IPv6Protocol,
-			expected:     resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96")),
-			nodePodCIDRs: []string{"2002::1234:abcd:ffff:0:0/96"},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, single-stack IPv6 cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			nodePodCIDRs:    []string{"2002::1234:abcd:ffff:0:0/96"},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
+			},
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 cluster with IPv4 config",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			family:       v1.IPv6Protocol,
-			expected:     proxyutiliptables.NewNoOpLocalDetector(),
-			nodePodCIDRs: []string{"10.0.0.0/24"},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, single-stack IPv6 cluster with single-stack IPv4 config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			nodePodCIDRs:    []string{"10.0.0.0/24"},
+			// This will output a warning that there is no IPv6 CIDR but it
+			// will still use the provided IPv4 CIDR for IPv4.
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv4 cluster with IPv6 config",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			family:       v1.IPv4Protocol,
-			expected:     proxyutiliptables.NewNoOpLocalDetector(),
-			nodePodCIDRs: []string{"2002::1234:abcd:ffff:0:0/96"},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, single-stack IPv4 cluster with single-stack IPv6 config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			nodePodCIDRs:    []string{"2002::1234:abcd:ffff:0:0/96"},
+			// This will output a warning that there is no IPv4 CIDR but it
+			// will still use the provided IPv6 CIDR for IPv6.
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
+			},
 		},
 		{
-			name:         "LocalModeNodeCIDR, IPv6 kube-proxy in dual-stack IPv4-primary cluster",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14,2002:0:0:1234::/64"},
-			family:       v1.IPv6Protocol,
-			expected:     resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96")),
-			nodePodCIDRs: []string{"10.0.0.0/24", "2002::1234:abcd:ffff:0:0/96"},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, dual-stack IPv4-primary cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			nodePodCIDRs:    []string{"10.0.0.0/24", "2002::1234:abcd:ffff:0:0/96"},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
+			},
 		},
 		{
-			name:         "LocalModeNodeCIDR, no PodCIDRs",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			family:       v1.IPv4Protocol,
-			expected:     proxyutiliptables.NewNoOpLocalDetector(),
-			nodePodCIDRs: []string{},
-			errExpected:  false,
+			name: "LocalModeNodeCIDR, dual-stack IPv6-primary cluster",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"2002:0:0:1234::/64", "10.0.0.0/14"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			nodePodCIDRs:    []string{"2002::1234:abcd:ffff:0:0/96", "10.0.0.0/24"},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
+			},
+		},
+		{
+			name: "LocalModeNodeCIDR, IPv6-primary kube-proxy / IPv4-primary config",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14", "2002:0:0:1234::/64"},
+				},
+			},
+			primaryIPFamily: v1.IPv6Protocol,
+			nodePodCIDRs:    []string{"10.0.0.0/24", "2002::1234:abcd:ffff:0:0/96"},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByCIDR("10.0.0.0/24"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"),
+			},
+		},
+		{
+			name: "LocalModeNodeCIDR, no PodCIDRs",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{""},
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			nodePodCIDRs:    []string{},
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
+			},
 		},
 		// unknown mode
 		{
-			name:        "unknown LocalMode",
-			mode:        proxyconfigapi.LocalMode("abcd"),
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			family:      v1.IPv4Protocol,
-			expected:    proxyutiliptables.NewNoOpLocalDetector(),
-			errExpected: false,
-		},
-		// LocalModeBridgeInterface
-		{
-			name: "LocalModeBrideInterface",
-			mode: proxyconfigapi.LocalModeBridgeInterface,
+			name: "unknown LocalMode",
 			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: "eth"},
+				DetectLocalMode: proxyconfigapi.LocalMode("abcd"),
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					ClusterCIDRs: []string{"10.0.0.0/14"},
+				},
 			},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByBridgeInterface("eth")),
-			errExpected: false,
-		},
-		{
-			name: "LocalModeBridgeInterface, strange bridge name",
-			mode: proxyconfigapi.LocalModeBridgeInterface,
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: "1234567890123456789"},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
+				v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
 			},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByBridgeInterface("1234567890123456789")),
-			errExpected: false,
-		},
-		// LocalModeInterfaceNamePrefix
-		{
-			name: "LocalModeInterfaceNamePrefix",
-			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{InterfaceNamePrefix: "eth"},
-			},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("eth")),
-			errExpected: false,
-		},
-		{
-			name: "LocalModeInterfaceNamePrefix, strange interface name",
-			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
-			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{InterfaceNamePrefix: "1234567890123456789"},
-			},
-			family:      v1.IPv4Protocol,
-			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("1234567890123456789")),
-			errExpected: false,
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			r, err := getLocalDetector(logger, c.family, c.mode, c.config, c.nodePodCIDRs)
-			if c.errExpected {
-				if err == nil {
-					t.Errorf("Expected error, but succeeded with %v", r)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("Error resolving detect-local: %v", err)
-				return
-			}
-			if !reflect.DeepEqual(r, c.expected) {
-				t.Errorf("Unexpected detect-local implementation, expected: %q, got: %q", c.expected, r)
-			}
-		})
-	}
-}
-
-func Test_getDualStackLocalDetectorTuple(t *testing.T) {
-	cases := []struct {
-		name         string
-		mode         proxyconfigapi.LocalMode
-		config       *proxyconfigapi.KubeProxyConfiguration
-		expected     [2]proxyutiliptables.LocalTrafficDetector
-		nodePodCIDRs []string
-		errExpected  bool
-	}{
-		// LocalModeClusterCIDR
-		{
-			name:   "LocalModeClusterCIDR, dual-stack IPv4-primary cluster",
-			mode:   proxyconfigapi.LocalModeClusterCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14,2002:0:0:1234::/64"},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14"))(
-				proxyutiliptables.NewDetectLocalByCIDR("2002:0:0:1234::/64")),
-			errExpected: false,
-		},
-		{
-			name:   "LocalModeClusterCIDR, dual-stack IPv6-primary cluster",
-			mode:   proxyconfigapi.LocalModeClusterCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64,10.0.0.0/14"},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14"))(
-				proxyutiliptables.NewDetectLocalByCIDR("2002:0:0:1234::/64")),
-			errExpected: false,
-		},
-		{
-			name:   "LocalModeClusterCIDR, single-stack IPv4 cluster",
-			mode:   proxyconfigapi.LocalModeClusterCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			expected: [2]proxyutiliptables.LocalTrafficDetector{
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/14")),
-				proxyutiliptables.NewNoOpLocalDetector()},
-			errExpected: false,
-		},
-		{
-			name:   "LocalModeClusterCIDR, single-stack IPv6 cluster",
-			mode:   proxyconfigapi.LocalModeClusterCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			expected: [2]proxyutiliptables.LocalTrafficDetector{
-				proxyutiliptables.NewNoOpLocalDetector(),
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002:0:0:1234::/64"))},
-			errExpected: false,
-		},
-		{
-			name:        "LocalModeClusterCIDR, no ClusterCIDR",
-			mode:        proxyconfigapi.LocalModeClusterCIDR,
-			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
-			errExpected: false,
-		},
-		// LocalModeNodeCIDR
-		{
-			name:   "LocalModeNodeCIDR, dual-stack IPv4-primary cluster",
-			mode:   proxyconfigapi.LocalModeNodeCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14,2002:0:0:1234::/64"},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24"))(
-				proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96")),
-			nodePodCIDRs: []string{"10.0.0.0/24", "2002::1234:abcd:ffff:0:0/96"},
-			errExpected:  false,
-		},
-		{
-			name:   "LocalModeNodeCIDR, dual-stack IPv6-primary cluster",
-			mode:   proxyconfigapi.LocalModeNodeCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64,10.0.0.0/14"},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24"))(
-				proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96")),
-			nodePodCIDRs: []string{"2002::1234:abcd:ffff:0:0/96", "10.0.0.0/24"},
-			errExpected:  false,
-		},
-		{
-			name:   "LocalModeNodeCIDR, single-stack IPv4 cluster",
-			mode:   proxyconfigapi.LocalModeNodeCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "10.0.0.0/14"},
-			expected: [2]proxyutiliptables.LocalTrafficDetector{
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("10.0.0.0/24")),
-				proxyutiliptables.NewNoOpLocalDetector()},
-			nodePodCIDRs: []string{"10.0.0.0/24"},
-			errExpected:  false,
-		},
-		{
-			name:   "LocalModeNodeCIDR, single-stack IPv6 cluster",
-			mode:   proxyconfigapi.LocalModeNodeCIDR,
-			config: &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: "2002:0:0:1234::/64"},
-			expected: [2]proxyutiliptables.LocalTrafficDetector{
-				proxyutiliptables.NewNoOpLocalDetector(),
-				resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByCIDR("2002::1234:abcd:ffff:0:0/96"))},
-			nodePodCIDRs: []string{"2002::1234:abcd:ffff:0:0/96"},
-			errExpected:  false,
-		},
-		{
-			name:         "LocalModeNodeCIDR, no PodCIDRs",
-			mode:         proxyconfigapi.LocalModeNodeCIDR,
-			config:       &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
-			expected:     [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
-			nodePodCIDRs: []string{},
-			errExpected:  false,
 		},
 		// LocalModeBridgeInterface
 		{
 			name: "LocalModeBridgeInterface",
-			mode: proxyconfigapi.LocalModeBridgeInterface,
 			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{BridgeInterface: "eth"},
+				DetectLocalMode: proxyconfigapi.LocalModeBridgeInterface,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					BridgeInterface: "eth",
+				},
 			},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByBridgeInterface("eth"))(
-				proxyutiliptables.NewDetectLocalByBridgeInterface("eth")),
-			errExpected: false,
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByBridgeInterface("eth"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByBridgeInterface("eth"),
+			},
+		},
+		{
+			name: "LocalModeBridgeInterface, strange bridge name",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeBridgeInterface,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					BridgeInterface: "1234567890123456789",
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByBridgeInterface("1234567890123456789"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByBridgeInterface("1234567890123456789"),
+			},
 		},
 		// LocalModeInterfaceNamePrefix
 		{
 			name: "LocalModeInterfaceNamePrefix",
-			mode: proxyconfigapi.LocalModeInterfaceNamePrefix,
 			config: &proxyconfigapi.KubeProxyConfiguration{
-				DetectLocal: proxyconfigapi.DetectLocalConfiguration{InterfaceNamePrefix: "veth"},
+				DetectLocalMode: proxyconfigapi.LocalModeInterfaceNamePrefix,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					InterfaceNamePrefix: "eth",
+				},
 			},
-			expected: resolveDualStackLocalDetectors(t)(
-				proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("veth"))(
-				proxyutiliptables.NewDetectLocalByInterfaceNamePrefix("veth")),
-			errExpected: false,
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByInterfaceNamePrefix("eth"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByInterfaceNamePrefix("eth"),
+			},
+		},
+		{
+			name: "LocalModeInterfaceNamePrefix, strange interface name",
+			config: &proxyconfigapi.KubeProxyConfiguration{
+				DetectLocalMode: proxyconfigapi.LocalModeInterfaceNamePrefix,
+				DetectLocal: proxyconfigapi.DetectLocalConfiguration{
+					InterfaceNamePrefix: "1234567890123456789",
+				},
+			},
+			primaryIPFamily: v1.IPv4Protocol,
+			expected: map[v1.IPFamily]proxyutil.LocalTrafficDetector{
+				v1.IPv4Protocol: proxyutil.NewDetectLocalByInterfaceNamePrefix("1234567890123456789"),
+				v1.IPv6Protocol: proxyutil.NewDetectLocalByInterfaceNamePrefix("1234567890123456789"),
+			},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			r, err := getDualStackLocalDetectorTuple(logger, c.mode, c.config, c.nodePodCIDRs)
-			if c.errExpected {
-				if err == nil {
-					t.Errorf("Expected error, but succeeded with %q", r)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("Error resolving detect-local: %v", err)
-				return
-			}
+			r := getLocalDetectors(logger, c.primaryIPFamily, c.config, c.nodePodCIDRs)
 			if !reflect.DeepEqual(r, c.expected) {
 				t.Errorf("Unexpected detect-local implementation, expected: %q, got: %q", c.expected, r)
 			}
@@ -452,32 +452,6 @@ func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
 			PodCIDR:  cidrs[0],
 			PodCIDRs: cidrs,
 		},
-	}
-}
-
-func resolveLocalDetector(t *testing.T) func(proxyutiliptables.LocalTrafficDetector, error) proxyutiliptables.LocalTrafficDetector {
-	return func(localDetector proxyutiliptables.LocalTrafficDetector, err error) proxyutiliptables.LocalTrafficDetector {
-		t.Helper()
-		if err != nil {
-			t.Fatalf("Error resolving detect-local: %v", err)
-		}
-		return localDetector
-	}
-}
-
-func resolveDualStackLocalDetectors(t *testing.T) func(localDetector proxyutiliptables.LocalTrafficDetector, err1 error) func(proxyutiliptables.LocalTrafficDetector, error) [2]proxyutiliptables.LocalTrafficDetector {
-	return func(localDetector proxyutiliptables.LocalTrafficDetector, err error) func(proxyutiliptables.LocalTrafficDetector, error) [2]proxyutiliptables.LocalTrafficDetector {
-		t.Helper()
-		if err != nil {
-			t.Fatalf("Error resolving dual stack detect-local: %v", err)
-		}
-		return func(otherLocalDetector proxyutiliptables.LocalTrafficDetector, err1 error) [2]proxyutiliptables.LocalTrafficDetector {
-			t.Helper()
-			if err1 != nil {
-				t.Fatalf("Error resolving dual stack detect-local: %v", err)
-			}
-			return [2]proxyutiliptables.LocalTrafficDetector{localDetector, otherLocalDetector}
-		}
 	}
 }
 
@@ -561,6 +535,7 @@ detectLocalMode: "BridgeInterface"`)
 	}
 
 	for _, tc := range testCases {
+		_, ctx := ktesting.NewTestContext(t)
 		file, tempDir, err := setUp()
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
@@ -576,7 +551,7 @@ detectLocalMode: "BridgeInterface"`)
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- opt.runLoop()
+			errCh <- opt.runLoop(ctx)
 		}()
 
 		if tc.append {
@@ -598,6 +573,7 @@ detectLocalMode: "BridgeInterface"`)
 }
 
 func Test_waitForPodCIDR(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
 	nodeName := "test-node"
 	oldNode := &v1.Node{
@@ -636,7 +612,7 @@ func Test_waitForPodCIDR(t *testing.T) {
 		// set the PodCIDRs on the new node
 		fakeWatch.Modify(updatedNode)
 	}()
-	got, err := waitForPodCIDR(client, node.Name)
+	got, err := waitForPodCIDR(ctx, client, node.Name)
 	if err != nil {
 		t.Errorf("waitForPodCIDR() unexpected error %v", err)
 		return
@@ -679,8 +655,8 @@ func TestGetConntrackMax(t *testing.T) {
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
-		logger, _ := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(logger, cfg)
+		_, ctx := ktesting.NewTestContext(t)
+		x, e := getConntrackMax(ctx, cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -720,6 +696,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			client := clientsetfake.NewSimpleClientset(tt.node)
 			s := &ProxyServer{
 				Config:   tt.config,
@@ -730,7 +707,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 					v1.IPv6Protocol: net.IPv6zero,
 				},
 			}
-			err := s.platformSetup()
+			err := s.platformSetup(ctx)
 			if err != nil {
 				t.Errorf("ProxyServer.createProxier() error = %v", err)
 				return

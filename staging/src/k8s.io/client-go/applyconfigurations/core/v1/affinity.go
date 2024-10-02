@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// AffinityApplyConfiguration represents an declarative configuration of the Affinity type for use
+// AffinityApplyConfiguration represents a declarative configuration of the Affinity type for use
 // with apply.
 type AffinityApplyConfiguration struct {
 	NodeAffinity    *NodeAffinityApplyConfiguration    `json:"nodeAffinity,omitempty"`
@@ -26,7 +26,7 @@ type AffinityApplyConfiguration struct {
 	PodAntiAffinity *PodAntiAffinityApplyConfiguration `json:"podAntiAffinity,omitempty"`
 }
 
-// AffinityApplyConfiguration constructs an declarative configuration of the Affinity type for use with
+// AffinityApplyConfiguration constructs a declarative configuration of the Affinity type for use with
 // apply.
 func Affinity() *AffinityApplyConfiguration {
 	return &AffinityApplyConfiguration{}

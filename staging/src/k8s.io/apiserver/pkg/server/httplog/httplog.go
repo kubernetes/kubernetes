@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/apiserver/pkg/server/routine"
 	"k8s.io/klog/v2"
 )
 
@@ -128,13 +129,29 @@ func withLogging(handler http.Handler, stackTracePred StacktracePred, shouldLogR
 		}
 		rl := newLoggedWithStartTime(req, w, startTime).StacktraceWhen(stackTracePred).IsTerminating(isTerminating)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
-		defer rl.Log()
+
+		var logFunc func()
+		logFunc = rl.Log
+		defer func() {
+			if logFunc != nil {
+				logFunc()
+			}
+		}()
 
 		if klog.V(3).Enabled() || (rl.isTerminating && klog.V(1).Enabled()) {
 			defer rl.Log()
 		}
 		w = responsewriter.WrapForHTTP1Or2(rl)
 		handler.ServeHTTP(w, req)
+
+		// We need to ensure that the request is logged after it is processed.
+		// In case the request is executed in a separate goroutine created via
+		// WithRoutine handler in the handler chain (i.e. above handler.ServeHTTP()
+		// would return request is completely responsed), we want the logging to
+		// happen in that goroutine too, so we append it to the task.
+		if routine.AppendTask(ctx, &routine.Task{Func: rl.Log}) {
+			logFunc = nil
+		}
 	})
 }
 

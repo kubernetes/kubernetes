@@ -49,7 +49,7 @@ type CertificateController struct {
 
 	handler func(context.Context, *certificates.CertificateSigningRequest) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 func NewCertificateController(
@@ -63,11 +63,16 @@ func NewCertificateController(
 	cc := &CertificateController{
 		name:       name,
 		kubeClient: kubeClient,
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
-			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-		), "certificate"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedMaxOfRateLimiter[string](
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](200*time.Millisecond, 1000*time.Second),
+				// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+			),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "certificate",
+			},
+		),
 		handler: handler,
 	}
 
@@ -140,7 +145,7 @@ func (cc *CertificateController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer cc.queue.Done(cKey)
 
-	if err := cc.syncFunc(ctx, cKey.(string)); err != nil {
+	if err := cc.syncFunc(ctx, cKey); err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,6 +47,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 }
 
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	slice.Generation = 1
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -65,6 +68,13 @@ func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	oldSlice := old.(*resource.ResourceSlice)
+
+	// Any changes to the spec increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
+		slice.Generation = oldSlice.Generation + 1
+	}
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -82,17 +92,17 @@ func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
 var TriggerFunc = map[string]storage.IndexerFunc{
 	// Only one index is supported:
 	// https://github.com/kubernetes/kubernetes/blob/3aa8c59fec0bf339e67ca80ea7905c817baeca85/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L346-L350
-	"nodeName": nodeNameTriggerFunc,
+	resource.ResourceSliceSelectorNodeName: nodeNameTriggerFunc,
 }
 
 func nodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*resource.ResourceSlice).NodeName
+	return obj.(*resource.ResourceSlice).Spec.NodeName
 }
 
 // Indexers returns the indexers for ResourceSlice.
 func Indexers() *cache.Indexers {
 	return &cache.Indexers{
-		storage.FieldIndex("nodeName"): nodeNameIndexFunc,
+		storage.FieldIndex(resource.ResourceSliceSelectorNodeName): nodeNameIndexFunc,
 	}
 }
 
@@ -101,7 +111,7 @@ func nodeNameIndexFunc(obj interface{}) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("not a ResourceSlice")
 	}
-	return []string{slice.NodeName}, nil
+	return []string{slice.Spec.NodeName}, nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -119,7 +129,7 @@ func Match(label labels.Selector, field fields.Selector) storage.SelectionPredic
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: []string{"nodeName"},
+		IndexFields: []string{resource.ResourceSliceSelectorNodeName},
 	}
 }
 
@@ -131,8 +141,8 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
 	fields := make(fields.Set, 3)
-	fields["nodeName"] = slice.NodeName
-	fields["driverName"] = slice.DriverName
+	fields[resource.ResourceSliceSelectorNodeName] = slice.Spec.NodeName
+	fields[resource.ResourceSliceSelectorDriver] = slice.Spec.Driver
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)

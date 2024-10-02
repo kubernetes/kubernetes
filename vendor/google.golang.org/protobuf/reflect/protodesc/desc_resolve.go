@@ -46,6 +46,11 @@ func (r *resolver) resolveMessageDependencies(ms []filedesc.Message, mds []*desc
 			if f.L1.Kind, f.L1.Enum, f.L1.Message, err = r.findTarget(f.Kind(), f.Parent().FullName(), partialName(fd.GetTypeName()), f.IsWeak()); err != nil {
 				return errors.New("message field %q cannot resolve type: %v", f.FullName(), err)
 			}
+			if f.L1.Kind == protoreflect.GroupKind && (f.IsMap() || f.IsMapEntry()) {
+				// A map field might inherit delimited encoding from a file-wide default feature.
+				// But maps never actually use delimited encoding. (At least for now...)
+				f.L1.Kind = protoreflect.MessageKind
+			}
 			if fd.DefaultValue != nil {
 				v, ev, err := unmarshalDefault(fd.GetDefaultValue(), f, r.allowUnresolvable)
 				if err != nil {

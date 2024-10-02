@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ModifyVolumeStatusApplyConfiguration represents an declarative configuration of the ModifyVolumeStatus type for use
+// ModifyVolumeStatusApplyConfiguration represents a declarative configuration of the ModifyVolumeStatus type for use
 // with apply.
 type ModifyVolumeStatusApplyConfiguration struct {
 	TargetVolumeAttributesClassName *string                                     `json:"targetVolumeAttributesClassName,omitempty"`
 	Status                          *v1.PersistentVolumeClaimModifyVolumeStatus `json:"status,omitempty"`
 }
 
-// ModifyVolumeStatusApplyConfiguration constructs an declarative configuration of the ModifyVolumeStatus type for use with
+// ModifyVolumeStatusApplyConfiguration constructs a declarative configuration of the ModifyVolumeStatus type for use with
 // apply.
 func ModifyVolumeStatus() *ModifyVolumeStatusApplyConfiguration {
 	return &ModifyVolumeStatusApplyConfiguration{}

@@ -19,7 +19,7 @@ option go_package = "github.com/openshift/api/user/v1";
 message Group {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Users is the list of users in this group.
   optional OptionalNames users = 2;
@@ -32,7 +32,7 @@ message Group {
 message GroupList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of groups
   repeated Group items = 2;
@@ -49,7 +49,7 @@ message GroupList {
 message Identity {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // ProviderName is the source of identity information
   optional string providerName = 2;
@@ -59,7 +59,7 @@ message Identity {
 
   // User is a reference to the user this identity is associated with
   // Both Name and UID must be set
-  optional k8s.io.api.core.v1.ObjectReference user = 4;
+  optional .k8s.io.api.core.v1.ObjectReference user = 4;
 
   // Extra holds extra information about this identity
   map<string, string> extra = 5;
@@ -72,7 +72,7 @@ message Identity {
 message IdentityList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of identities
   repeated Identity items = 2;
@@ -98,7 +98,7 @@ message OptionalNames {
 message User {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // FullName is the full name of user
   optional string fullName = 2;
@@ -120,13 +120,13 @@ message User {
 message UserIdentityMapping {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Identity is a reference to an identity
-  optional k8s.io.api.core.v1.ObjectReference identity = 2;
+  optional .k8s.io.api.core.v1.ObjectReference identity = 2;
 
   // User is a reference to a user
-  optional k8s.io.api.core.v1.ObjectReference user = 3;
+  optional .k8s.io.api.core.v1.ObjectReference user = 3;
 }
 
 // UserList is a collection of Users
@@ -136,7 +136,7 @@ message UserIdentityMapping {
 message UserList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of users
   repeated User items = 2;

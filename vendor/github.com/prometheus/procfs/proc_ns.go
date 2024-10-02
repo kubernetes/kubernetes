@@ -40,7 +40,7 @@ func (p Proc) Namespaces() (Namespaces, error) {
 
 	names, err := d.Readdirnames(-1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read contents of ns dir: %w", err)
+		return nil, fmt.Errorf("%w: failed to read contents of ns dir: %w", ErrFileRead, err)
 	}
 
 	ns := make(Namespaces, len(names))
@@ -52,13 +52,13 @@ func (p Proc) Namespaces() (Namespaces, error) {
 
 		fields := strings.SplitN(target, ":", 2)
 		if len(fields) != 2 {
-			return nil, fmt.Errorf("failed to parse namespace type and inode from %q", target)
+			return nil, fmt.Errorf("%w: namespace type and inode from %q", ErrFileParse, target)
 		}
 
 		typ := fields[0]
 		inode, err := strconv.ParseUint(strings.Trim(fields[1], "[]"), 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse inode from %q: %w", fields[1], err)
+			return nil, fmt.Errorf("%w: inode from %q: %w", ErrFileParse, fields[1], err)
 		}
 
 		ns[name] = Namespace{typ, uint32(inode)}

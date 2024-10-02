@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/controller"
@@ -33,7 +33,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 	)
 
 	dirverName1 := "my-driver1"
-	vac1 := &storagev1alpha1.VolumeAttributesClass{
+	vac1 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac1",
 			Annotations: map[string]string{
@@ -42,7 +42,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		},
 		DriverName: dirverName1,
 	}
-	vac2 := &storagev1alpha1.VolumeAttributesClass{
+	vac2 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac2",
 			Annotations: map[string]string{
@@ -51,7 +51,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		},
 		DriverName: dirverName1,
 	}
-	vac3 := &storagev1alpha1.VolumeAttributesClass{
+	vac3 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac3",
 			Annotations: map[string]string{
@@ -61,7 +61,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		},
 		DriverName: dirverName1,
 	}
-	vac4 := &storagev1alpha1.VolumeAttributesClass{
+	vac4 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac4",
 			Annotations: map[string]string{
@@ -71,7 +71,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		},
 		DriverName: dirverName1,
 	}
-	vac5 := &storagev1alpha1.VolumeAttributesClass{
+	vac5 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac5",
 			Annotations: map[string]string{
@@ -83,7 +83,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 	}
 
 	dirverName2 := "my-driver2"
-	vac6 := &storagev1alpha1.VolumeAttributesClass{
+	vac6 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac6",
 			Annotations: map[string]string{
@@ -92,7 +92,7 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		},
 		DriverName: dirverName2,
 	}
-	vac7 := &storagev1alpha1.VolumeAttributesClass{
+	vac7 := &storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-vac7",
 			Annotations: map[string]string{
@@ -105,8 +105,8 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 	testCases := []struct {
 		name       string
 		driverName string
-		classes    []*storagev1alpha1.VolumeAttributesClass
-		expect     *storagev1alpha1.VolumeAttributesClass
+		classes    []*storagev1beta1.VolumeAttributesClass
+		expect     *storagev1beta1.VolumeAttributesClass
 	}{
 		{
 			name:       "no volume attributes class",
@@ -115,31 +115,31 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		{
 			name:       "no default volume attributes class",
 			driverName: dirverName1,
-			classes:    []*storagev1alpha1.VolumeAttributesClass{vac1, vac2, vac6},
+			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac6},
 			expect:     nil,
 		},
 		{
 			name:       "no default volume attributes class for the driverName1",
 			driverName: dirverName1,
-			classes:    []*storagev1alpha1.VolumeAttributesClass{vac1, vac2, vac6, vac7},
+			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac6, vac7},
 			expect:     nil,
 		},
 		{
 			name:       "one default volume attributes class for the driverName1",
 			driverName: dirverName1,
-			classes:    []*storagev1alpha1.VolumeAttributesClass{vac1, vac2, vac3, vac6, vac7},
+			classes:    []*storagev1beta1.VolumeAttributesClass{vac1, vac2, vac3, vac6, vac7},
 			expect:     vac3,
 		},
 		{
 			name:       "two default volume attributes class with different creation timestamp for the driverName1",
 			driverName: dirverName1,
-			classes:    []*storagev1alpha1.VolumeAttributesClass{vac3, vac4, vac6, vac7},
+			classes:    []*storagev1beta1.VolumeAttributesClass{vac3, vac4, vac6, vac7},
 			expect:     vac4,
 		},
 		{
 			name:       "two default volume attributes class with same creation timestamp for the driverName1",
 			driverName: dirverName1,
-			classes:    []*storagev1alpha1.VolumeAttributesClass{vac4, vac5, vac6, vac7},
+			classes:    []*storagev1beta1.VolumeAttributesClass{vac4, vac5, vac6, vac7},
 			expect:     vac4,
 		},
 	}
@@ -148,13 +148,13 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 			for _, c := range tc.classes {
-				err := informerFactory.Storage().V1alpha1().VolumeAttributesClasses().Informer().GetStore().Add(c)
+				err := informerFactory.Storage().V1beta1().VolumeAttributesClasses().Informer().GetStore().Add(c)
 				if err != nil {
 					t.Errorf("Expected no error, got %v", err)
 					return
 				}
 			}
-			lister := informerFactory.Storage().V1alpha1().VolumeAttributesClasses().Lister()
+			lister := informerFactory.Storage().V1beta1().VolumeAttributesClasses().Lister()
 			actual, err := GetDefaultVolumeAttributesClass(lister, tc.driverName)
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
@@ -170,17 +170,17 @@ func TestGetDefaultVolumeAttributesClass(t *testing.T) {
 func TestIsDefaultVolumeAttributesClassAnnotation(t *testing.T) {
 	testCases := []struct {
 		name   string
-		class  *storagev1alpha1.VolumeAttributesClass
+		class  *storagev1beta1.VolumeAttributesClass
 		expect bool
 	}{
 		{
 			name:   "no annotation",
-			class:  &storagev1alpha1.VolumeAttributesClass{},
+			class:  &storagev1beta1.VolumeAttributesClass{},
 			expect: false,
 		},
 		{
 			name: "annotation is not boolean",
-			class: &storagev1alpha1.VolumeAttributesClass{
+			class: &storagev1beta1.VolumeAttributesClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						AlphaIsDefaultVolumeAttributesClassAnnotation: "not-boolean",
@@ -191,7 +191,7 @@ func TestIsDefaultVolumeAttributesClassAnnotation(t *testing.T) {
 		},
 		{
 			name: "annotation is false",
-			class: &storagev1alpha1.VolumeAttributesClass{
+			class: &storagev1beta1.VolumeAttributesClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						AlphaIsDefaultVolumeAttributesClassAnnotation: "false",
@@ -202,7 +202,7 @@ func TestIsDefaultVolumeAttributesClassAnnotation(t *testing.T) {
 		},
 		{
 			name: "annotation is true",
-			class: &storagev1alpha1.VolumeAttributesClass{
+			class: &storagev1beta1.VolumeAttributesClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						AlphaIsDefaultVolumeAttributesClassAnnotation: "true",

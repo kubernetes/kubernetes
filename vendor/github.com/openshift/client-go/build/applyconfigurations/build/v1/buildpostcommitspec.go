@@ -2,7 +2,7 @@
 
 package v1
 
-// BuildPostCommitSpecApplyConfiguration represents an declarative configuration of the BuildPostCommitSpec type for use
+// BuildPostCommitSpecApplyConfiguration represents a declarative configuration of the BuildPostCommitSpec type for use
 // with apply.
 type BuildPostCommitSpecApplyConfiguration struct {
 	Command []string `json:"command,omitempty"`
@@ -10,7 +10,7 @@ type BuildPostCommitSpecApplyConfiguration struct {
 	Script  *string  `json:"script,omitempty"`
 }
 
-// BuildPostCommitSpecApplyConfiguration constructs an declarative configuration of the BuildPostCommitSpec type for use with
+// BuildPostCommitSpecApplyConfiguration constructs a declarative configuration of the BuildPostCommitSpec type for use with
 // apply.
 func BuildPostCommitSpec() *BuildPostCommitSpecApplyConfiguration {
 	return &BuildPostCommitSpecApplyConfiguration{}

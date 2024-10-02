@@ -27,20 +27,22 @@ var groupsKind = v1.SchemeGroupVersion.WithKind("Group")
 
 // Get takes name of the group, and returns the corresponding group object, and an error if there is any.
 func (c *FakeGroups) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Group, err error) {
+	emptyResult := &v1.Group{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(groupsResource, name), &v1.Group{})
+		Invokes(testing.NewRootGetActionWithOptions(groupsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Group), err
 }
 
 // List takes label and field selectors, and returns the list of Groups that match those selectors.
 func (c *FakeGroups) List(ctx context.Context, opts metav1.ListOptions) (result *v1.GroupList, err error) {
+	emptyResult := &v1.GroupList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(groupsResource, groupsKind, opts), &v1.GroupList{})
+		Invokes(testing.NewRootListActionWithOptions(groupsResource, groupsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,25 +61,27 @@ func (c *FakeGroups) List(ctx context.Context, opts metav1.ListOptions) (result 
 // Watch returns a watch.Interface that watches the requested groups.
 func (c *FakeGroups) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(groupsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(groupsResource, opts))
 }
 
 // Create takes the representation of a group and creates it.  Returns the server's representation of the group, and an error, if there is any.
 func (c *FakeGroups) Create(ctx context.Context, group *v1.Group, opts metav1.CreateOptions) (result *v1.Group, err error) {
+	emptyResult := &v1.Group{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(groupsResource, group), &v1.Group{})
+		Invokes(testing.NewRootCreateActionWithOptions(groupsResource, group, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Group), err
 }
 
 // Update takes the representation of a group and updates it. Returns the server's representation of the group, and an error, if there is any.
 func (c *FakeGroups) Update(ctx context.Context, group *v1.Group, opts metav1.UpdateOptions) (result *v1.Group, err error) {
+	emptyResult := &v1.Group{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(groupsResource, group), &v1.Group{})
+		Invokes(testing.NewRootUpdateActionWithOptions(groupsResource, group, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Group), err
 }
@@ -91,7 +95,7 @@ func (c *FakeGroups) Delete(ctx context.Context, name string, opts metav1.Delete
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeGroups) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(groupsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(groupsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.GroupList{})
 	return err
@@ -99,10 +103,11 @@ func (c *FakeGroups) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 
 // Patch applies the patch and returns the patched group.
 func (c *FakeGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Group, err error) {
+	emptyResult := &v1.Group{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(groupsResource, name, pt, data, subresources...), &v1.Group{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(groupsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Group), err
 }
@@ -120,10 +125,11 @@ func (c *FakeGroups) Apply(ctx context.Context, group *userv1.GroupApplyConfigur
 	if name == nil {
 		return nil, fmt.Errorf("group.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Group{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(groupsResource, *name, types.ApplyPatchType, data), &v1.Group{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(groupsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Group), err
 }

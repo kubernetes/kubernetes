@@ -79,7 +79,7 @@ func webSocketServerStreams(req *http.Request, w http.ResponseWriter, opts Optio
 				if p := recover(); p != nil {
 					// Standard panic logging.
 					for _, fn := range runtime.PanicHandlers {
-						fn(p)
+						fn(req.Context(), p)
 					}
 				}
 			}()

@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// VolumeAttachmentSpecApplyConfiguration represents an declarative configuration of the VolumeAttachmentSpec type for use
+// VolumeAttachmentSpecApplyConfiguration represents a declarative configuration of the VolumeAttachmentSpec type for use
 // with apply.
 type VolumeAttachmentSpecApplyConfiguration struct {
 	Attacher *string                                   `json:"attacher,omitempty"`
@@ -26,7 +26,7 @@ type VolumeAttachmentSpecApplyConfiguration struct {
 	NodeName *string                                   `json:"nodeName,omitempty"`
 }
 
-// VolumeAttachmentSpecApplyConfiguration constructs an declarative configuration of the VolumeAttachmentSpec type for use with
+// VolumeAttachmentSpecApplyConfiguration constructs a declarative configuration of the VolumeAttachmentSpec type for use with
 // apply.
 func VolumeAttachmentSpec() *VolumeAttachmentSpecApplyConfiguration {
 	return &VolumeAttachmentSpecApplyConfiguration{}

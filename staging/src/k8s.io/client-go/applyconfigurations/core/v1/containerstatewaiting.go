@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ContainerStateWaitingApplyConfiguration represents an declarative configuration of the ContainerStateWaiting type for use
+// ContainerStateWaitingApplyConfiguration represents a declarative configuration of the ContainerStateWaiting type for use
 // with apply.
 type ContainerStateWaitingApplyConfiguration struct {
 	Reason  *string `json:"reason,omitempty"`
 	Message *string `json:"message,omitempty"`
 }
 
-// ContainerStateWaitingApplyConfiguration constructs an declarative configuration of the ContainerStateWaiting type for use with
+// ContainerStateWaitingApplyConfiguration constructs a declarative configuration of the ContainerStateWaiting type for use with
 // apply.
 func ContainerStateWaiting() *ContainerStateWaitingApplyConfiguration {
 	return &ContainerStateWaitingApplyConfiguration{}

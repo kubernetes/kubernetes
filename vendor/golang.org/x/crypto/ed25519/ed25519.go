@@ -11,9 +11,7 @@
 // operations with the same key more efficient. This package refers to the RFC
 // 8032 private key as the “seed”.
 //
-// Beginning with Go 1.13, the functionality of this package was moved to the
-// standard library as crypto/ed25519. This package only acts as a compatibility
-// wrapper.
+// This package is a wrapper around the standard library crypto/ed25519 package.
 package ed25519
 
 import (

@@ -2,7 +2,7 @@
 
 package v1
 
-// NamedTagEventListApplyConfiguration represents an declarative configuration of the NamedTagEventList type for use
+// NamedTagEventListApplyConfiguration represents a declarative configuration of the NamedTagEventList type for use
 // with apply.
 type NamedTagEventListApplyConfiguration struct {
 	Tag        *string                               `json:"tag,omitempty"`
@@ -10,7 +10,7 @@ type NamedTagEventListApplyConfiguration struct {
 	Conditions []TagEventConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// NamedTagEventListApplyConfiguration constructs an declarative configuration of the NamedTagEventList type for use with
+// NamedTagEventListApplyConfiguration constructs a declarative configuration of the NamedTagEventList type for use with
 // apply.
 func NamedTagEventList() *NamedTagEventListApplyConfiguration {
 	return &NamedTagEventListApplyConfiguration{}

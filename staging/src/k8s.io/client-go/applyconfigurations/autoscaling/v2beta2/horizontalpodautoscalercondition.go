@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// HorizontalPodAutoscalerConditionApplyConfiguration represents an declarative configuration of the HorizontalPodAutoscalerCondition type for use
+// HorizontalPodAutoscalerConditionApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerCondition type for use
 // with apply.
 type HorizontalPodAutoscalerConditionApplyConfiguration struct {
 	Type               *v2beta2.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type HorizontalPodAutoscalerConditionApplyConfiguration struct {
 	Message            *string                                       `json:"message,omitempty"`
 }
 
-// HorizontalPodAutoscalerConditionApplyConfiguration constructs an declarative configuration of the HorizontalPodAutoscalerCondition type for use with
+// HorizontalPodAutoscalerConditionApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerCondition type for use with
 // apply.
 func HorizontalPodAutoscalerCondition() *HorizontalPodAutoscalerConditionApplyConfiguration {
 	return &HorizontalPodAutoscalerConditionApplyConfiguration{}

@@ -61,7 +61,7 @@ type DynamicFileCAContent struct {
 	listeners []Listener
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 var _ Notifier = &DynamicFileCAContent{}
@@ -83,7 +83,10 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	ret := &DynamicFileCAContent{
 		name:     name,
 		filename: filename,
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: fmt.Sprintf("DynamicCABundle-%s", purpose)},
+		),
 	}
 	if err := ret.loadCABundle(); err != nil {
 		return nil, err

@@ -40,7 +40,7 @@ func hasSeeAlso(cmd *cobra.Command) bool {
 // that do not contain \n.
 func forceMultiLine(s string) string {
 	if len(s) > 60 && !strings.Contains(s, "\n") {
-		s = s + "\n"
+		s += "\n"
 	}
 	return s
 }

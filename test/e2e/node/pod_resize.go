@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -79,6 +80,28 @@ type TestContainerInfo struct {
 	CPUPolicy    *v1.ResourceResizeRestartPolicy
 	MemPolicy    *v1.ResourceResizeRestartPolicy
 	RestartCount int32
+}
+
+type containerPatch struct {
+	Name      string `json:"name"`
+	Resources struct {
+		Requests struct {
+			CPU     string `json:"cpu,omitempty"`
+			Memory  string `json:"memory,omitempty"`
+			EphStor string `json:"ephemeral-storage,omitempty"`
+		} `json:"requests"`
+		Limits struct {
+			CPU     string `json:"cpu,omitempty"`
+			Memory  string `json:"memory,omitempty"`
+			EphStor string `json:"ephemeral-storage,omitempty"`
+		} `json:"limits"`
+	} `json:"resources"`
+}
+
+type patchSpec struct {
+	Spec struct {
+		Containers []containerPatch `json:"containers"`
+	} `json:"spec"`
 }
 
 func isInPlaceResizeSupportedByRuntime(c clientset.Interface, nodeName string) bool {
@@ -174,7 +197,6 @@ func initDefaultResizePolicy(containers []TestContainerInfo) {
 }
 
 func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStatus) {
-	cmd := "trap exit TERM; while true; do sleep 1; done"
 	res, alloc, resizePol := getTestResourceInfo(tcInfo)
 	bTrue := true
 	bFalse := false
@@ -209,7 +231,7 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 		Name:            tcInfo.Name,
 		Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 		Command:         []string{"/bin/sh"},
-		Args:            []string{"-c", cmd},
+		Args:            []string{"-c", e2epod.InfiniteSleepCommand},
 		Resources:       res,
 		ResizePolicy:    resizePol,
 		SecurityContext: securityContext,
@@ -419,11 +441,18 @@ func verifyPodContainersCgroupValues(pod *v1.Pod, tcInfo []TestContainerInfo, fl
 	return true
 }
 
-func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo) *v1.Pod {
+func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo, initialContainers []TestContainerInfo, isRollback bool) *v1.Pod {
 
 	waitForContainerRestart := func() error {
 		var restartContainersExpected []string
-		for _, ci := range expectedContainers {
+
+		restartContainers := expectedContainers
+		// if we're rolling back, extract restart counts from test case "expected" containers
+		if isRollback {
+			restartContainers = initialContainers
+		}
+
+		for _, ci := range restartContainers {
 			if ci.RestartCount > 0 {
 				restartContainersExpected = append(restartContainersExpected, ci.Name)
 			}
@@ -439,7 +468,12 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 			restartedContainersCount := 0
 			for _, cName := range restartContainersExpected {
 				cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, cName)
-				if cs.RestartCount < 1 {
+				expectedRestarts := int32(1)
+				// if we're rolling back, we should have 2 container restarts
+				if isRollback {
+					expectedRestarts = int32(2)
+				}
+				if cs.RestartCount < expectedRestarts {
 					break
 				}
 				restartedContainersCount++
@@ -513,6 +547,28 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 		framework.ExpectNoError(cErr, "failed to verify container cgroup values equals expected values")
 	}
 	return resizedPod
+}
+
+func genPatchString(containers []TestContainerInfo) (string, error) {
+	var patch patchSpec
+
+	for _, container := range containers {
+		var cPatch containerPatch
+		cPatch.Name = container.Name
+		cPatch.Resources.Requests.CPU = container.Resources.CPUReq
+		cPatch.Resources.Requests.Memory = container.Resources.MemReq
+		cPatch.Resources.Limits.CPU = container.Resources.CPULim
+		cPatch.Resources.Limits.Memory = container.Resources.MemLim
+
+		patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return "", err
+	}
+
+	return string(patchBytes), nil
 }
 
 func doPodResizeTests() {
@@ -1264,31 +1320,40 @@ func doPodResizeTests() {
 				}
 			}
 
-			ginkgo.By("patching pod for resize")
-			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
-				types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{})
-			framework.ExpectNoError(pErr, "failed to patch pod for resize")
+			patchAndVerify := func(patchString string, expectedContainers []TestContainerInfo, initialContainers []TestContainerInfo, opStr string, isRollback bool) {
+				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
+				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
+					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{})
+				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
 
-			ginkgo.By("verifying pod patched for resize")
-			verifyPodResources(patchedPod, tc.expected)
-			verifyPodAllocations(patchedPod, tc.containers, true)
+				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
+				verifyPodResources(patchedPod, expectedContainers)
+				verifyPodAllocations(patchedPod, initialContainers, true)
 
-			ginkgo.By("waiting for resize to be actuated")
-			resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod, patchedPod, tc.expected)
+				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
+				resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod, patchedPod, expectedContainers, initialContainers, isRollback)
 
-			// Check cgroup values only for containerd versions before 1.6.9
-			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
-				ginkgo.By("verifying pod container's cgroup values after resize")
-				if !framework.NodeOSDistroIs("windows") {
-					verifyPodContainersCgroupValues(resizedPod, tc.expected, true)
+				// Check cgroup values only for containerd versions before 1.6.9
+				if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
+					ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
+					if !framework.NodeOSDistroIs("windows") {
+						verifyPodContainersCgroupValues(resizedPod, expectedContainers, true)
+					}
 				}
+
+				ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
+				verifyPodResources(resizedPod, expectedContainers)
+
+				ginkgo.By(fmt.Sprintf("verifying pod allocations after %s", opStr))
+				verifyPodAllocations(resizedPod, expectedContainers, true)
 			}
 
-			ginkgo.By("verifying pod resources after resize")
-			verifyPodResources(resizedPod, tc.expected)
+			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize", false)
 
-			ginkgo.By("verifying pod allocations after resize")
-			verifyPodAllocations(resizedPod, tc.expected, true)
+			rbPatchStr, err := genPatchString(tc.containers)
+			framework.ExpectNoError(err)
+			// Resize has been actuated, test rollback
+			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback", true)
 
 			ginkgo.By("deleting pod")
 			err = e2epod.DeletePodWithWait(ctx, f.ClientSet, newPod)
@@ -1373,7 +1438,7 @@ func doPodResizeResourceQuotaTests() {
 		verifyPodAllocations(patchedPod, containers, true)
 
 		ginkgo.By("waiting for resize to be actuated")
-		resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod1, patchedPod, expected)
+		resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod1, patchedPod, expected, containers, false)
 		if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod1.Spec.NodeName) {
 			ginkgo.By("verifying pod container's cgroup values after resize")
 			if !framework.NodeOSDistroIs("windows") {
@@ -1630,7 +1695,7 @@ func doPodResizeSchedulerTests() {
 		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableMilliCPUValues(&node)
 		framework.Logf("TEST2: Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
-		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
+		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
 		testPod1CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
 		framework.Logf("TEST2: testPod1 MilliCPUs after resize '%dm'", testPod1CPUQuantityResized.MilliValue())
 

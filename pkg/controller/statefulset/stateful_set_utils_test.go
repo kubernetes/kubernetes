@@ -23,19 +23,20 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-
-	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/ptr"
@@ -61,6 +62,88 @@ func getClaimPodName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim) str
 		return podName
 	}
 	return matches[1]
+}
+
+// ownerRefsChanged returns true if newRefs does not match originalRefs.
+func ownerRefsChanged(originalRefs, newRefs []metav1.OwnerReference) bool {
+	if len(originalRefs) != len(newRefs) {
+		return true
+	}
+	key := func(ref *metav1.OwnerReference) string {
+		return fmt.Sprintf("%s-%s-%s", ref.APIVersion, ref.Kind, ref.Name)
+	}
+	refs := map[string]bool{}
+	for i := range originalRefs {
+		refs[key(&originalRefs[i])] = true
+	}
+	for i := range newRefs {
+		k := key(&newRefs[i])
+		if val, found := refs[k]; !found || !val {
+			return true
+		}
+		refs[k] = false
+	}
+	return false
+}
+
+func TestOwnerRefsChanged(t *testing.T) {
+	toRefs := func(strs []string) []metav1.OwnerReference {
+		refs := []metav1.OwnerReference{}
+		for _, s := range strs {
+			pieces := strings.Split(s, "/")
+			refs = append(refs, metav1.OwnerReference{
+				APIVersion: pieces[0],
+				Kind:       pieces[1],
+				Name:       pieces[2],
+			})
+		}
+		return refs
+	}
+	testCases := []struct {
+		orig, new []string
+		changed   bool
+	}{
+		{
+			orig:    []string{"v1/pod/foo"},
+			new:     []string{},
+			changed: true,
+		},
+		{
+			orig:    []string{"v1/pod/foo"},
+			new:     []string{"v1/pod/foo"},
+			changed: false,
+		},
+		{
+			orig:    []string{"v1/pod/foo"},
+			new:     []string{"v1/pod/bar"},
+			changed: true,
+		},
+		{
+			orig:    []string{"v1/pod/foo", "v1/set/bob"},
+			new:     []string{"v1/pod/foo", "v1/set/alice"},
+			changed: true,
+		},
+		{
+			orig:    []string{"v1/pod/foo", "v1/set/bob"},
+			new:     []string{"v1/pod/foo", "v1/set/bob"},
+			changed: false,
+		},
+		{
+			orig:    []string{"v1/pod/foo", "v1/set/bob"},
+			new:     []string{"v1/pod/foo", "v1/set/bob", "v1/set/bob"},
+			changed: true,
+		},
+		{
+			orig:    []string{"v1/pod/foo", "v1/set/bob"},
+			new:     []string{"v1/set/bob", "v1/pod/foo"},
+			changed: false,
+		},
+	}
+	for _, tc := range testCases {
+		if ownerRefsChanged(toRefs(tc.orig), toRefs(tc.new)) != tc.changed {
+			t.Errorf("Expected change=%t but got %t for %v vs %v", tc.changed, !tc.changed, tc.orig, tc.new)
+		}
+	}
 }
 
 func TestGetParentNameAndOrdinal(t *testing.T) {
@@ -253,7 +336,84 @@ func TestGetPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 	}
 }
 
-func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
+func TestMatchesRef(t *testing.T) {
+	testCases := []struct {
+		name        string
+		ref         metav1.OwnerReference
+		obj         metav1.ObjectMeta
+		schema      schema.GroupVersionKind
+		shouldMatch bool
+	}{
+		{
+			name: "full match",
+			ref: metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       "fred",
+				UID:        "abc",
+			},
+			obj: metav1.ObjectMeta{
+				Name: "fred",
+				UID:  "abc",
+			},
+			schema:      podKind,
+			shouldMatch: true,
+		},
+		{
+			name: "match without UID",
+			ref: metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       "fred",
+				UID:        "abc",
+			},
+			obj: metav1.ObjectMeta{
+				Name: "fred",
+				UID:  "not-matching",
+			},
+			schema:      podKind,
+			shouldMatch: true,
+		},
+		{
+			name: "mismatch name",
+			ref: metav1.OwnerReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Name:       "fred",
+				UID:        "abc",
+			},
+			obj: metav1.ObjectMeta{
+				Name: "joan",
+				UID:  "abc",
+			},
+			schema:      podKind,
+			shouldMatch: false,
+		},
+		{
+			name: "wrong schema",
+			ref: metav1.OwnerReference{
+				APIVersion: "beta2",
+				Kind:       "Pod",
+				Name:       "fred",
+				UID:        "abc",
+			},
+			obj: metav1.ObjectMeta{
+				Name: "fred",
+				UID:  "abc",
+			},
+			schema:      podKind,
+			shouldMatch: false,
+		},
+	}
+	for _, tc := range testCases {
+		got := matchesRef(&tc.ref, &tc.obj, tc.schema)
+		if got != tc.shouldMatch {
+			t.Errorf("Failed %s: got %t, expected %t", tc.name, got, tc.shouldMatch)
+		}
+	}
+}
+
+func TestIsClaimOwnerUpToDate(t *testing.T) {
 	testCases := []struct {
 		name            string
 		scaleDownPolicy apps.PersistentVolumeClaimRetentionPolicyType
@@ -334,24 +494,32 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 						WhenDeleted: tc.setDeletePolicy,
 					}
 					set.Spec.Replicas = &tc.replicas
+					claimRefs := claim.GetOwnerReferences()
 					if setPodRef {
-						setOwnerRef(&claim, &pod, &pod.TypeMeta)
+						claimRefs = addControllerRef(claimRefs, &pod, podKind)
 					}
 					if setSetRef {
-						setOwnerRef(&claim, &set, &set.TypeMeta)
+						claimRefs = addControllerRef(claimRefs, &set, controllerKind)
 					}
 					if useOtherRefs {
-						randomObject1 := v1.Pod{}
-						randomObject1.Name = "rand1"
-						randomObject1.GetObjectMeta().SetUID("rand1-abc")
-						randomObject2 := v1.Pod{}
-						randomObject2.Name = "rand2"
-						randomObject2.GetObjectMeta().SetUID("rand2-def")
-						setOwnerRef(&claim, &randomObject1, &randomObject1.TypeMeta)
-						setOwnerRef(&claim, &randomObject2, &randomObject2.TypeMeta)
+						claimRefs = append(
+							claimRefs,
+							metav1.OwnerReference{
+								Name:       "rand1",
+								APIVersion: "v1",
+								Kind:       "Pod",
+								UID:        "rand1-uid",
+							},
+							metav1.OwnerReference{
+								Name:       "rand2",
+								APIVersion: "v1",
+								Kind:       "Pod",
+								UID:        "rand2-uid",
+							})
 					}
+					claim.SetOwnerReferences(claimRefs)
 					shouldMatch := setPodRef == tc.needsPodRef && setSetRef == tc.needsSetRef
-					if claimOwnerMatchesSetAndPod(logger, &claim, &set, &pod) != shouldMatch {
+					if isClaimOwnerUpToDate(logger, &claim, &set, &pod) != shouldMatch {
 						t.Errorf("Bad match for %s with pod=%v,set=%v,others=%v", tc.name, setPodRef, setSetRef, useOtherRefs)
 					}
 				}
@@ -360,14 +528,194 @@ func TestClaimOwnerMatchesSetAndPod(t *testing.T) {
 	}
 }
 
+func TestClaimOwnerUpToDateEdgeCases(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	logger := klog.FromContext(ctx)
+
+	testCases := []struct {
+		name        string
+		ownerRefs   []metav1.OwnerReference
+		policy      apps.StatefulSetPersistentVolumeClaimRetentionPolicy
+		shouldMatch bool
+	}{
+		{
+			name: "normal controller, pod",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "pod-1",
+					APIVersion: "v1",
+					Kind:       "Pod",
+					UID:        "pod-123",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "non-controller causes policy mismatch, pod",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "pod-1",
+					APIVersion: "v1",
+					Kind:       "Pod",
+					UID:        "pod-123",
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: false,
+		},
+		{
+			name: "stale controller does not affect policy, pod",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "pod-1",
+					APIVersion: "v1",
+					Kind:       "Pod",
+					UID:        "pod-stale",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "unexpected controller causes policy mismatch, pod",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "pod-1",
+					APIVersion: "v1",
+					Kind:       "Pod",
+					UID:        "pod-123",
+					Controller: ptr.To(true),
+				},
+				{
+					Name:       "Random",
+					APIVersion: "v1",
+					Kind:       "Pod",
+					UID:        "random",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: false,
+		},
+		{
+			name: "normal controller, set",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "stateful-set",
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					UID:        "ss-456",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "non-controller causes policy mismatch, set",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "stateful-set",
+					APIVersion: "appsv1",
+					Kind:       "StatefulSet",
+					UID:        "ss-456",
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: false,
+		},
+		{
+			name: "stale controller ignored, set",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "stateful-set",
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					UID:        "set-stale",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "unexpected controller causes policy mismatch, set",
+			ownerRefs: []metav1.OwnerReference{
+				{
+					Name:       "stateful-set",
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					UID:        "ss-456",
+					Controller: ptr.To(true),
+				},
+				{
+					Name:       "Random",
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					UID:        "random",
+					Controller: ptr.To(true),
+				},
+			},
+			policy: apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			shouldMatch: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		claim := v1.PersistentVolumeClaim{}
+		claim.Name = "target-claim"
+		pod := v1.Pod{}
+		pod.Name = "pod-1"
+		pod.GetObjectMeta().SetUID("pod-123")
+		set := apps.StatefulSet{}
+		set.Name = "stateful-set"
+		set.GetObjectMeta().SetUID("ss-456")
+		set.Spec.PersistentVolumeClaimRetentionPolicy = &tc.policy
+		set.Spec.Replicas = ptr.To(int32(1))
+		claim.SetOwnerReferences(tc.ownerRefs)
+		got := isClaimOwnerUpToDate(logger, &claim, &set, &pod)
+		if got != tc.shouldMatch {
+			t.Errorf("Unexpected match for %s, got %t expected %t", tc.name, got, tc.shouldMatch)
+		}
+	}
+}
+
 func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 	testCases := []struct {
-		name            string
-		scaleDownPolicy apps.PersistentVolumeClaimRetentionPolicyType
-		setDeletePolicy apps.PersistentVolumeClaimRetentionPolicyType
-		condemned       bool
-		needsPodRef     bool
-		needsSetRef     bool
+		name                 string
+		scaleDownPolicy      apps.PersistentVolumeClaimRetentionPolicyType
+		setDeletePolicy      apps.PersistentVolumeClaimRetentionPolicyType
+		condemned            bool
+		needsPodRef          bool
+		needsSetRef          bool
+		unexpectedController bool
 	}{
 		{
 			name:            "retain",
@@ -417,47 +765,228 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 			needsPodRef:     true,
 			needsSetRef:     false,
 		},
+		{
+			name:                 "unexpected controller",
+			scaleDownPolicy:      apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			setDeletePolicy:      apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			condemned:            true,
+			needsPodRef:          false,
+			needsSetRef:          false,
+			unexpectedController: true,
+		},
 	}
 	for _, tc := range testCases {
-		for _, hasPodRef := range []bool{true, false} {
-			for _, hasSetRef := range []bool{true, false} {
-				_, ctx := ktesting.NewTestContext(t)
-				logger := klog.FromContext(ctx)
-				set := apps.StatefulSet{}
-				set.Name = "ss"
-				numReplicas := int32(5)
-				set.Spec.Replicas = &numReplicas
-				set.SetUID("ss-123")
-				set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
-					WhenScaled:  tc.scaleDownPolicy,
-					WhenDeleted: tc.setDeletePolicy,
-				}
-				pod := v1.Pod{}
-				if tc.condemned {
-					pod.Name = "pod-8"
-				} else {
-					pod.Name = "pod-1"
-				}
-				pod.SetUID("pod-456")
-				claim := v1.PersistentVolumeClaim{}
-				if hasPodRef {
-					setOwnerRef(&claim, &pod, &pod.TypeMeta)
-				}
-				if hasSetRef {
-					setOwnerRef(&claim, &set, &set.TypeMeta)
-				}
-				needsUpdate := hasPodRef != tc.needsPodRef || hasSetRef != tc.needsSetRef
-				shouldUpdate := updateClaimOwnerRefForSetAndPod(logger, &claim, &set, &pod)
-				if shouldUpdate != needsUpdate {
-					t.Errorf("Bad update for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
-				}
-				if hasOwnerRef(&claim, &pod) != tc.needsPodRef {
-					t.Errorf("Bad pod ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
-				}
-				if hasOwnerRef(&claim, &set) != tc.needsSetRef {
-					t.Errorf("Bad set ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
-				}
+		for variations := 0; variations < 8; variations++ {
+			hasPodRef := (variations & 1) != 0
+			hasSetRef := (variations & 2) != 0
+			extraOwner := (variations & 3) != 0
+			_, ctx := ktesting.NewTestContext(t)
+			logger := klog.FromContext(ctx)
+			set := apps.StatefulSet{}
+			set.Name = "ss"
+			numReplicas := int32(5)
+			set.Spec.Replicas = &numReplicas
+			set.SetUID("ss-123")
+			set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled:  tc.scaleDownPolicy,
+				WhenDeleted: tc.setDeletePolicy,
 			}
+			pod := v1.Pod{}
+			if tc.condemned {
+				pod.Name = "pod-8"
+			} else {
+				pod.Name = "pod-1"
+			}
+			pod.SetUID("pod-456")
+			claim := v1.PersistentVolumeClaim{}
+			claimRefs := claim.GetOwnerReferences()
+			if hasPodRef {
+				claimRefs = addControllerRef(claimRefs, &pod, podKind)
+			}
+			if hasSetRef {
+				claimRefs = addControllerRef(claimRefs, &set, controllerKind)
+			}
+			if extraOwner {
+				// Note the extra owner should not affect our owner references.
+				claimRefs = append(claimRefs, metav1.OwnerReference{
+					APIVersion: "custom/v1",
+					Kind:       "random",
+					Name:       "random",
+					UID:        "abc",
+				})
+			}
+			if tc.unexpectedController {
+				claimRefs = append(claimRefs, metav1.OwnerReference{
+					APIVersion: "custom/v1",
+					Kind:       "Unknown",
+					Name:       "unknown",
+					UID:        "xyz",
+					Controller: ptr.To(true),
+				})
+			}
+			claim.SetOwnerReferences(claimRefs)
+			updateClaimOwnerRefForSetAndPod(logger, &claim, &set, &pod)
+			// Confirm that after the update, the specified owner is set as the only controller.
+			// Any other controllers will be cleaned update by the update.
+			check := func(target, owner metav1.Object) bool {
+				for _, ref := range target.GetOwnerReferences() {
+					if ref.UID == owner.GetUID() {
+						return ref.Controller != nil && *ref.Controller
+					}
+				}
+				return false
+			}
+			if check(&claim, &pod) != tc.needsPodRef {
+				t.Errorf("Bad pod ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
+			}
+			if check(&claim, &set) != tc.needsSetRef {
+				t.Errorf("Bad set ref for %s hasPodRef=%v hasSetRef=%v", tc.name, hasPodRef, hasSetRef)
+			}
+		}
+	}
+}
+
+func TestUpdateClaimControllerRef(t *testing.T) {
+	testCases := []struct {
+		name         string
+		originalRefs []metav1.OwnerReference
+		expectedRefs []metav1.OwnerReference
+	}{
+		{
+			name: "set correctly",
+			originalRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "someone",
+					Kind:       "Else",
+					Name:       "foo",
+				},
+			},
+			expectedRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "someone",
+					Kind:       "Else",
+					Name:       "foo",
+				},
+			},
+		},
+		{
+			name: "missing controller",
+			originalRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+				},
+			},
+			expectedRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+					Controller: ptr.To(true),
+				},
+			},
+		},
+		{
+			name: "matching name but missing",
+			originalRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "someone",
+					Kind:       "else",
+					Name:       "sts",
+					UID:        "456",
+				},
+			},
+			expectedRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "someone",
+					Kind:       "else",
+					Name:       "sts",
+					UID:        "456",
+				},
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+					Controller: ptr.To(true),
+				},
+			},
+		},
+		{
+			name:         "not present",
+			originalRefs: []metav1.OwnerReference{},
+			expectedRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					UID:        "123",
+					Controller: ptr.To(true),
+				},
+			},
+		},
+		{
+			name: "controller, but no UID",
+			originalRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+					Controller: ptr.To(true),
+				},
+			},
+			// The missing UID is interpreted as an unexpected stale reference.
+			expectedRefs: []metav1.OwnerReference{},
+		},
+		{
+			name: "neither controller nor UID",
+			originalRefs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "sts",
+				},
+			},
+			// The missing UID is interpreted as an unexpected stale reference.
+			expectedRefs: []metav1.OwnerReference{},
+		},
+	}
+	for _, tc := range testCases {
+		_, ctx := ktesting.NewTestContext(t)
+		logger := klog.FromContext(ctx)
+		set := apps.StatefulSet{}
+		set.Name = "sts"
+		set.Spec.Replicas = ptr.To(int32(1))
+		set.SetUID("123")
+		set.Spec.PersistentVolumeClaimRetentionPolicy = &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
+			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
+		}
+		pod := v1.Pod{}
+		pod.Name = "pod-0"
+		pod.SetUID("456")
+		claim := v1.PersistentVolumeClaim{}
+		claim.SetOwnerReferences(tc.originalRefs)
+		updateClaimOwnerRefForSetAndPod(logger, &claim, &set, &pod)
+		if ownerRefsChanged(tc.expectedRefs, claim.GetOwnerReferences()) {
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.expectedRefs, claim.GetOwnerReferences())
 		}
 	}
 }
@@ -465,23 +994,427 @@ func TestUpdateClaimOwnerRefForSetAndPod(t *testing.T) {
 func TestHasOwnerRef(t *testing.T) {
 	target := v1.Pod{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
-		{UID: "123"}, {UID: "456"}})
-	ownerA := v1.Pod{}
-	ownerA.GetObjectMeta().SetUID("123")
-	ownerB := v1.Pod{}
-	ownerB.GetObjectMeta().SetUID("789")
-	if !hasOwnerRef(&target, &ownerA) {
-		t.Error("Missing owner")
+		{UID: "123", Controller: ptr.To(true)},
+		{UID: "456", Controller: ptr.To(false)},
+		{UID: "789"},
+	})
+	testCases := []struct {
+		uid    types.UID
+		hasRef bool
+	}{
+		{
+			uid:    "123",
+			hasRef: true,
+		},
+		{
+			uid:    "456",
+			hasRef: true,
+		},
+		{
+			uid:    "789",
+			hasRef: true,
+		},
+		{
+			uid:    "012",
+			hasRef: false,
+		},
 	}
-	if hasOwnerRef(&target, &ownerB) {
-		t.Error("Unexpected owner")
+	for _, tc := range testCases {
+		owner := v1.Pod{}
+		owner.GetObjectMeta().SetUID(tc.uid)
+		got := hasOwnerRef(&target, &owner)
+		if got != tc.hasRef {
+			t.Errorf("Expected %t for %s, got %t", tc.hasRef, tc.uid, got)
+		}
+	}
+}
+
+func TestHasUnexpectedController(t *testing.T) {
+	// Each test case will be tested against a StatefulSet named "set" and a Pod named "pod" with UIDs "123".
+	testCases := []struct {
+		name                             string
+		refs                             []metav1.OwnerReference
+		shouldReportUnexpectedController bool
+	}{
+		{
+			name: "custom controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "chipmunks/v1",
+					Kind:       "CustomController",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			name: "custom non-controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "chipmunks/v1",
+					Kind:       "CustomController",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(false),
+				},
+			},
+			shouldReportUnexpectedController: false,
+		},
+		{
+			name: "custom unspecified controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "chipmunks/v1",
+					Kind:       "CustomController",
+					Name:       "simon",
+					UID:        "other-uid",
+				},
+			},
+			shouldReportUnexpectedController: false,
+		},
+		{
+			name: "other pod controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			name: "other set controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			name: "own set controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "set",
+					UID:        "set-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: false,
+		},
+		{
+			name: "own set controller, stale uid",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       "set",
+					UID:        "stale-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			name: "own pod controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: false,
+		},
+		{
+			name: "own pod controller, stale uid",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "stale-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			// API validation should prevent two controllers from being set,
+			// but for completeness it is still tested.
+			name: "own controller and another",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod-uid",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "chipmunks/v1",
+					Kind:       "CustomController",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(true),
+				},
+			},
+			shouldReportUnexpectedController: true,
+		},
+		{
+			name: "own controller and a non-controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod-uid",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "chipmunks/v1",
+					Kind:       "CustomController",
+					Name:       "simon",
+					UID:        "other-uid",
+					Controller: ptr.To(false),
+				},
+			},
+			shouldReportUnexpectedController: false,
+		},
+	}
+	for _, tc := range testCases {
+		target := &v1.PersistentVolumeClaim{}
+		target.SetOwnerReferences(tc.refs)
+		set := &apps.StatefulSet{}
+		set.SetName("set")
+		set.SetUID("set-uid")
+		pod := &v1.Pod{}
+		pod.SetName("pod")
+		pod.SetUID("pod-uid")
+		set.Spec.PersistentVolumeClaimRetentionPolicy = nil
+		if hasUnexpectedController(target, set, pod) {
+			t.Errorf("Any controller should be allowed when no retention policy (retain behavior) is specified. Incorrectly identified unexpected controller at %s", tc.name)
+		}
+		for _, policy := range []apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			{WhenDeleted: "Retain", WhenScaled: "Delete"},
+			{WhenDeleted: "Delete", WhenScaled: "Retain"},
+			{WhenDeleted: "Delete", WhenScaled: "Delete"},
+		} {
+			set.Spec.PersistentVolumeClaimRetentionPolicy = &policy
+			got := hasUnexpectedController(target, set, pod)
+			if got != tc.shouldReportUnexpectedController {
+				t.Errorf("Unexpected controller mismatch at %s (policy %v)", tc.name, policy)
+			}
+		}
+	}
+}
+
+func TestNonController(t *testing.T) {
+	testCases := []struct {
+		name string
+		refs []metav1.OwnerReference
+		// The set and pod objets will be created with names "set" and "pod", respectively.
+		setUID        types.UID
+		podUID        types.UID
+		nonController bool
+	}{
+		{
+			// API validation should prevent two controllers from being set,
+			// but for completeness the semantics here are tested.
+			name: "set and pod controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+					Controller: ptr.To(true),
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: false,
+		},
+		{
+			name: "set controller, pod noncontroller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod",
+				},
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+					Controller: ptr.To(true),
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: true,
+		},
+		{
+			name: "set noncontroller, pod controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod",
+					Controller: ptr.To(true),
+				},
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: true,
+		},
+		{
+			name: "set controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+					Controller: ptr.To(true),
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: false,
+		},
+		{
+			name: "pod controller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       "pod",
+					UID:        "pod",
+					Controller: ptr.To(true),
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: false,
+		},
+		{
+			name:          "nothing",
+			refs:          []metav1.OwnerReference{},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: false,
+		},
+		{
+			name: "set noncontroller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: true,
+		},
+		{
+			name: "set noncontroller with ptr",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Set",
+					Name:       "set",
+					UID:        "set",
+					Controller: ptr.To(false),
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: true,
+		},
+		{
+			name: "pod noncontroller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "pod",
+					Name:       "pod",
+					UID:        "pod",
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: true,
+		},
+		{
+			name: "other noncontroller",
+			refs: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "pod",
+					Name:       "pod",
+					UID:        "not-matching",
+				},
+			},
+			setUID:        "set",
+			podUID:        "pod",
+			nonController: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		claim := v1.PersistentVolumeClaim{}
+		claim.SetOwnerReferences(tc.refs)
+		pod := v1.Pod{}
+		pod.SetUID(tc.podUID)
+		pod.SetName("pod")
+		set := apps.StatefulSet{}
+		set.SetUID(tc.setUID)
+		set.SetName("set")
+		got := hasNonControllerOwner(&claim, &set, &pod)
+		if got != tc.nonController {
+			t.Errorf("Failed %s: got %t, expected %t", tc.name, got, tc.nonController)
+		}
 	}
 }
 
 func TestHasStaleOwnerRef(t *testing.T) {
-	target := v1.Pod{}
+	target := v1.PersistentVolumeClaim{}
 	target.SetOwnerReferences([]metav1.OwnerReference{
-		{Name: "bob", UID: "123"}, {Name: "shirley", UID: "456"}})
+		{Name: "bob", UID: "123", APIVersion: "v1", Kind: "Pod"},
+		{Name: "shirley", UID: "456", APIVersion: "v1", Kind: "Pod"},
+	})
 	ownerA := v1.Pod{}
 	ownerA.SetUID("123")
 	ownerA.Name = "bob"
@@ -491,90 +1424,14 @@ func TestHasStaleOwnerRef(t *testing.T) {
 	ownerC := v1.Pod{}
 	ownerC.Name = "yvonne"
 	ownerC.SetUID("345")
-	if hasStaleOwnerRef(&target, &ownerA) {
+	if hasStaleOwnerRef(&target, &ownerA, podKind) {
 		t.Error("ownerA should not be stale")
 	}
-	if !hasStaleOwnerRef(&target, &ownerB) {
+	if !hasStaleOwnerRef(&target, &ownerB, podKind) {
 		t.Error("ownerB should be stale")
 	}
-	if hasStaleOwnerRef(&target, &ownerC) {
+	if hasStaleOwnerRef(&target, &ownerC, podKind) {
 		t.Error("ownerC should not be stale")
-	}
-}
-
-func TestSetOwnerRef(t *testing.T) {
-	target := v1.Pod{}
-	ownerA := v1.Pod{}
-	ownerA.Name = "A"
-	ownerA.GetObjectMeta().SetUID("ABC")
-	if setOwnerRef(&target, &ownerA, &ownerA.TypeMeta) != true {
-		t.Errorf("Unexpected lack of update")
-	}
-	ownerRefs := target.GetObjectMeta().GetOwnerReferences()
-	if len(ownerRefs) != 1 {
-		t.Errorf("Unexpected owner ref count: %d", len(ownerRefs))
-	}
-	if ownerRefs[0].UID != "ABC" {
-		t.Errorf("Unexpected owner UID %v", ownerRefs[0].UID)
-	}
-	if setOwnerRef(&target, &ownerA, &ownerA.TypeMeta) != false {
-		t.Errorf("Unexpected update")
-	}
-	if len(target.GetObjectMeta().GetOwnerReferences()) != 1 {
-		t.Error("Unexpected duplicate reference")
-	}
-	ownerB := v1.Pod{}
-	ownerB.Name = "B"
-	ownerB.GetObjectMeta().SetUID("BCD")
-	if setOwnerRef(&target, &ownerB, &ownerB.TypeMeta) != true {
-		t.Error("Unexpected lack of second update")
-	}
-	ownerRefs = target.GetObjectMeta().GetOwnerReferences()
-	if len(ownerRefs) != 2 {
-		t.Errorf("Unexpected owner ref count: %d", len(ownerRefs))
-	}
-	if ownerRefs[0].UID != "ABC" || ownerRefs[1].UID != "BCD" {
-		t.Errorf("Bad second ownerRefs: %v", ownerRefs)
-	}
-}
-
-func TestRemoveOwnerRef(t *testing.T) {
-	target := v1.Pod{}
-	ownerA := v1.Pod{}
-	ownerA.Name = "A"
-	ownerA.GetObjectMeta().SetUID("ABC")
-	if removeOwnerRef(&target, &ownerA) != false {
-		t.Error("Unexpected update on empty remove")
-	}
-	setOwnerRef(&target, &ownerA, &ownerA.TypeMeta)
-	if removeOwnerRef(&target, &ownerA) != true {
-		t.Error("Unexpected lack of update")
-	}
-	if len(target.GetObjectMeta().GetOwnerReferences()) != 0 {
-		t.Error("Unexpected owner reference remains")
-	}
-
-	ownerB := v1.Pod{}
-	ownerB.Name = "B"
-	ownerB.GetObjectMeta().SetUID("BCD")
-
-	setOwnerRef(&target, &ownerA, &ownerA.TypeMeta)
-	if removeOwnerRef(&target, &ownerB) != false {
-		t.Error("Unexpected update for mismatched owner")
-	}
-	if len(target.GetObjectMeta().GetOwnerReferences()) != 1 {
-		t.Error("Missing ref after no-op remove")
-	}
-	setOwnerRef(&target, &ownerB, &ownerB.TypeMeta)
-	if removeOwnerRef(&target, &ownerA) != true {
-		t.Error("Missing update for second remove")
-	}
-	ownerRefs := target.GetObjectMeta().GetOwnerReferences()
-	if len(ownerRefs) != 1 {
-		t.Error("Extra ref after second remove")
-	}
-	if ownerRefs[0].UID != "BCD" {
-		t.Error("Bad UID after second remove")
 	}
 }
 

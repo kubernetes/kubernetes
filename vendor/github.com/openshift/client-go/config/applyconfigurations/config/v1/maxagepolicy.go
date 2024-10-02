@@ -2,14 +2,14 @@
 
 package v1
 
-// MaxAgePolicyApplyConfiguration represents an declarative configuration of the MaxAgePolicy type for use
+// MaxAgePolicyApplyConfiguration represents a declarative configuration of the MaxAgePolicy type for use
 // with apply.
 type MaxAgePolicyApplyConfiguration struct {
 	LargestMaxAge  *int32 `json:"largestMaxAge,omitempty"`
 	SmallestMaxAge *int32 `json:"smallestMaxAge,omitempty"`
 }
 
-// MaxAgePolicyApplyConfiguration constructs an declarative configuration of the MaxAgePolicy type for use with
+// MaxAgePolicyApplyConfiguration constructs a declarative configuration of the MaxAgePolicy type for use with
 // apply.
 func MaxAgePolicy() *MaxAgePolicyApplyConfiguration {
 	return &MaxAgePolicyApplyConfiguration{}

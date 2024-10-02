@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// FeatureGateSelectionApplyConfiguration represents an declarative configuration of the FeatureGateSelection type for use
+// FeatureGateSelectionApplyConfiguration represents a declarative configuration of the FeatureGateSelection type for use
 // with apply.
 type FeatureGateSelectionApplyConfiguration struct {
 	FeatureSet      *v1.FeatureSet                        `json:"featureSet,omitempty"`
 	CustomNoUpgrade *CustomFeatureGatesApplyConfiguration `json:"customNoUpgrade,omitempty"`
 }
 
-// FeatureGateSelectionApplyConfiguration constructs an declarative configuration of the FeatureGateSelection type for use with
+// FeatureGateSelectionApplyConfiguration constructs a declarative configuration of the FeatureGateSelection type for use with
 // apply.
 func FeatureGateSelection() *FeatureGateSelectionApplyConfiguration {
 	return &FeatureGateSelectionApplyConfiguration{}

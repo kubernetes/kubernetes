@@ -2,13 +2,13 @@
 
 package v1
 
-// ExternalPlatformSpecApplyConfiguration represents an declarative configuration of the ExternalPlatformSpec type for use
+// ExternalPlatformSpecApplyConfiguration represents a declarative configuration of the ExternalPlatformSpec type for use
 // with apply.
 type ExternalPlatformSpecApplyConfiguration struct {
 	PlatformName *string `json:"platformName,omitempty"`
 }
 
-// ExternalPlatformSpecApplyConfiguration constructs an declarative configuration of the ExternalPlatformSpec type for use with
+// ExternalPlatformSpecApplyConfiguration constructs a declarative configuration of the ExternalPlatformSpec type for use with
 // apply.
 func ExternalPlatformSpec() *ExternalPlatformSpecApplyConfiguration {
 	return &ExternalPlatformSpecApplyConfiguration{}

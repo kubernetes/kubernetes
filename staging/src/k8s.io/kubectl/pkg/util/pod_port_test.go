@@ -71,6 +71,67 @@ func TestLookupContainerPortNumberByName(t *testing.T) {
 			portnum:  int32(0),
 			err:      true,
 		},
+		{
+			name: "test success 2",
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "sql",
+									ContainerPort: int32(3306)},
+							},
+						},
+					},
+				},
+			},
+			portname: "sql",
+			portnum:  int32(3306),
+			err:      false,
+		}, {
+			name: "test failure 2",
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Ports: []v1.ContainerPort{
+								{
+									Name:          "sql",
+									ContainerPort: int32(3306)},
+							},
+						},
+					},
+				},
+			},
+			portname: "metrics",
+			portnum:  int32(0),
+			err:      true,
+		},
 	}
 
 	for _, tt := range tests {

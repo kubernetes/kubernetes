@@ -26,7 +26,7 @@
                "spec":{
                   "containers":[{
                     "name": "mock-container",
-                    "image": "registry.k8s.io/pause:3.9",
+                    "image": "registry.k8s.io/pause:3.10",
                     "ports":[{
                         "containerPort":9949,
                         "protocol":"TCP"
@@ -60,7 +60,7 @@
             "spec":{
               "containers":[{
                 "name": "mock-container",
-                "image": "registry.k8s.io/pause:3.9",
+                "image": "registry.k8s.io/pause:3.10",
                 "ports":[{
                   "containerPort":9949,
                   "protocol":"TCP"

@@ -18,11 +18,16 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"sigs.k8s.io/yaml"
+
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 )
 
 type TimeHolder struct {
@@ -100,6 +105,7 @@ func TestTimeUnmarshalJSON(t *testing.T) {
 	}{
 		{"{\"t\":null}", Time{}},
 		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"{\"t\":\"1998-05-05T05:05:05.123456789Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 123456789, time.UTC).Local()}},
 	}
 
 	for _, c := range cases {
@@ -144,6 +150,62 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 		if input.T.UnixNano() != result.T.UnixNano() {
 			t.Errorf("%d-4: Failed to marshal input '%#v': got %#v", i, input, result)
 		}
+	}
+}
+
+func TestTimeMarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   Time
+		out  []byte
+	}{
+		{name: "zero value", in: Time{}, out: []byte{0xf6}},                                                                                        // null
+		{name: "no fractional seconds", in: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), out: []byte("\x541998-05-05T05:05:05Z")},                // '1998-05-05T05:05:05Z'
+		{name: "fractional seconds truncated", in: Date(1998, time.May, 5, 5, 5, 5, 123456789, time.UTC), out: []byte("\x541998-05-05T05:05:05Z")}, // '1998-05-05T05:05:05Z'
+		{name: "epoch", in: Time{Time: time.Unix(0, 0)}, out: []byte("\x541970-01-01T00:00:00Z")},                                                  // '1970-01-01T00:00:00Z'
+		{name: "pre-epoch", in: Date(1960, time.January, 1, 0, 0, 0, 0, time.UTC), out: []byte("\x541960-01-01T00:00:00Z")},                        // '1960-01-01T00:00:00Z'
+	} {
+		t.Run(fmt.Sprintf("%+v", tc.in), func(t *testing.T) {
+			got, err := tc.in.MarshalCBOR()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.out, got); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTimeUnmarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		in         []byte
+		out        Time
+		errMessage string
+	}{
+		{name: "null", in: []byte{0xf6}, out: Time{}}, // null
+		{name: "no fractional seconds", in: []byte("\x58\x141998-05-05T05:05:05Z"), out: Time{Time: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},                    // '1998-05-05T05:05:05Z'
+		{name: "fractional seconds", in: []byte("\x58\x1e1998-05-05T05:05:05.123456789Z"), out: Time{Time: Date(1998, time.May, 5, 5, 5, 5, 123456789, time.UTC).Local()}},     // '1998-05-05T05:05:05.123456789Z'
+		{name: "invalid cbor type", in: []byte{0x07}, out: Time{}, errMessage: "cbor: cannot unmarshal positive integer into Go value of type string"},                         // 7
+		{name: "malformed timestamp", in: []byte("\x45hello"), out: Time{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got Time
+			err := got.UnmarshalCBOR(tc.in)
+			if err != nil {
+				if tc.errMessage == "" {
+					t.Fatalf("want nil error, got: %v", err)
+				} else if gotMessage := err.Error(); tc.errMessage != gotMessage {
+					t.Fatalf("want error: %q, got: %q", tc.errMessage, gotMessage)
+				}
+			} else if tc.errMessage != "" {
+				t.Fatalf("got nil error, want: %s", tc.errMessage)
+			}
+			if diff := cmp.Diff(tc.out, got); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -237,5 +299,29 @@ func TestTimeIsZero(t *testing.T) {
 				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})
+	}
+}
+
+func TestTimeRoundtripCBOR(t *testing.T) {
+	fuzzer := fuzz.New()
+	for i := 0; i < 500; i++ {
+		var initial, final Time
+		fuzzer.Fuzz(&initial)
+		b, err := cbor.Marshal(initial)
+		if err != nil {
+			t.Errorf("error encoding %v: %v", initial, err)
+			continue
+		}
+		err = cbor.Unmarshal(b, &final)
+		if err != nil {
+			t.Errorf("%v: error decoding %v: %v", initial, string(b), err)
+		}
+		if !final.Equal(&initial) {
+			diag, err := cbor.Diagnose(b)
+			if err != nil {
+				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
+			}
+			t.Errorf("expected equal: %v, %v (cbor was '%s')", initial, final, diag)
+		}
 	}
 }

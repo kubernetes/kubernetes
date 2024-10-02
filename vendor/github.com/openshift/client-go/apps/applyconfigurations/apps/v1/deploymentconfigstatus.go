@@ -2,7 +2,7 @@
 
 package v1
 
-// DeploymentConfigStatusApplyConfiguration represents an declarative configuration of the DeploymentConfigStatus type for use
+// DeploymentConfigStatusApplyConfiguration represents a declarative configuration of the DeploymentConfigStatus type for use
 // with apply.
 type DeploymentConfigStatusApplyConfiguration struct {
 	LatestVersion       *int64                                  `json:"latestVersion,omitempty"`
@@ -16,7 +16,7 @@ type DeploymentConfigStatusApplyConfiguration struct {
 	ReadyReplicas       *int32                                  `json:"readyReplicas,omitempty"`
 }
 
-// DeploymentConfigStatusApplyConfiguration constructs an declarative configuration of the DeploymentConfigStatus type for use with
+// DeploymentConfigStatusApplyConfiguration constructs a declarative configuration of the DeploymentConfigStatus type for use with
 // apply.
 func DeploymentConfigStatus() *DeploymentConfigStatusApplyConfiguration {
 	return &DeploymentConfigStatusApplyConfiguration{}

@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// APIRequestCountStatusApplyConfiguration represents an declarative configuration of the APIRequestCountStatus type for use
+// APIRequestCountStatusApplyConfiguration represents a declarative configuration of the APIRequestCountStatus type for use
 // with apply.
 type APIRequestCountStatusApplyConfiguration struct {
 	Conditions       []v1.ConditionApplyConfiguration             `json:"conditions,omitempty"`
@@ -16,7 +16,7 @@ type APIRequestCountStatusApplyConfiguration struct {
 	Last24h          []PerResourceAPIRequestLogApplyConfiguration `json:"last24h,omitempty"`
 }
 
-// APIRequestCountStatusApplyConfiguration constructs an declarative configuration of the APIRequestCountStatus type for use with
+// APIRequestCountStatusApplyConfiguration constructs a declarative configuration of the APIRequestCountStatus type for use with
 // apply.
 func APIRequestCountStatus() *APIRequestCountStatusApplyConfiguration {
 	return &APIRequestCountStatusApplyConfiguration{}

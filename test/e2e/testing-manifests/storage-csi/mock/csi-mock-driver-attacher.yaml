@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.5.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.6.1
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

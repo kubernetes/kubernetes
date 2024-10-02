@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
@@ -22,17 +11,19 @@ import (
 	"path/filepath"
 	"runtime"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-type pidProvider func() int
-type executablePathProvider func() (string, error)
-type commandArgsProvider func() []string
-type ownerProvider func() (*user.User, error)
-type runtimeNameProvider func() string
-type runtimeVersionProvider func() string
-type runtimeOSProvider func() string
-type runtimeArchProvider func() string
+type (
+	pidProvider            func() int
+	executablePathProvider func() (string, error)
+	commandArgsProvider    func() []string
+	ownerProvider          func() (*user.User, error)
+	runtimeNameProvider    func() string
+	runtimeVersionProvider func() string
+	runtimeOSProvider      func() string
+	runtimeArchProvider    func() string
+)
 
 var (
 	defaultPidProvider            pidProvider            = os.Getpid
@@ -108,14 +99,16 @@ func setUserProviders(ownerProvider ownerProvider) {
 	owner = ownerProvider
 }
 
-type processPIDDetector struct{}
-type processExecutableNameDetector struct{}
-type processExecutablePathDetector struct{}
-type processCommandArgsDetector struct{}
-type processOwnerDetector struct{}
-type processRuntimeNameDetector struct{}
-type processRuntimeVersionDetector struct{}
-type processRuntimeDescriptionDetector struct{}
+type (
+	processPIDDetector                struct{}
+	processExecutableNameDetector     struct{}
+	processExecutablePathDetector     struct{}
+	processCommandArgsDetector        struct{}
+	processOwnerDetector              struct{}
+	processRuntimeNameDetector        struct{}
+	processRuntimeVersionDetector     struct{}
+	processRuntimeDescriptionDetector struct{}
+)
 
 // Detect returns a *Resource that describes the process identifier (PID) of the
 // executing process.

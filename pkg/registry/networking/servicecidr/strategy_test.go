@@ -43,10 +43,6 @@ func TestServiceCIDRStrategy(t *testing.T) {
 		t.Errorf("Expected ServiceCIDR to be cluster-scoped")
 	}
 
-	resetFields := Strategy.GetResetFields()
-	if len(resetFields) != 1 {
-		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
-	}
 	obj := &networking.ServiceCIDR{Spec: networking.ServiceCIDRSpec{CIDRs: []string{"bad cidr"}}}
 
 	errors := Strategy.Validate(context.TODO(), obj)
@@ -64,11 +60,6 @@ func TestServiceCIDRStrategy(t *testing.T) {
 }
 
 func TestServiceCIDRStatusStrategy(t *testing.T) {
-	resetFields := StatusStrategy.GetResetFields()
-	if len(resetFields) != 1 {
-		t.Errorf("ResetFields should have 1 element, but have %d", len(resetFields))
-	}
-
 	oldObj := &networking.ServiceCIDR{Spec: networking.ServiceCIDRSpec{}}
 	newObj := &networking.ServiceCIDR{
 		Spec: networking.ServiceCIDRSpec{

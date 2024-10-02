@@ -912,7 +912,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       ]
     },
@@ -1191,6 +1191,35 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "volumeattributesclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "VolumeAttributesClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "vac"
+              ],
+              "singularResource": "volumeattributesclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
         },
         {
           "freshness": "Current",
@@ -1602,6 +1631,32 @@
             }
           ],
           "version": "v1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "leasecandidates",
+              "responseKind": {
+                "group": "",
+                "kind": "LeaseCandidate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "leasecandidate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },
@@ -1892,6 +1947,26 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "deviceclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "deviceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "podschedulingcontexts",
               "responseKind": {
                 "group": "",
@@ -1915,26 +1990,6 @@
                   ]
                 }
               ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceclaimparameters",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClaimParameters",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclaimparameters",
               "verbs": [
                 "create",
                 "delete",
@@ -2002,46 +2057,6 @@
               ]
             },
             {
-              "resource": "resourceclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "resourceclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceclassparameters",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClassParameters",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclassparameters",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "resourceslices",
               "responseKind": {
                 "group": "",
@@ -2062,7 +2077,7 @@
               ]
             }
           ],
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },

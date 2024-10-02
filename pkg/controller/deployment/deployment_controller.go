@@ -94,7 +94,7 @@ type DeploymentController struct {
 	podListerSynced cache.InformerSynced
 
 	// Deployments that need to be synced
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewDeploymentController creates a new DeploymentController.
@@ -105,7 +105,12 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		client:           client,
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "deployment",
+			},
+		),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -486,19 +491,19 @@ func (dc *DeploymentController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer dc.queue.Done(key)
 
-	err := dc.syncHandler(ctx, key.(string))
+	err := dc.syncHandler(ctx, key)
 	dc.handleErr(ctx, err, key)
 
 	return true
 }
 
-func (dc *DeploymentController) handleErr(ctx context.Context, err error, key interface{}) {
+func (dc *DeploymentController) handleErr(ctx context.Context, err error, key string) {
 	logger := klog.FromContext(ctx)
 	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
 	}
-	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key)
 	if keyErr != nil {
 		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
 	}

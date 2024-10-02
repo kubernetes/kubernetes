@@ -2,7 +2,7 @@
 
 package v1
 
-// OpenIDIdentityProviderApplyConfiguration represents an declarative configuration of the OpenIDIdentityProvider type for use
+// OpenIDIdentityProviderApplyConfiguration represents a declarative configuration of the OpenIDIdentityProvider type for use
 // with apply.
 type OpenIDIdentityProviderApplyConfiguration struct {
 	ClientID                 *string                                   `json:"clientID,omitempty"`
@@ -14,7 +14,7 @@ type OpenIDIdentityProviderApplyConfiguration struct {
 	Claims                   *OpenIDClaimsApplyConfiguration           `json:"claims,omitempty"`
 }
 
-// OpenIDIdentityProviderApplyConfiguration constructs an declarative configuration of the OpenIDIdentityProvider type for use with
+// OpenIDIdentityProviderApplyConfiguration constructs a declarative configuration of the OpenIDIdentityProvider type for use with
 // apply.
 func OpenIDIdentityProvider() *OpenIDIdentityProviderApplyConfiguration {
 	return &OpenIDIdentityProviderApplyConfiguration{}

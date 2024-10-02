@@ -60,16 +60,19 @@ type SecurityContextConstraints struct {
 	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
 	// DefaultAddCapabilities and RequiredDropCapabilities.
 	// +nullable
+	// +listType=atomic
 	DefaultAddCapabilities []corev1.Capability `json:"defaultAddCapabilities" protobuf:"bytes,4,rep,name=defaultAddCapabilities,casttype=Capability"`
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
 	// are required to be dropped and cannot be added.
 	// +nullable
+	// +listType=atomic
 	RequiredDropCapabilities []corev1.Capability `json:"requiredDropCapabilities" protobuf:"bytes,5,rep,name=requiredDropCapabilities,casttype=Capability"`
 	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
 	// Capabilities in this field maybe added at the pod author's discretion.
 	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
 	// To allow all capabilities you may use '*'.
 	// +nullable
+	// +listType=atomic
 	AllowedCapabilities []corev1.Capability `json:"allowedCapabilities" protobuf:"bytes,6,rep,name=allowedCapabilities,casttype=Capability"`
 	// AllowHostDirVolumePlugin determines if the policy allow containers to use the HostDir volume plugin
 	// +k8s:conversion-gen=false
@@ -78,12 +81,14 @@ type SecurityContextConstraints struct {
 	// of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use "*".
 	// To allow no volumes, set to ["none"].
 	// +nullable
+	// +listType=atomic
 	Volumes []FSType `json:"volumes" protobuf:"bytes,8,rep,name=volumes,casttype=FSType"`
 	// AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
 	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
 	// is allowed in the "Volumes" field.
 	// +optional
 	// +nullable
+	// +listType=atomic
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,21,rep,name=allowedFlexVolumes"`
 	// AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
 	AllowHostNetwork bool `json:"allowHostNetwork" protobuf:"varint,9,opt,name=allowHostNetwork"`
@@ -93,6 +98,17 @@ type SecurityContextConstraints struct {
 	AllowHostPID bool `json:"allowHostPID" protobuf:"varint,11,opt,name=allowHostPID"`
 	// AllowHostIPC determines if the policy allows host ipc in the containers.
 	AllowHostIPC bool `json:"allowHostIPC" protobuf:"varint,12,opt,name=allowHostIPC"`
+	// userNamespaceLevel determines if the policy allows host users in containers.
+	// Valid values are "AllowHostLevel", "RequirePodLevel", and omitted.
+	// When "AllowHostLevel" is set, a pod author may set `hostUsers` to either `true` or `false`.
+	// When "RequirePodLevel" is set, a pod author must set `hostUsers` to `false`.
+	// When omitted, the default value is "AllowHostLevel".
+	// +openshift:enable:FeatureGate=UserNamespacesPodSecurityStandards
+	// +kubebuilder:validation:Enum="AllowHostLevel";"RequirePodLevel"
+	// +kubebuilder:default:="AllowHostLevel"
+	// +default="AllowHostLevel"
+	// +optional
+	UserNamespaceLevel NamespaceLevelType `json:"userNamespaceLevel,omitempty" protobuf:"bytes,26,opt,name=userNamespaceLevel"`
 	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
 	// process can gain more privileges than its parent process.
 	// +optional
@@ -125,10 +141,12 @@ type SecurityContextConstraints struct {
 	// The users who have permissions to use this security context constraints
 	// +optional
 	// +nullable
+	// +listType=atomic
 	Users []string `json:"users" protobuf:"bytes,18,rep,name=users"`
 	// The groups that have permission to use this security context constraints
 	// +optional
 	// +nullable
+	// +listType=atomic
 	Groups []string `json:"groups" protobuf:"bytes,19,rep,name=groups"`
 
 	// SeccompProfiles lists the allowed profiles that may be set for the pod or
@@ -137,6 +155,7 @@ type SecurityContextConstraints struct {
 	// used to generate a value for a pod the first non-wildcard profile will be used as
 	// the default.
 	// +nullable
+	// +listType=atomic
 	SeccompProfiles []string `json:"seccompProfiles,omitempty" protobuf:"bytes,20,opt,name=seccompProfiles"`
 
 	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
@@ -149,6 +168,7 @@ type SecurityContextConstraints struct {
 	// e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
 	// +optional
 	// +nullable
+	// +listType=atomic
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty" protobuf:"bytes,24,rep,name=allowedUnsafeSysctls"`
 	// ForbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
@@ -159,6 +179,7 @@ type SecurityContextConstraints struct {
 	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
 	// +optional
 	// +nullable
+	// +listType=atomic
 	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,25,rep,name=forbiddenSysctls"`
 }
 
@@ -195,6 +216,7 @@ var (
 	FSStorageOS                 FSType = "storageOS"
 	FSTypeCSI                   FSType = "csi"
 	FSTypeEphemeral             FSType = "ephemeral"
+	FSTypeImage                 FSType = "image"
 	FSTypeAll                   FSType = "*"
 	FSTypeNone                  FSType = "none"
 )
@@ -232,6 +254,7 @@ type FSGroupStrategyOptions struct {
 	Type FSGroupStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=FSGroupStrategyType"`
 	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
 	// fs group then supply a single range with the same start and end.
+	// +listType=atomic
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
 
@@ -241,6 +264,7 @@ type SupplementalGroupsStrategyOptions struct {
 	Type SupplementalGroupsStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=SupplementalGroupsStrategyType"`
 	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
 	// supplemental group then supply a single range with the same start and end.
+	// +listType=atomic
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
 
@@ -252,6 +276,9 @@ type IDRange struct {
 	// Max is the end of the range, inclusive.
 	Max int64 `json:"max,omitempty" protobuf:"varint,2,opt,name=max"`
 }
+
+// NamespaceLevelType shows the allowable values for the UserNamespaceLevel field.
+type NamespaceLevelType string
 
 // SELinuxContextStrategyType denotes strategy types for generating SELinux options for a
 // SecurityContext
@@ -270,6 +297,11 @@ type SupplementalGroupsStrategyType string
 type FSGroupStrategyType string
 
 const (
+	// NamespaceLevelAllowHost allows a pod to set `hostUsers` field to either `true` or `false`
+	NamespaceLevelAllowHost NamespaceLevelType = "AllowHostLevel"
+	// NamespaceLevelRequirePod requires the `hostUsers` field be `false` in a pod.
+	NamespaceLevelRequirePod NamespaceLevelType = "RequirePodLevel"
+
 	// container must have SELinux labels of X applied.
 	SELinuxStrategyMustRunAs SELinuxContextStrategyType = "MustRunAs"
 	// container may make requests for any SELinux context labels.
@@ -323,6 +355,10 @@ type SecurityContextConstraintsList struct {
 type PodSecurityPolicySubjectReview struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
+
 	// spec defines specification for the PodSecurityPolicySubjectReview.
 	Spec PodSecurityPolicySubjectReviewSpec `json:"spec" protobuf:"bytes,1,opt,name=spec"`
 
@@ -372,6 +408,10 @@ type PodSecurityPolicySubjectReviewStatus struct {
 type PodSecurityPolicySelfSubjectReview struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
+
 	// spec defines specification the PodSecurityPolicySelfSubjectReview.
 	Spec PodSecurityPolicySelfSubjectReviewSpec `json:"spec" protobuf:"bytes,1,opt,name=spec"`
 
@@ -395,6 +435,10 @@ type PodSecurityPolicySelfSubjectReviewSpec struct {
 // +openshift:compatibility-gen:level=2
 type PodSecurityPolicyReview struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
 
 	// spec is the PodSecurityPolicy to check.
 	Spec PodSecurityPolicyReviewSpec `json:"spec" protobuf:"bytes,1,opt,name=spec"`

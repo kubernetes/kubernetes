@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type ValidatingAdmissionPolicyLister interface {
 
 // validatingAdmissionPolicyLister implements the ValidatingAdmissionPolicyLister interface.
 type validatingAdmissionPolicyLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ValidatingAdmissionPolicy]
 }
 
 // NewValidatingAdmissionPolicyLister returns a new ValidatingAdmissionPolicyLister.
 func NewValidatingAdmissionPolicyLister(indexer cache.Indexer) ValidatingAdmissionPolicyLister {
-	return &validatingAdmissionPolicyLister{indexer: indexer}
-}
-
-// List lists all ValidatingAdmissionPolicies in the indexer.
-func (s *validatingAdmissionPolicyLister) List(selector labels.Selector) (ret []*v1.ValidatingAdmissionPolicy, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ValidatingAdmissionPolicy))
-	})
-	return ret, err
-}
-
-// Get retrieves the ValidatingAdmissionPolicy from the index for a given name.
-func (s *validatingAdmissionPolicyLister) Get(name string) (*v1.ValidatingAdmissionPolicy, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("validatingadmissionpolicy"), name)
-	}
-	return obj.(*v1.ValidatingAdmissionPolicy), nil
+	return &validatingAdmissionPolicyLister{listers.New[*v1.ValidatingAdmissionPolicy](indexer, v1.Resource("validatingadmissionpolicy"))}
 }

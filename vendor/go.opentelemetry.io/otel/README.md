@@ -11,17 +11,11 @@ It provides a set of APIs to directly measure performance and behavior of your s
 
 ## Project Status
 
-| Signal  | Status     | Project               |
-|---------|------------|-----------------------|
-| Traces  | Stable     | N/A                   |
-| Metrics | Mixed [1]  | [Go: Metric SDK (GA)] |
-| Logs    | Frozen [2] | N/A                   |
-
-[Go: Metric SDK (GA)]: https://github.com/orgs/open-telemetry/projects/34
-
-- [1]: [Metrics API](https://pkg.go.dev/go.opentelemetry.io/otel/metric) is Stable. [Metrics SDK](https://pkg.go.dev/go.opentelemetry.io/otel/sdk/metric) is Beta.
-- [2]: The Logs signal development is halted for this project while we stabilize the Metrics SDK.
-   No Logs Pull Requests are currently being accepted.
+| Signal  | Status             |
+|---------|--------------------|
+| Traces  | Stable             |
+| Metrics | Stable             |
+| Logs    | Beta[^1]           |
 
 Progress and status specific to this repository is tracked in our
 [project boards](https://github.com/open-telemetry/opentelemetry-go/projects)
@@ -30,6 +24,8 @@ and
 
 Project versioning information and stability guarantees can be found in the
 [versioning documentation](VERSIONING.md).
+
+[^1]: https://github.com/orgs/open-telemetry/projects/43
 
 ### Compatibility
 
@@ -53,23 +49,25 @@ Currently, this project supports the following environments.
 
 | OS      | Go Version | Architecture |
 |---------|------------|--------------|
+| Ubuntu  | 1.22       | amd64        |
 | Ubuntu  | 1.21       | amd64        |
-| Ubuntu  | 1.20       | amd64        |
+| Ubuntu  | 1.22       | 386          |
 | Ubuntu  | 1.21       | 386          |
-| Ubuntu  | 1.20       | 386          |
+| Linux   | 1.22       | arm64        |
+| Linux   | 1.21       | arm64        |
+| MacOS   | 1.22       | amd64        |
 | MacOS   | 1.21       | amd64        |
-| MacOS   | 1.20       | amd64        |
+| Windows | 1.22       | amd64        |
 | Windows | 1.21       | amd64        |
-| Windows | 1.20       | amd64        |
+| Windows | 1.22       | 386          |
 | Windows | 1.21       | 386          |
-| Windows | 1.20       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.
 
 ## Getting Started
 
-You can find a getting started guide on [opentelemetry.io](https://opentelemetry.io/docs/go/getting-started/).
+You can find a getting started guide on [opentelemetry.io](https://opentelemetry.io/docs/languages/go/getting-started/).
 
 OpenTelemetry's goal is to provide a single set of APIs to capture distributed
 traces and metrics from your application and send them to an observability
@@ -99,12 +97,12 @@ export pipeline to send that telemetry to an observability platform.
 
 All officially supported exporters for the OpenTelemetry project are contained in the [exporters directory](./exporters).
 
-| Exporter                              | Metrics | Traces |
-|---------------------------------------|:-------:|:------:|
-| [OTLP](./exporters/otlp/)             |    ✓    |   ✓    |
-| [Prometheus](./exporters/prometheus/) |    ✓    |        |
-| [stdout](./exporters/stdout/)         |    ✓    |   ✓    |
-| [Zipkin](./exporters/zipkin/)         |         |   ✓    |
+| Exporter                              | Logs | Metrics | Traces |
+|---------------------------------------|:----:|:-------:|:------:|
+| [OTLP](./exporters/otlp/)             |  ✓   |    ✓    |   ✓    |
+| [Prometheus](./exporters/prometheus/) |      |    ✓    |        |
+| [stdout](./exporters/stdout/)         |  ✓   |    ✓    |   ✓    |
+| [Zipkin](./exporters/zipkin/)         |      |         |   ✓    |
 
 ## Contributing
 

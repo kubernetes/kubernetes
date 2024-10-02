@@ -2,7 +2,7 @@
 
 package v1
 
-// RecreateDeploymentStrategyParamsApplyConfiguration represents an declarative configuration of the RecreateDeploymentStrategyParams type for use
+// RecreateDeploymentStrategyParamsApplyConfiguration represents a declarative configuration of the RecreateDeploymentStrategyParams type for use
 // with apply.
 type RecreateDeploymentStrategyParamsApplyConfiguration struct {
 	TimeoutSeconds *int64                           `json:"timeoutSeconds,omitempty"`
@@ -11,7 +11,7 @@ type RecreateDeploymentStrategyParamsApplyConfiguration struct {
 	Post           *LifecycleHookApplyConfiguration `json:"post,omitempty"`
 }
 
-// RecreateDeploymentStrategyParamsApplyConfiguration constructs an declarative configuration of the RecreateDeploymentStrategyParams type for use with
+// RecreateDeploymentStrategyParamsApplyConfiguration constructs a declarative configuration of the RecreateDeploymentStrategyParams type for use with
 // apply.
 func RecreateDeploymentStrategyParams() *RecreateDeploymentStrategyParamsApplyConfiguration {
 	return &RecreateDeploymentStrategyParamsApplyConfiguration{}

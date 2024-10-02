@@ -35,7 +35,7 @@ message ClusterRoleScopeRestriction {
 message OAuthAccessToken {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // ClientName references the client that created this token.
   optional string clientName = 2;
@@ -74,7 +74,7 @@ message OAuthAccessToken {
 message OAuthAccessTokenList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of OAuth access tokens
   repeated OAuthAccessToken items = 2;
@@ -87,7 +87,7 @@ message OAuthAccessTokenList {
 message OAuthAuthorizeToken {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // ClientName references the client that created this token.
   optional string clientName = 2;
@@ -125,7 +125,7 @@ message OAuthAuthorizeToken {
 message OAuthAuthorizeTokenList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of OAuth authorization tokens
   repeated OAuthAuthorizeToken items = 2;
@@ -138,7 +138,7 @@ message OAuthAuthorizeTokenList {
 message OAuthClient {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Secret is the unique secret associated with a client
   optional string secret = 2;
@@ -192,7 +192,7 @@ message OAuthClient {
 message OAuthClientAuthorization {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // ClientName references the client that created this authorization
   optional string clientName = 2;
@@ -215,7 +215,7 @@ message OAuthClientAuthorization {
 message OAuthClientAuthorizationList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of OAuth client authorizations
   repeated OAuthClientAuthorization items = 2;
@@ -228,7 +228,7 @@ message OAuthClientAuthorizationList {
 message OAuthClientList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of OAuth clients
   repeated OAuthClient items = 2;
@@ -241,7 +241,7 @@ message OAuthClientList {
 message OAuthRedirectReference {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The reference to an redirect object in the current namespace.
   optional RedirectReference reference = 2;
@@ -274,7 +274,7 @@ message ScopeRestriction {
 message UserOAuthAccessToken {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // ClientName references the client that created this token.
   optional string clientName = 2;
@@ -314,7 +314,7 @@ message UserOAuthAccessToken {
 message UserOAuthAccessTokenList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated UserOAuthAccessToken items = 2;
 }

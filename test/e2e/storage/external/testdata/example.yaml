@@ -1,5 +1,7 @@
 StorageClass:
   FromExistingClassName: example
+VolumeAttributesClass:
+  FromExistingClassName: example-vac
 DriverInfo:
   Name: example
   RequiredAccessModes:

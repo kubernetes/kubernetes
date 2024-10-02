@@ -81,7 +81,7 @@ type autoRegisterController struct {
 	apiServicesAtStart map[string]bool
 
 	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewAutoRegisterController creates a new autoRegisterController.
@@ -97,7 +97,10 @@ func NewAutoRegisterController(apiServiceInformer informers.APIServiceInformer, 
 		syncedSuccessfullyLock: &sync.RWMutex{},
 		syncedSuccessfully:     map[string]bool{},
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "autoregister"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "autoregister"},
+		),
 	}
 	c.syncHandler = c.checkAPIService
 
@@ -182,7 +185,7 @@ func (c *autoRegisterController) processNextWorkItem() bool {
 	defer c.queue.Done(key)
 
 	// do your work on the key.  This method will contains your "do stuff" logic
-	err := c.syncHandler(key.(string))
+	err := c.syncHandler(key)
 	if err == nil {
 		// if you had no error, tell the queue to stop tracking history for your key.  This will
 		// reset things like failure counts for per-item rate limiting

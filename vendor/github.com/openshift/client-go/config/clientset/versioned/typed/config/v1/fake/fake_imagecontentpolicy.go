@@ -27,20 +27,22 @@ var imagecontentpoliciesKind = v1.SchemeGroupVersion.WithKind("ImageContentPolic
 
 // Get takes name of the imageContentPolicy, and returns the corresponding imageContentPolicy object, and an error if there is any.
 func (c *FakeImageContentPolicies) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ImageContentPolicy, err error) {
+	emptyResult := &v1.ImageContentPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(imagecontentpoliciesResource, name), &v1.ImageContentPolicy{})
+		Invokes(testing.NewRootGetActionWithOptions(imagecontentpoliciesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ImageContentPolicy), err
 }
 
 // List takes label and field selectors, and returns the list of ImageContentPolicies that match those selectors.
 func (c *FakeImageContentPolicies) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ImageContentPolicyList, err error) {
+	emptyResult := &v1.ImageContentPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(imagecontentpoliciesResource, imagecontentpoliciesKind, opts), &v1.ImageContentPolicyList{})
+		Invokes(testing.NewRootListActionWithOptions(imagecontentpoliciesResource, imagecontentpoliciesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,25 +61,27 @@ func (c *FakeImageContentPolicies) List(ctx context.Context, opts metav1.ListOpt
 // Watch returns a watch.Interface that watches the requested imageContentPolicies.
 func (c *FakeImageContentPolicies) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(imagecontentpoliciesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(imagecontentpoliciesResource, opts))
 }
 
 // Create takes the representation of a imageContentPolicy and creates it.  Returns the server's representation of the imageContentPolicy, and an error, if there is any.
 func (c *FakeImageContentPolicies) Create(ctx context.Context, imageContentPolicy *v1.ImageContentPolicy, opts metav1.CreateOptions) (result *v1.ImageContentPolicy, err error) {
+	emptyResult := &v1.ImageContentPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(imagecontentpoliciesResource, imageContentPolicy), &v1.ImageContentPolicy{})
+		Invokes(testing.NewRootCreateActionWithOptions(imagecontentpoliciesResource, imageContentPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ImageContentPolicy), err
 }
 
 // Update takes the representation of a imageContentPolicy and updates it. Returns the server's representation of the imageContentPolicy, and an error, if there is any.
 func (c *FakeImageContentPolicies) Update(ctx context.Context, imageContentPolicy *v1.ImageContentPolicy, opts metav1.UpdateOptions) (result *v1.ImageContentPolicy, err error) {
+	emptyResult := &v1.ImageContentPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(imagecontentpoliciesResource, imageContentPolicy), &v1.ImageContentPolicy{})
+		Invokes(testing.NewRootUpdateActionWithOptions(imagecontentpoliciesResource, imageContentPolicy, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ImageContentPolicy), err
 }
@@ -91,7 +95,7 @@ func (c *FakeImageContentPolicies) Delete(ctx context.Context, name string, opts
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeImageContentPolicies) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(imagecontentpoliciesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(imagecontentpoliciesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ImageContentPolicyList{})
 	return err
@@ -99,10 +103,11 @@ func (c *FakeImageContentPolicies) DeleteCollection(ctx context.Context, opts me
 
 // Patch applies the patch and returns the patched imageContentPolicy.
 func (c *FakeImageContentPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageContentPolicy, err error) {
+	emptyResult := &v1.ImageContentPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagecontentpoliciesResource, name, pt, data, subresources...), &v1.ImageContentPolicy{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagecontentpoliciesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ImageContentPolicy), err
 }
@@ -120,10 +125,11 @@ func (c *FakeImageContentPolicies) Apply(ctx context.Context, imageContentPolicy
 	if name == nil {
 		return nil, fmt.Errorf("imageContentPolicy.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ImageContentPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(imagecontentpoliciesResource, *name, types.ApplyPatchType, data), &v1.ImageContentPolicy{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagecontentpoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ImageContentPolicy), err
 }

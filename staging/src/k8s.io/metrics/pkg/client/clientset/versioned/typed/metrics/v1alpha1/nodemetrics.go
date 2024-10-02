@@ -20,11 +20,10 @@ package v1alpha1
 
 import (
 	"context"
-	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -45,54 +44,18 @@ type NodeMetricsInterface interface {
 
 // nodeMetricses implements NodeMetricsInterface
 type nodeMetricses struct {
-	client rest.Interface
+	*gentype.ClientWithList[*v1alpha1.NodeMetrics, *v1alpha1.NodeMetricsList]
 }
 
 // newNodeMetricses returns a NodeMetricses
 func newNodeMetricses(c *MetricsV1alpha1Client) *nodeMetricses {
 	return &nodeMetricses{
-		client: c.RESTClient(),
+		gentype.NewClientWithList[*v1alpha1.NodeMetrics, *v1alpha1.NodeMetricsList](
+			"nodes",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1alpha1.NodeMetrics { return &v1alpha1.NodeMetrics{} },
+			func() *v1alpha1.NodeMetricsList { return &v1alpha1.NodeMetricsList{} }),
 	}
-}
-
-// Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
-func (c *nodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
-	result = &v1alpha1.NodeMetrics{}
-	err = c.client.Get().
-		Resource("nodes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
-func (c *nodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.NodeMetricsList{}
-	err = c.client.Get().
-		Resource("nodes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested nodeMetricses.
-func (c *nodeMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("nodes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
 }

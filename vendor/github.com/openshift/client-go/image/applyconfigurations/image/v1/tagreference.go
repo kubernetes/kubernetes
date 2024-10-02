@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// TagReferenceApplyConfiguration represents an declarative configuration of the TagReference type for use
+// TagReferenceApplyConfiguration represents a declarative configuration of the TagReference type for use
 // with apply.
 type TagReferenceApplyConfiguration struct {
 	Name            *string                               `json:"name,omitempty"`
@@ -18,7 +18,7 @@ type TagReferenceApplyConfiguration struct {
 	ReferencePolicy *TagReferencePolicyApplyConfiguration `json:"referencePolicy,omitempty"`
 }
 
-// TagReferenceApplyConfiguration constructs an declarative configuration of the TagReference type for use with
+// TagReferenceApplyConfiguration constructs a declarative configuration of the TagReference type for use with
 // apply.
 func TagReference() *TagReferenceApplyConfiguration {
 	return &TagReferenceApplyConfiguration{}

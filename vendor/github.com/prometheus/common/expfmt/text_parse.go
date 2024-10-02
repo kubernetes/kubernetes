@@ -16,6 +16,7 @@ package expfmt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -24,8 +25,9 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/prometheus/common/model"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/prometheus/common/model"
 )
 
 // A stateFn is a function that represents a state in a state machine. By
@@ -112,7 +114,7 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 	// stream. Turn this error into something nicer and more
 	// meaningful. (io.EOF is often used as a signal for the legitimate end
 	// of an input stream.)
-	if p.err == io.EOF {
+	if p.err != nil && errors.Is(p.err, io.EOF) {
 		p.parseError("unexpected end of input stream")
 	}
 	return p.metricFamiliesByName, p.err
@@ -146,7 +148,7 @@ func (p *TextParser) startOfLine() stateFn {
 		// which is not an error but the signal that we are done.
 		// Any other error that happens to align with the start of
 		// a line is still an error.
-		if p.err == io.EOF {
+		if errors.Is(p.err, io.EOF) {
 			p.err = nil
 		}
 		return nil

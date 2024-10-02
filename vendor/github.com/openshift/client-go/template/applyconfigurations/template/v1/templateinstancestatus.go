@@ -2,14 +2,14 @@
 
 package v1
 
-// TemplateInstanceStatusApplyConfiguration represents an declarative configuration of the TemplateInstanceStatus type for use
+// TemplateInstanceStatusApplyConfiguration represents a declarative configuration of the TemplateInstanceStatus type for use
 // with apply.
 type TemplateInstanceStatusApplyConfiguration struct {
 	Conditions []TemplateInstanceConditionApplyConfiguration `json:"conditions,omitempty"`
 	Objects    []TemplateInstanceObjectApplyConfiguration    `json:"objects,omitempty"`
 }
 
-// TemplateInstanceStatusApplyConfiguration constructs an declarative configuration of the TemplateInstanceStatus type for use with
+// TemplateInstanceStatusApplyConfiguration constructs a declarative configuration of the TemplateInstanceStatus type for use with
 // apply.
 func TemplateInstanceStatus() *TemplateInstanceStatusApplyConfiguration {
 	return &TemplateInstanceStatusApplyConfiguration{}

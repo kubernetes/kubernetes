@@ -18,10 +18,11 @@ package operationexecutor
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"strconv"
 	"testing"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -680,20 +681,6 @@ func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.P
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
-		startOperationAndBlock(fopg.ch, fopg.quit)
-		return volumetypes.NewOperationContext(nil, nil, false)
-	}
-	return volumetypes.GeneratedOperations{
-		OperationFunc: opFunc,
-	}, nil
-}
-
-func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(
-	pluginNodeVolumes map[types.NodeName][]*volume.Spec,
-	pluginNane string,
-	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
-	actualStateOfWorldAttacherUpdater ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return volumetypes.NewOperationContext(nil, nil, false)

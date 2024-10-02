@@ -40,22 +40,24 @@ var podmetricsesKind = v1beta1.SchemeGroupVersion.WithKind("PodMetrics")
 
 // Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
 func (c *FakePodMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodMetrics, err error) {
+	emptyResult := &v1beta1.PodMetrics{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), &v1beta1.PodMetrics{})
+		Invokes(testing.NewGetActionWithOptions(podmetricsesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.PodMetrics), err
 }
 
 // List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
 func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodMetricsList, err error) {
+	emptyResult := &v1beta1.PodMetricsList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), &v1beta1.PodMetricsList{})
+		Invokes(testing.NewListActionWithOptions(podmetricsesResource, podmetricsesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -74,6 +76,6 @@ func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested podMetricses.
 func (c *FakePodMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(podmetricsesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(podmetricsesResource, c.ns, opts))
 
 }

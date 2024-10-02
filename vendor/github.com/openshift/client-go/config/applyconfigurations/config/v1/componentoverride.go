@@ -2,7 +2,7 @@
 
 package v1
 
-// ComponentOverrideApplyConfiguration represents an declarative configuration of the ComponentOverride type for use
+// ComponentOverrideApplyConfiguration represents a declarative configuration of the ComponentOverride type for use
 // with apply.
 type ComponentOverrideApplyConfiguration struct {
 	Kind      *string `json:"kind,omitempty"`
@@ -12,7 +12,7 @@ type ComponentOverrideApplyConfiguration struct {
 	Unmanaged *bool   `json:"unmanaged,omitempty"`
 }
 
-// ComponentOverrideApplyConfiguration constructs an declarative configuration of the ComponentOverride type for use with
+// ComponentOverrideApplyConfiguration constructs a declarative configuration of the ComponentOverride type for use with
 // apply.
 func ComponentOverride() *ComponentOverrideApplyConfiguration {
 	return &ComponentOverrideApplyConfiguration{}

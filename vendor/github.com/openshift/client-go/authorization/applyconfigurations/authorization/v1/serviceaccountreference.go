@@ -2,14 +2,14 @@
 
 package v1
 
-// ServiceAccountReferenceApplyConfiguration represents an declarative configuration of the ServiceAccountReference type for use
+// ServiceAccountReferenceApplyConfiguration represents a declarative configuration of the ServiceAccountReference type for use
 // with apply.
 type ServiceAccountReferenceApplyConfiguration struct {
 	Name      *string `json:"name,omitempty"`
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// ServiceAccountReferenceApplyConfiguration constructs an declarative configuration of the ServiceAccountReference type for use with
+// ServiceAccountReferenceApplyConfiguration constructs a declarative configuration of the ServiceAccountReference type for use with
 // apply.
 func ServiceAccountReference() *ServiceAccountReferenceApplyConfiguration {
 	return &ServiceAccountReferenceApplyConfiguration{}

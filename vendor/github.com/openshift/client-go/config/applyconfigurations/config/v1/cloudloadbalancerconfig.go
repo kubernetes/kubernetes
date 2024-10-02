@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// CloudLoadBalancerConfigApplyConfiguration represents an declarative configuration of the CloudLoadBalancerConfig type for use
+// CloudLoadBalancerConfigApplyConfiguration represents a declarative configuration of the CloudLoadBalancerConfig type for use
 // with apply.
 type CloudLoadBalancerConfigApplyConfiguration struct {
 	DNSType       *v1.DNSType                             `json:"dnsType,omitempty"`
 	ClusterHosted *CloudLoadBalancerIPsApplyConfiguration `json:"clusterHosted,omitempty"`
 }
 
-// CloudLoadBalancerConfigApplyConfiguration constructs an declarative configuration of the CloudLoadBalancerConfig type for use with
+// CloudLoadBalancerConfigApplyConfiguration constructs a declarative configuration of the CloudLoadBalancerConfig type for use with
 // apply.
 func CloudLoadBalancerConfig() *CloudLoadBalancerConfigApplyConfiguration {
 	return &CloudLoadBalancerConfigApplyConfiguration{}

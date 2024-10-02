@@ -2,7 +2,7 @@
 
 package v1
 
-// GitBuildSourceApplyConfiguration represents an declarative configuration of the GitBuildSource type for use
+// GitBuildSourceApplyConfiguration represents a declarative configuration of the GitBuildSource type for use
 // with apply.
 type GitBuildSourceApplyConfiguration struct {
 	URI                           *string `json:"uri,omitempty"`
@@ -10,7 +10,7 @@ type GitBuildSourceApplyConfiguration struct {
 	ProxyConfigApplyConfiguration `json:",inline"`
 }
 
-// GitBuildSourceApplyConfiguration constructs an declarative configuration of the GitBuildSource type for use with
+// GitBuildSourceApplyConfiguration constructs a declarative configuration of the GitBuildSource type for use with
 // apply.
 func GitBuildSource() *GitBuildSourceApplyConfiguration {
 	return &GitBuildSourceApplyConfiguration{}

@@ -37,10 +37,16 @@ func (s *Structural) ToKubeOpenAPI() *spec.Schema {
 			ret.Properties[k] = *v.ToKubeOpenAPI()
 		}
 	}
+	if s.AdditionalProperties != nil {
+		ret.AdditionalProperties = &spec.SchemaOrBool{
+			Allows: s.AdditionalProperties.Bool,
+			Schema: s.AdditionalProperties.Structural.ToKubeOpenAPI(),
+		}
+	}
 	s.Generic.toKubeOpenAPI(ret)
 	s.Extensions.toKubeOpenAPI(ret)
 	s.ValueValidation.toKubeOpenAPI(ret)
-
+	s.ValidationExtensions.toKubeOpenAPI(ret)
 	return ret
 }
 
@@ -53,12 +59,6 @@ func (g *Generic) toKubeOpenAPI(ret *spec.Schema) {
 		ret.Type = spec.StringOrArray{g.Type}
 	}
 	ret.Nullable = g.Nullable
-	if g.AdditionalProperties != nil {
-		ret.AdditionalProperties = &spec.SchemaOrBool{
-			Allows: g.AdditionalProperties.Bool,
-			Schema: g.AdditionalProperties.Structural.ToKubeOpenAPI(),
-		}
-	}
 	ret.Description = g.Description
 	ret.Title = g.Title
 	ret.Default = g.Default.Object
@@ -87,6 +87,13 @@ func (x *Extensions) toKubeOpenAPI(ret *spec.Schema) {
 	if x.XMapType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
 	}
+}
+
+func (x *ValidationExtensions) toKubeOpenAPI(ret *spec.Schema) {
+	if x == nil {
+		return
+	}
+
 	if len(x.XValidations) > 0 {
 		ret.VendorExtensible.AddExtension("x-kubernetes-validations", x.XValidations)
 	}
@@ -138,6 +145,7 @@ func (vv *NestedValueValidation) toKubeOpenAPI() *spec.Schema {
 	ret := &spec.Schema{}
 
 	vv.ValueValidation.toKubeOpenAPI(ret)
+	vv.ValidationExtensions.toKubeOpenAPI(ret)
 	if vv.Items != nil {
 		ret.Items = &spec.SchemaOrArray{Schema: vv.Items.toKubeOpenAPI()}
 	}
@@ -149,6 +157,5 @@ func (vv *NestedValueValidation) toKubeOpenAPI() *spec.Schema {
 	}
 	vv.ForbiddenGenerics.toKubeOpenAPI(ret)   // normally empty. Exception: int-or-string
 	vv.ForbiddenExtensions.toKubeOpenAPI(ret) // shouldn't do anything
-
 	return ret
 }

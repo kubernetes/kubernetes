@@ -8,7 +8,7 @@ import (
 	v1 "github.com/openshift/api/user/v1"
 	scheme "github.com/openshift/client-go/user/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // UserIdentityMappingsGetter has a method to return a UserIdentityMappingInterface.
@@ -28,59 +28,17 @@ type UserIdentityMappingInterface interface {
 
 // userIdentityMappings implements UserIdentityMappingInterface
 type userIdentityMappings struct {
-	client rest.Interface
+	*gentype.Client[*v1.UserIdentityMapping]
 }
 
 // newUserIdentityMappings returns a UserIdentityMappings
 func newUserIdentityMappings(c *UserV1Client) *userIdentityMappings {
 	return &userIdentityMappings{
-		client: c.RESTClient(),
+		gentype.NewClient[*v1.UserIdentityMapping](
+			"useridentitymappings",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1.UserIdentityMapping { return &v1.UserIdentityMapping{} }),
 	}
-}
-
-// Get takes name of the userIdentityMapping, and returns the corresponding userIdentityMapping object, and an error if there is any.
-func (c *userIdentityMappings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.UserIdentityMapping, err error) {
-	result = &v1.UserIdentityMapping{}
-	err = c.client.Get().
-		Resource("useridentitymappings").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Create takes the representation of a userIdentityMapping and creates it.  Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *userIdentityMappings) Create(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.CreateOptions) (result *v1.UserIdentityMapping, err error) {
-	result = &v1.UserIdentityMapping{}
-	err = c.client.Post().
-		Resource("useridentitymappings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(userIdentityMapping).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a userIdentityMapping and updates it. Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *userIdentityMappings) Update(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.UpdateOptions) (result *v1.UserIdentityMapping, err error) {
-	result = &v1.UserIdentityMapping{}
-	err = c.client.Put().
-		Resource("useridentitymappings").
-		Name(userIdentityMapping.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(userIdentityMapping).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the userIdentityMapping and deletes it. Returns an error if one occurs.
-func (c *userIdentityMappings) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("useridentitymappings").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
 }

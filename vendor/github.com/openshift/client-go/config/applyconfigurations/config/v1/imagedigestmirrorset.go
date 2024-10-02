@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageDigestMirrorSetApplyConfiguration represents an declarative configuration of the ImageDigestMirrorSet type for use
+// ImageDigestMirrorSetApplyConfiguration represents a declarative configuration of the ImageDigestMirrorSet type for use
 // with apply.
 type ImageDigestMirrorSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ImageDigestMirrorSetApplyConfiguration struct {
 	Status                           *apiconfigv1.ImageDigestMirrorSetStatus     `json:"status,omitempty"`
 }
 
-// ImageDigestMirrorSet constructs an declarative configuration of the ImageDigestMirrorSet type for use with
+// ImageDigestMirrorSet constructs a declarative configuration of the ImageDigestMirrorSet type for use with
 // apply.
 func ImageDigestMirrorSet(name string) *ImageDigestMirrorSetApplyConfiguration {
 	b := &ImageDigestMirrorSetApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithSpec(value *ImageDigestMirr
 func (b *ImageDigestMirrorSetApplyConfiguration) WithStatus(value apiconfigv1.ImageDigestMirrorSetStatus) *ImageDigestMirrorSetApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImageDigestMirrorSetApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

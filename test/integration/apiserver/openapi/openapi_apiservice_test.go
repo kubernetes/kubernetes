@@ -44,7 +44,7 @@ func TestSlowAPIServiceOpenAPIDoesNotBlockHealthCheck(t *testing.T) {
 	defer cancelCtx()
 
 	etcd := framework.SharedEtcd()
-	setupServer := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcd)
+	setupServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcd)
 	client := generateTestClient(t, setupServer)
 
 	service := testdiscovery.NewFakeService("test-server", client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func TestSlowAPIServiceOpenAPIDoesNotBlockHealthCheck(t *testing.T) {
 	require.NoError(t, registerAPIService(ctx, client, groupVersion, service))
 
 	setupServer.TearDownFn()
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcd)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcd)
 	t.Cleanup(server.TearDownFn)
 	client2 := generateTestClient(t, server)
 
@@ -100,7 +100,7 @@ func TestFetchingOpenAPIBeforeReady(t *testing.T) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 	client := generateTestClient(t, server)
 

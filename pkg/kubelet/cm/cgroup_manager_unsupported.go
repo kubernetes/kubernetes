@@ -41,6 +41,10 @@ func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
+func (m *unsupportedCgroupManager) Version() int {
+	return 0
+}
+
 func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
 	return ""
 }

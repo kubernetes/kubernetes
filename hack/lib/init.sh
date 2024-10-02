@@ -25,13 +25,6 @@ set -o pipefail
 # https://github.com/kubernetes/kubernetes/issues/52255
 unset CDPATH
 
-# FIXME(dims): Note that here we assume that if GOFLAGS are already set we
-# leave them as-is and not try to add providerless to it. So if you
-# really need to set your own GOFLAGS, ensure you add "providerless" explicitly
-if [[ "${KUBE_PROVIDERLESS:-"n"}" == "y" ]]; then
-  export GOFLAGS=${GOFLAGS:-"-tags=providerless"}
-fi
-
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -96,11 +89,12 @@ batch/v1beta1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
 certificates.k8s.io/v1alpha1 \
+coordination.k8s.io/v1alpha1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
 discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
-resource.k8s.io/v1alpha2 \
+resource.k8s.io/v1alpha3 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
 events.k8s.io/v1beta1 \

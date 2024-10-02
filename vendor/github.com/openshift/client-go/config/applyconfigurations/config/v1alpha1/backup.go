@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// BackupApplyConfiguration represents an declarative configuration of the Backup type for use
+// BackupApplyConfiguration represents a declarative configuration of the Backup type for use
 // with apply.
 type BackupApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type BackupApplyConfiguration struct {
 	Status                           *configv1alpha1.BackupStatus  `json:"status,omitempty"`
 }
 
-// Backup constructs an declarative configuration of the Backup type for use with
+// Backup constructs a declarative configuration of the Backup type for use with
 // apply.
 func Backup(name string) *BackupApplyConfiguration {
 	b := &BackupApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *BackupApplyConfiguration) WithSpec(value *BackupSpecApplyConfiguration)
 func (b *BackupApplyConfiguration) WithStatus(value configv1alpha1.BackupStatus) *BackupApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *BackupApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

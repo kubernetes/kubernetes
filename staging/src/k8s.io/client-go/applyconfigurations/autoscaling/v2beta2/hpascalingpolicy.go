@@ -22,7 +22,7 @@ import (
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 )
 
-// HPAScalingPolicyApplyConfiguration represents an declarative configuration of the HPAScalingPolicy type for use
+// HPAScalingPolicyApplyConfiguration represents a declarative configuration of the HPAScalingPolicy type for use
 // with apply.
 type HPAScalingPolicyApplyConfiguration struct {
 	Type          *v2beta2.HPAScalingPolicyType `json:"type,omitempty"`
@@ -30,7 +30,7 @@ type HPAScalingPolicyApplyConfiguration struct {
 	PeriodSeconds *int32                        `json:"periodSeconds,omitempty"`
 }
 
-// HPAScalingPolicyApplyConfiguration constructs an declarative configuration of the HPAScalingPolicy type for use with
+// HPAScalingPolicyApplyConfiguration constructs a declarative configuration of the HPAScalingPolicy type for use with
 // apply.
 func HPAScalingPolicy() *HPAScalingPolicyApplyConfiguration {
 	return &HPAScalingPolicyApplyConfiguration{}

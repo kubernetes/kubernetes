@@ -17,6 +17,7 @@ package http2 // import "golang.org/x/net/http2"
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/http/httpguts"
 )
@@ -210,12 +212,6 @@ type stringWriter interface {
 	WriteString(s string) (n int, err error)
 }
 
-// A gate lets two goroutines coordinate their activities.
-type gate chan struct{}
-
-func (g gate) Done() { g <- struct{}{} }
-func (g gate) Wait() { <-g }
-
 // A closeWaiter is like a sync.WaitGroup but only goes 1 to 0 (open to closed).
 type closeWaiter chan struct{}
 
@@ -383,3 +379,14 @@ func validPseudoPath(v string) bool {
 // makes that struct also non-comparable, and generally doesn't add
 // any size (as long as it's first).
 type incomparable [0]func()
+
+// synctestGroupInterface is the methods of synctestGroup used by Server and Transport.
+// It's defined as an interface here to let us keep synctestGroup entirely test-only
+// and not a part of non-test builds.
+type synctestGroupInterface interface {
+	Join()
+	Now() time.Time
+	NewTimer(d time.Duration) timer
+	AfterFunc(d time.Duration, f func()) timer
+	ContextWithTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc)
+}

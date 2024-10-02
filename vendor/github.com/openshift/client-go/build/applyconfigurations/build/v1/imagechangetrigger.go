@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ImageChangeTriggerApplyConfiguration represents an declarative configuration of the ImageChangeTrigger type for use
+// ImageChangeTriggerApplyConfiguration represents a declarative configuration of the ImageChangeTrigger type for use
 // with apply.
 type ImageChangeTriggerApplyConfiguration struct {
 	LastTriggeredImageID *string             `json:"lastTriggeredImageID,omitempty"`
@@ -14,7 +14,7 @@ type ImageChangeTriggerApplyConfiguration struct {
 	Paused               *bool               `json:"paused,omitempty"`
 }
 
-// ImageChangeTriggerApplyConfiguration constructs an declarative configuration of the ImageChangeTrigger type for use with
+// ImageChangeTriggerApplyConfiguration constructs a declarative configuration of the ImageChangeTrigger type for use with
 // apply.
 func ImageChangeTrigger() *ImageChangeTriggerApplyConfiguration {
 	return &ImageChangeTriggerApplyConfiguration{}

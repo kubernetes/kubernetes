@@ -24,7 +24,8 @@ type GinkgoFlag struct {
 	DeprecatedDocLink string
 	DeprecatedVersion string
 
-	ExportAs string
+	ExportAs     string
+	AlwaysExport bool
 }
 
 type GinkgoFlags []GinkgoFlag
@@ -431,7 +432,7 @@ func (ssv stringSliceVar) Set(s string) error {
 	return nil
 }
 
-//given a set of GinkgoFlags and bindings, generate flag arguments suitable to be passed to an application with that set of flags configured.
+// given a set of GinkgoFlags and bindings, generate flag arguments suitable to be passed to an application with that set of flags configured.
 func GenerateFlagArgs(flags GinkgoFlags, bindings interface{}) ([]string, error) {
 	result := []string{}
 	for _, flag := range flags {
@@ -451,19 +452,19 @@ func GenerateFlagArgs(flags GinkgoFlags, bindings interface{}) ([]string, error)
 		iface := value.Interface()
 		switch value.Type() {
 		case reflect.TypeOf(string("")):
-			if iface.(string) != "" {
+			if iface.(string) != "" || flag.AlwaysExport {
 				result = append(result, fmt.Sprintf("--%s=%s", name, iface))
 			}
 		case reflect.TypeOf(int64(0)):
-			if iface.(int64) != 0 {
+			if iface.(int64) != 0 || flag.AlwaysExport {
 				result = append(result, fmt.Sprintf("--%s=%d", name, iface))
 			}
 		case reflect.TypeOf(float64(0)):
-			if iface.(float64) != 0 {
+			if iface.(float64) != 0 || flag.AlwaysExport {
 				result = append(result, fmt.Sprintf("--%s=%f", name, iface))
 			}
 		case reflect.TypeOf(int(0)):
-			if iface.(int) != 0 {
+			if iface.(int) != 0 || flag.AlwaysExport {
 				result = append(result, fmt.Sprintf("--%s=%d", name, iface))
 			}
 		case reflect.TypeOf(bool(true)):
@@ -471,7 +472,7 @@ func GenerateFlagArgs(flags GinkgoFlags, bindings interface{}) ([]string, error)
 				result = append(result, fmt.Sprintf("--%s", name))
 			}
 		case reflect.TypeOf(time.Duration(0)):
-			if iface.(time.Duration) != time.Duration(0) {
+			if iface.(time.Duration) != time.Duration(0) || flag.AlwaysExport {
 				result = append(result, fmt.Sprintf("--%s=%s", name, iface))
 			}
 

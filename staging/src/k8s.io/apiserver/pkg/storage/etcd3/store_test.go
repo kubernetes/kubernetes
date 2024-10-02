@@ -166,6 +166,11 @@ func TestGetListNonRecursive(t *testing.T) {
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client), store)
 }
 
+func TestGetListRecursivePrefix(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }

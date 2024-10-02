@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/stdlib"
@@ -28,8 +29,6 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/parser"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 const (
@@ -313,7 +312,7 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 		Types(types.OptionalType),
 
 		// Configure the optMap and optFlatMap macros.
-		Macros(NewReceiverMacro(optMapMacro, 2, optMap)),
+		Macros(ReceiverMacro(optMapMacro, 2, optMap)),
 
 		// Global and member functions for working with optional values.
 		Function(optionalOfFunc,
@@ -374,7 +373,7 @@ func (lib *optionalLib) CompileOptions() []EnvOption {
 			Overload("optional_map_index_value", []*Type{OptionalType(mapTypeKV), paramTypeK}, optionalTypeV)),
 	}
 	if lib.version >= 1 {
-		opts = append(opts, Macros(NewReceiverMacro(optFlatMapMacro, 2, optFlatMap)))
+		opts = append(opts, Macros(ReceiverMacro(optFlatMapMacro, 2, optFlatMap)))
 	}
 	return opts
 }
@@ -386,57 +385,57 @@ func (lib *optionalLib) ProgramOptions() []ProgramOption {
 	}
 }
 
-func optMap(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
+func optMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *Error) {
 	varIdent := args[0]
 	varName := ""
-	switch varIdent.GetExprKind().(type) {
-	case *exprpb.Expr_IdentExpr:
-		varName = varIdent.GetIdentExpr().GetName()
+	switch varIdent.Kind() {
+	case ast.IdentKind:
+		varName = varIdent.AsIdent()
 	default:
-		return nil, meh.NewError(varIdent.GetId(), "optMap() variable name must be a simple identifier")
+		return nil, meh.NewError(varIdent.ID(), "optMap() variable name must be a simple identifier")
 	}
 	mapExpr := args[1]
-	return meh.GlobalCall(
+	return meh.NewCall(
 		operators.Conditional,
-		meh.ReceiverCall(hasValueFunc, target),
-		meh.GlobalCall(optionalOfFunc,
-			meh.Fold(
-				unusedIterVar,
+		meh.NewMemberCall(hasValueFunc, target),
+		meh.NewCall(optionalOfFunc,
+			meh.NewComprehension(
 				meh.NewList(),
+				unusedIterVar,
 				varName,
-				meh.ReceiverCall(valueFunc, target),
-				meh.LiteralBool(false),
-				meh.Ident(varName),
+				meh.NewMemberCall(valueFunc, target),
+				meh.NewLiteral(types.False),
+				meh.NewIdent(varName),
 				mapExpr,
 			),
 		),
-		meh.GlobalCall(optionalNoneFunc),
+		meh.NewCall(optionalNoneFunc),
 	), nil
 }
 
-func optFlatMap(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *Error) {
+func optFlatMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *Error) {
 	varIdent := args[0]
 	varName := ""
-	switch varIdent.GetExprKind().(type) {
-	case *exprpb.Expr_IdentExpr:
-		varName = varIdent.GetIdentExpr().GetName()
+	switch varIdent.Kind() {
+	case ast.IdentKind:
+		varName = varIdent.AsIdent()
 	default:
-		return nil, meh.NewError(varIdent.GetId(), "optFlatMap() variable name must be a simple identifier")
+		return nil, meh.NewError(varIdent.ID(), "optFlatMap() variable name must be a simple identifier")
 	}
 	mapExpr := args[1]
-	return meh.GlobalCall(
+	return meh.NewCall(
 		operators.Conditional,
-		meh.ReceiverCall(hasValueFunc, target),
-		meh.Fold(
-			unusedIterVar,
+		meh.NewMemberCall(hasValueFunc, target),
+		meh.NewComprehension(
 			meh.NewList(),
+			unusedIterVar,
 			varName,
-			meh.ReceiverCall(valueFunc, target),
-			meh.LiteralBool(false),
-			meh.Ident(varName),
+			meh.NewMemberCall(valueFunc, target),
+			meh.NewLiteral(types.False),
+			meh.NewIdent(varName),
 			mapExpr,
 		),
-		meh.GlobalCall(optionalNoneFunc),
+		meh.NewCall(optionalNoneFunc),
 	), nil
 }
 

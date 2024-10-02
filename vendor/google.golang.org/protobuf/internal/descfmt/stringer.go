@@ -252,6 +252,7 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool, record fu
 				{rv.MethodByName("Values"), "Values"},
 				{rv.MethodByName("ReservedNames"), "ReservedNames"},
 				{rv.MethodByName("ReservedRanges"), "ReservedRanges"},
+				{rv.MethodByName("IsClosed"), "IsClosed"},
 			}...)
 
 		case protoreflect.EnumValueDescriptor:

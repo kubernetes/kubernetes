@@ -2,13 +2,13 @@
 
 package v1
 
-// SignatureIssuerApplyConfiguration represents an declarative configuration of the SignatureIssuer type for use
+// SignatureIssuerApplyConfiguration represents a declarative configuration of the SignatureIssuer type for use
 // with apply.
 type SignatureIssuerApplyConfiguration struct {
 	SignatureGenericEntityApplyConfiguration `json:",inline"`
 }
 
-// SignatureIssuerApplyConfiguration constructs an declarative configuration of the SignatureIssuer type for use with
+// SignatureIssuerApplyConfiguration constructs a declarative configuration of the SignatureIssuer type for use with
 // apply.
 func SignatureIssuer() *SignatureIssuerApplyConfiguration {
 	return &SignatureIssuerApplyConfiguration{}

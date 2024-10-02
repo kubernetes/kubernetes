@@ -382,7 +382,7 @@ func simpleCompileCEL(schema *spec.Schema, expression string) (cel.Program, erro
 	}
 	declType := celopenapi.SchemaDeclType(schema, true).MaybeAssignTypeName("selfType")
 	rt := commoncel.NewDeclTypeProvider(declType)
-	opts, err := rt.EnvOptions(env.TypeProvider())
+	opts, err := rt.EnvOptions(env.CELTypeProvider())
 	if err != nil {
 		return nil, err
 	}

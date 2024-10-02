@@ -2,7 +2,7 @@
 
 package v1
 
-// GitSourceRevisionApplyConfiguration represents an declarative configuration of the GitSourceRevision type for use
+// GitSourceRevisionApplyConfiguration represents a declarative configuration of the GitSourceRevision type for use
 // with apply.
 type GitSourceRevisionApplyConfiguration struct {
 	Commit    *string                              `json:"commit,omitempty"`
@@ -11,7 +11,7 @@ type GitSourceRevisionApplyConfiguration struct {
 	Message   *string                              `json:"message,omitempty"`
 }
 
-// GitSourceRevisionApplyConfiguration constructs an declarative configuration of the GitSourceRevision type for use with
+// GitSourceRevisionApplyConfiguration constructs a declarative configuration of the GitSourceRevision type for use with
 // apply.
 func GitSourceRevision() *GitSourceRevisionApplyConfiguration {
 	return &GitSourceRevisionApplyConfiguration{}

@@ -217,7 +217,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 			},
 		},
 		{
-			desc:           "CSINode not found for a volume type that supports csi migration",
+			desc:           "CSINode not found for a volume type that completes csi migration",
 			createNodeName: kubetypes.NodeName("another-node"),
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -238,7 +238,6 @@ func Test_CreateVolumeSpec(t *testing.T) {
 					},
 				},
 			},
-			wantErrorMessage: "csiNode \"another-node\" not found",
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {

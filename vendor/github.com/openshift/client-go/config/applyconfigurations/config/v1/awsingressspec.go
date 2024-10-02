@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// AWSIngressSpecApplyConfiguration represents an declarative configuration of the AWSIngressSpec type for use
+// AWSIngressSpecApplyConfiguration represents a declarative configuration of the AWSIngressSpec type for use
 // with apply.
 type AWSIngressSpecApplyConfiguration struct {
 	Type *v1.AWSLBType `json:"type,omitempty"`
 }
 
-// AWSIngressSpecApplyConfiguration constructs an declarative configuration of the AWSIngressSpec type for use with
+// AWSIngressSpecApplyConfiguration constructs a declarative configuration of the AWSIngressSpec type for use with
 // apply.
 func AWSIngressSpec() *AWSIngressSpecApplyConfiguration {
 	return &AWSIngressSpecApplyConfiguration{}

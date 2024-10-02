@@ -2,14 +2,14 @@
 
 package v1
 
-// PerResourceAPIRequestLogApplyConfiguration represents an declarative configuration of the PerResourceAPIRequestLog type for use
+// PerResourceAPIRequestLogApplyConfiguration represents a declarative configuration of the PerResourceAPIRequestLog type for use
 // with apply.
 type PerResourceAPIRequestLogApplyConfiguration struct {
 	ByNode       []PerNodeAPIRequestLogApplyConfiguration `json:"byNode,omitempty"`
 	RequestCount *int64                                   `json:"requestCount,omitempty"`
 }
 
-// PerResourceAPIRequestLogApplyConfiguration constructs an declarative configuration of the PerResourceAPIRequestLog type for use with
+// PerResourceAPIRequestLogApplyConfiguration constructs a declarative configuration of the PerResourceAPIRequestLog type for use with
 // apply.
 func PerResourceAPIRequestLog() *PerResourceAPIRequestLogApplyConfiguration {
 	return &PerResourceAPIRequestLogApplyConfiguration{}

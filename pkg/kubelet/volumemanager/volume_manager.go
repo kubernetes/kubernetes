@@ -182,7 +182,6 @@ func NewVolumeManager(
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
-	keepTerminatedPodVolumes bool,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()
@@ -211,7 +210,6 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
-		keepTerminatedPodVolumes,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)
@@ -325,7 +323,7 @@ func (vm *volumeManager) GetPossiblyMountedVolumesForPod(podName types.UniquePod
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	podName := util.GetUniquePodName(pod)
-	supplementalGroups := sets.NewString()
+	supplementalGroups := sets.New[string]()
 
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
 		if mountedVolume.VolumeGidValue != "" {
@@ -334,7 +332,7 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
-	for _, group := range supplementalGroups.List() {
+	for _, group := range sets.List(supplementalGroups) {
 		iGroup, extra := getExtraSupplementalGid(group, pod)
 		if !extra {
 			continue
@@ -482,7 +480,7 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 }
 
 func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {
-	volumesNotInDSW := sets.NewString(expectedVolumes...)
+	volumesNotInDSW := sets.New[string](expectedVolumes...)
 
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName {
@@ -490,7 +488,7 @@ func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, e
 		}
 	}
 
-	return volumesNotInDSW.List()
+	return sets.List(volumesNotInDSW)
 }
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
@@ -536,7 +534,7 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 // expectedVolumes. It returns a list of unmounted volumes.
 // The list also includes volume that may be mounted in uncertain state.
 func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
-	mountedVolumes := sets.NewString()
+	mountedVolumes := sets.New[string]()
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
 		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
 	}
@@ -545,7 +543,7 @@ func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expect
 
 // filterUnmountedVolumes adds each element of expectedVolumes that is not in
 // mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string) []string {
+func filterUnmountedVolumes(mountedVolumes sets.Set[string], expectedVolumes []string) []string {
 	unmountedVolumes := []string{}
 	for _, expectedVolume := range expectedVolumes {
 		if !mountedVolumes.Has(expectedVolume) {

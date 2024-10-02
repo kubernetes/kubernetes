@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// DeploymentTriggerImageChangeParamsApplyConfiguration represents an declarative configuration of the DeploymentTriggerImageChangeParams type for use
+// DeploymentTriggerImageChangeParamsApplyConfiguration represents a declarative configuration of the DeploymentTriggerImageChangeParams type for use
 // with apply.
 type DeploymentTriggerImageChangeParamsApplyConfiguration struct {
 	Automatic          *bool               `json:"automatic,omitempty"`
@@ -15,7 +15,7 @@ type DeploymentTriggerImageChangeParamsApplyConfiguration struct {
 	LastTriggeredImage *string             `json:"lastTriggeredImage,omitempty"`
 }
 
-// DeploymentTriggerImageChangeParamsApplyConfiguration constructs an declarative configuration of the DeploymentTriggerImageChangeParams type for use with
+// DeploymentTriggerImageChangeParamsApplyConfiguration constructs a declarative configuration of the DeploymentTriggerImageChangeParams type for use with
 // apply.
 func DeploymentTriggerImageChangeParams() *DeploymentTriggerImageChangeParamsApplyConfiguration {
 	return &DeploymentTriggerImageChangeParamsApplyConfiguration{}

@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type ImageDigestMirrorSetLister interface {
 
 // imageDigestMirrorSetLister implements the ImageDigestMirrorSetLister interface.
 type imageDigestMirrorSetLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ImageDigestMirrorSet]
 }
 
 // NewImageDigestMirrorSetLister returns a new ImageDigestMirrorSetLister.
 func NewImageDigestMirrorSetLister(indexer cache.Indexer) ImageDigestMirrorSetLister {
-	return &imageDigestMirrorSetLister{indexer: indexer}
-}
-
-// List lists all ImageDigestMirrorSets in the indexer.
-func (s *imageDigestMirrorSetLister) List(selector labels.Selector) (ret []*v1.ImageDigestMirrorSet, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ImageDigestMirrorSet))
-	})
-	return ret, err
-}
-
-// Get retrieves the ImageDigestMirrorSet from the index for a given name.
-func (s *imageDigestMirrorSetLister) Get(name string) (*v1.ImageDigestMirrorSet, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("imagedigestmirrorset"), name)
-	}
-	return obj.(*v1.ImageDigestMirrorSet), nil
+	return &imageDigestMirrorSetLister{listers.New[*v1.ImageDigestMirrorSet](indexer, v1.Resource("imagedigestmirrorset"))}
 }

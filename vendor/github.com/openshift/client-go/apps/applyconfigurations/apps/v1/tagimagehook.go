@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// TagImageHookApplyConfiguration represents an declarative configuration of the TagImageHook type for use
+// TagImageHookApplyConfiguration represents a declarative configuration of the TagImageHook type for use
 // with apply.
 type TagImageHookApplyConfiguration struct {
 	ContainerName *string             `json:"containerName,omitempty"`
 	To            *v1.ObjectReference `json:"to,omitempty"`
 }
 
-// TagImageHookApplyConfiguration constructs an declarative configuration of the TagImageHook type for use with
+// TagImageHookApplyConfiguration constructs a declarative configuration of the TagImageHook type for use with
 // apply.
 func TagImageHook() *TagImageHookApplyConfiguration {
 	return &TagImageHookApplyConfiguration{}

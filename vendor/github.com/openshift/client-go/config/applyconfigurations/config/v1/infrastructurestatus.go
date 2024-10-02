@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// InfrastructureStatusApplyConfiguration represents an declarative configuration of the InfrastructureStatus type for use
+// InfrastructureStatusApplyConfiguration represents a declarative configuration of the InfrastructureStatus type for use
 // with apply.
 type InfrastructureStatusApplyConfiguration struct {
 	InfrastructureName     *string                           `json:"infrastructureName,omitempty"`
@@ -20,7 +20,7 @@ type InfrastructureStatusApplyConfiguration struct {
 	CPUPartitioning        *v1.CPUPartitioningMode           `json:"cpuPartitioning,omitempty"`
 }
 
-// InfrastructureStatusApplyConfiguration constructs an declarative configuration of the InfrastructureStatus type for use with
+// InfrastructureStatusApplyConfiguration constructs a declarative configuration of the InfrastructureStatus type for use with
 // apply.
 func InfrastructureStatus() *InfrastructureStatusApplyConfiguration {
 	return &InfrastructureStatusApplyConfiguration{}

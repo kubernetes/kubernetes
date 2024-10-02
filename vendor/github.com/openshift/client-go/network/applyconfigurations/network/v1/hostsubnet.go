@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// HostSubnetApplyConfiguration represents an declarative configuration of the HostSubnet type for use
+// HostSubnetApplyConfiguration represents a declarative configuration of the HostSubnet type for use
 // with apply.
 type HostSubnetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -23,7 +23,7 @@ type HostSubnetApplyConfiguration struct {
 	EgressCIDRs                      []networkv1.HostSubnetEgressCIDR `json:"egressCIDRs,omitempty"`
 }
 
-// HostSubnet constructs an declarative configuration of the HostSubnet type for use with
+// HostSubnet constructs a declarative configuration of the HostSubnet type for use with
 // apply.
 func HostSubnet(name string) *HostSubnetApplyConfiguration {
 	b := &HostSubnetApplyConfiguration{}
@@ -268,4 +268,10 @@ func (b *HostSubnetApplyConfiguration) WithEgressCIDRs(values ...networkv1.HostS
 		b.EgressCIDRs = append(b.EgressCIDRs, values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *HostSubnetApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

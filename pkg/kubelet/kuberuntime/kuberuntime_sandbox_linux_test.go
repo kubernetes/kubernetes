@@ -209,3 +209,55 @@ func newTestPodWithLinuxSecurityContext() *v1.Pod {
 
 	return pod
 }
+
+func newSupplementalGroupsPolicyPod(supplementalGroupsPolicy *v1.SupplementalGroupsPolicy) *v1.Pod {
+	pod := newTestPod()
+	if pod.Spec.SecurityContext == nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+	}
+	pod.Spec.SecurityContext.SupplementalGroupsPolicy = supplementalGroupsPolicy
+	return pod
+}
+
+func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	tests := []struct {
+		description    string
+		pod            *v1.Pod
+		expected       string
+		expectedErr    bool
+		expectedErrMsg string
+	}{{
+		description: "SupplementalGroups=nil should convert to Merge",
+		pod:         newSupplementalGroupsPolicyPod(nil),
+		expected:    runtimeapi.SupplementalGroupsPolicy_Merge.String(),
+	}, {
+		description: "SupplementalGroups=Merge should convert to Merge",
+		pod:         newSupplementalGroupsPolicyPod(&supplementalGroupsPolicyMerge),
+		expected:    runtimeapi.SupplementalGroupsPolicy_Merge.String(),
+	}, {
+		description: "SupplementalGroups=Strict should convert to Strict",
+		pod:         newSupplementalGroupsPolicyPod(&supplementalGroupsPolicyStrict),
+		expected:    runtimeapi.SupplementalGroupsPolicy_Strict.String(),
+	}, {
+		description:    "SupplementalGroups=Unsupported should raise an error",
+		pod:            newSupplementalGroupsPolicyPod(&supplementalGroupsPolicyUnSupported),
+		expectedErr:    true,
+		expectedErrMsg: "unsupported supplementalGroupsPolicy: UnSupported",
+	},
+	}
+
+	for i, test := range tests {
+		config, err := m.generatePodSandboxLinuxConfig(test.pod)
+		if test.expectedErr {
+			assert.NotEmptyf(t, err, "TestCase[%d]: %s", i, test.description)
+			assert.Emptyf(t, config, "TestCase[%d]: %s", i, test.description)
+			assert.Containsf(t, err.Error(), test.expectedErrMsg, "TestCase[%d]: %s", i, test.description)
+		} else {
+			actualPolicy := config.SecurityContext.SupplementalGroupsPolicy.String()
+			assert.EqualValues(t, test.expected, actualPolicy, "TestCase[%d]: %s", i, test.description)
+		}
+	}
+}

@@ -195,10 +195,10 @@ func keyToString(keyEvent *winterm.KEY_EVENT_RECORD, escapeSequence []byte) stri
 
 	// <Alt>+Key generates ESC N Key
 	if !control && alt {
-		return ansiterm.KEY_ESC_N + strings.ToLower(string(keyEvent.UnicodeChar))
+		return ansiterm.KEY_ESC_N + strings.ToLower(string(rune(keyEvent.UnicodeChar)))
 	}
 
-	return string(keyEvent.UnicodeChar)
+	return string(rune(keyEvent.UnicodeChar))
 }
 
 // formatVirtualKey converts a virtual key (e.g., up arrow) into the appropriate ANSI string.

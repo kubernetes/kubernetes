@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ConfigMapBuildSourceApplyConfiguration represents an declarative configuration of the ConfigMapBuildSource type for use
+// ConfigMapBuildSourceApplyConfiguration represents a declarative configuration of the ConfigMapBuildSource type for use
 // with apply.
 type ConfigMapBuildSourceApplyConfiguration struct {
 	ConfigMap      *v1.LocalObjectReference `json:"configMap,omitempty"`
 	DestinationDir *string                  `json:"destinationDir,omitempty"`
 }
 
-// ConfigMapBuildSourceApplyConfiguration constructs an declarative configuration of the ConfigMapBuildSource type for use with
+// ConfigMapBuildSourceApplyConfiguration constructs a declarative configuration of the ConfigMapBuildSource type for use with
 // apply.
 func ConfigMapBuildSource() *ConfigMapBuildSourceApplyConfiguration {
 	return &ConfigMapBuildSourceApplyConfiguration{}

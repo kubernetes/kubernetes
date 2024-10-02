@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// OAuthAuthorizeTokenApplyConfiguration represents an declarative configuration of the OAuthAuthorizeToken type for use
+// OAuthAuthorizeTokenApplyConfiguration represents a declarative configuration of the OAuthAuthorizeToken type for use
 // with apply.
 type OAuthAuthorizeTokenApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -27,7 +27,7 @@ type OAuthAuthorizeTokenApplyConfiguration struct {
 	CodeChallengeMethod              *string  `json:"codeChallengeMethod,omitempty"`
 }
 
-// OAuthAuthorizeToken constructs an declarative configuration of the OAuthAuthorizeToken type for use with
+// OAuthAuthorizeToken constructs a declarative configuration of the OAuthAuthorizeToken type for use with
 // apply.
 func OAuthAuthorizeToken(name string) *OAuthAuthorizeTokenApplyConfiguration {
 	b := &OAuthAuthorizeTokenApplyConfiguration{}
@@ -302,4 +302,10 @@ func (b *OAuthAuthorizeTokenApplyConfiguration) WithCodeChallenge(value string) 
 func (b *OAuthAuthorizeTokenApplyConfiguration) WithCodeChallengeMethod(value string) *OAuthAuthorizeTokenApplyConfiguration {
 	b.CodeChallengeMethod = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *OAuthAuthorizeTokenApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

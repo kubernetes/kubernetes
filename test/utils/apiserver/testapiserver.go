@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	etcdserver "k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -69,6 +70,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 	// the loopback client config uses a loopback cert with different SNI.  We need to use the "real"
 	// cert, so we'll hope we aren't hacked during a unit test and instead load it from the server we started.
 	wardleToKASKubeClientConfig := rest.CopyConfig(kubeClientConfig)
+	wardleToKASKubeClientConfig.ServerName = "" // reset SNI to use the "real" cert
 
 	servingCerts, _, err := cert.GetServingCertificatesForURL(wardleToKASKubeClientConfig.Host, "")
 	if err != nil {

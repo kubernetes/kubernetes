@@ -18,11 +18,16 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"sigs.k8s.io/yaml"
+
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 )
 
 type MicroTimeHolder struct {
@@ -110,6 +115,59 @@ func TestMicroTimeUnmarshalJSON(t *testing.T) {
 		if result.T != c.result {
 			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
 		}
+	}
+}
+
+func TestMicroTimeMarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   MicroTime
+		out  []byte
+	}{
+		{name: "zero value", in: MicroTime{}, out: []byte{0xf6}},                                                                                       // null
+		{name: "no fractional seconds", in: DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), out: []byte("\x58\x1b1998-05-05T05:05:05.000000Z")},    // '1998-05-05T05:05:05.000000Z'
+		{name: "nanoseconds truncated", in: DateMicro(1998, time.May, 5, 5, 5, 5, 5050, time.UTC), out: []byte("\x58\x1b1998-05-05T05:05:05.000005Z")}, // '1998-05-05T05:05:05.000005Z'
+	} {
+		t.Run(fmt.Sprintf("%+v", tc.in), func(t *testing.T) {
+			got, err := tc.in.MarshalCBOR()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.out, got); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestMicroTimeUnmarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		in         []byte
+		out        MicroTime
+		errMessage string
+	}{
+		{name: "null", in: []byte{0xf6}, out: MicroTime{}}, // null
+		{name: "valid", in: []byte("\x58\x1b1998-05-05T05:05:05.000000Z"), out: MicroTime{Time: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},                                    // '1998-05-05T05:05:05.000000Z'
+		{name: "invalid cbor type", in: []byte{0x07}, out: MicroTime{}, errMessage: "cbor: cannot unmarshal positive integer into Go value of type string"},                                // 7
+		{name: "malformed timestamp", in: []byte("\x45hello"), out: MicroTime{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05.000000Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got MicroTime
+			err := got.UnmarshalCBOR(tc.in)
+			if err != nil {
+				if tc.errMessage == "" {
+					t.Fatalf("want nil error, got: %v", err)
+				} else if gotMessage := err.Error(); tc.errMessage != gotMessage {
+					t.Fatalf("want error: %q, got: %q", tc.errMessage, gotMessage)
+				}
+			} else if tc.errMessage != "" {
+				t.Fatalf("got nil error, want: %s", tc.errMessage)
+			}
+			if diff := cmp.Diff(tc.out, got); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -317,4 +375,28 @@ func TestMicroTimeProtoUnmarshalRaw(t *testing.T) {
 		})
 	}
 
+}
+
+func TestMicroTimeRoundtripCBOR(t *testing.T) {
+	fuzzer := fuzz.New()
+	for i := 0; i < 500; i++ {
+		var initial, final MicroTime
+		fuzzer.Fuzz(&initial)
+		b, err := cbor.Marshal(initial)
+		if err != nil {
+			t.Errorf("error encoding %v: %v", initial, err)
+			continue
+		}
+		err = cbor.Unmarshal(b, &final)
+		if err != nil {
+			t.Errorf("%v: error decoding %v: %v", initial, string(b), err)
+		}
+		if !final.Equal(&initial) {
+			diag, err := cbor.Diagnose(b)
+			if err != nil {
+				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
+			}
+			t.Errorf("expected equal: %v, %v (cbor was '%s')", initial, final, diag)
+		}
+	}
 }

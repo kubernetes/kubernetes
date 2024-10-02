@@ -105,6 +105,29 @@ func (i *informerSync) Name() string {
 	return "informer-sync"
 }
 
+type shutdown struct {
+	stopCh <-chan struct{}
+}
+
+// NewShutdownHealthz returns a new HealthChecker that will fail if the embedded channel is closed.
+// This is intended to allow for graceful shutdown sequences.
+func NewShutdownHealthz(stopCh <-chan struct{}) HealthChecker {
+	return &shutdown{stopCh}
+}
+
+func (s *shutdown) Name() string {
+	return "shutdown"
+}
+
+func (s *shutdown) Check(req *http.Request) error {
+	select {
+	case <-s.stopCh:
+		return fmt.Errorf("process is shutting down")
+	default:
+	}
+	return nil
+}
+
 func (i *informerSync) Check(_ *http.Request) error {
 	stopCh := make(chan struct{})
 	// Close stopCh to force checking if informers are synced now.

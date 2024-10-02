@@ -19,11 +19,16 @@ package dra
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
+	// Start starts the reconcile loop of the manager.
+	// This will ensure that all claims are unprepared even if pods get deleted unexpectedly.
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
+
 	// PrepareResources prepares resources for a pod.
 	// It communicates with the DRA resource plugin to prepare resources.
 	PrepareResources(pod *v1.Pod) error
@@ -45,8 +50,6 @@ type Manager interface {
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.
 type ContainerInfo struct {
-	// The Annotations for the container
-	Annotations []kubecontainer.Annotation
 	// CDI Devices for the container
 	CDIDevices []kubecontainer.CDIDevice
 }

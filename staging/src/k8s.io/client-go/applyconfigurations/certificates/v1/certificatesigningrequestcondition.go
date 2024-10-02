@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CertificateSigningRequestConditionApplyConfiguration represents an declarative configuration of the CertificateSigningRequestCondition type for use
+// CertificateSigningRequestConditionApplyConfiguration represents a declarative configuration of the CertificateSigningRequestCondition type for use
 // with apply.
 type CertificateSigningRequestConditionApplyConfiguration struct {
 	Type               *v1.RequestConditionType `json:"type,omitempty"`
@@ -35,7 +35,7 @@ type CertificateSigningRequestConditionApplyConfiguration struct {
 	LastTransitionTime *metav1.Time             `json:"lastTransitionTime,omitempty"`
 }
 
-// CertificateSigningRequestConditionApplyConfiguration constructs an declarative configuration of the CertificateSigningRequestCondition type for use with
+// CertificateSigningRequestConditionApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestCondition type for use with
 // apply.
 func CertificateSigningRequestCondition() *CertificateSigningRequestConditionApplyConfiguration {
 	return &CertificateSigningRequestConditionApplyConfiguration{}

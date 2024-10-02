@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ComponentRouteStatusApplyConfiguration represents an declarative configuration of the ComponentRouteStatus type for use
+// ComponentRouteStatusApplyConfiguration represents a declarative configuration of the ComponentRouteStatus type for use
 // with apply.
 type ComponentRouteStatusApplyConfiguration struct {
 	Namespace        *string                              `json:"namespace,omitempty"`
@@ -19,7 +19,7 @@ type ComponentRouteStatusApplyConfiguration struct {
 	RelatedObjects   []ObjectReferenceApplyConfiguration  `json:"relatedObjects,omitempty"`
 }
 
-// ComponentRouteStatusApplyConfiguration constructs an declarative configuration of the ComponentRouteStatus type for use with
+// ComponentRouteStatusApplyConfiguration constructs a declarative configuration of the ComponentRouteStatus type for use with
 // apply.
 func ComponentRouteStatus() *ComponentRouteStatusApplyConfiguration {
 	return &ComponentRouteStatusApplyConfiguration{}

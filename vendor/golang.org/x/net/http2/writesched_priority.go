@@ -443,8 +443,8 @@ func (ws *priorityWriteScheduler) addClosedOrIdleNode(list *[]*priorityNode, max
 }
 
 func (ws *priorityWriteScheduler) removeNode(n *priorityNode) {
-	for k := n.kids; k != nil; k = k.next {
-		k.setParent(n.parent)
+	for n.kids != nil {
+		n.kids.setParent(n.parent)
 	}
 	n.setParent(nil)
 	delete(ws.nodes, n.id)

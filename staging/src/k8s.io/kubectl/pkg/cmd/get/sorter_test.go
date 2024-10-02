@@ -31,6 +31,7 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/utils/ptr"
 )
 
 func toUnstructuredOrDie(data []byte) *unstructured.Unstructured {
@@ -103,8 +104,6 @@ func createUnstructuredPodResource(t *testing.T, memReq, memLimit, cpuReq, cpuLi
 }
 
 func TestSortingPrinter(t *testing.T) {
-	intPtr := func(val int32) *int32 { return &val }
-
 	a := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "a",
@@ -272,17 +271,17 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []corev1.ReplicationController{
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(5),
+							Replicas: ptr.To[int32](5),
 						},
 					},
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(1),
+							Replicas: ptr.To[int32](1),
 						},
 					},
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(9),
+							Replicas: ptr.To[int32](9),
 						},
 					},
 				},
@@ -291,17 +290,17 @@ func TestSortingPrinter(t *testing.T) {
 				Items: []corev1.ReplicationController{
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(1),
+							Replicas: ptr.To[int32](1),
 						},
 					},
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(5),
+							Replicas: ptr.To[int32](5),
 						},
 					},
 					{
 						Spec: corev1.ReplicationControllerSpec{
-							Replicas: intPtr(9),
+							Replicas: ptr.To[int32](9),
 						},
 					},
 				},

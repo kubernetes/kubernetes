@@ -18,7 +18,7 @@ package rest
 
 import (
 	networkingapiv1 "k8s.io/api/networking/v1"
-	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -42,7 +42,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1alpha1.SchemeGroupVersion.Version] = storageMap
+		apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1beta1.SchemeGroupVersion.Version] = storageMap
 	}
 
 	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
@@ -92,7 +92,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	// ipaddress
-	if resource := "ipaddresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "ipaddresses"; apiResourceConfigSource.ResourceEnabled(networkingapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
 		ipAddressStorage, err := ipaddressstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return storage, err
@@ -101,7 +101,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	}
 
 	// servicecidrs
-	if resource := "servicecidrs"; apiResourceConfigSource.ResourceEnabled(networkingapiv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "servicecidrs"; apiResourceConfigSource.ResourceEnabled(networkingapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
 		serviceCIDRStorage, serviceCIDRStatusStorage, err := servicecidrstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return storage, err

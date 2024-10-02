@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterNetworkApplyConfiguration represents an declarative configuration of the ClusterNetwork type for use
+// ClusterNetworkApplyConfiguration represents a declarative configuration of the ClusterNetwork type for use
 // with apply.
 type ClusterNetworkApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -25,7 +25,7 @@ type ClusterNetworkApplyConfiguration struct {
 	MTU                              *uint32                                 `json:"mtu,omitempty"`
 }
 
-// ClusterNetwork constructs an declarative configuration of the ClusterNetwork type for use with
+// ClusterNetwork constructs a declarative configuration of the ClusterNetwork type for use with
 // apply.
 func ClusterNetwork(name string) *ClusterNetworkApplyConfiguration {
 	b := &ClusterNetworkApplyConfiguration{}
@@ -287,4 +287,10 @@ func (b *ClusterNetworkApplyConfiguration) WithVXLANPort(value uint32) *ClusterN
 func (b *ClusterNetworkApplyConfiguration) WithMTU(value uint32) *ClusterNetworkApplyConfiguration {
 	b.MTU = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterNetworkApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

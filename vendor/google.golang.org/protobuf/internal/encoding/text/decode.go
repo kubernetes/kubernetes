@@ -601,7 +601,7 @@ func (d *Decoder) consumeToken(kind Kind, size int, attrs uint8) Token {
 
 // newSyntaxError returns a syntax error with line and column information for
 // current position.
-func (d *Decoder) newSyntaxError(f string, x ...interface{}) error {
+func (d *Decoder) newSyntaxError(f string, x ...any) error {
 	e := errors.New(f, x...)
 	line, column := d.Position(len(d.orig) - len(d.in))
 	return errors.New("syntax error (line %d:%d): %v", line, column, e)

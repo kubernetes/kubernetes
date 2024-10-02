@@ -21,7 +21,7 @@ import (
 	"net"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 	netutils "k8s.io/utils/net"
@@ -60,8 +60,6 @@ func TestGetNodeIPs(t *testing.T) {
 		cidrs         []string
 		itfAddrsPairs []InterfaceAddrsPair
 		expected      map[v1.IPFamily]expectation
-		// nodeIP will take effect when `--nodeport-addresses` is empty
-		nodeIP net.IP
 	}{
 		{
 			name:  "IPv4 single",
@@ -371,53 +369,6 @@ func TestGetNodeIPs(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "ipv4 with nodeIP",
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf: net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{
-						&net.IPNet{IP: netutils.ParseIPSloppy("1.2.3.4"), Mask: net.CIDRMask(30, 32)},
-					},
-				},
-				{
-					itf: net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{
-						&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
-					},
-				},
-			},
-			expected: map[v1.IPFamily]expectation{
-				v1.IPv4Protocol: {
-					ips: sets.New[string]("1.2.3.4"),
-				},
-			},
-			nodeIP: netutils.ParseIPSloppy("1.2.3.4"),
-		},
-		{
-			name: "ipv6 with nodeIP",
-			itfAddrsPairs: []InterfaceAddrsPair{
-				{
-					itf: net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{
-						&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
-					},
-				},
-				{
-					itf: net.Interface{Index: 1, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0},
-					addrs: []net.Addr{
-						&net.IPNet{IP: netutils.ParseIPSloppy("::1"), Mask: net.CIDRMask(128, 128)},
-					},
-				},
-			},
-			expected: map[v1.IPFamily]expectation{
-				v1.IPv6Protocol: {
-					matchAll: true,
-					ips:      sets.New[string]("2001:db8::1", "::1"),
-				},
-			},
-			nodeIP: netutils.ParseIPSloppy("1.2.3.4"),
-		},
 	}
 
 	for _, tc := range testCases {
@@ -428,10 +379,7 @@ func TestGetNodeIPs(t *testing.T) {
 			}
 
 			for _, family := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
-				if tc.nodeIP != nil && v1.IPFamily(fmt.Sprintf("IPv%s", netutils.IPFamilyOf(tc.nodeIP))) != family {
-					continue
-				}
-				npa := NewNodePortAddresses(family, tc.cidrs, tc.nodeIP)
+				npa := NewNodePortAddresses(family, tc.cidrs)
 
 				if npa.MatchAll() != tc.expected[family].matchAll {
 					t.Errorf("unexpected MatchAll(%s), expected: %v", family, tc.expected[family].matchAll)
@@ -503,12 +451,12 @@ func TestContainsIPv4Loopback(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings, nil)
+			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings)
 			if got := npa.ContainsIPv4Loopback(); got != tt.want {
 				t.Errorf("IPv4 ContainsIPv4Loopback() = %v, want %v", got, tt.want)
 			}
 			// ContainsIPv4Loopback should always be false for family=IPv6
-			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings, nil)
+			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings)
 			if got := npa.ContainsIPv4Loopback(); got {
 				t.Errorf("IPv6 ContainsIPv4Loopback() = %v, want %v", got, false)
 			}

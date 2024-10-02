@@ -91,7 +91,7 @@ func (ServiceCIDRList) SwaggerDoc() map[string]string {
 
 var map_ServiceCIDRSpec = map[string]string{
 	"":      "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
-	"cidrs": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
+	"cidrs": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. The network address of each CIDR, the address that identifies the subnet of a host, is reserved and will not be allocated. The broadcast address for IPv4 CIDRs is also reserved and will not be allocated. This field is immutable.",
 }
 
 func (ServiceCIDRSpec) SwaggerDoc() map[string]string {

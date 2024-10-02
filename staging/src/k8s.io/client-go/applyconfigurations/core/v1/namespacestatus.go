@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// NamespaceStatusApplyConfiguration represents an declarative configuration of the NamespaceStatus type for use
+// NamespaceStatusApplyConfiguration represents a declarative configuration of the NamespaceStatus type for use
 // with apply.
 type NamespaceStatusApplyConfiguration struct {
 	Phase      *v1.NamespacePhase                     `json:"phase,omitempty"`
 	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// NamespaceStatusApplyConfiguration constructs an declarative configuration of the NamespaceStatus type for use with
+// NamespaceStatusApplyConfiguration constructs a declarative configuration of the NamespaceStatus type for use with
 // apply.
 func NamespaceStatus() *NamespaceStatusApplyConfiguration {
 	return &NamespaceStatusApplyConfiguration{}

@@ -470,7 +470,7 @@ func TestLabelSelectorMatchExpression(t *testing.T) {
 	}}
 	for index, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			allErrs := ValidateLabelSelector(testCase.labelSelector, LabelSelectorValidationOptions{false}, field.NewPath("labelSelector"))
+			allErrs := ValidateLabelSelector(testCase.labelSelector, LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, field.NewPath("labelSelector"))
 			if len(allErrs) != testCase.wantErrorNumber {
 				t.Errorf("case[%d]: expected failure", index)
 			}

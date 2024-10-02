@@ -2,7 +2,7 @@
 
 package v1
 
-// PerNodeAPIRequestLogApplyConfiguration represents an declarative configuration of the PerNodeAPIRequestLog type for use
+// PerNodeAPIRequestLogApplyConfiguration represents a declarative configuration of the PerNodeAPIRequestLog type for use
 // with apply.
 type PerNodeAPIRequestLogApplyConfiguration struct {
 	NodeName     *string                                    `json:"nodeName,omitempty"`
@@ -10,7 +10,7 @@ type PerNodeAPIRequestLogApplyConfiguration struct {
 	ByUser       []PerUserAPIRequestCountApplyConfiguration `json:"byUser,omitempty"`
 }
 
-// PerNodeAPIRequestLogApplyConfiguration constructs an declarative configuration of the PerNodeAPIRequestLog type for use with
+// PerNodeAPIRequestLogApplyConfiguration constructs a declarative configuration of the PerNodeAPIRequestLog type for use with
 // apply.
 func PerNodeAPIRequestLog() *PerNodeAPIRequestLogApplyConfiguration {
 	return &PerNodeAPIRequestLogApplyConfiguration{}

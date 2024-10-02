@@ -2,7 +2,7 @@
 
 package v1alpha1
 
-// FulcioCAWithRekorApplyConfiguration represents an declarative configuration of the FulcioCAWithRekor type for use
+// FulcioCAWithRekorApplyConfiguration represents a declarative configuration of the FulcioCAWithRekor type for use
 // with apply.
 type FulcioCAWithRekorApplyConfiguration struct {
 	FulcioCAData  []byte                                 `json:"fulcioCAData,omitempty"`
@@ -10,7 +10,7 @@ type FulcioCAWithRekorApplyConfiguration struct {
 	FulcioSubject *PolicyFulcioSubjectApplyConfiguration `json:"fulcioSubject,omitempty"`
 }
 
-// FulcioCAWithRekorApplyConfiguration constructs an declarative configuration of the FulcioCAWithRekor type for use with
+// FulcioCAWithRekorApplyConfiguration constructs a declarative configuration of the FulcioCAWithRekor type for use with
 // apply.
 func FulcioCAWithRekor() *FulcioCAWithRekorApplyConfiguration {
 	return &FulcioCAWithRekorApplyConfiguration{}

@@ -11,16 +11,16 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NodeApplyConfiguration represents an declarative configuration of the Node type for use
+// NodeApplyConfiguration represents a declarative configuration of the Node type for use
 // with apply.
 type NodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *NodeSpecApplyConfiguration `json:"spec,omitempty"`
-	Status                           *apiconfigv1.NodeStatus     `json:"status,omitempty"`
+	Spec                             *NodeSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                           *NodeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Node constructs an declarative configuration of the Node type for use with
+// Node constructs a declarative configuration of the Node type for use with
 // apply.
 func Node(name string) *NodeApplyConfiguration {
 	b := &NodeApplyConfiguration{}
@@ -234,7 +234,13 @@ func (b *NodeApplyConfiguration) WithSpec(value *NodeSpecApplyConfiguration) *No
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *NodeApplyConfiguration) WithStatus(value apiconfigv1.NodeStatus) *NodeApplyConfiguration {
-	b.Status = &value
+func (b *NodeApplyConfiguration) WithStatus(value *NodeStatusApplyConfiguration) *NodeApplyConfiguration {
+	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *NodeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

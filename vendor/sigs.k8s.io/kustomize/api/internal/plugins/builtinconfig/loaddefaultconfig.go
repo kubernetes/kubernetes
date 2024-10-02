@@ -33,7 +33,7 @@ func loadDefaultConfig(
 // makeTransformerConfigFromBytes returns a TransformerConfig object from bytes
 func makeTransformerConfigFromBytes(data []byte) (*TransformerConfig, error) {
 	var t TransformerConfig
-	err := yaml.Unmarshal(data, &t)
+	err := yaml.UnmarshalStrict(data, &t)
 	if err != nil {
 		return nil, err
 	}

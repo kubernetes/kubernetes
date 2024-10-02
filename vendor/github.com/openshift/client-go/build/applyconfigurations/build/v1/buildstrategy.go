@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/build/v1"
 )
 
-// BuildStrategyApplyConfiguration represents an declarative configuration of the BuildStrategy type for use
+// BuildStrategyApplyConfiguration represents a declarative configuration of the BuildStrategy type for use
 // with apply.
 type BuildStrategyApplyConfiguration struct {
 	Type                    *v1.BuildStrategyType                           `json:"type,omitempty"`
@@ -16,7 +16,7 @@ type BuildStrategyApplyConfiguration struct {
 	JenkinsPipelineStrategy *JenkinsPipelineBuildStrategyApplyConfiguration `json:"jenkinsPipelineStrategy,omitempty"`
 }
 
-// BuildStrategyApplyConfiguration constructs an declarative configuration of the BuildStrategy type for use with
+// BuildStrategyApplyConfiguration constructs a declarative configuration of the BuildStrategy type for use with
 // apply.
 func BuildStrategy() *BuildStrategyApplyConfiguration {
 	return &BuildStrategyApplyConfiguration{}

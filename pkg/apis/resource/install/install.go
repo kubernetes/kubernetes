@@ -23,7 +23,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/resource/v1alpha2"
+	"k8s.io/kubernetes/pkg/apis/resource/v1alpha3"
 )
 
 func init() {
@@ -33,6 +33,6 @@ func init() {
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(resource.AddToScheme(scheme))
-	utilruntime.Must(v1alpha2.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1alpha2.SchemeGroupVersion))
+	utilruntime.Must(v1alpha3.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(v1alpha3.SchemeGroupVersion))
 }

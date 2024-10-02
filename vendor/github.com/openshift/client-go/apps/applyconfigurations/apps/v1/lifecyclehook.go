@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/apps/v1"
 )
 
-// LifecycleHookApplyConfiguration represents an declarative configuration of the LifecycleHook type for use
+// LifecycleHookApplyConfiguration represents a declarative configuration of the LifecycleHook type for use
 // with apply.
 type LifecycleHookApplyConfiguration struct {
 	FailurePolicy *v1.LifecycleHookFailurePolicy    `json:"failurePolicy,omitempty"`
@@ -14,7 +14,7 @@ type LifecycleHookApplyConfiguration struct {
 	TagImages     []TagImageHookApplyConfiguration  `json:"tagImages,omitempty"`
 }
 
-// LifecycleHookApplyConfiguration constructs an declarative configuration of the LifecycleHook type for use with
+// LifecycleHookApplyConfiguration constructs a declarative configuration of the LifecycleHook type for use with
 // apply.
 func LifecycleHook() *LifecycleHookApplyConfiguration {
 	return &LifecycleHookApplyConfiguration{}

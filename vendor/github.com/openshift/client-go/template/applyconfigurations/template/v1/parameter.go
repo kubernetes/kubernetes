@@ -2,7 +2,7 @@
 
 package v1
 
-// ParameterApplyConfiguration represents an declarative configuration of the Parameter type for use
+// ParameterApplyConfiguration represents a declarative configuration of the Parameter type for use
 // with apply.
 type ParameterApplyConfiguration struct {
 	Name        *string `json:"name,omitempty"`
@@ -14,7 +14,7 @@ type ParameterApplyConfiguration struct {
 	Required    *bool   `json:"required,omitempty"`
 }
 
-// ParameterApplyConfiguration constructs an declarative configuration of the Parameter type for use with
+// ParameterApplyConfiguration constructs a declarative configuration of the Parameter type for use with
 // apply.
 func Parameter() *ParameterApplyConfiguration {
 	return &ParameterApplyConfiguration{}

@@ -200,13 +200,13 @@ func (t *nodeSelectorTerm) match(nodeLabels labels.Set, nodeFields fields.Set) (
 	return true, nil
 }
 
-var validSelectorOperators = []string{
-	string(v1.NodeSelectorOpIn),
-	string(v1.NodeSelectorOpNotIn),
-	string(v1.NodeSelectorOpExists),
-	string(v1.NodeSelectorOpDoesNotExist),
-	string(v1.NodeSelectorOpGt),
-	string(v1.NodeSelectorOpLt),
+var validSelectorOperators = []v1.NodeSelectorOperator{
+	v1.NodeSelectorOpIn,
+	v1.NodeSelectorOpNotIn,
+	v1.NodeSelectorOpExists,
+	v1.NodeSelectorOpDoesNotExist,
+	v1.NodeSelectorOpGt,
+	v1.NodeSelectorOpLt,
 }
 
 // nodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
@@ -250,9 +250,9 @@ func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement, path *
 	return selector, nil
 }
 
-var validFieldSelectorOperators = []string{
-	string(v1.NodeSelectorOpIn),
-	string(v1.NodeSelectorOpNotIn),
+var validFieldSelectorOperators = []v1.NodeSelectorOperator{
+	v1.NodeSelectorOpIn,
+	v1.NodeSelectorOpNotIn,
 }
 
 // nodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements

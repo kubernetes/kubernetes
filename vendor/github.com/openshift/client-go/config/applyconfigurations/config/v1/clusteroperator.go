@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterOperatorApplyConfiguration represents an declarative configuration of the ClusterOperator type for use
+// ClusterOperatorApplyConfiguration represents a declarative configuration of the ClusterOperator type for use
 // with apply.
 type ClusterOperatorApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ClusterOperatorApplyConfiguration struct {
 	Status                           *ClusterOperatorStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ClusterOperator constructs an declarative configuration of the ClusterOperator type for use with
+// ClusterOperator constructs a declarative configuration of the ClusterOperator type for use with
 // apply.
 func ClusterOperator(name string) *ClusterOperatorApplyConfiguration {
 	b := &ClusterOperatorApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ClusterOperatorApplyConfiguration) WithSpec(value configv1.ClusterOpera
 func (b *ClusterOperatorApplyConfiguration) WithStatus(value *ClusterOperatorStatusApplyConfiguration) *ClusterOperatorApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterOperatorApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

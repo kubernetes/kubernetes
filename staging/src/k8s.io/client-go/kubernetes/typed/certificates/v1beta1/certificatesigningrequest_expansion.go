@@ -30,7 +30,7 @@ type CertificateSigningRequestExpansion interface {
 
 func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Put().
+	err = c.GetClient().Put().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequest.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).

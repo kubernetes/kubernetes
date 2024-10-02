@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TokenConfigApplyConfiguration represents an declarative configuration of the TokenConfig type for use
+// TokenConfigApplyConfiguration represents a declarative configuration of the TokenConfig type for use
 // with apply.
 type TokenConfigApplyConfiguration struct {
 	AccessTokenMaxAgeSeconds            *int32       `json:"accessTokenMaxAgeSeconds,omitempty"`
@@ -14,7 +14,7 @@ type TokenConfigApplyConfiguration struct {
 	AccessTokenInactivityTimeout        *v1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
 }
 
-// TokenConfigApplyConfiguration constructs an declarative configuration of the TokenConfig type for use with
+// TokenConfigApplyConfiguration constructs a declarative configuration of the TokenConfig type for use with
 // apply.
 func TokenConfig() *TokenConfigApplyConfiguration {
 	return &TokenConfigApplyConfiguration{}

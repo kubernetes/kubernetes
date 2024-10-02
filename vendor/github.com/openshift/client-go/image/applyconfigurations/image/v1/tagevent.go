@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TagEventApplyConfiguration represents an declarative configuration of the TagEvent type for use
+// TagEventApplyConfiguration represents a declarative configuration of the TagEvent type for use
 // with apply.
 type TagEventApplyConfiguration struct {
 	Created              *v1.Time `json:"created,omitempty"`
@@ -15,7 +15,7 @@ type TagEventApplyConfiguration struct {
 	Generation           *int64   `json:"generation,omitempty"`
 }
 
-// TagEventApplyConfiguration constructs an declarative configuration of the TagEvent type for use with
+// TagEventApplyConfiguration constructs a declarative configuration of the TagEvent type for use with
 // apply.
 func TagEvent() *TagEventApplyConfiguration {
 	return &TagEventApplyConfiguration{}

@@ -84,7 +84,7 @@ func TestCertRotation(t *testing.T) {
 	// Should have had a rotation; connections will have been closed
 	select {
 	case _, ok := <-w.ResultChan():
-		assert.Equal(t, false, ok)
+		assert.False(t, ok)
 	default:
 		t.Fatal("Watch wasn't closed despite rotation")
 	}

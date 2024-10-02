@@ -82,15 +82,22 @@ message NUMANode {
 
 // DynamicResource contains information about the devices assigned to a container by DRA
 message DynamicResource {
-    string class_name = 1;
+    // tombstone: removed in 1.31 because claims are no longer associated with one class
+    // string class_name = 1;
     string claim_name = 2;
     string claim_namespace = 3;
     repeated ClaimResource claim_resources = 4;
 }
 
-// ClaimResource contains per plugin resource information
+// ClaimResource contains resource information. The driver name/pool name/device name
+// triplet uniquely identifies the device. Should DRA get extended to other kinds
+// of resources, then device_name will be empty and other fields will get added.
+// Each device at the DRA API level may map to zero or more CDI devices.
 message ClaimResource {
     repeated CDIDevice cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
+    string driver_name = 2;
+    string pool_name = 3;
+    string device_name = 4;
 }
 
 // CDIDevice specifies a CDI device information

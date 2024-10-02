@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// BuildOutputApplyConfiguration represents an declarative configuration of the BuildOutput type for use
+// BuildOutputApplyConfiguration represents a declarative configuration of the BuildOutput type for use
 // with apply.
 type BuildOutputApplyConfiguration struct {
 	To          *v1.ObjectReference            `json:"to,omitempty"`
@@ -14,7 +14,7 @@ type BuildOutputApplyConfiguration struct {
 	ImageLabels []ImageLabelApplyConfiguration `json:"imageLabels,omitempty"`
 }
 
-// BuildOutputApplyConfiguration constructs an declarative configuration of the BuildOutput type for use with
+// BuildOutputApplyConfiguration constructs a declarative configuration of the BuildOutput type for use with
 // apply.
 func BuildOutput() *BuildOutputApplyConfiguration {
 	return &BuildOutputApplyConfiguration{}

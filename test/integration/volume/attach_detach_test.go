@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	fakecloud "k8s.io/cloud-provider/fake"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -143,7 +142,7 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	namespaceName := "test-pod-deletion"
@@ -217,7 +216,7 @@ func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedIn
 
 func TestPodUpdateWithWithADC(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 	namespaceName := "test-pod-update"
 
@@ -286,78 +285,6 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected 0 pods in dsw after pod completion", 0)
 }
 
-func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-	namespaceName := "test-pod-update"
-
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-sandbox",
-			Annotations: map[string]string{
-				util.ControllerManagedAttachAnnotation:  "true",
-				util.KeepTerminatedPodVolumesAnnotation: "true",
-			},
-		},
-	}
-
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
-	testClient, ctrl, pvCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
-
-	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
-	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
-
-	pod := fakePodWithVol(namespaceName)
-	podStopCh := make(chan struct{})
-	defer close(podStopCh)
-
-	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to created node : %v", err)
-	}
-
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
-
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-		t.Errorf("Failed to create pod : %v", err)
-	}
-
-	podInformer := informers.Core().V1().Pods().Informer()
-	go podInformer.Run(podStopCh)
-
-	// start controller loop
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(tCtx.Done())
-	go informers.Core().V1().PersistentVolumes().Informer().Run(tCtx.Done())
-	go informers.Storage().V1().VolumeAttachments().Informer().Run(tCtx.Done())
-	initCSIObjects(tCtx.Done(), informers)
-	go ctrl.Run(tCtx)
-	// Run pvCtrl to avoid leaking goroutines started during its creation.
-	go pvCtrl.Run(tCtx)
-
-	waitToObservePods(t, podInformer, 1)
-	podKey, err := cache.MetaNamespaceKeyFunc(pod)
-	if err != nil {
-		t.Fatalf("MetaNamespaceKeyFunc failed with : %v", err)
-	}
-
-	_, _, err = podInformer.GetStore().GetByKey(podKey)
-
-	if err != nil {
-		t.Fatalf("Pod not found in Pod Informer cache : %v", err)
-	}
-
-	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
-
-	pod.Status.Phase = v1.PodSucceeded
-
-	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
-		t.Errorf("Failed to update pod : %v", err)
-	}
-
-	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected non-zero pods in dsw if KeepTerminatedPodVolumesAnnotation is set", 1)
-}
-
 // wait for the podInformer to observe the pods. Call this function before
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
@@ -420,7 +347,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.Cloud{}
 	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		ctx,
@@ -432,7 +358,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		informers.Storage().V1().CSINodes(),
 		informers.Storage().V1().CSIDrivers(),
 		informers.Storage().V1().VolumeAttachments(),
-		cloud,
 		plugins,
 		nil, /* prober */
 		false,
@@ -451,8 +376,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		KubeClient:                testClient,
 		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
 		VolumePlugins:             plugins,
-		Cloud:                     nil,
-		ClusterName:               "volume-test-cluster",
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
@@ -472,7 +395,7 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 	namespaceName := "test-pod-deletion"
 
@@ -549,7 +472,7 @@ func TestPodAddedByDswp(t *testing.T) {
 
 func TestPVCBoundWithADC(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	tCtx := ktesting.Init(t)

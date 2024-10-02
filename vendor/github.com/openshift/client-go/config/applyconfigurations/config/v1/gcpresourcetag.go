@@ -2,7 +2,7 @@
 
 package v1
 
-// GCPResourceTagApplyConfiguration represents an declarative configuration of the GCPResourceTag type for use
+// GCPResourceTagApplyConfiguration represents a declarative configuration of the GCPResourceTag type for use
 // with apply.
 type GCPResourceTagApplyConfiguration struct {
 	ParentID *string `json:"parentID,omitempty"`
@@ -10,7 +10,7 @@ type GCPResourceTagApplyConfiguration struct {
 	Value    *string `json:"value,omitempty"`
 }
 
-// GCPResourceTagApplyConfiguration constructs an declarative configuration of the GCPResourceTag type for use with
+// GCPResourceTagApplyConfiguration constructs a declarative configuration of the GCPResourceTag type for use with
 // apply.
 func GCPResourceTag() *GCPResourceTagApplyConfiguration {
 	return &GCPResourceTagApplyConfiguration{}

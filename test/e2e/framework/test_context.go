@@ -399,7 +399,7 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	// Randomize specs as well as suites
 	suiteConfig.RandomizeAllSpecs = true
 	// Disable skipped tests unless they are explicitly requested.
-	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
+	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 && suiteConfig.LabelFilter == "" {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
 	}
 	return suiteConfig, reporterConfig

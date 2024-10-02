@@ -4,8 +4,10 @@
 package types
 
 type HelmConfig struct {
-	Enabled bool
-	Command string
+	Enabled     bool
+	Command     string
+	ApiVersions []string
+	KubeVersion string
 }
 
 // PluginConfig holds plugin configuration.

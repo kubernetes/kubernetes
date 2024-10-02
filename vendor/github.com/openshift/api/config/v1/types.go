@@ -401,7 +401,7 @@ const (
 
 // IBMCloudServiceName contains a value specifying the name of an IBM Cloud Service,
 // which are used by MAPI, CIRO, CIO, Installer, etc.
-// +kubebuilder:validation:Enum=CIS;COS;DNSServices;GlobalSearch;GlobalTagging;HyperProtect;IAM;KeyProtect;ResourceController;ResourceManager;VPC
+// +kubebuilder:validation:Enum=CIS;COS;COSConfig;DNSServices;GlobalCatalog;GlobalSearch;GlobalTagging;HyperProtect;IAM;KeyProtect;ResourceController;ResourceManager;VPC
 type IBMCloudServiceName string
 
 const (
@@ -409,8 +409,12 @@ const (
 	IBMCloudServiceCIS IBMCloudServiceName = "CIS"
 	// IBMCloudServiceCOS is the name for IBM Cloud COS.
 	IBMCloudServiceCOS IBMCloudServiceName = "COS"
+	// IBMCloudServiceCOSConfig is the name for IBM Cloud COS Config service.
+	IBMCloudServiceCOSConfig IBMCloudServiceName = "COSConfig"
 	// IBMCloudServiceDNSServices is the name for IBM Cloud DNS Services.
 	IBMCloudServiceDNSServices IBMCloudServiceName = "DNSServices"
+	// IBMCloudServiceGlobalCatalog is the name for IBM Cloud Global Catalog service.
+	IBMCloudServiceGlobalCatalog IBMCloudServiceName = "GlobalCatalog"
 	// IBMCloudServiceGlobalSearch is the name for IBM Cloud Global Search.
 	IBMCloudServiceGlobalSearch IBMCloudServiceName = "GlobalSearch"
 	// IBMCloudServiceGlobalTagging is the name for IBM Cloud Global Tagging.

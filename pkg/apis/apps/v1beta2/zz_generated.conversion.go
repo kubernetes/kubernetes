@@ -378,9 +378,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1beta2_ControllerRevision_To_apps_ControllerRevision(in *v1beta2.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Data, &out.Data, s); err != nil {
-		return err
-	}
+	out.Data = in.Data
 	out.Revision = in.Revision
 	return nil
 }
@@ -392,9 +390,7 @@ func Convert_v1beta2_ControllerRevision_To_apps_ControllerRevision(in *v1beta2.C
 
 func autoConvert_apps_ControllerRevision_To_v1beta2_ControllerRevision(in *apps.ControllerRevision, out *v1beta2.ControllerRevision, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Data, &out.Data, s); err != nil {
-		return err
-	}
+	out.Data = in.Data
 	out.Revision = in.Revision
 	return nil
 }
@@ -406,17 +402,7 @@ func Convert_apps_ControllerRevision_To_v1beta2_ControllerRevision(in *apps.Cont
 
 func autoConvert_v1beta2_ControllerRevisionList_To_apps_ControllerRevisionList(in *v1beta2.ControllerRevisionList, out *apps.ControllerRevisionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]apps.ControllerRevision, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta2_ControllerRevision_To_apps_ControllerRevision(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]apps.ControllerRevision)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -427,17 +413,7 @@ func Convert_v1beta2_ControllerRevisionList_To_apps_ControllerRevisionList(in *v
 
 func autoConvert_apps_ControllerRevisionList_To_v1beta2_ControllerRevisionList(in *apps.ControllerRevisionList, out *v1beta2.ControllerRevisionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]v1beta2.ControllerRevision, len(*in))
-		for i := range *in {
-			if err := Convert_apps_ControllerRevision_To_v1beta2_ControllerRevision(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]v1beta2.ControllerRevision)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

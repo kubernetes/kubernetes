@@ -31,7 +31,7 @@ func TestBugs(t *testing.T) {
 	// https://issues.redhat.com/browse/OCPBUGS-25641
 	t.Skip("temporarily disabled")
 
-	assert.NoError(t, framework.FormatBugs())
+	require.NoError(t, framework.FormatBugs())
 	RecordBugs()
 	Describe()
 

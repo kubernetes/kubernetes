@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// TypedObjectReferenceApplyConfiguration represents an declarative configuration of the TypedObjectReference type for use
+// TypedObjectReferenceApplyConfiguration represents a declarative configuration of the TypedObjectReference type for use
 // with apply.
 type TypedObjectReferenceApplyConfiguration struct {
 	APIGroup  *string `json:"apiGroup,omitempty"`
@@ -27,7 +27,7 @@ type TypedObjectReferenceApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// TypedObjectReferenceApplyConfiguration constructs an declarative configuration of the TypedObjectReference type for use with
+// TypedObjectReferenceApplyConfiguration constructs a declarative configuration of the TypedObjectReference type for use with
 // apply.
 func TypedObjectReference() *TypedObjectReferenceApplyConfiguration {
 	return &TypedObjectReferenceApplyConfiguration{}

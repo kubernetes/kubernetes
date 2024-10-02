@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -24,19 +25,50 @@ import (
 	"math"
 	"net"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	certificates "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
 )
+
+func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddress) func() *x509.CertificateRequest {
+	return func() *x509.CertificateRequest {
+		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
+		// by default, require at least one IP before requesting a serving certificate
+		hasRequiredAddresses := len(ips) > 0
+
+		// optionally allow requesting a serving certificate with just a DNS name
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowDNSOnlyNodeCSR) {
+			hasRequiredAddresses = hasRequiredAddresses || len(hostnames) > 0
+		}
+
+		// don't return a template if we have no addresses to request for
+		if !hasRequiredAddresses {
+			return nil
+		}
+		return &x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+				Organization: []string{"system:nodes"},
+			},
+			DNSNames:    hostnames,
+			IPAddresses: ips,
+		}
+	}
+}
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
@@ -88,21 +120,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	)
 	legacyregistry.MustRegister(certificateRotationAge)
 
-	getTemplate := func() *x509.CertificateRequest {
-		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
-		// don't return a template if we have no addresses to request for
-		if len(hostnames) == 0 && len(ips) == 0 {
-			return nil
-		}
-		return &x509.CertificateRequest{
-			Subject: pkix.Name{
-				CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-				Organization: []string{"system:nodes"},
-			},
-			DNSNames:    hostnames,
-			IPAddresses: ips,
-		}
-	}
+	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn:             clientsetFn,
@@ -233,4 +251,67 @@ func NewKubeletClientCertificateManager(
 	}
 
 	return m, nil
+}
+
+// NewKubeletServerCertificateDynamicFileManager creates a certificate manager based on reading and watching certificate and key files.
+// The returned struct implements certificate.Manager interface, enabling using it like other CertificateManager in this package.
+// But the struct doesn't communicate with API server to perform certificate request at all.
+func NewKubeletServerCertificateDynamicFileManager(certFile, keyFile string) (certificate.Manager, error) {
+	c, err := dynamiccertificates.NewDynamicServingContentFromFiles("kubelet-server-cert-files", certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to set up dynamic certificate manager for kubelet server cert files: %w", err)
+	}
+	m := &kubeletServerCertificateDynamicFileManager{
+		dynamicCertificateContent: c,
+		certFile:                  certFile,
+		keyFile:                   keyFile,
+	}
+	m.Enqueue()
+	c.AddListener(m)
+	return m, nil
+}
+
+// kubeletServerCertificateDynamicFileManager uses a dynamic CertKeyContentProvider based on cert and key files.
+type kubeletServerCertificateDynamicFileManager struct {
+	cancelFn                  context.CancelFunc
+	certFile                  string
+	keyFile                   string
+	dynamicCertificateContent *dynamiccertificates.DynamicCertKeyPairContent
+	currentTLSCertificate     atomic.Pointer[tls.Certificate]
+}
+
+// Enqueue implements the functions to be notified when the serving cert content changes.
+func (m *kubeletServerCertificateDynamicFileManager) Enqueue() {
+	certContent, keyContent := m.dynamicCertificateContent.CurrentCertKeyContent()
+	cert, err := tls.X509KeyPair(certContent, keyContent)
+	if err != nil {
+		klog.ErrorS(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
+		return
+	}
+	m.currentTLSCertificate.Store(&cert)
+	klog.V(4).InfoS("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
+}
+
+// Current returns the last valid certificate key pair loaded from files.
+func (m *kubeletServerCertificateDynamicFileManager) Current() *tls.Certificate {
+	return m.currentTLSCertificate.Load()
+}
+
+// Start starts watching the certificate and key files
+func (m *kubeletServerCertificateDynamicFileManager) Start() {
+	var ctx context.Context
+	ctx, m.cancelFn = context.WithCancel(context.Background())
+	go m.dynamicCertificateContent.Run(ctx, 1)
+}
+
+// Stop stops watching the certificate and key files
+func (m *kubeletServerCertificateDynamicFileManager) Stop() {
+	if m.cancelFn != nil {
+		m.cancelFn()
+	}
+}
+
+// ServerHealthy always returns true since the file manager doesn't communicate with any server
+func (m *kubeletServerCertificateDynamicFileManager) ServerHealthy() bool {
+	return true
 }

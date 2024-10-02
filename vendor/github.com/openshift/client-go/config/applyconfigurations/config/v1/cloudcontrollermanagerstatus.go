@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// CloudControllerManagerStatusApplyConfiguration represents an declarative configuration of the CloudControllerManagerStatus type for use
+// CloudControllerManagerStatusApplyConfiguration represents a declarative configuration of the CloudControllerManagerStatus type for use
 // with apply.
 type CloudControllerManagerStatusApplyConfiguration struct {
 	State *v1.CloudControllerManagerState `json:"state,omitempty"`
 }
 
-// CloudControllerManagerStatusApplyConfiguration constructs an declarative configuration of the CloudControllerManagerStatus type for use with
+// CloudControllerManagerStatusApplyConfiguration constructs a declarative configuration of the CloudControllerManagerStatus type for use with
 // apply.
 func CloudControllerManagerStatus() *CloudControllerManagerStatusApplyConfiguration {
 	return &CloudControllerManagerStatusApplyConfiguration{}

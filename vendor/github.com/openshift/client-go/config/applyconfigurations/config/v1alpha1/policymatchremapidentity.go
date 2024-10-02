@@ -6,14 +6,14 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// PolicyMatchRemapIdentityApplyConfiguration represents an declarative configuration of the PolicyMatchRemapIdentity type for use
+// PolicyMatchRemapIdentityApplyConfiguration represents a declarative configuration of the PolicyMatchRemapIdentity type for use
 // with apply.
 type PolicyMatchRemapIdentityApplyConfiguration struct {
 	Prefix       *v1alpha1.IdentityRepositoryPrefix `json:"prefix,omitempty"`
 	SignedPrefix *v1alpha1.IdentityRepositoryPrefix `json:"signedPrefix,omitempty"`
 }
 
-// PolicyMatchRemapIdentityApplyConfiguration constructs an declarative configuration of the PolicyMatchRemapIdentity type for use with
+// PolicyMatchRemapIdentityApplyConfiguration constructs a declarative configuration of the PolicyMatchRemapIdentity type for use with
 // apply.
 func PolicyMatchRemapIdentity() *PolicyMatchRemapIdentityApplyConfiguration {
 	return &PolicyMatchRemapIdentityApplyConfiguration{}

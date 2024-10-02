@@ -361,6 +361,8 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
 	// WARNING: in.EncryptionAlgorithm requires manual conversion: does not exist in peer-type
+	// WARNING: in.CertificateValidityPeriod requires manual conversion: does not exist in peer-type
+	// WARNING: in.CACertificateValidityPeriod requires manual conversion: does not exist in peer-type
 	return nil
 }
 

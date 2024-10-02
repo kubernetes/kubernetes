@@ -34,6 +34,19 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
+func allPodLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+	clientConfig, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := corev1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, true)
+}
+
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
@@ -44,11 +57,11 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, false)
 }
 
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
@@ -58,7 +71,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	case *corev1.PodList:
 		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
 		for i := range t.Items {
-			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers, allPods)
 			if err != nil {
 				return nil, err
 			}
@@ -95,7 +108,9 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 				// Default to the first container name(aligning behavior with `kubectl exec').
 				currOpts.Container = t.Spec.Containers[0].Name
 				if len(t.Spec.Containers) > 1 || len(t.Spec.InitContainers) > 0 || len(t.Spec.EphemeralContainers) > 0 {
-					fmt.Fprintf(os.Stderr, "Defaulted container %q out of: %s\n", currOpts.Container, podcmd.AllContainerNames(t))
+					if !allPods {
+						fmt.Fprintf(os.Stderr, "Defaulted container %q out of: %s\n", currOpts.Container, podcmd.AllContainerNames(t))
+					}
 				}
 			}
 
@@ -117,7 +132,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +143,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +154,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.EphemeralContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -161,9 +176,18 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	if err != nil {
 		return nil, err
 	}
+	var targetObj runtime.Object = pod
+
 	if numPods > 1 {
-		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+		if allPods {
+			targetObj, err = GetPodList(clientset, namespace, selector.String(), timeout, sortBy)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
+		}
 	}
 
-	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, targetObj, options, timeout, allContainers, allPods)
 }

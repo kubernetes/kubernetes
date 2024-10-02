@@ -232,6 +232,7 @@ func (in *IsPersonalSubjectAccessReview) DeepCopyObject() runtime.Object {
 func (in *LocalResourceAccessReview) DeepCopyInto(out *LocalResourceAccessReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Action.DeepCopyInto(&out.Action)
 	return
 }
@@ -258,6 +259,7 @@ func (in *LocalResourceAccessReview) DeepCopyObject() runtime.Object {
 func (in *LocalSubjectAccessReview) DeepCopyInto(out *LocalSubjectAccessReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Action.DeepCopyInto(&out.Action)
 	if in.GroupsSlice != nil {
 		in, out := &in.GroupsSlice, &out.GroupsSlice
@@ -444,6 +446,7 @@ func (in *PolicyRule) DeepCopy() *PolicyRule {
 func (in *ResourceAccessReview) DeepCopyInto(out *ResourceAccessReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Action.DeepCopyInto(&out.Action)
 	return
 }
@@ -737,6 +740,7 @@ func (in *RoleList) DeepCopyObject() runtime.Object {
 func (in *SelfSubjectRulesReview) DeepCopyInto(out *SelfSubjectRulesReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return
@@ -827,6 +831,7 @@ func (in *ServiceAccountRestriction) DeepCopy() *ServiceAccountRestriction {
 func (in *SubjectAccessReview) DeepCopyInto(out *SubjectAccessReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Action.DeepCopyInto(&out.Action)
 	if in.GroupsSlice != nil {
 		in, out := &in.GroupsSlice, &out.GroupsSlice
@@ -888,6 +893,7 @@ func (in *SubjectAccessReviewResponse) DeepCopyObject() runtime.Object {
 func (in *SubjectRulesReview) DeepCopyInto(out *SubjectRulesReview) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 	return

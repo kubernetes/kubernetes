@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ConsoleApplyConfiguration represents an declarative configuration of the Console type for use
+// ConsoleApplyConfiguration represents a declarative configuration of the Console type for use
 // with apply.
 type ConsoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ConsoleApplyConfiguration struct {
 	Status                           *ConsoleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Console constructs an declarative configuration of the Console type for use with
+// Console constructs a declarative configuration of the Console type for use with
 // apply.
 func Console(name string) *ConsoleApplyConfiguration {
 	b := &ConsoleApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ConsoleApplyConfiguration) WithSpec(value *ConsoleSpecApplyConfiguratio
 func (b *ConsoleApplyConfiguration) WithStatus(value *ConsoleStatusApplyConfiguration) *ConsoleApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ConsoleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

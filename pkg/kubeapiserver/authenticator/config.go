@@ -55,14 +55,16 @@ import (
 
 // Config contains the data on how to authenticate a request to the Kube API Server
 type Config struct {
-	Anonymous      bool
+	// Anonymous holds the effective anonymous config, specified either via config file
+	// (hoisted out of AuthenticationConfig) or via flags (constructed from flag-specified values).
+	Anonymous apiserver.AnonymousAuthConfig
+
 	BootstrapToken bool
 
 	TokenAuthFile               string
 	AuthenticationConfig        *apiserver.AuthenticationConfiguration
 	AuthenticationConfigData    string
 	OIDCSigningAlgs             []string
-	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountIssuers       []string
 	APIAudiences                authenticator.Audiences
@@ -79,7 +81,9 @@ type Config struct {
 
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
-	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
+	// ServiceAccountPublicKeysGetter returns public keys for verifying service account tokens.
+	ServiceAccountPublicKeysGetter serviceaccount.PublicKeysGetter
+	// ServiceAccountTokenGetter fetches API objects used to verify bound objects in service account token claims.
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	SecretsWriter               typedv1core.SecretsGetter
 	BootstrapTokenAuthenticator authenticator.Token
@@ -127,15 +131,15 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 		}
 		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, tokenAuth))
 	}
-	if len(config.ServiceAccountKeyFiles) > 0 {
-		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter, config.SecretsWriter)
+	if config.ServiceAccountPublicKeysGetter != nil {
+		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountPublicKeysGetter, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter, config.SecretsWriter)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
 	if len(config.ServiceAccountIssuers) > 0 {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuers, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuers, config.ServiceAccountPublicKeysGetter, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -212,8 +216,8 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 	}
 
 	if len(authenticators) == 0 {
-		if config.Anonymous {
-			return anonymous.NewAuthenticator(), nil, &securityDefinitionsV2, securitySchemesV3, nil
+		if config.Anonymous.Enabled {
+			return anonymous.NewAuthenticator(config.Anonymous.Conditions), nil, &securityDefinitionsV2, securitySchemesV3, nil
 		}
 		return nil, nil, &securityDefinitionsV2, securitySchemesV3, nil
 	}
@@ -222,10 +226,10 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 
 	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
-	if config.Anonymous {
+	if config.Anonymous.Enabled {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token
 		// or invalid username/password combination anonymous).
-		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator(config.Anonymous.Conditions))
 	}
 
 	return authenticator, updateAuthenticationConfig, &securityDefinitionsV2, securitySchemesV3, nil
@@ -338,36 +342,25 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 }
 
 // newLegacyServiceAccountAuthenticator returns an authenticator.Token or an error
-func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (authenticator.Token, error) {
-	allPublicKeys := []interface{}{}
-	for _, keyfile := range keyfiles {
-		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
-		if err != nil {
-			return nil, err
-		}
-		allPublicKeys = append(allPublicKeys, publicKeys...)
+func newLegacyServiceAccountAuthenticator(publicKeysGetter serviceaccount.PublicKeysGetter, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter, secretsWriter typedv1core.SecretsGetter) (authenticator.Token, error) {
+	if publicKeysGetter == nil {
+		return nil, fmt.Errorf("no public key getter provided")
 	}
 	validator, err := serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter, secretsWriter)
 	if err != nil {
 		return nil, fmt.Errorf("while creating legacy validator, err: %w", err)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, validator)
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, publicKeysGetter, apiAudiences, validator)
 	return tokenAuthenticator, nil
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Token or an error
-func newServiceAccountAuthenticator(issuers []string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
-	allPublicKeys := []interface{}{}
-	for _, keyfile := range keyfiles {
-		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
-		if err != nil {
-			return nil, err
-		}
-		allPublicKeys = append(allPublicKeys, publicKeys...)
+func newServiceAccountAuthenticator(issuers []string, publicKeysGetter serviceaccount.PublicKeysGetter, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+	if publicKeysGetter == nil {
+		return nil, fmt.Errorf("no public key getter provided")
 	}
-
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(issuers, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(issuers, publicKeysGetter, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
 	return tokenAuthenticator, nil
 }
 

@@ -53,10 +53,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodePorts},
 						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 						{Name: names.VolumeRestrictions},
-						{Name: names.EBSLimits},
-						{Name: names.GCEPDLimits},
 						{Name: names.NodeVolumeLimits},
-						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
@@ -86,10 +83,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodePorts},
 						{Name: names.NodeResourcesFit, Weight: ptr.To[int32](1)},
 						{Name: names.VolumeRestrictions},
-						{Name: names.EBSLimits},
-						{Name: names.GCEPDLimits},
 						{Name: names.NodeVolumeLimits},
-						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
 						{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
@@ -108,7 +102,7 @@ func TestApplyFeatureGates(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			for k, v := range test.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
 
 			gotConfig := getDefaultPlugins()

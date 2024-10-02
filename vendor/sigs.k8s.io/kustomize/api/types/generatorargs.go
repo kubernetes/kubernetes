@@ -5,7 +5,7 @@ package types
 
 // GeneratorArgs contains arguments common to ConfigMap and Secret generators.
 type GeneratorArgs struct {
-	// Namespace for the configmap, optional
+	// Namespace for the resource, optional
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 
 	// Name - actually the partial name - of the generated resource.

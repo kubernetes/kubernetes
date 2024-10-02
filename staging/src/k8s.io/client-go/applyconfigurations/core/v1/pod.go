@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodApplyConfiguration represents an declarative configuration of the Pod type for use
+// PodApplyConfiguration represents a declarative configuration of the Pod type for use
 // with apply.
 type PodApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type PodApplyConfiguration struct {
 	Status                           *PodStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Pod constructs an declarative configuration of the Pod type for use with
+// Pod constructs a declarative configuration of the Pod type for use with
 // apply.
 func Pod(name, namespace string) *PodApplyConfiguration {
 	b := &PodApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *PodApplyConfiguration) WithSpec(value *PodSpecApplyConfiguration) *PodA
 func (b *PodApplyConfiguration) WithStatus(value *PodStatusApplyConfiguration) *PodApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PodApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

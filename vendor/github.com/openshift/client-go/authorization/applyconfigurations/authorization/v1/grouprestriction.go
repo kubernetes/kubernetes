@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GroupRestrictionApplyConfiguration represents an declarative configuration of the GroupRestriction type for use
+// GroupRestrictionApplyConfiguration represents a declarative configuration of the GroupRestriction type for use
 // with apply.
 type GroupRestrictionApplyConfiguration struct {
 	Groups    []string                             `json:"groups,omitempty"`
 	Selectors []v1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
 }
 
-// GroupRestrictionApplyConfiguration constructs an declarative configuration of the GroupRestriction type for use with
+// GroupRestrictionApplyConfiguration constructs a declarative configuration of the GroupRestriction type for use with
 // apply.
 func GroupRestriction() *GroupRestrictionApplyConfiguration {
 	return &GroupRestrictionApplyConfiguration{}

@@ -8,7 +8,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageSignatureApplyConfiguration represents an declarative configuration of the ImageSignature type for use
+// ImageSignatureApplyConfiguration represents a declarative configuration of the ImageSignature type for use
 // with apply.
 type ImageSignatureApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -23,7 +23,7 @@ type ImageSignatureApplyConfiguration struct {
 	IssuedTo                         *SignatureSubjectApplyConfiguration    `json:"issuedTo,omitempty"`
 }
 
-// ImageSignature constructs an declarative configuration of the ImageSignature type for use with
+// ImageSignature constructs a declarative configuration of the ImageSignature type for use with
 // apply.
 func ImageSignature(name string) *ImageSignatureApplyConfiguration {
 	b := &ImageSignatureApplyConfiguration{}
@@ -266,4 +266,10 @@ func (b *ImageSignatureApplyConfiguration) WithIssuedBy(value *SignatureIssuerAp
 func (b *ImageSignatureApplyConfiguration) WithIssuedTo(value *SignatureSubjectApplyConfiguration) *ImageSignatureApplyConfiguration {
 	b.IssuedTo = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImageSignatureApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

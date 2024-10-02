@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type ImageContentPolicyLister interface {
 
 // imageContentPolicyLister implements the ImageContentPolicyLister interface.
 type imageContentPolicyLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ImageContentPolicy]
 }
 
 // NewImageContentPolicyLister returns a new ImageContentPolicyLister.
 func NewImageContentPolicyLister(indexer cache.Indexer) ImageContentPolicyLister {
-	return &imageContentPolicyLister{indexer: indexer}
-}
-
-// List lists all ImageContentPolicies in the indexer.
-func (s *imageContentPolicyLister) List(selector labels.Selector) (ret []*v1.ImageContentPolicy, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ImageContentPolicy))
-	})
-	return ret, err
-}
-
-// Get retrieves the ImageContentPolicy from the index for a given name.
-func (s *imageContentPolicyLister) Get(name string) (*v1.ImageContentPolicy, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("imagecontentpolicy"), name)
-	}
-	return obj.(*v1.ImageContentPolicy), nil
+	return &imageContentPolicyLister{listers.New[*v1.ImageContentPolicy](indexer, v1.Resource("imagecontentpolicy"))}
 }

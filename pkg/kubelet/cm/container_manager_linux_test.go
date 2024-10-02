@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -177,17 +176,13 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 func TestGetCapacity(t *testing.T) {
 	ephemeralStorageFromCapacity := int64(2000)
 	ephemeralStorageFromCadvisor := int64(8000)
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	mockCtrlError := gomock.NewController(t)
-	defer mockCtrlError.Finish()
 
-	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor := cadvisortest.NewMockInterface(t)
 	rootfs := cadvisorapiv2.FsInfo{
 		Capacity: 8000,
 	}
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
-	mockCadvisorError := cadvisortest.NewMockInterface(mockCtrlError)
+	mockCadvisorError := cadvisortest.NewMockInterface(t)
 	mockCadvisorError.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{}, errors.New("Unable to get rootfs data from cAdvisor interface"))
 	cases := []struct {
 		name                                 string

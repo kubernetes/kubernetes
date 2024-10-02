@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/security/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type SecurityContextConstraintsLister interface {
 
 // securityContextConstraintsLister implements the SecurityContextConstraintsLister interface.
 type securityContextConstraintsLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.SecurityContextConstraints]
 }
 
 // NewSecurityContextConstraintsLister returns a new SecurityContextConstraintsLister.
 func NewSecurityContextConstraintsLister(indexer cache.Indexer) SecurityContextConstraintsLister {
-	return &securityContextConstraintsLister{indexer: indexer}
-}
-
-// List lists all SecurityContextConstraints in the indexer.
-func (s *securityContextConstraintsLister) List(selector labels.Selector) (ret []*v1.SecurityContextConstraints, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.SecurityContextConstraints))
-	})
-	return ret, err
-}
-
-// Get retrieves the SecurityContextConstraints from the index for a given name.
-func (s *securityContextConstraintsLister) Get(name string) (*v1.SecurityContextConstraints, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("securitycontextconstraints"), name)
-	}
-	return obj.(*v1.SecurityContextConstraints), nil
+	return &securityContextConstraintsLister{listers.New[*v1.SecurityContextConstraints](indexer, v1.Resource("securitycontextconstraints"))}
 }

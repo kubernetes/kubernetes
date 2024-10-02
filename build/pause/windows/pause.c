@@ -16,6 +16,14 @@ limitations under the License.
 
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
+
+#define STRINGIFY(x) #x
+#define VERSION_STRING(x) STRINGIFY(x)
+
+#ifndef VERSION
+#define VERSION HEAD
+#endif
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 {
@@ -34,8 +42,18 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 	}
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+	int i;
+	for (i = 1; i < argc; ++i)
+	{
+		if (!_stricmp(argv[i], "-v"))
+		{
+			fprintf(stdout, "pause.c %s\n", VERSION_STRING(VERSION));
+			return 0;
+		}
+	}
+
 	if (SetConsoleCtrlHandler(CtrlHandler, TRUE))
 	{
 		Sleep(INFINITE);

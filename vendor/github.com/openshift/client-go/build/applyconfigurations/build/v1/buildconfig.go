@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// BuildConfigApplyConfiguration represents an declarative configuration of the BuildConfig type for use
+// BuildConfigApplyConfiguration represents a declarative configuration of the BuildConfig type for use
 // with apply.
 type BuildConfigApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type BuildConfigApplyConfiguration struct {
 	Status                           *BuildConfigStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// BuildConfig constructs an declarative configuration of the BuildConfig type for use with
+// BuildConfig constructs a declarative configuration of the BuildConfig type for use with
 // apply.
 func BuildConfig(name, namespace string) *BuildConfigApplyConfiguration {
 	b := &BuildConfigApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *BuildConfigApplyConfiguration) WithSpec(value *BuildConfigSpecApplyConf
 func (b *BuildConfigApplyConfiguration) WithStatus(value *BuildConfigStatusApplyConfiguration) *BuildConfigApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *BuildConfigApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

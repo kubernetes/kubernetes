@@ -185,6 +185,25 @@ type AuthenticationConfiguration struct {
 	//		"<username claim>": "username"
 	// }
 	JWT []JWTAuthenticator `json:"jwt"`
+
+	// If present --anonymous-auth must not be set
+	Anonymous *AnonymousAuthConfig `json:"anonymous,omitempty"`
+}
+
+// AnonymousAuthConfig provides the configuration for the anonymous authenticator.
+type AnonymousAuthConfig struct {
+	Enabled bool `json:"enabled"`
+
+	// If set, anonymous auth is only allowed if the request meets one of the
+	// conditions.
+	Conditions []AnonymousAuthCondition `json:"conditions,omitempty"`
+}
+
+// AnonymousAuthCondition describes the condition under which anonymous auth
+// should be enabled.
+type AnonymousAuthCondition struct {
+	// Path for which anonymous auth is enabled.
+	Path string `json:"path"`
 }
 
 // JWTAuthenticator provides the configuration for a single JWT authenticator.

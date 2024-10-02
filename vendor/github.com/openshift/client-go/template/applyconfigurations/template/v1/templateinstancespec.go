@@ -6,7 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// TemplateInstanceSpecApplyConfiguration represents an declarative configuration of the TemplateInstanceSpec type for use
+// TemplateInstanceSpecApplyConfiguration represents a declarative configuration of the TemplateInstanceSpec type for use
 // with apply.
 type TemplateInstanceSpecApplyConfiguration struct {
 	Template  *TemplateApplyConfiguration                  `json:"template,omitempty"`
@@ -14,7 +14,7 @@ type TemplateInstanceSpecApplyConfiguration struct {
 	Requester *TemplateInstanceRequesterApplyConfiguration `json:"requester,omitempty"`
 }
 
-// TemplateInstanceSpecApplyConfiguration constructs an declarative configuration of the TemplateInstanceSpec type for use with
+// TemplateInstanceSpecApplyConfiguration constructs a declarative configuration of the TemplateInstanceSpec type for use with
 // apply.
 func TemplateInstanceSpec() *TemplateInstanceSpecApplyConfiguration {
 	return &TemplateInstanceSpecApplyConfiguration{}

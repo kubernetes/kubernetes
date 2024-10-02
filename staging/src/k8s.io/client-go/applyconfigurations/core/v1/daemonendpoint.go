@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// DaemonEndpointApplyConfiguration represents an declarative configuration of the DaemonEndpoint type for use
+// DaemonEndpointApplyConfiguration represents a declarative configuration of the DaemonEndpoint type for use
 // with apply.
 type DaemonEndpointApplyConfiguration struct {
 	Port *int32 `json:"Port,omitempty"`
 }
 
-// DaemonEndpointApplyConfiguration constructs an declarative configuration of the DaemonEndpoint type for use with
+// DaemonEndpointApplyConfiguration constructs a declarative configuration of the DaemonEndpoint type for use with
 // apply.
 func DaemonEndpoint() *DaemonEndpointApplyConfiguration {
 	return &DaemonEndpointApplyConfiguration{}

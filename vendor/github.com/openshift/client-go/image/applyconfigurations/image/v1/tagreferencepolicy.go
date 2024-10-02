@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/image/v1"
 )
 
-// TagReferencePolicyApplyConfiguration represents an declarative configuration of the TagReferencePolicy type for use
+// TagReferencePolicyApplyConfiguration represents a declarative configuration of the TagReferencePolicy type for use
 // with apply.
 type TagReferencePolicyApplyConfiguration struct {
 	Type *v1.TagReferencePolicyType `json:"type,omitempty"`
 }
 
-// TagReferencePolicyApplyConfiguration constructs an declarative configuration of the TagReferencePolicy type for use with
+// TagReferencePolicyApplyConfiguration constructs a declarative configuration of the TagReferencePolicy type for use with
 // apply.
 func TagReferencePolicy() *TagReferencePolicyApplyConfiguration {
 	return &TagReferencePolicyApplyConfiguration{}

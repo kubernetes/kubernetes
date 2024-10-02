@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ReleaseApplyConfiguration represents an declarative configuration of the Release type for use
+// ReleaseApplyConfiguration represents a declarative configuration of the Release type for use
 // with apply.
 type ReleaseApplyConfiguration struct {
 	Version  *string  `json:"version,omitempty"`
@@ -15,7 +15,7 @@ type ReleaseApplyConfiguration struct {
 	Channels []string `json:"channels,omitempty"`
 }
 
-// ReleaseApplyConfiguration constructs an declarative configuration of the Release type for use with
+// ReleaseApplyConfiguration constructs a declarative configuration of the Release type for use with
 // apply.
 func Release() *ReleaseApplyConfiguration {
 	return &ReleaseApplyConfiguration{}

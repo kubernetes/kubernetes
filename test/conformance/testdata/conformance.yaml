@@ -1055,6 +1055,14 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Verify Pod Failure policy allows to fail job early on exit code.
+  codename: '[sig-apps] Job should allow to use the pod failure policy on exit code
+    to fail the job early [Conformance]'
+  description: Create a job with pod failure policy, and exactly one pod failing.
+    The exit code of the failed pod matches the pod failure policy triggering the
+    Job failure.
+  release: v1.31
+  file: test/e2e/apps/job.go
 - testname: Jobs, apply changes to status
   codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
   description: Attempt to create a running Job which MUST succeed. Attempt to patch
@@ -2749,6 +2757,15 @@
     found, the scheduler MUST preempt a lower priority pod to schedule the critical
     pod.
   release: v1.19
+  file: test/e2e/scheduling/preemption.go
+- testname: Verify the DisruptionTarget condition is added to the preempted pod
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] validates pod disruption
+    condition is added to the preempted pod [Conformance]'
+  description: ' 1. Run a low priority pod with finalizer which consumes 1/1 of node
+    resources 2. Schedule a higher priority pod which also consumes 1/1 of node resources
+    3. See if the pod with lower priority is preempted and has the pod disruption
+    condition 4. Remove the finalizer so that the pod can be deleted by GC'
+  release: v1.31
   file: test/e2e/scheduling/preemption.go
 - testname: CSIDriver, lifecycle
   codename: '[sig-storage] CSIInlineVolumes should run through the lifecycle of a

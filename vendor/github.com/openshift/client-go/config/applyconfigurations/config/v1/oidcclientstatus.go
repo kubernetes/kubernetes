@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// OIDCClientStatusApplyConfiguration represents an declarative configuration of the OIDCClientStatus type for use
+// OIDCClientStatusApplyConfiguration represents a declarative configuration of the OIDCClientStatus type for use
 // with apply.
 type OIDCClientStatusApplyConfiguration struct {
 	ComponentName      *string                                 `json:"componentName,omitempty"`
@@ -17,7 +17,7 @@ type OIDCClientStatusApplyConfiguration struct {
 	Conditions         []metav1.ConditionApplyConfiguration    `json:"conditions,omitempty"`
 }
 
-// OIDCClientStatusApplyConfiguration constructs an declarative configuration of the OIDCClientStatus type for use with
+// OIDCClientStatusApplyConfiguration constructs a declarative configuration of the OIDCClientStatus type for use with
 // apply.
 func OIDCClientStatus() *OIDCClientStatusApplyConfiguration {
 	return &OIDCClientStatusApplyConfiguration{}

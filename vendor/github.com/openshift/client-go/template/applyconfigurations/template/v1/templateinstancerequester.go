@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/template/v1"
 )
 
-// TemplateInstanceRequesterApplyConfiguration represents an declarative configuration of the TemplateInstanceRequester type for use
+// TemplateInstanceRequesterApplyConfiguration represents a declarative configuration of the TemplateInstanceRequester type for use
 // with apply.
 type TemplateInstanceRequesterApplyConfiguration struct {
 	Username *string                  `json:"username,omitempty"`
@@ -15,7 +15,7 @@ type TemplateInstanceRequesterApplyConfiguration struct {
 	Extra    map[string]v1.ExtraValue `json:"extra,omitempty"`
 }
 
-// TemplateInstanceRequesterApplyConfiguration constructs an declarative configuration of the TemplateInstanceRequester type for use with
+// TemplateInstanceRequesterApplyConfiguration constructs a declarative configuration of the TemplateInstanceRequester type for use with
 // apply.
 func TemplateInstanceRequester() *TemplateInstanceRequesterApplyConfiguration {
 	return &TemplateInstanceRequesterApplyConfiguration{}

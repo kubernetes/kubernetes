@@ -25,7 +25,7 @@ import (
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	"go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -45,7 +45,7 @@ func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, trace.NewNoopTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, noopoteltrace.NewTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
@@ -88,7 +88,7 @@ func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, trace.NewNoopTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, noopoteltrace.NewTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {

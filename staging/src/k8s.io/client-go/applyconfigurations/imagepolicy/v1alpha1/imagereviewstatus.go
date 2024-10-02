@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// ImageReviewStatusApplyConfiguration represents an declarative configuration of the ImageReviewStatus type for use
+// ImageReviewStatusApplyConfiguration represents a declarative configuration of the ImageReviewStatus type for use
 // with apply.
 type ImageReviewStatusApplyConfiguration struct {
 	Allowed          *bool             `json:"allowed,omitempty"`
@@ -26,7 +26,7 @@ type ImageReviewStatusApplyConfiguration struct {
 	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty"`
 }
 
-// ImageReviewStatusApplyConfiguration constructs an declarative configuration of the ImageReviewStatus type for use with
+// ImageReviewStatusApplyConfiguration constructs a declarative configuration of the ImageReviewStatus type for use with
 // apply.
 func ImageReviewStatus() *ImageReviewStatusApplyConfiguration {
 	return &ImageReviewStatusApplyConfiguration{}

@@ -22,14 +22,14 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 )
 
-// StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration represents an declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use
+// StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration represents a declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use
 // with apply.
 type StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration struct {
 	WhenDeleted *v1beta2.PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
 	WhenScaled  *v1beta2.PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
 
-// StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration constructs an declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use with
+// StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration constructs a declarative configuration of the StatefulSetPersistentVolumeClaimRetentionPolicy type for use with
 // apply.
 func StatefulSetPersistentVolumeClaimRetentionPolicy() *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
 	return &StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}

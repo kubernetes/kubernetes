@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// BrokerTemplateInstanceSpecApplyConfiguration represents an declarative configuration of the BrokerTemplateInstanceSpec type for use
+// BrokerTemplateInstanceSpecApplyConfiguration represents a declarative configuration of the BrokerTemplateInstanceSpec type for use
 // with apply.
 type BrokerTemplateInstanceSpecApplyConfiguration struct {
 	TemplateInstance *v1.ObjectReference `json:"templateInstance,omitempty"`
@@ -14,7 +14,7 @@ type BrokerTemplateInstanceSpecApplyConfiguration struct {
 	BindingIDs       []string            `json:"bindingIDs,omitempty"`
 }
 
-// BrokerTemplateInstanceSpecApplyConfiguration constructs an declarative configuration of the BrokerTemplateInstanceSpec type for use with
+// BrokerTemplateInstanceSpecApplyConfiguration constructs a declarative configuration of the BrokerTemplateInstanceSpec type for use with
 // apply.
 func BrokerTemplateInstanceSpec() *BrokerTemplateInstanceSpecApplyConfiguration {
 	return &BrokerTemplateInstanceSpecApplyConfiguration{}

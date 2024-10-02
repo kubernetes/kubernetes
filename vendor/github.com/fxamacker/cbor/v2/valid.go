@@ -7,7 +7,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"strconv"
+
+	"github.com/x448/float16"
 )
 
 // SyntaxError is a description of a CBOR syntax error.
@@ -82,11 +85,11 @@ func (e *ExtraneousDataError) Error() string {
 // allowExtraData indicates if extraneous data is allowed after the CBOR data item.
 // - use allowExtraData = true when using Decoder.Decode()
 // - use allowExtraData = false when using Unmarshal()
-func (d *decoder) wellformed(allowExtraData bool) error {
+func (d *decoder) wellformed(allowExtraData bool, checkBuiltinTags bool) error {
 	if len(d.data) == d.off {
 		return io.EOF
 	}
-	_, err := d.wellformedInternal(0)
+	_, err := d.wellformedInternal(0, checkBuiltinTags)
 	if err == nil {
 		if !allowExtraData && d.off != len(d.data) {
 			err = &ExtraneousDataError{len(d.data) - d.off, d.off}
@@ -96,19 +99,19 @@ func (d *decoder) wellformed(allowExtraData bool) error {
 }
 
 // wellformedInternal checks data's well-formedness and returns max depth and error.
-func (d *decoder) wellformedInternal(depth int) (int, error) {
-	t, ai, val, err := d.wellformedHead()
+func (d *decoder) wellformedInternal(depth int, checkBuiltinTags bool) (int, error) { //nolint:gocyclo
+	t, _, val, indefiniteLength, err := d.wellformedHeadWithIndefiniteLengthFlag()
 	if err != nil {
 		return 0, err
 	}
 
 	switch t {
 	case cborTypeByteString, cborTypeTextString:
-		if ai == 31 {
+		if indefiniteLength {
 			if d.dm.indefLength == IndefLengthForbidden {
 				return 0, &IndefiniteLengthError{t}
 			}
-			return d.wellformedIndefiniteString(t, depth)
+			return d.wellformedIndefiniteString(t, depth, checkBuiltinTags)
 		}
 		valInt := int(val)
 		if valInt < 0 {
@@ -119,17 +122,18 @@ func (d *decoder) wellformedInternal(depth int) (int, error) {
 			return 0, io.ErrUnexpectedEOF
 		}
 		d.off += valInt
+
 	case cborTypeArray, cborTypeMap:
 		depth++
 		if depth > d.dm.maxNestedLevels {
 			return 0, &MaxNestedLevelError{d.dm.maxNestedLevels}
 		}
 
-		if ai == 31 {
+		if indefiniteLength {
 			if d.dm.indefLength == IndefLengthForbidden {
 				return 0, &IndefiniteLengthError{t}
 			}
-			return d.wellformedIndefiniteArrayOrMap(t, depth)
+			return d.wellformedIndefiniteArrayOrMap(t, depth, checkBuiltinTags)
 		}
 
 		valInt := int(val)
@@ -156,7 +160,7 @@ func (d *decoder) wellformedInternal(depth int) (int, error) {
 		for j := 0; j < count; j++ {
 			for i := 0; i < valInt; i++ {
 				var dpt int
-				if dpt, err = d.wellformedInternal(depth); err != nil {
+				if dpt, err = d.wellformedInternal(depth, checkBuiltinTags); err != nil {
 					return 0, err
 				}
 				if dpt > maxDepth {
@@ -165,20 +169,35 @@ func (d *decoder) wellformedInternal(depth int) (int, error) {
 			}
 		}
 		depth = maxDepth
+
 	case cborTypeTag:
 		if d.dm.tagsMd == TagsForbidden {
 			return 0, &TagsMdError{}
 		}
+
+		tagNum := val
 
 		// Scan nested tag numbers to avoid recursion.
 		for {
 			if len(d.data) == d.off { // Tag number must be followed by tag content.
 				return 0, io.ErrUnexpectedEOF
 			}
-			if cborType(d.data[d.off]&0xe0) != cborTypeTag {
+			if checkBuiltinTags {
+				err = validBuiltinTag(tagNum, d.data[d.off])
+				if err != nil {
+					return 0, err
+				}
+			}
+			if d.dm.bignumTag == BignumTagForbidden && (tagNum == 2 || tagNum == 3) {
+				return 0, &UnacceptableDataItemError{
+					CBORType: cborTypeTag.String(),
+					Message:  "bignum",
+				}
+			}
+			if getType(d.data[d.off]) != cborTypeTag {
 				break
 			}
-			if _, _, _, err = d.wellformedHead(); err != nil {
+			if _, _, tagNum, err = d.wellformedHead(); err != nil {
 				return 0, err
 			}
 			depth++
@@ -187,31 +206,32 @@ func (d *decoder) wellformedInternal(depth int) (int, error) {
 			}
 		}
 		// Check tag content.
-		return d.wellformedInternal(depth)
+		return d.wellformedInternal(depth, checkBuiltinTags)
 	}
+
 	return depth, nil
 }
 
 // wellformedIndefiniteString checks indefinite length byte/text string's well-formedness and returns max depth and error.
-func (d *decoder) wellformedIndefiniteString(t cborType, depth int) (int, error) {
+func (d *decoder) wellformedIndefiniteString(t cborType, depth int, checkBuiltinTags bool) (int, error) {
 	var err error
 	for {
 		if len(d.data) == d.off {
 			return 0, io.ErrUnexpectedEOF
 		}
-		if d.data[d.off] == 0xff {
+		if isBreakFlag(d.data[d.off]) {
 			d.off++
 			break
 		}
 		// Peek ahead to get next type and indefinite length status.
-		nt := cborType(d.data[d.off] & 0xe0)
+		nt, ai := parseInitialByte(d.data[d.off])
 		if t != nt {
 			return 0, &SyntaxError{"cbor: wrong element type " + nt.String() + " for indefinite-length " + t.String()}
 		}
-		if (d.data[d.off] & 0x1f) == 31 {
+		if additionalInformation(ai).isIndefiniteLength() {
 			return 0, &SyntaxError{"cbor: indefinite-length " + t.String() + " chunk is not definite-length"}
 		}
-		if depth, err = d.wellformedInternal(depth); err != nil {
+		if depth, err = d.wellformedInternal(depth, checkBuiltinTags); err != nil {
 			return 0, err
 		}
 	}
@@ -219,7 +239,7 @@ func (d *decoder) wellformedIndefiniteString(t cborType, depth int) (int, error)
 }
 
 // wellformedIndefiniteArrayOrMap checks indefinite length array/map's well-formedness and returns max depth and error.
-func (d *decoder) wellformedIndefiniteArrayOrMap(t cborType, depth int) (int, error) {
+func (d *decoder) wellformedIndefiniteArrayOrMap(t cborType, depth int, checkBuiltinTags bool) (int, error) {
 	var err error
 	maxDepth := depth
 	i := 0
@@ -227,12 +247,12 @@ func (d *decoder) wellformedIndefiniteArrayOrMap(t cborType, depth int) (int, er
 		if len(d.data) == d.off {
 			return 0, io.ErrUnexpectedEOF
 		}
-		if d.data[d.off] == 0xff {
+		if isBreakFlag(d.data[d.off]) {
 			d.off++
 			break
 		}
 		var dpt int
-		if dpt, err = d.wellformedInternal(depth); err != nil {
+		if dpt, err = d.wellformedInternal(depth, checkBuiltinTags); err != nil {
 			return 0, err
 		}
 		if dpt > maxDepth {
@@ -255,22 +275,39 @@ func (d *decoder) wellformedIndefiniteArrayOrMap(t cborType, depth int) (int, er
 	return maxDepth, nil
 }
 
+func (d *decoder) wellformedHeadWithIndefiniteLengthFlag() (
+	t cborType,
+	ai byte,
+	val uint64,
+	indefiniteLength bool,
+	err error,
+) {
+	t, ai, val, err = d.wellformedHead()
+	if err != nil {
+		return
+	}
+	indefiniteLength = additionalInformation(ai).isIndefiniteLength()
+	return
+}
+
 func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) {
 	dataLen := len(d.data) - d.off
 	if dataLen == 0 {
 		return 0, 0, 0, io.ErrUnexpectedEOF
 	}
 
-	t = cborType(d.data[d.off] & 0xe0)
-	ai = d.data[d.off] & 0x1f
+	t, ai = parseInitialByte(d.data[d.off])
 	val = uint64(ai)
 	d.off++
+	dataLen--
 
-	if ai < 24 {
+	if ai <= maxAdditionalInformationWithoutArgument {
 		return t, ai, val, nil
 	}
-	if ai == 24 {
-		if dataLen < 2 {
+
+	if ai == additionalInformationWith1ByteArgument {
+		const argumentSize = 1
+		if dataLen < argumentSize {
 			return 0, 0, 0, io.ErrUnexpectedEOF
 		}
 		val = uint64(d.data[d.off])
@@ -280,31 +317,53 @@ func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) 
 		}
 		return t, ai, val, nil
 	}
-	if ai == 25 {
-		if dataLen < 3 {
+
+	if ai == additionalInformationWith2ByteArgument {
+		const argumentSize = 2
+		if dataLen < argumentSize {
 			return 0, 0, 0, io.ErrUnexpectedEOF
 		}
-		val = uint64(binary.BigEndian.Uint16(d.data[d.off : d.off+2]))
-		d.off += 2
+		val = uint64(binary.BigEndian.Uint16(d.data[d.off : d.off+argumentSize]))
+		d.off += argumentSize
+		if t == cborTypePrimitives {
+			if err := d.acceptableFloat(float64(float16.Frombits(uint16(val)).Float32())); err != nil {
+				return 0, 0, 0, err
+			}
+		}
 		return t, ai, val, nil
 	}
-	if ai == 26 {
-		if dataLen < 5 {
+
+	if ai == additionalInformationWith4ByteArgument {
+		const argumentSize = 4
+		if dataLen < argumentSize {
 			return 0, 0, 0, io.ErrUnexpectedEOF
 		}
-		val = uint64(binary.BigEndian.Uint32(d.data[d.off : d.off+4]))
-		d.off += 4
+		val = uint64(binary.BigEndian.Uint32(d.data[d.off : d.off+argumentSize]))
+		d.off += argumentSize
+		if t == cborTypePrimitives {
+			if err := d.acceptableFloat(float64(math.Float32frombits(uint32(val)))); err != nil {
+				return 0, 0, 0, err
+			}
+		}
 		return t, ai, val, nil
 	}
-	if ai == 27 {
-		if dataLen < 9 {
+
+	if ai == additionalInformationWith8ByteArgument {
+		const argumentSize = 8
+		if dataLen < argumentSize {
 			return 0, 0, 0, io.ErrUnexpectedEOF
 		}
-		val = binary.BigEndian.Uint64(d.data[d.off : d.off+8])
-		d.off += 8
+		val = binary.BigEndian.Uint64(d.data[d.off : d.off+argumentSize])
+		d.off += argumentSize
+		if t == cborTypePrimitives {
+			if err := d.acceptableFloat(math.Float64frombits(val)); err != nil {
+				return 0, 0, 0, err
+			}
+		}
 		return t, ai, val, nil
 	}
-	if ai == 31 {
+
+	if additionalInformation(ai).isIndefiniteLength() {
 		switch t {
 		case cborTypePositiveInt, cborTypeNegativeInt, cborTypeTag:
 			return 0, 0, 0, &SyntaxError{"cbor: invalid additional information " + strconv.Itoa(int(ai)) + " for type " + t.String()}
@@ -313,6 +372,23 @@ func (d *decoder) wellformedHead() (t cborType, ai byte, val uint64, err error) 
 		}
 		return t, ai, val, nil
 	}
+
 	// ai == 28, 29, 30
 	return 0, 0, 0, &SyntaxError{"cbor: invalid additional information " + strconv.Itoa(int(ai)) + " for type " + t.String()}
+}
+
+func (d *decoder) acceptableFloat(f float64) error {
+	switch {
+	case d.dm.nanDec == NaNDecodeForbidden && math.IsNaN(f):
+		return &UnacceptableDataItemError{
+			CBORType: cborTypePrimitives.String(),
+			Message:  "floating-point NaN",
+		}
+	case d.dm.infDec == InfDecodeForbidden && math.IsInf(f, 0):
+		return &UnacceptableDataItemError{
+			CBORType: cborTypePrimitives.String(),
+			Message:  "floating-point infinity",
+		}
+	}
+	return nil
 }

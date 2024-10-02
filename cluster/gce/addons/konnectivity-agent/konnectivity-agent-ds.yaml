@@ -27,7 +27,7 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       containers:
-        - image: registry.k8s.io/kas-network-proxy/proxy-agent:v0.29.0
+        - image: registry.k8s.io/kas-network-proxy/proxy-agent:v0.30.3
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [
@@ -39,6 +39,7 @@ __EXTRA_PARAMS__
                   "--sync-interval=5s",
                   "--sync-interval-cap=30s",
                   "--probe-interval=5s",
+                  "--keepalive-time=60s",
                   "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token",
                   "--agent-identifiers=ipv4=$(HOST_IP)"
                   ]

@@ -2,14 +2,14 @@
 
 package v1
 
-// CommonWebHookCauseApplyConfiguration represents an declarative configuration of the CommonWebHookCause type for use
+// CommonWebHookCauseApplyConfiguration represents a declarative configuration of the CommonWebHookCause type for use
 // with apply.
 type CommonWebHookCauseApplyConfiguration struct {
 	Revision *SourceRevisionApplyConfiguration `json:"revision,omitempty"`
 	Secret   *string                           `json:"secret,omitempty"`
 }
 
-// CommonWebHookCauseApplyConfiguration constructs an declarative configuration of the CommonWebHookCause type for use with
+// CommonWebHookCauseApplyConfiguration constructs a declarative configuration of the CommonWebHookCause type for use with
 // apply.
 func CommonWebHookCause() *CommonWebHookCauseApplyConfiguration {
 	return &CommonWebHookCauseApplyConfiguration{}

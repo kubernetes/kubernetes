@@ -28,14 +28,17 @@ var slice = &resource.ResourceSlice{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-class",
 	},
-	NodeName:   "valid-node-name",
-	DriverName: "testdriver.example.com",
-	ResourceModel: resource.ResourceModel{
-		NamedResources: &resource.NamedResourcesResources{},
+	Spec: resource.ResourceSliceSpec{
+		NodeName: "valid-node-name",
+		Driver:   "testdriver.example.com",
+		Pool: resource.ResourcePool{
+			Name:               "valid-pool-name",
+			ResourceSliceCount: 1,
+		},
 	},
 }
 
-func TestClassStrategy(t *testing.T) {
+func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
 	}
@@ -44,7 +47,7 @@ func TestClassStrategy(t *testing.T) {
 	}
 }
 
-func TestClassStrategyCreate(t *testing.T) {
+func TestResourceSliceStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	slice := slice.DeepCopy()
 
@@ -55,15 +58,15 @@ func TestClassStrategyCreate(t *testing.T) {
 	}
 }
 
-func TestClassStrategyUpdate(t *testing.T) {
+func TestResourceSliceStrategyUpdate(t *testing.T) {
 	t.Run("no-changes-okay", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
 		slice := slice.DeepCopy()
-		newClass := slice.DeepCopy()
-		newClass.ResourceVersion = "4"
+		newSlice := slice.DeepCopy()
+		newSlice.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClass, slice)
-		errs := Strategy.ValidateUpdate(ctx, newClass, slice)
+		Strategy.PrepareForUpdate(ctx, newSlice, slice)
+		errs := Strategy.ValidateUpdate(ctx, newSlice, slice)
 		if len(errs) != 0 {
 			t.Errorf("unexpected validation errors: %v", errs)
 		}
@@ -72,12 +75,12 @@ func TestClassStrategyUpdate(t *testing.T) {
 	t.Run("name-change-not-allowed", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
 		slice := slice.DeepCopy()
-		newClass := slice.DeepCopy()
-		newClass.Name = "valid-class-2"
-		newClass.ResourceVersion = "4"
+		newSlice := slice.DeepCopy()
+		newSlice.Name = "valid-slice-2"
+		newSlice.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClass, slice)
-		errs := Strategy.ValidateUpdate(ctx, newClass, slice)
+		Strategy.PrepareForUpdate(ctx, newSlice, slice)
+		errs := Strategy.ValidateUpdate(ctx, newSlice, slice)
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
 		}

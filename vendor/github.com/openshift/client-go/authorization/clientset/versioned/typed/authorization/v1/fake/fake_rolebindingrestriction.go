@@ -28,22 +28,24 @@ var rolebindingrestrictionsKind = v1.SchemeGroupVersion.WithKind("RoleBindingRes
 
 // Get takes name of the roleBindingRestriction, and returns the corresponding roleBindingRestriction object, and an error if there is any.
 func (c *FakeRoleBindingRestrictions) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RoleBindingRestriction, err error) {
+	emptyResult := &v1.RoleBindingRestriction{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rolebindingrestrictionsResource, c.ns, name), &v1.RoleBindingRestriction{})
+		Invokes(testing.NewGetActionWithOptions(rolebindingrestrictionsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RoleBindingRestriction), err
 }
 
 // List takes label and field selectors, and returns the list of RoleBindingRestrictions that match those selectors.
 func (c *FakeRoleBindingRestrictions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RoleBindingRestrictionList, err error) {
+	emptyResult := &v1.RoleBindingRestrictionList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolebindingrestrictionsResource, rolebindingrestrictionsKind, c.ns, opts), &v1.RoleBindingRestrictionList{})
+		Invokes(testing.NewListActionWithOptions(rolebindingrestrictionsResource, rolebindingrestrictionsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -62,28 +64,30 @@ func (c *FakeRoleBindingRestrictions) List(ctx context.Context, opts metav1.List
 // Watch returns a watch.Interface that watches the requested roleBindingRestrictions.
 func (c *FakeRoleBindingRestrictions) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(rolebindingrestrictionsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(rolebindingrestrictionsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a roleBindingRestriction and creates it.  Returns the server's representation of the roleBindingRestriction, and an error, if there is any.
 func (c *FakeRoleBindingRestrictions) Create(ctx context.Context, roleBindingRestriction *v1.RoleBindingRestriction, opts metav1.CreateOptions) (result *v1.RoleBindingRestriction, err error) {
+	emptyResult := &v1.RoleBindingRestriction{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolebindingrestrictionsResource, c.ns, roleBindingRestriction), &v1.RoleBindingRestriction{})
+		Invokes(testing.NewCreateActionWithOptions(rolebindingrestrictionsResource, c.ns, roleBindingRestriction, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RoleBindingRestriction), err
 }
 
 // Update takes the representation of a roleBindingRestriction and updates it. Returns the server's representation of the roleBindingRestriction, and an error, if there is any.
 func (c *FakeRoleBindingRestrictions) Update(ctx context.Context, roleBindingRestriction *v1.RoleBindingRestriction, opts metav1.UpdateOptions) (result *v1.RoleBindingRestriction, err error) {
+	emptyResult := &v1.RoleBindingRestriction{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolebindingrestrictionsResource, c.ns, roleBindingRestriction), &v1.RoleBindingRestriction{})
+		Invokes(testing.NewUpdateActionWithOptions(rolebindingrestrictionsResource, c.ns, roleBindingRestriction, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RoleBindingRestriction), err
 }
@@ -98,7 +102,7 @@ func (c *FakeRoleBindingRestrictions) Delete(ctx context.Context, name string, o
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeRoleBindingRestrictions) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolebindingrestrictionsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(rolebindingrestrictionsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.RoleBindingRestrictionList{})
 	return err
@@ -106,11 +110,12 @@ func (c *FakeRoleBindingRestrictions) DeleteCollection(ctx context.Context, opts
 
 // Patch applies the patch and returns the patched roleBindingRestriction.
 func (c *FakeRoleBindingRestrictions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBindingRestriction, err error) {
+	emptyResult := &v1.RoleBindingRestriction{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingrestrictionsResource, c.ns, name, pt, data, subresources...), &v1.RoleBindingRestriction{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolebindingrestrictionsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RoleBindingRestriction), err
 }
@@ -128,11 +133,12 @@ func (c *FakeRoleBindingRestrictions) Apply(ctx context.Context, roleBindingRest
 	if name == nil {
 		return nil, fmt.Errorf("roleBindingRestriction.Name must be provided to Apply")
 	}
+	emptyResult := &v1.RoleBindingRestriction{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingrestrictionsResource, c.ns, *name, types.ApplyPatchType, data), &v1.RoleBindingRestriction{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolebindingrestrictionsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.RoleBindingRestriction), err
 }

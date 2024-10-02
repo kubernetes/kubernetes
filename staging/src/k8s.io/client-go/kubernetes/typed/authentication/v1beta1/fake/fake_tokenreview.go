@@ -37,10 +37,11 @@ var tokenreviewsKind = v1beta1.SchemeGroupVersion.WithKind("TokenReview")
 
 // Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
 func (c *FakeTokenReviews) Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (result *v1beta1.TokenReview, err error) {
+	emptyResult := &v1beta1.TokenReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(tokenreviewsResource, tokenReview), &v1beta1.TokenReview{})
+		Invokes(testing.NewRootCreateActionWithOptions(tokenreviewsResource, tokenReview, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.TokenReview), err
 }

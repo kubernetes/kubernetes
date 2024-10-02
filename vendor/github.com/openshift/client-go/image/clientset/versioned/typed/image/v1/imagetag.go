@@ -4,12 +4,11 @@ package v1
 
 import (
 	"context"
-	"time"
 
 	v1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // ImageTagsGetter has a method to return a ImageTagInterface.
@@ -30,82 +29,18 @@ type ImageTagInterface interface {
 
 // imageTags implements ImageTagInterface
 type imageTags struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*v1.ImageTag, *v1.ImageTagList]
 }
 
 // newImageTags returns a ImageTags
 func newImageTags(c *ImageV1Client, namespace string) *imageTags {
 	return &imageTags{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*v1.ImageTag, *v1.ImageTagList](
+			"imagetags",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.ImageTag { return &v1.ImageTag{} },
+			func() *v1.ImageTagList { return &v1.ImageTagList{} }),
 	}
-}
-
-// Get takes name of the imageTag, and returns the corresponding imageTag object, and an error if there is any.
-func (c *imageTags) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ImageTag, err error) {
-	result = &v1.ImageTag{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("imagetags").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ImageTags that match those selectors.
-func (c *imageTags) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ImageTagList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.ImageTagList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("imagetags").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Create takes the representation of a imageTag and creates it.  Returns the server's representation of the imageTag, and an error, if there is any.
-func (c *imageTags) Create(ctx context.Context, imageTag *v1.ImageTag, opts metav1.CreateOptions) (result *v1.ImageTag, err error) {
-	result = &v1.ImageTag{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("imagetags").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(imageTag).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a imageTag and updates it. Returns the server's representation of the imageTag, and an error, if there is any.
-func (c *imageTags) Update(ctx context.Context, imageTag *v1.ImageTag, opts metav1.UpdateOptions) (result *v1.ImageTag, err error) {
-	result = &v1.ImageTag{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("imagetags").
-		Name(imageTag.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(imageTag).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the imageTag and deletes it. Returns an error if one occurs.
-func (c *imageTags) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("imagetags").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
 }

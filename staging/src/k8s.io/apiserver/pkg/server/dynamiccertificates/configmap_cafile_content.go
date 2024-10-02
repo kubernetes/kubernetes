@@ -54,7 +54,7 @@ type ConfigMapCAController struct {
 
 	listeners []Listener
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// preRunCaches are the caches to sync before starting the work of this control loop
 	preRunCaches []cache.InformerSynced
 }
@@ -94,7 +94,10 @@ func NewDynamicCAFromConfigMapController(purpose, namespace, name, key string, k
 		configmapLister:    configmapLister,
 		configMapInformer:  uncastConfigmapInformer,
 
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: fmt.Sprintf("DynamicConfigMapCABundle-%s", purpose)},
+		),
 		preRunCaches: []cache.InformerSynced{uncastConfigmapInformer.HasSynced},
 	}
 

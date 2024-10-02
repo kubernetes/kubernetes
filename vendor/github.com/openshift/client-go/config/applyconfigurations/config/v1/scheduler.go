@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// SchedulerApplyConfiguration represents an declarative configuration of the Scheduler type for use
+// SchedulerApplyConfiguration represents a declarative configuration of the Scheduler type for use
 // with apply.
 type SchedulerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type SchedulerApplyConfiguration struct {
 	Status                           *apiconfigv1.SchedulerStatus     `json:"status,omitempty"`
 }
 
-// Scheduler constructs an declarative configuration of the Scheduler type for use with
+// Scheduler constructs a declarative configuration of the Scheduler type for use with
 // apply.
 func Scheduler(name string) *SchedulerApplyConfiguration {
 	b := &SchedulerApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *SchedulerApplyConfiguration) WithSpec(value *SchedulerSpecApplyConfigur
 func (b *SchedulerApplyConfiguration) WithStatus(value apiconfigv1.SchedulerStatus) *SchedulerApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *SchedulerApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -455,7 +455,7 @@ var _ = SIGDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "srv",
-						Image: framework.ServeHostnameImage,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -873,7 +873,7 @@ var _ = SIGDescribe("Pods", func() {
 
 		// wait as required for all 3 pods to be running
 		ginkgo.By("waiting for all 3 pods to be running")
-		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 3, 0, f.Timeouts.PodStart)
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 3, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "3 pods not found running.")
 
 		// delete Collection of pods with a label in the current namespace

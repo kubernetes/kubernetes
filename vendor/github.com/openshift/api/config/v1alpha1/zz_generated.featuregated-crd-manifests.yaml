@@ -28,7 +28,7 @@ clusterimagepolicies.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
-  - ImagePolicy
+  - SigstoreImageVerification
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -41,7 +41,7 @@ clusterimagepolicies.config.openshift.io:
   Scope: Cluster
   ShortNames: null
   TopLevelFeatureGates:
-  - ImagePolicy
+  - SigstoreImageVerification
   Version: v1alpha1
 
 imagepolicies.config.openshift.io:
@@ -51,7 +51,7 @@ imagepolicies.config.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates:
-  - ImagePolicy
+  - SigstoreImageVerification
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -64,7 +64,7 @@ imagepolicies.config.openshift.io:
   Scope: Namespaced
   ShortNames: null
   TopLevelFeatureGates:
-  - ImagePolicy
+  - SigstoreImageVerification
   Version: v1alpha1
 
 insightsdatagathers.config.openshift.io:

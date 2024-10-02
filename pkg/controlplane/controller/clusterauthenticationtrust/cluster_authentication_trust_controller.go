@@ -61,7 +61,7 @@ type Controller struct {
 
 	// queue is where incoming work is placed to de-dup and to allow "easy" rate limited requeues on errors.
 	// we only ever place one entry in here, but it is keyed as usual: namespace/name
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// kubeSystemConfigMapInformer is tracked so that we can start these on Run
 	kubeSystemConfigMapInformer cache.SharedIndexInformer
@@ -94,11 +94,14 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c := &Controller{
-		requiredAuthenticationData:  requiredAuthenticationData,
-		configMapLister:             corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
-		configMapClient:             kubeClient.CoreV1(),
-		namespaceClient:             kubeClient.CoreV1(),
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster_authentication_trust_controller"),
+		requiredAuthenticationData: requiredAuthenticationData,
+		configMapLister:            corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
+		configMapClient:            kubeClient.CoreV1(),
+		namespaceClient:            kubeClient.CoreV1(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "cluster_authentication_trust_controller"},
+		),
 		preRunCaches:                []cache.InformerSynced{kubeSystemConfigMapInformer.HasSynced},
 		kubeSystemConfigMapInformer: kubeSystemConfigMapInformer,
 	}

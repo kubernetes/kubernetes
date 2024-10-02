@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// DeploymentConfigSpecApplyConfiguration represents an declarative configuration of the DeploymentConfigSpec type for use
+// DeploymentConfigSpecApplyConfiguration represents a declarative configuration of the DeploymentConfigSpec type for use
 // with apply.
 type DeploymentConfigSpecApplyConfiguration struct {
 	Strategy             *DeploymentStrategyApplyConfiguration `json:"strategy,omitempty"`
@@ -21,7 +21,7 @@ type DeploymentConfigSpecApplyConfiguration struct {
 	Template             *corev1.PodTemplateSpec               `json:"template,omitempty"`
 }
 
-// DeploymentConfigSpecApplyConfiguration constructs an declarative configuration of the DeploymentConfigSpec type for use with
+// DeploymentConfigSpecApplyConfiguration constructs a declarative configuration of the DeploymentConfigSpec type for use with
 // apply.
 func DeploymentConfigSpec() *DeploymentConfigSpecApplyConfiguration {
 	return &DeploymentConfigSpecApplyConfiguration{}

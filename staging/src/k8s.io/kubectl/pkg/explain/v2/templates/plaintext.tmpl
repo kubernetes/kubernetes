@@ -118,7 +118,7 @@ Takes dictionary as argument with keys:
     {{- else if $resolved.items -}}
         {{- /* If the schema is an array then traverse the array item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.items) -}}
-    {{- else if $resolved.additionalProperties -}}
+    {{- else if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
         {{- /* If the schema is a map then traverse the map item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.additionalProperties) -}}
     {{- else -}}
@@ -182,7 +182,9 @@ Takes dictionary as argument with keys:
             {{- template "fieldList" (set $nextContext "schema" .)}}
         {{- end -}}
         {{- if $resolved.items}}{{- template "fieldList" (set $nextContext "schema" $resolved.items)}}{{end}}
-        {{- if $resolved.additionalProperties}}{{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}{{end}}
+        {{- if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
+            {{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}
+        {{- end -}}
     {{- end -}}
 {{- end -}}
 
@@ -235,7 +237,7 @@ Takes dictionary as argument with keys:
         {{- if .items -}}
             {{- template "description" (set $ "schema" .items) -}}
         {{- end -}}
-        {{- if .additionalProperties -}}
+        {{- if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
             {{- template "description" (set $ "schema" .additionalProperties) -}}
         {{- end -}}
     {{- end -}}
@@ -256,7 +258,7 @@ Takes dictionary as argument with keys:
     {{- with $.schema -}}
         {{- if .items -}}
             []{{template "typeGuess" (set $ "schema" .items)}}
-        {{- else if .additionalProperties -}}
+        {{- else if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
             map[string]{{template "typeGuess" (set $ "schema" .additionalProperties)}}
         {{- else if and .allOf (not .properties) (eq (len .allOf) 1) -}}
             {{- /* If allOf has a single element and there are no direct

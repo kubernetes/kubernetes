@@ -53,11 +53,19 @@ type VolumeResource struct {
 // CreateVolumeResource constructs a VolumeResource for the current test. It knows how to deal with
 // different test pattern volume types.
 func CreateVolumeResource(ctx context.Context, driver TestDriver, config *PerTestConfig, pattern TestPattern, testVolumeSizeRange e2evolume.SizeRange) *VolumeResource {
-	return CreateVolumeResourceWithAccessModes(ctx, driver, config, pattern, testVolumeSizeRange, driver.GetDriverInfo().RequiredAccessModes)
+	return CreateVolumeResourceWithAccessModes(ctx, driver, config, pattern, testVolumeSizeRange, driver.GetDriverInfo().RequiredAccessModes, nil)
+}
+
+// CreateVolumeResource constructs a VolumeResource for the current test using the specified VAC name.
+func CreateVolumeResourceWithVAC(ctx context.Context, driver TestDriver, config *PerTestConfig, pattern TestPattern, testVolumeSizeRange e2evolume.SizeRange, vacName *string) *VolumeResource {
+	if pattern.VolType != DynamicPV {
+		framework.Failf("Creating volume with VAC only supported on dynamic PV tests")
+	}
+	return CreateVolumeResourceWithAccessModes(ctx, driver, config, pattern, testVolumeSizeRange, driver.GetDriverInfo().RequiredAccessModes, vacName)
 }
 
 // CreateVolumeResourceWithAccessModes constructs a VolumeResource for the current test with the provided access modes.
-func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver, config *PerTestConfig, pattern TestPattern, testVolumeSizeRange e2evolume.SizeRange, accessModes []v1.PersistentVolumeAccessMode) *VolumeResource {
+func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver, config *PerTestConfig, pattern TestPattern, testVolumeSizeRange e2evolume.SizeRange, accessModes []v1.PersistentVolumeAccessMode, vacName *string) *VolumeResource {
 	r := VolumeResource{
 		Config:  config,
 		Pattern: pattern,
@@ -107,7 +115,7 @@ func CreateVolumeResourceWithAccessModes(ctx context.Context, driver TestDriver,
 			switch pattern.VolType {
 			case DynamicPV:
 				r.Pv, r.Pvc = createPVCPVFromDynamicProvisionSC(
-					ctx, f, dInfo.Name, claimSize, r.Sc, pattern.VolMode, accessModes)
+					ctx, f, dInfo.Name, claimSize, r.Sc, pattern.VolMode, accessModes, vacName)
 				r.VolSource = storageutils.CreateVolumeSource(r.Pvc.Name, false /* readOnly */)
 			case GenericEphemeralVolume:
 				driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
@@ -287,17 +295,19 @@ func createPVCPVFromDynamicProvisionSC(
 	sc *storagev1.StorageClass,
 	volMode v1.PersistentVolumeMode,
 	accessModes []v1.PersistentVolumeAccessMode,
+	vacName *string,
 ) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
 	ginkgo.By("creating a claim")
 	pvcCfg := e2epv.PersistentVolumeClaimConfig{
-		NamePrefix:       name,
-		ClaimSize:        claimSize,
-		StorageClassName: &(sc.Name),
-		AccessModes:      accessModes,
-		VolumeMode:       &volMode,
+		NamePrefix:                name,
+		ClaimSize:                 claimSize,
+		StorageClassName:          &(sc.Name),
+		VolumeAttributesClassName: vacName,
+		AccessModes:               accessModes,
+		VolumeMode:                &volMode,
 	}
 
 	pvc := e2epv.MakePersistentVolumeClaim(pvcCfg, ns)

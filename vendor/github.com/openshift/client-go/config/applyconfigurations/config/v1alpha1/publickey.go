@@ -2,14 +2,14 @@
 
 package v1alpha1
 
-// PublicKeyApplyConfiguration represents an declarative configuration of the PublicKey type for use
+// PublicKeyApplyConfiguration represents a declarative configuration of the PublicKey type for use
 // with apply.
 type PublicKeyApplyConfiguration struct {
 	KeyData      []byte `json:"keyData,omitempty"`
 	RekorKeyData []byte `json:"rekorKeyData,omitempty"`
 }
 
-// PublicKeyApplyConfiguration constructs an declarative configuration of the PublicKey type for use with
+// PublicKeyApplyConfiguration constructs a declarative configuration of the PublicKey type for use with
 // apply.
 func PublicKey() *PublicKeyApplyConfiguration {
 	return &PublicKeyApplyConfiguration{}

@@ -48,10 +48,12 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	netutils "k8s.io/utils/net"
@@ -136,7 +138,7 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
 	}
-
+	config.EffectiveVersion = utilversion.NewEffectiveVersion("")
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.OpenAPIV3Config = DefaultOpenAPIV3Config(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
@@ -317,17 +319,16 @@ func TestInstallAPIGroups(t *testing.T) {
 }
 
 func TestPrepareRun(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	s, config, assert := newMaster(t)
 
 	assert.NotNil(config.OpenAPIConfig)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
-	done := make(chan struct{})
-	defer close(done)
 
 	s.PrepareRun()
-	s.RunPostStartHooks(done)
+	s.RunPostStartHooks(ctx)
 
 	// openapi is installed in PrepareRun
 	resp, err := http.Get(server.URL + "/openapi/v2")
@@ -353,9 +354,10 @@ func TestPrepareRun(t *testing.T) {
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	s, _, assert := newMaster(t)
 	s.PrepareRun()
-	s.RunPostStartHooks(make(chan struct{}))
+	s.RunPostStartHooks(ctx)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
@@ -458,7 +460,9 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableProfiling = true
 
 	kubeVersion := fakeVersion()
-	config.Version = &kubeVersion
+	effectiveVersion := utilversion.NewEffectiveVersion(kubeVersion.String())
+	effectiveVersion.Set(effectiveVersion.BinaryVersion().WithInfo(kubeVersion), effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
+	config.EffectiveVersion = effectiveVersion
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
@@ -585,7 +589,7 @@ func fakeVersion() version.Info {
 	return version.Info{
 		Major:        "42",
 		Minor:        "42",
-		GitVersion:   "42",
+		GitVersion:   "42.42",
 		GitCommit:    "34973274ccef6ab4dfaaf86599792fa9c3fe4689",
 		GitTreeState: "Dirty",
 		BuildDate:    time.Now().String(),

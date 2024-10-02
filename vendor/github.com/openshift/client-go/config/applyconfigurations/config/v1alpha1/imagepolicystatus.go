@@ -6,13 +6,13 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImagePolicyStatusApplyConfiguration represents an declarative configuration of the ImagePolicyStatus type for use
+// ImagePolicyStatusApplyConfiguration represents a declarative configuration of the ImagePolicyStatus type for use
 // with apply.
 type ImagePolicyStatusApplyConfiguration struct {
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ImagePolicyStatusApplyConfiguration constructs an declarative configuration of the ImagePolicyStatus type for use with
+// ImagePolicyStatusApplyConfiguration constructs a declarative configuration of the ImagePolicyStatus type for use with
 // apply.
 func ImagePolicyStatus() *ImagePolicyStatusApplyConfiguration {
 	return &ImagePolicyStatusApplyConfiguration{}

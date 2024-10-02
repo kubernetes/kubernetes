@@ -6,7 +6,7 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// RetentionPolicyApplyConfiguration represents an declarative configuration of the RetentionPolicy type for use
+// RetentionPolicyApplyConfiguration represents a declarative configuration of the RetentionPolicy type for use
 // with apply.
 type RetentionPolicyApplyConfiguration struct {
 	RetentionType   *v1alpha1.RetentionType                  `json:"retentionType,omitempty"`
@@ -14,7 +14,7 @@ type RetentionPolicyApplyConfiguration struct {
 	RetentionSize   *RetentionSizeConfigApplyConfiguration   `json:"retentionSize,omitempty"`
 }
 
-// RetentionPolicyApplyConfiguration constructs an declarative configuration of the RetentionPolicy type for use with
+// RetentionPolicyApplyConfiguration constructs a declarative configuration of the RetentionPolicy type for use with
 // apply.
 func RetentionPolicy() *RetentionPolicyApplyConfiguration {
 	return &RetentionPolicyApplyConfiguration{}

@@ -1,0 +1,1772 @@
+{
+  "kind": "DaemonSet",
+  "apiVersion": "apps/v1beta2",
+  "metadata": {
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "matchLabelsKey": "matchLabelsValue"
+      },
+      "matchExpressions": [
+        {
+          "key": "keyValue",
+          "operator": "operatorValue",
+          "values": [
+            "valuesValue"
+          ]
+        }
+      ]
+    },
+    "template": {
+      "metadata": {
+        "name": "nameValue",
+        "generateName": "generateNameValue",
+        "namespace": "namespaceValue",
+        "selfLink": "selfLinkValue",
+        "uid": "uidValue",
+        "resourceVersion": "resourceVersionValue",
+        "generation": 7,
+        "creationTimestamp": "2008-01-01T01:01:01Z",
+        "deletionTimestamp": "2009-01-01T01:01:01Z",
+        "deletionGracePeriodSeconds": 10,
+        "labels": {
+          "labelsKey": "labelsValue"
+        },
+        "annotations": {
+          "annotationsKey": "annotationsValue"
+        },
+        "ownerReferences": [
+          {
+            "apiVersion": "apiVersionValue",
+            "kind": "kindValue",
+            "name": "nameValue",
+            "uid": "uidValue",
+            "controller": true,
+            "blockOwnerDeletion": true
+          }
+        ],
+        "finalizers": [
+          "finalizersValue"
+        ],
+        "managedFields": [
+          {
+            "manager": "managerValue",
+            "operation": "operationValue",
+            "apiVersion": "apiVersionValue",
+            "time": "2004-01-01T01:01:01Z",
+            "fieldsType": "fieldsTypeValue",
+            "fieldsV1": {},
+            "subresource": "subresourceValue"
+          }
+        ]
+      },
+      "spec": {
+        "volumes": [
+          {
+            "name": "nameValue",
+            "hostPath": {
+              "path": "pathValue",
+              "type": "typeValue"
+            },
+            "emptyDir": {
+              "medium": "mediumValue",
+              "sizeLimit": "0"
+            },
+            "gcePersistentDisk": {
+              "pdName": "pdNameValue",
+              "fsType": "fsTypeValue",
+              "partition": 3,
+              "readOnly": true
+            },
+            "awsElasticBlockStore": {
+              "volumeID": "volumeIDValue",
+              "fsType": "fsTypeValue",
+              "partition": 3,
+              "readOnly": true
+            },
+            "gitRepo": {
+              "repository": "repositoryValue",
+              "revision": "revisionValue",
+              "directory": "directoryValue"
+            },
+            "secret": {
+              "secretName": "secretNameValue",
+              "items": [
+                {
+                  "key": "keyValue",
+                  "path": "pathValue",
+                  "mode": 3
+                }
+              ],
+              "defaultMode": 3,
+              "optional": true
+            },
+            "nfs": {
+              "server": "serverValue",
+              "path": "pathValue",
+              "readOnly": true
+            },
+            "iscsi": {
+              "targetPortal": "targetPortalValue",
+              "iqn": "iqnValue",
+              "lun": 3,
+              "iscsiInterface": "iscsiInterfaceValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true,
+              "portals": [
+                "portalsValue"
+              ],
+              "chapAuthDiscovery": true,
+              "chapAuthSession": true,
+              "secretRef": {
+                "name": "nameValue"
+              },
+              "initiatorName": "initiatorNameValue"
+            },
+            "glusterfs": {
+              "endpoints": "endpointsValue",
+              "path": "pathValue",
+              "readOnly": true
+            },
+            "persistentVolumeClaim": {
+              "claimName": "claimNameValue",
+              "readOnly": true
+            },
+            "rbd": {
+              "monitors": [
+                "monitorsValue"
+              ],
+              "image": "imageValue",
+              "fsType": "fsTypeValue",
+              "pool": "poolValue",
+              "user": "userValue",
+              "keyring": "keyringValue",
+              "secretRef": {
+                "name": "nameValue"
+              },
+              "readOnly": true
+            },
+            "flexVolume": {
+              "driver": "driverValue",
+              "fsType": "fsTypeValue",
+              "secretRef": {
+                "name": "nameValue"
+              },
+              "readOnly": true,
+              "options": {
+                "optionsKey": "optionsValue"
+              }
+            },
+            "cinder": {
+              "volumeID": "volumeIDValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true,
+              "secretRef": {
+                "name": "nameValue"
+              }
+            },
+            "cephfs": {
+              "monitors": [
+                "monitorsValue"
+              ],
+              "path": "pathValue",
+              "user": "userValue",
+              "secretFile": "secretFileValue",
+              "secretRef": {
+                "name": "nameValue"
+              },
+              "readOnly": true
+            },
+            "flocker": {
+              "datasetName": "datasetNameValue",
+              "datasetUUID": "datasetUUIDValue"
+            },
+            "downwardAPI": {
+              "items": [
+                {
+                  "path": "pathValue",
+                  "fieldRef": {
+                    "apiVersion": "apiVersionValue",
+                    "fieldPath": "fieldPathValue"
+                  },
+                  "resourceFieldRef": {
+                    "containerName": "containerNameValue",
+                    "resource": "resourceValue",
+                    "divisor": "0"
+                  },
+                  "mode": 4
+                }
+              ],
+              "defaultMode": 2
+            },
+            "fc": {
+              "targetWWNs": [
+                "targetWWNsValue"
+              ],
+              "lun": 2,
+              "fsType": "fsTypeValue",
+              "readOnly": true,
+              "wwids": [
+                "wwidsValue"
+              ]
+            },
+            "azureFile": {
+              "secretName": "secretNameValue",
+              "shareName": "shareNameValue",
+              "readOnly": true
+            },
+            "configMap": {
+              "name": "nameValue",
+              "items": [
+                {
+                  "key": "keyValue",
+                  "path": "pathValue",
+                  "mode": 3
+                }
+              ],
+              "defaultMode": 3,
+              "optional": true
+            },
+            "vsphereVolume": {
+              "volumePath": "volumePathValue",
+              "fsType": "fsTypeValue",
+              "storagePolicyName": "storagePolicyNameValue",
+              "storagePolicyID": "storagePolicyIDValue"
+            },
+            "quobyte": {
+              "registry": "registryValue",
+              "volume": "volumeValue",
+              "readOnly": true,
+              "user": "userValue",
+              "group": "groupValue",
+              "tenant": "tenantValue"
+            },
+            "azureDisk": {
+              "diskName": "diskNameValue",
+              "diskURI": "diskURIValue",
+              "cachingMode": "cachingModeValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true,
+              "kind": "kindValue"
+            },
+            "photonPersistentDisk": {
+              "pdID": "pdIDValue",
+              "fsType": "fsTypeValue"
+            },
+            "projected": {
+              "sources": [
+                {
+                  "secret": {
+                    "name": "nameValue",
+                    "items": [
+                      {
+                        "key": "keyValue",
+                        "path": "pathValue",
+                        "mode": 3
+                      }
+                    ],
+                    "optional": true
+                  },
+                  "downwardAPI": {
+                    "items": [
+                      {
+                        "path": "pathValue",
+                        "fieldRef": {
+                          "apiVersion": "apiVersionValue",
+                          "fieldPath": "fieldPathValue"
+                        },
+                        "resourceFieldRef": {
+                          "containerName": "containerNameValue",
+                          "resource": "resourceValue",
+                          "divisor": "0"
+                        },
+                        "mode": 4
+                      }
+                    ]
+                  },
+                  "configMap": {
+                    "name": "nameValue",
+                    "items": [
+                      {
+                        "key": "keyValue",
+                        "path": "pathValue",
+                        "mode": 3
+                      }
+                    ],
+                    "optional": true
+                  },
+                  "serviceAccountToken": {
+                    "audience": "audienceValue",
+                    "expirationSeconds": 2,
+                    "path": "pathValue"
+                  },
+                  "clusterTrustBundle": {
+                    "name": "nameValue",
+                    "signerName": "signerNameValue",
+                    "labelSelector": {
+                      "matchLabels": {
+                        "matchLabelsKey": "matchLabelsValue"
+                      },
+                      "matchExpressions": [
+                        {
+                          "key": "keyValue",
+                          "operator": "operatorValue",
+                          "values": [
+                            "valuesValue"
+                          ]
+                        }
+                      ]
+                    },
+                    "optional": true,
+                    "path": "pathValue"
+                  }
+                }
+              ],
+              "defaultMode": 2
+            },
+            "portworxVolume": {
+              "volumeID": "volumeIDValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true
+            },
+            "scaleIO": {
+              "gateway": "gatewayValue",
+              "system": "systemValue",
+              "secretRef": {
+                "name": "nameValue"
+              },
+              "sslEnabled": true,
+              "protectionDomain": "protectionDomainValue",
+              "storagePool": "storagePoolValue",
+              "storageMode": "storageModeValue",
+              "volumeName": "volumeNameValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true
+            },
+            "storageos": {
+              "volumeName": "volumeNameValue",
+              "volumeNamespace": "volumeNamespaceValue",
+              "fsType": "fsTypeValue",
+              "readOnly": true,
+              "secretRef": {
+                "name": "nameValue"
+              }
+            },
+            "csi": {
+              "driver": "driverValue",
+              "readOnly": true,
+              "fsType": "fsTypeValue",
+              "volumeAttributes": {
+                "volumeAttributesKey": "volumeAttributesValue"
+              },
+              "nodePublishSecretRef": {
+                "name": "nameValue"
+              }
+            },
+            "ephemeral": {
+              "volumeClaimTemplate": {
+                "metadata": {
+                  "name": "nameValue",
+                  "generateName": "generateNameValue",
+                  "namespace": "namespaceValue",
+                  "selfLink": "selfLinkValue",
+                  "uid": "uidValue",
+                  "resourceVersion": "resourceVersionValue",
+                  "generation": 7,
+                  "creationTimestamp": "2008-01-01T01:01:01Z",
+                  "deletionTimestamp": "2009-01-01T01:01:01Z",
+                  "deletionGracePeriodSeconds": 10,
+                  "labels": {
+                    "labelsKey": "labelsValue"
+                  },
+                  "annotations": {
+                    "annotationsKey": "annotationsValue"
+                  },
+                  "ownerReferences": [
+                    {
+                      "apiVersion": "apiVersionValue",
+                      "kind": "kindValue",
+                      "name": "nameValue",
+                      "uid": "uidValue",
+                      "controller": true,
+                      "blockOwnerDeletion": true
+                    }
+                  ],
+                  "finalizers": [
+                    "finalizersValue"
+                  ],
+                  "managedFields": [
+                    {
+                      "manager": "managerValue",
+                      "operation": "operationValue",
+                      "apiVersion": "apiVersionValue",
+                      "time": "2004-01-01T01:01:01Z",
+                      "fieldsType": "fieldsTypeValue",
+                      "fieldsV1": {},
+                      "subresource": "subresourceValue"
+                    }
+                  ]
+                },
+                "spec": {
+                  "accessModes": [
+                    "accessModesValue"
+                  ],
+                  "selector": {
+                    "matchLabels": {
+                      "matchLabelsKey": "matchLabelsValue"
+                    },
+                    "matchExpressions": [
+                      {
+                        "key": "keyValue",
+                        "operator": "operatorValue",
+                        "values": [
+                          "valuesValue"
+                        ]
+                      }
+                    ]
+                  },
+                  "resources": {
+                    "limits": {
+                      "limitsKey": "0"
+                    },
+                    "requests": {
+                      "requestsKey": "0"
+                    }
+                  },
+                  "volumeName": "volumeNameValue",
+                  "storageClassName": "storageClassNameValue",
+                  "volumeMode": "volumeModeValue",
+                  "dataSource": {
+                    "apiGroup": "apiGroupValue",
+                    "kind": "kindValue",
+                    "name": "nameValue"
+                  },
+                  "dataSourceRef": {
+                    "apiGroup": "apiGroupValue",
+                    "kind": "kindValue",
+                    "name": "nameValue",
+                    "namespace": "namespaceValue"
+                  },
+                  "volumeAttributesClassName": "volumeAttributesClassNameValue"
+                }
+              }
+            }
+          }
+        ],
+        "initContainers": [
+          {
+            "name": "nameValue",
+            "image": "imageValue",
+            "command": [
+              "commandValue"
+            ],
+            "args": [
+              "argsValue"
+            ],
+            "workingDir": "workingDirValue",
+            "ports": [
+              {
+                "name": "nameValue",
+                "hostPort": 2,
+                "containerPort": 3,
+                "protocol": "protocolValue",
+                "hostIP": "hostIPValue"
+              }
+            ],
+            "envFrom": [
+              {
+                "prefix": "prefixValue",
+                "configMapRef": {
+                  "name": "nameValue",
+                  "optional": true
+                },
+                "secretRef": {
+                  "name": "nameValue",
+                  "optional": true
+                }
+              }
+            ],
+            "env": [
+              {
+                "name": "nameValue",
+                "value": "valueValue",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "apiVersionValue",
+                    "fieldPath": "fieldPathValue"
+                  },
+                  "resourceFieldRef": {
+                    "containerName": "containerNameValue",
+                    "resource": "resourceValue",
+                    "divisor": "0"
+                  },
+                  "configMapKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  },
+                  "secretKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  }
+                }
+              }
+            ],
+            "resources": {
+              "limits": {
+                "limitsKey": "0"
+              },
+              "requests": {
+                "requestsKey": "0"
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
+            },
+            "resizePolicy": [
+              {
+                "resourceName": "resourceNameValue",
+                "restartPolicy": "restartPolicyValue"
+              }
+            ],
+            "restartPolicy": "restartPolicyValue",
+            "volumeMounts": [
+              {
+                "name": "nameValue",
+                "readOnly": true,
+                "mountPath": "mountPathValue",
+                "subPath": "subPathValue",
+                "mountPropagation": "mountPropagationValue",
+                "subPathExpr": "subPathExprValue"
+              }
+            ],
+            "volumeDevices": [
+              {
+                "name": "nameValue",
+                "devicePath": "devicePathValue"
+              }
+            ],
+            "livenessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "readinessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "startupProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "lifecycle": {
+              "postStart": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              },
+              "preStop": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              }
+            },
+            "terminationMessagePath": "terminationMessagePathValue",
+            "terminationMessagePolicy": "terminationMessagePolicyValue",
+            "imagePullPolicy": "imagePullPolicyValue",
+            "securityContext": {
+              "capabilities": {
+                "add": [
+                  "addValue"
+                ],
+                "drop": [
+                  "dropValue"
+                ]
+              },
+              "privileged": true,
+              "seLinuxOptions": {
+                "user": "userValue",
+                "role": "roleValue",
+                "type": "typeValue",
+                "level": "levelValue"
+              },
+              "windowsOptions": {
+                "gmsaCredentialSpecName": "gmsaCredentialSpecNameValue",
+                "gmsaCredentialSpec": "gmsaCredentialSpecValue",
+                "runAsUserName": "runAsUserNameValue",
+                "hostProcess": true
+              },
+              "runAsUser": 4,
+              "runAsGroup": 8,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": true,
+              "procMount": "procMountValue",
+              "seccompProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            },
+            "stdin": true,
+            "stdinOnce": true,
+            "tty": true
+          }
+        ],
+        "containers": [
+          {
+            "name": "nameValue",
+            "image": "imageValue",
+            "command": [
+              "commandValue"
+            ],
+            "args": [
+              "argsValue"
+            ],
+            "workingDir": "workingDirValue",
+            "ports": [
+              {
+                "name": "nameValue",
+                "hostPort": 2,
+                "containerPort": 3,
+                "protocol": "protocolValue",
+                "hostIP": "hostIPValue"
+              }
+            ],
+            "envFrom": [
+              {
+                "prefix": "prefixValue",
+                "configMapRef": {
+                  "name": "nameValue",
+                  "optional": true
+                },
+                "secretRef": {
+                  "name": "nameValue",
+                  "optional": true
+                }
+              }
+            ],
+            "env": [
+              {
+                "name": "nameValue",
+                "value": "valueValue",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "apiVersionValue",
+                    "fieldPath": "fieldPathValue"
+                  },
+                  "resourceFieldRef": {
+                    "containerName": "containerNameValue",
+                    "resource": "resourceValue",
+                    "divisor": "0"
+                  },
+                  "configMapKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  },
+                  "secretKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  }
+                }
+              }
+            ],
+            "resources": {
+              "limits": {
+                "limitsKey": "0"
+              },
+              "requests": {
+                "requestsKey": "0"
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
+            },
+            "resizePolicy": [
+              {
+                "resourceName": "resourceNameValue",
+                "restartPolicy": "restartPolicyValue"
+              }
+            ],
+            "restartPolicy": "restartPolicyValue",
+            "volumeMounts": [
+              {
+                "name": "nameValue",
+                "readOnly": true,
+                "mountPath": "mountPathValue",
+                "subPath": "subPathValue",
+                "mountPropagation": "mountPropagationValue",
+                "subPathExpr": "subPathExprValue"
+              }
+            ],
+            "volumeDevices": [
+              {
+                "name": "nameValue",
+                "devicePath": "devicePathValue"
+              }
+            ],
+            "livenessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "readinessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "startupProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "lifecycle": {
+              "postStart": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              },
+              "preStop": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              }
+            },
+            "terminationMessagePath": "terminationMessagePathValue",
+            "terminationMessagePolicy": "terminationMessagePolicyValue",
+            "imagePullPolicy": "imagePullPolicyValue",
+            "securityContext": {
+              "capabilities": {
+                "add": [
+                  "addValue"
+                ],
+                "drop": [
+                  "dropValue"
+                ]
+              },
+              "privileged": true,
+              "seLinuxOptions": {
+                "user": "userValue",
+                "role": "roleValue",
+                "type": "typeValue",
+                "level": "levelValue"
+              },
+              "windowsOptions": {
+                "gmsaCredentialSpecName": "gmsaCredentialSpecNameValue",
+                "gmsaCredentialSpec": "gmsaCredentialSpecValue",
+                "runAsUserName": "runAsUserNameValue",
+                "hostProcess": true
+              },
+              "runAsUser": 4,
+              "runAsGroup": 8,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": true,
+              "procMount": "procMountValue",
+              "seccompProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            },
+            "stdin": true,
+            "stdinOnce": true,
+            "tty": true
+          }
+        ],
+        "ephemeralContainers": [
+          {
+            "name": "nameValue",
+            "image": "imageValue",
+            "command": [
+              "commandValue"
+            ],
+            "args": [
+              "argsValue"
+            ],
+            "workingDir": "workingDirValue",
+            "ports": [
+              {
+                "name": "nameValue",
+                "hostPort": 2,
+                "containerPort": 3,
+                "protocol": "protocolValue",
+                "hostIP": "hostIPValue"
+              }
+            ],
+            "envFrom": [
+              {
+                "prefix": "prefixValue",
+                "configMapRef": {
+                  "name": "nameValue",
+                  "optional": true
+                },
+                "secretRef": {
+                  "name": "nameValue",
+                  "optional": true
+                }
+              }
+            ],
+            "env": [
+              {
+                "name": "nameValue",
+                "value": "valueValue",
+                "valueFrom": {
+                  "fieldRef": {
+                    "apiVersion": "apiVersionValue",
+                    "fieldPath": "fieldPathValue"
+                  },
+                  "resourceFieldRef": {
+                    "containerName": "containerNameValue",
+                    "resource": "resourceValue",
+                    "divisor": "0"
+                  },
+                  "configMapKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  },
+                  "secretKeyRef": {
+                    "name": "nameValue",
+                    "key": "keyValue",
+                    "optional": true
+                  }
+                }
+              }
+            ],
+            "resources": {
+              "limits": {
+                "limitsKey": "0"
+              },
+              "requests": {
+                "requestsKey": "0"
+              },
+              "claims": [
+                {
+                  "name": "nameValue"
+                }
+              ]
+            },
+            "resizePolicy": [
+              {
+                "resourceName": "resourceNameValue",
+                "restartPolicy": "restartPolicyValue"
+              }
+            ],
+            "restartPolicy": "restartPolicyValue",
+            "volumeMounts": [
+              {
+                "name": "nameValue",
+                "readOnly": true,
+                "mountPath": "mountPathValue",
+                "subPath": "subPathValue",
+                "mountPropagation": "mountPropagationValue",
+                "subPathExpr": "subPathExprValue"
+              }
+            ],
+            "volumeDevices": [
+              {
+                "name": "nameValue",
+                "devicePath": "devicePathValue"
+              }
+            ],
+            "livenessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "readinessProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "startupProbe": {
+              "exec": {
+                "command": [
+                  "commandValue"
+                ]
+              },
+              "httpGet": {
+                "path": "pathValue",
+                "port": "portValue",
+                "host": "hostValue",
+                "scheme": "schemeValue",
+                "httpHeaders": [
+                  {
+                    "name": "nameValue",
+                    "value": "valueValue"
+                  }
+                ]
+              },
+              "tcpSocket": {
+                "port": "portValue",
+                "host": "hostValue"
+              },
+              "grpc": {
+                "port": 1,
+                "service": "serviceValue"
+              },
+              "initialDelaySeconds": 2,
+              "timeoutSeconds": 3,
+              "periodSeconds": 4,
+              "successThreshold": 5,
+              "failureThreshold": 6,
+              "terminationGracePeriodSeconds": 7
+            },
+            "lifecycle": {
+              "postStart": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              },
+              "preStop": {
+                "exec": {
+                  "command": [
+                    "commandValue"
+                  ]
+                },
+                "httpGet": {
+                  "path": "pathValue",
+                  "port": "portValue",
+                  "host": "hostValue",
+                  "scheme": "schemeValue",
+                  "httpHeaders": [
+                    {
+                      "name": "nameValue",
+                      "value": "valueValue"
+                    }
+                  ]
+                },
+                "tcpSocket": {
+                  "port": "portValue",
+                  "host": "hostValue"
+                },
+                "sleep": {
+                  "seconds": 1
+                }
+              }
+            },
+            "terminationMessagePath": "terminationMessagePathValue",
+            "terminationMessagePolicy": "terminationMessagePolicyValue",
+            "imagePullPolicy": "imagePullPolicyValue",
+            "securityContext": {
+              "capabilities": {
+                "add": [
+                  "addValue"
+                ],
+                "drop": [
+                  "dropValue"
+                ]
+              },
+              "privileged": true,
+              "seLinuxOptions": {
+                "user": "userValue",
+                "role": "roleValue",
+                "type": "typeValue",
+                "level": "levelValue"
+              },
+              "windowsOptions": {
+                "gmsaCredentialSpecName": "gmsaCredentialSpecNameValue",
+                "gmsaCredentialSpec": "gmsaCredentialSpecValue",
+                "runAsUserName": "runAsUserNameValue",
+                "hostProcess": true
+              },
+              "runAsUser": 4,
+              "runAsGroup": 8,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": true,
+              "procMount": "procMountValue",
+              "seccompProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              }
+            },
+            "stdin": true,
+            "stdinOnce": true,
+            "tty": true,
+            "targetContainerName": "targetContainerNameValue"
+          }
+        ],
+        "restartPolicy": "restartPolicyValue",
+        "terminationGracePeriodSeconds": 4,
+        "activeDeadlineSeconds": 5,
+        "dnsPolicy": "dnsPolicyValue",
+        "nodeSelector": {
+          "nodeSelectorKey": "nodeSelectorValue"
+        },
+        "serviceAccountName": "serviceAccountNameValue",
+        "serviceAccount": "serviceAccountValue",
+        "automountServiceAccountToken": true,
+        "nodeName": "nodeNameValue",
+        "hostNetwork": true,
+        "hostPID": true,
+        "hostIPC": true,
+        "shareProcessNamespace": true,
+        "securityContext": {
+          "seLinuxOptions": {
+            "user": "userValue",
+            "role": "roleValue",
+            "type": "typeValue",
+            "level": "levelValue"
+          },
+          "windowsOptions": {
+            "gmsaCredentialSpecName": "gmsaCredentialSpecNameValue",
+            "gmsaCredentialSpec": "gmsaCredentialSpecValue",
+            "runAsUserName": "runAsUserNameValue",
+            "hostProcess": true
+          },
+          "runAsUser": 2,
+          "runAsGroup": 6,
+          "runAsNonRoot": true,
+          "supplementalGroups": [
+            4
+          ],
+          "fsGroup": 5,
+          "sysctls": [
+            {
+              "name": "nameValue",
+              "value": "valueValue"
+            }
+          ],
+          "fsGroupChangePolicy": "fsGroupChangePolicyValue",
+          "seccompProfile": {
+            "type": "typeValue",
+            "localhostProfile": "localhostProfileValue"
+          }
+        },
+        "imagePullSecrets": [
+          {
+            "name": "nameValue"
+          }
+        ],
+        "hostname": "hostnameValue",
+        "subdomain": "subdomainValue",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ],
+                  "matchFields": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "weight": 1,
+                "preference": {
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ],
+                  "matchFields": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "podAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "labelSelector": {
+                  "matchLabels": {
+                    "matchLabelsKey": "matchLabelsValue"
+                  },
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                },
+                "namespaces": [
+                  "namespacesValue"
+                ],
+                "topologyKey": "topologyKeyValue",
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "matchLabelsKey": "matchLabelsValue"
+                  },
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                },
+                "matchLabelKeys": [
+                  "matchLabelKeysValue"
+                ],
+                "mismatchLabelKeys": [
+                  "mismatchLabelKeysValue"
+                ]
+              }
+            ],
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "weight": 1,
+                "podAffinityTerm": {
+                  "labelSelector": {
+                    "matchLabels": {
+                      "matchLabelsKey": "matchLabelsValue"
+                    },
+                    "matchExpressions": [
+                      {
+                        "key": "keyValue",
+                        "operator": "operatorValue",
+                        "values": [
+                          "valuesValue"
+                        ]
+                      }
+                    ]
+                  },
+                  "namespaces": [
+                    "namespacesValue"
+                  ],
+                  "topologyKey": "topologyKeyValue",
+                  "namespaceSelector": {
+                    "matchLabels": {
+                      "matchLabelsKey": "matchLabelsValue"
+                    },
+                    "matchExpressions": [
+                      {
+                        "key": "keyValue",
+                        "operator": "operatorValue",
+                        "values": [
+                          "valuesValue"
+                        ]
+                      }
+                    ]
+                  },
+                  "matchLabelKeys": [
+                    "matchLabelKeysValue"
+                  ],
+                  "mismatchLabelKeys": [
+                    "mismatchLabelKeysValue"
+                  ]
+                }
+              }
+            ]
+          },
+          "podAntiAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "labelSelector": {
+                  "matchLabels": {
+                    "matchLabelsKey": "matchLabelsValue"
+                  },
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                },
+                "namespaces": [
+                  "namespacesValue"
+                ],
+                "topologyKey": "topologyKeyValue",
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "matchLabelsKey": "matchLabelsValue"
+                  },
+                  "matchExpressions": [
+                    {
+                      "key": "keyValue",
+                      "operator": "operatorValue",
+                      "values": [
+                        "valuesValue"
+                      ]
+                    }
+                  ]
+                },
+                "matchLabelKeys": [
+                  "matchLabelKeysValue"
+                ],
+                "mismatchLabelKeys": [
+                  "mismatchLabelKeysValue"
+                ]
+              }
+            ],
+            "preferredDuringSchedulingIgnoredDuringExecution": [
+              {
+                "weight": 1,
+                "podAffinityTerm": {
+                  "labelSelector": {
+                    "matchLabels": {
+                      "matchLabelsKey": "matchLabelsValue"
+                    },
+                    "matchExpressions": [
+                      {
+                        "key": "keyValue",
+                        "operator": "operatorValue",
+                        "values": [
+                          "valuesValue"
+                        ]
+                      }
+                    ]
+                  },
+                  "namespaces": [
+                    "namespacesValue"
+                  ],
+                  "topologyKey": "topologyKeyValue",
+                  "namespaceSelector": {
+                    "matchLabels": {
+                      "matchLabelsKey": "matchLabelsValue"
+                    },
+                    "matchExpressions": [
+                      {
+                        "key": "keyValue",
+                        "operator": "operatorValue",
+                        "values": [
+                          "valuesValue"
+                        ]
+                      }
+                    ]
+                  },
+                  "matchLabelKeys": [
+                    "matchLabelKeysValue"
+                  ],
+                  "mismatchLabelKeys": [
+                    "mismatchLabelKeysValue"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "schedulerName": "schedulerNameValue",
+        "tolerations": [
+          {
+            "key": "keyValue",
+            "operator": "operatorValue",
+            "value": "valueValue",
+            "effect": "effectValue",
+            "tolerationSeconds": 5
+          }
+        ],
+        "hostAliases": [
+          {
+            "ip": "ipValue",
+            "hostnames": [
+              "hostnamesValue"
+            ]
+          }
+        ],
+        "priorityClassName": "priorityClassNameValue",
+        "priority": 25,
+        "dnsConfig": {
+          "nameservers": [
+            "nameserversValue"
+          ],
+          "searches": [
+            "searchesValue"
+          ],
+          "options": [
+            {
+              "name": "nameValue",
+              "value": "valueValue"
+            }
+          ]
+        },
+        "readinessGates": [
+          {
+            "conditionType": "conditionTypeValue"
+          }
+        ],
+        "runtimeClassName": "runtimeClassNameValue",
+        "enableServiceLinks": true,
+        "preemptionPolicy": "preemptionPolicyValue",
+        "overhead": {
+          "overheadKey": "0"
+        },
+        "topologySpreadConstraints": [
+          {
+            "maxSkew": 1,
+            "topologyKey": "topologyKeyValue",
+            "whenUnsatisfiable": "whenUnsatisfiableValue",
+            "labelSelector": {
+              "matchLabels": {
+                "matchLabelsKey": "matchLabelsValue"
+              },
+              "matchExpressions": [
+                {
+                  "key": "keyValue",
+                  "operator": "operatorValue",
+                  "values": [
+                    "valuesValue"
+                  ]
+                }
+              ]
+            },
+            "minDomains": 5,
+            "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+            "nodeTaintsPolicy": "nodeTaintsPolicyValue",
+            "matchLabelKeys": [
+              "matchLabelKeysValue"
+            ]
+          }
+        ],
+        "setHostnameAsFQDN": true,
+        "os": {
+          "name": "nameValue"
+        },
+        "hostUsers": true,
+        "schedulingGates": [
+          {
+            "name": "nameValue"
+          }
+        ],
+        "resourceClaims": [
+          {
+            "name": "nameValue"
+          }
+        ]
+      }
+    },
+    "updateStrategy": {
+      "type": "typeValue",
+      "rollingUpdate": {
+        "maxUnavailable": "maxUnavailableValue",
+        "maxSurge": "maxSurgeValue"
+      }
+    },
+    "minReadySeconds": 4,
+    "revisionHistoryLimit": 6
+  },
+  "status": {
+    "currentNumberScheduled": 1,
+    "numberMisscheduled": 2,
+    "desiredNumberScheduled": 3,
+    "numberReady": 4,
+    "observedGeneration": 5,
+    "updatedNumberScheduled": 6,
+    "numberAvailable": 7,
+    "numberUnavailable": 8,
+    "collisionCount": 9,
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "lastTransitionTime": "2003-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ]
+  }
+}

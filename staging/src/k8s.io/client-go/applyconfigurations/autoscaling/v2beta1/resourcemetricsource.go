@@ -23,7 +23,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
-// ResourceMetricSourceApplyConfiguration represents an declarative configuration of the ResourceMetricSource type for use
+// ResourceMetricSourceApplyConfiguration represents a declarative configuration of the ResourceMetricSource type for use
 // with apply.
 type ResourceMetricSourceApplyConfiguration struct {
 	Name                     *v1.ResourceName   `json:"name,omitempty"`
@@ -31,7 +31,7 @@ type ResourceMetricSourceApplyConfiguration struct {
 	TargetAverageValue       *resource.Quantity `json:"targetAverageValue,omitempty"`
 }
 
-// ResourceMetricSourceApplyConfiguration constructs an declarative configuration of the ResourceMetricSource type for use with
+// ResourceMetricSourceApplyConfiguration constructs a declarative configuration of the ResourceMetricSource type for use with
 // apply.
 func ResourceMetricSource() *ResourceMetricSourceApplyConfiguration {
 	return &ResourceMetricSourceApplyConfiguration{}

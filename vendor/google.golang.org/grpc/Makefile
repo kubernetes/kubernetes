@@ -30,17 +30,20 @@ testdeps:
 	GO111MODULE=on go get -d -v -t google.golang.org/grpc/...
 
 vet: vetdeps
-	./vet.sh
+	./scripts/vet.sh
 
 vetdeps:
-	./vet.sh -install
+	./scripts/vet.sh -install
 
 .PHONY: \
 	all \
 	build \
 	clean \
+	deps \
 	proto \
 	test \
+	testsubmodule \
 	testrace \
+	testdeps \
 	vet \
 	vetdeps

@@ -297,6 +297,17 @@ func (s *EtcdServer) LeaseRevoke(ctx context.Context, r *pb.LeaseRevokeRequest) 
 
 func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, error) {
 	if s.isLeader() {
+		// If s.isLeader() returns true, but we fail to ensure the current
+		// member's leadership, there are a couple of possibilities:
+		//   1. current member gets stuck on writing WAL entries;
+		//   2. current member is in network isolation status;
+		//   3. current member isn't a leader anymore (possibly due to #1 above).
+		// In such case, we just return error to client, so that the client can
+		// switch to another member to continue the lease keep-alive operation.
+		if !s.ensureLeadership() {
+			return -1, lease.ErrNotPrimary
+		}
+
 		if err := s.waitAppliedIndex(); err != nil {
 			return 0, err
 		}

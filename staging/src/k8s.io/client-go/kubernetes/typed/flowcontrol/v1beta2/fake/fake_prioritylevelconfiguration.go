@@ -43,20 +43,22 @@ var prioritylevelconfigurationsKind = v1beta2.SchemeGroupVersion.WithKind("Prior
 
 // Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
 func (c *FakePriorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(prioritylevelconfigurationsResource, name), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootGetActionWithOptions(prioritylevelconfigurationsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
 
 // List takes label and field selectors, and returns the list of PriorityLevelConfigurations that match those selectors.
 func (c *FakePriorityLevelConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.PriorityLevelConfigurationList, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfigurationList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(prioritylevelconfigurationsResource, prioritylevelconfigurationsKind, opts), &v1beta2.PriorityLevelConfigurationList{})
+		Invokes(testing.NewRootListActionWithOptions(prioritylevelconfigurationsResource, prioritylevelconfigurationsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -75,36 +77,39 @@ func (c *FakePriorityLevelConfigurations) List(ctx context.Context, opts v1.List
 // Watch returns a watch.Interface that watches the requested priorityLevelConfigurations.
 func (c *FakePriorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(prioritylevelconfigurationsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(prioritylevelconfigurationsResource, opts))
 }
 
 // Create takes the representation of a priorityLevelConfiguration and creates it.  Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
 func (c *FakePriorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.CreateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(prioritylevelconfigurationsResource, priorityLevelConfiguration), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootCreateActionWithOptions(prioritylevelconfigurationsResource, priorityLevelConfiguration, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
 
 // Update takes the representation of a priorityLevelConfiguration and updates it. Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
 func (c *FakePriorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(prioritylevelconfigurationsResource, priorityLevelConfiguration), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootUpdateActionWithOptions(prioritylevelconfigurationsResource, priorityLevelConfiguration, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePriorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1beta2.PriorityLevelConfiguration, error) {
+func (c *FakePriorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(prioritylevelconfigurationsResource, "status", priorityLevelConfiguration), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(prioritylevelconfigurationsResource, "status", priorityLevelConfiguration, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
@@ -118,7 +123,7 @@ func (c *FakePriorityLevelConfigurations) Delete(ctx context.Context, name strin
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePriorityLevelConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(prioritylevelconfigurationsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(prioritylevelconfigurationsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta2.PriorityLevelConfigurationList{})
 	return err
@@ -126,10 +131,11 @@ func (c *FakePriorityLevelConfigurations) DeleteCollection(ctx context.Context, 
 
 // Patch applies the patch and returns the patched priorityLevelConfiguration.
 func (c *FakePriorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.PriorityLevelConfiguration, err error) {
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, name, pt, data, subresources...), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(prioritylevelconfigurationsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
@@ -147,10 +153,11 @@ func (c *FakePriorityLevelConfigurations) Apply(ctx context.Context, priorityLev
 	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }
@@ -169,10 +176,11 @@ func (c *FakePriorityLevelConfigurations) ApplyStatus(ctx context.Context, prior
 	if name == nil {
 		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta2.PriorityLevelConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data, "status"), &v1beta2.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(prioritylevelconfigurationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta2.PriorityLevelConfiguration), err
 }

@@ -2,14 +2,14 @@
 
 package v1
 
-// NutanixPrismElementEndpointApplyConfiguration represents an declarative configuration of the NutanixPrismElementEndpoint type for use
+// NutanixPrismElementEndpointApplyConfiguration represents a declarative configuration of the NutanixPrismElementEndpoint type for use
 // with apply.
 type NutanixPrismElementEndpointApplyConfiguration struct {
 	Name     *string                                 `json:"name,omitempty"`
 	Endpoint *NutanixPrismEndpointApplyConfiguration `json:"endpoint,omitempty"`
 }
 
-// NutanixPrismElementEndpointApplyConfiguration constructs an declarative configuration of the NutanixPrismElementEndpoint type for use with
+// NutanixPrismElementEndpointApplyConfiguration constructs a declarative configuration of the NutanixPrismElementEndpoint type for use with
 // apply.
 func NutanixPrismElementEndpoint() *NutanixPrismElementEndpointApplyConfiguration {
 	return &NutanixPrismElementEndpointApplyConfiguration{}

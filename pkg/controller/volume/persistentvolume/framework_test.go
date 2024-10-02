@@ -409,6 +409,14 @@ func withExpectedCapacity(capacity string, claims []*v1.PersistentVolumeClaim) [
 	return claims
 }
 
+// withExpectedVAC sets the claim.Status.CurrentVolumeAttributesClassName of the first claim in the
+// array to given value and returns the array.  Meant to be used to compose
+// claims specified inline in a test.
+func withExpectedVAC(vacName *string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Status.CurrentVolumeAttributesClassName = vacName
+	return claims
+}
+
 // withMessage saves given message into volume.Status.Message of the first
 // volume in the array and returns the array.  Meant to be used to compose
 // volumes specified inline in a test.
@@ -419,6 +427,7 @@ func withMessage(message string, volumes []*v1.PersistentVolume) []*v1.Persisten
 
 // newVolumeArray returns array with a single volume that would be returned by
 // newVolume() with the same parameters.
+// TODO: make the newVolumeArray function accept volume attributes class name as an input parameter
 func newVolumeArray(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, class string, annotations ...string) []*v1.PersistentVolume {
 	return []*v1.PersistentVolume{
 		newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, reclaimPolicy, class, annotations...),
@@ -489,6 +498,9 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		// For most of the tests it's enough to copy claim's requested capacity,
 		// individual tests can adjust it using withExpectedCapacity()
 		claim.Status.Capacity = claim.Spec.Resources.Requests
+		// For most of the tests it's enough to copy claim's requested vac,
+		// individual tests can adjust it using withExpectedVAC()
+		claim.Status.CurrentVolumeAttributesClassName = claim.Spec.VolumeAttributesClassName
 	}
 
 	return &claim
@@ -496,10 +508,16 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 
 // newClaimArray returns array with a single claim that would be returned by
 // newClaim() with the same parameters.
+// TODO: make the newClaimArray function accept volume attributes class name as an input parameter
 func newClaimArray(name, claimUID, capacity, boundToVolume string, phase v1.PersistentVolumeClaimPhase, class *string, annotations ...string) []*v1.PersistentVolumeClaim {
 	return []*v1.PersistentVolumeClaim{
 		newClaim(name, claimUID, capacity, boundToVolume, phase, class, annotations...),
 	}
+}
+
+func claimWithVAC(vacName *string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.VolumeAttributesClassName = vacName
+	return claims
 }
 
 // claimWithAnnotation saves given annotation into given claims. Meant to be
@@ -534,6 +552,22 @@ func annotateClaim(claim *v1.PersistentVolumeClaim, ann map[string]string) *v1.P
 		claim.Annotations[key] = val
 	}
 	return claim
+}
+
+// volumeWithVAC saves given vac into given volume.
+// Meant to be used to compose volume specified inline in a test.
+func volumeWithVAC(vacName string, volume *v1.PersistentVolume) *v1.PersistentVolume {
+	volume.Spec.VolumeAttributesClassName = &vacName
+	return volume
+}
+
+// volumesWithVAC saves given vac into given volumes.
+// Meant to be used to compose volumes specified inline in a test.
+func volumesWithVAC(vacName string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
+	for _, volume := range volumes {
+		volumeWithVAC(vacName, volume)
+	}
+	return volumes
 }
 
 // volumeWithAnnotation saves given annotation into given volume.
@@ -976,7 +1010,7 @@ func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 	return false, nil
 }
 
-func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
 

@@ -111,7 +111,7 @@ type ReplicaSetController struct {
 	podListerSynced cache.InformerSynced
 
 	// Controllers that need to be synced
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -145,7 +145,10 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		eventBroadcaster: eventBroadcaster,
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
+		),
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -548,7 +551,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer rsc.queue.Done(key)
 
-	err := rsc.syncHandler(ctx, key.(string))
+	err := rsc.syncHandler(ctx, key)
 	if err == nil {
 		rsc.queue.Forget(key)
 		return true

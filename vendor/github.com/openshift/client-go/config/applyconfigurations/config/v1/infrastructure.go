@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// InfrastructureApplyConfiguration represents an declarative configuration of the Infrastructure type for use
+// InfrastructureApplyConfiguration represents a declarative configuration of the Infrastructure type for use
 // with apply.
 type InfrastructureApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type InfrastructureApplyConfiguration struct {
 	Status                           *InfrastructureStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Infrastructure constructs an declarative configuration of the Infrastructure type for use with
+// Infrastructure constructs a declarative configuration of the Infrastructure type for use with
 // apply.
 func Infrastructure(name string) *InfrastructureApplyConfiguration {
 	b := &InfrastructureApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *InfrastructureApplyConfiguration) WithSpec(value *InfrastructureSpecApp
 func (b *InfrastructureApplyConfiguration) WithStatus(value *InfrastructureStatusApplyConfiguration) *InfrastructureApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *InfrastructureApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

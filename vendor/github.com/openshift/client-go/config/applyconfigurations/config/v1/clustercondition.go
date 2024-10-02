@@ -2,14 +2,14 @@
 
 package v1
 
-// ClusterConditionApplyConfiguration represents an declarative configuration of the ClusterCondition type for use
+// ClusterConditionApplyConfiguration represents a declarative configuration of the ClusterCondition type for use
 // with apply.
 type ClusterConditionApplyConfiguration struct {
 	Type   *string                                   `json:"type,omitempty"`
 	PromQL *PromQLClusterConditionApplyConfiguration `json:"promql,omitempty"`
 }
 
-// ClusterConditionApplyConfiguration constructs an declarative configuration of the ClusterCondition type for use with
+// ClusterConditionApplyConfiguration constructs a declarative configuration of the ClusterCondition type for use with
 // apply.
 func ClusterCondition() *ClusterConditionApplyConfiguration {
 	return &ClusterConditionApplyConfiguration{}

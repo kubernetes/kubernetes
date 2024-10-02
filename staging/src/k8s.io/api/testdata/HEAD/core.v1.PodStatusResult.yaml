@@ -43,6 +43,11 @@ status:
   containerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
@@ -65,6 +70,7 @@ status:
     resources:
       claims:
       - name: nameValue
+        request: requestValue
       limits:
         limitsKey: "0"
       requests:
@@ -85,6 +91,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue
@@ -93,6 +105,11 @@ status:
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
@@ -115,6 +132,7 @@ status:
     resources:
       claims:
       - name: nameValue
+        request: requestValue
       limits:
         limitsKey: "0"
       requests:
@@ -135,6 +153,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue
@@ -146,6 +170,11 @@ status:
   initContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
@@ -168,6 +197,7 @@ status:
     resources:
       claims:
       - name: nameValue
+        request: requestValue
       limits:
         limitsKey: "0"
       requests:
@@ -188,6 +218,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue

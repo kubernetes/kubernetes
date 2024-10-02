@@ -2,7 +2,7 @@
 
 package v1
 
-// RequestHeaderIdentityProviderApplyConfiguration represents an declarative configuration of the RequestHeaderIdentityProvider type for use
+// RequestHeaderIdentityProviderApplyConfiguration represents a declarative configuration of the RequestHeaderIdentityProvider type for use
 // with apply.
 type RequestHeaderIdentityProviderApplyConfiguration struct {
 	LoginURL                 *string                                   `json:"loginURL,omitempty"`
@@ -15,7 +15,7 @@ type RequestHeaderIdentityProviderApplyConfiguration struct {
 	EmailHeaders             []string                                  `json:"emailHeaders,omitempty"`
 }
 
-// RequestHeaderIdentityProviderApplyConfiguration constructs an declarative configuration of the RequestHeaderIdentityProvider type for use with
+// RequestHeaderIdentityProviderApplyConfiguration constructs a declarative configuration of the RequestHeaderIdentityProvider type for use with
 // apply.
 func RequestHeaderIdentityProvider() *RequestHeaderIdentityProviderApplyConfiguration {
 	return &RequestHeaderIdentityProviderApplyConfiguration{}

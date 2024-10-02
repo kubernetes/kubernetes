@@ -2,14 +2,14 @@
 
 package v1
 
-// PerVerbAPIRequestCountApplyConfiguration represents an declarative configuration of the PerVerbAPIRequestCount type for use
+// PerVerbAPIRequestCountApplyConfiguration represents a declarative configuration of the PerVerbAPIRequestCount type for use
 // with apply.
 type PerVerbAPIRequestCountApplyConfiguration struct {
 	Verb         *string `json:"verb,omitempty"`
 	RequestCount *int64  `json:"requestCount,omitempty"`
 }
 
-// PerVerbAPIRequestCountApplyConfiguration constructs an declarative configuration of the PerVerbAPIRequestCount type for use with
+// PerVerbAPIRequestCountApplyConfiguration constructs a declarative configuration of the PerVerbAPIRequestCount type for use with
 // apply.
 func PerVerbAPIRequestCount() *PerVerbAPIRequestCountApplyConfiguration {
 	return &PerVerbAPIRequestCountApplyConfiguration{}

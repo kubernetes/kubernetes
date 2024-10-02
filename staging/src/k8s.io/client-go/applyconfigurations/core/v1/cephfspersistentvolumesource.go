@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// CephFSPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the CephFSPersistentVolumeSource type for use
+// CephFSPersistentVolumeSourceApplyConfiguration represents a declarative configuration of the CephFSPersistentVolumeSource type for use
 // with apply.
 type CephFSPersistentVolumeSourceApplyConfiguration struct {
 	Monitors   []string                           `json:"monitors,omitempty"`
@@ -29,7 +29,7 @@ type CephFSPersistentVolumeSourceApplyConfiguration struct {
 	ReadOnly   *bool                              `json:"readOnly,omitempty"`
 }
 
-// CephFSPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the CephFSPersistentVolumeSource type for use with
+// CephFSPersistentVolumeSourceApplyConfiguration constructs a declarative configuration of the CephFSPersistentVolumeSource type for use with
 // apply.
 func CephFSPersistentVolumeSource() *CephFSPersistentVolumeSourceApplyConfiguration {
 	return &CephFSPersistentVolumeSourceApplyConfiguration{}

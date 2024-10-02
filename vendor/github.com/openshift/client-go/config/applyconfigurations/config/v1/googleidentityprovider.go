@@ -2,7 +2,7 @@
 
 package v1
 
-// GoogleIdentityProviderApplyConfiguration represents an declarative configuration of the GoogleIdentityProvider type for use
+// GoogleIdentityProviderApplyConfiguration represents a declarative configuration of the GoogleIdentityProvider type for use
 // with apply.
 type GoogleIdentityProviderApplyConfiguration struct {
 	ClientID     *string                                `json:"clientID,omitempty"`
@@ -10,7 +10,7 @@ type GoogleIdentityProviderApplyConfiguration struct {
 	HostedDomain *string                                `json:"hostedDomain,omitempty"`
 }
 
-// GoogleIdentityProviderApplyConfiguration constructs an declarative configuration of the GoogleIdentityProvider type for use with
+// GoogleIdentityProviderApplyConfiguration constructs a declarative configuration of the GoogleIdentityProvider type for use with
 // apply.
 func GoogleIdentityProvider() *GoogleIdentityProviderApplyConfiguration {
 	return &GoogleIdentityProviderApplyConfiguration{}

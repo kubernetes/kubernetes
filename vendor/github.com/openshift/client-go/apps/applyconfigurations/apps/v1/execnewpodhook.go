@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ExecNewPodHookApplyConfiguration represents an declarative configuration of the ExecNewPodHook type for use
+// ExecNewPodHookApplyConfiguration represents a declarative configuration of the ExecNewPodHook type for use
 // with apply.
 type ExecNewPodHookApplyConfiguration struct {
 	Command       []string    `json:"command,omitempty"`
@@ -15,7 +15,7 @@ type ExecNewPodHookApplyConfiguration struct {
 	Volumes       []string    `json:"volumes,omitempty"`
 }
 
-// ExecNewPodHookApplyConfiguration constructs an declarative configuration of the ExecNewPodHook type for use with
+// ExecNewPodHookApplyConfiguration constructs a declarative configuration of the ExecNewPodHook type for use with
 // apply.
 func ExecNewPodHook() *ExecNewPodHookApplyConfiguration {
 	return &ExecNewPodHookApplyConfiguration{}

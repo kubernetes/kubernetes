@@ -20,8 +20,8 @@ package v1beta2
 
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type ReplicaSetLister interface {
 
 // replicaSetLister implements the ReplicaSetLister interface.
 type replicaSetLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1beta2.ReplicaSet]
 }
 
 // NewReplicaSetLister returns a new ReplicaSetLister.
 func NewReplicaSetLister(indexer cache.Indexer) ReplicaSetLister {
-	return &replicaSetLister{indexer: indexer}
-}
-
-// List lists all ReplicaSets in the indexer.
-func (s *replicaSetLister) List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.ReplicaSet))
-	})
-	return ret, err
+	return &replicaSetLister{listers.New[*v1beta2.ReplicaSet](indexer, v1beta2.Resource("replicaset"))}
 }
 
 // ReplicaSets returns an object that can list and get ReplicaSets.
 func (s *replicaSetLister) ReplicaSets(namespace string) ReplicaSetNamespaceLister {
-	return replicaSetNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return replicaSetNamespaceLister{listers.NewNamespaced[*v1beta2.ReplicaSet](s.ResourceIndexer, namespace)}
 }
 
 // ReplicaSetNamespaceLister helps list and get ReplicaSets.
@@ -74,26 +66,5 @@ type ReplicaSetNamespaceLister interface {
 // replicaSetNamespaceLister implements the ReplicaSetNamespaceLister
 // interface.
 type replicaSetNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ReplicaSets in the indexer for a given namespace.
-func (s replicaSetNamespaceLister) List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta2.ReplicaSet))
-	})
-	return ret, err
-}
-
-// Get retrieves the ReplicaSet from the indexer for a given namespace and name.
-func (s replicaSetNamespaceLister) Get(name string) (*v1beta2.ReplicaSet, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta2.Resource("replicaset"), name)
-	}
-	return obj.(*v1beta2.ReplicaSet), nil
+	listers.ResourceIndexer[*v1beta2.ReplicaSet]
 }

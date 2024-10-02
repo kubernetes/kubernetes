@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CSINodeApplyConfiguration represents an declarative configuration of the CSINode type for use
+// CSINodeApplyConfiguration represents a declarative configuration of the CSINode type for use
 // with apply.
 type CSINodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type CSINodeApplyConfiguration struct {
 	Spec                             *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// CSINode constructs an declarative configuration of the CSINode type for use with
+// CSINode constructs a declarative configuration of the CSINode type for use with
 // apply.
 func CSINode(name string) *CSINodeApplyConfiguration {
 	b := &CSINodeApplyConfiguration{}
@@ -244,4 +244,10 @@ func (b *CSINodeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 func (b *CSINodeApplyConfiguration) WithSpec(value *CSINodeSpecApplyConfiguration) *CSINodeApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *CSINodeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

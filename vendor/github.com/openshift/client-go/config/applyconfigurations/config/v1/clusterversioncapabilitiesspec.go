@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ClusterVersionCapabilitiesSpecApplyConfiguration represents an declarative configuration of the ClusterVersionCapabilitiesSpec type for use
+// ClusterVersionCapabilitiesSpecApplyConfiguration represents a declarative configuration of the ClusterVersionCapabilitiesSpec type for use
 // with apply.
 type ClusterVersionCapabilitiesSpecApplyConfiguration struct {
 	BaselineCapabilitySet         *v1.ClusterVersionCapabilitySet `json:"baselineCapabilitySet,omitempty"`
 	AdditionalEnabledCapabilities []v1.ClusterVersionCapability   `json:"additionalEnabledCapabilities,omitempty"`
 }
 
-// ClusterVersionCapabilitiesSpecApplyConfiguration constructs an declarative configuration of the ClusterVersionCapabilitiesSpec type for use with
+// ClusterVersionCapabilitiesSpecApplyConfiguration constructs a declarative configuration of the ClusterVersionCapabilitiesSpec type for use with
 // apply.
 func ClusterVersionCapabilitiesSpec() *ClusterVersionCapabilitiesSpecApplyConfiguration {
 	return &ClusterVersionCapabilitiesSpecApplyConfiguration{}

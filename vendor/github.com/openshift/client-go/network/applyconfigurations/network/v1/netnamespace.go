@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NetNamespaceApplyConfiguration represents an declarative configuration of the NetNamespace type for use
+// NetNamespaceApplyConfiguration represents a declarative configuration of the NetNamespace type for use
 // with apply.
 type NetNamespaceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -21,7 +21,7 @@ type NetNamespaceApplyConfiguration struct {
 	EgressIPs                        []networkv1.NetNamespaceEgressIP `json:"egressIPs,omitempty"`
 }
 
-// NetNamespace constructs an declarative configuration of the NetNamespace type for use with
+// NetNamespace constructs a declarative configuration of the NetNamespace type for use with
 // apply.
 func NetNamespace(name string) *NetNamespaceApplyConfiguration {
 	b := &NetNamespaceApplyConfiguration{}
@@ -248,4 +248,10 @@ func (b *NetNamespaceApplyConfiguration) WithEgressIPs(values ...networkv1.NetNa
 		b.EgressIPs = append(b.EgressIPs, values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *NetNamespaceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

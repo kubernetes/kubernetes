@@ -129,7 +129,7 @@ type DaemonSetsController struct {
 	kubeDefaultNodeSelector            labels.Selector
 
 	// DaemonSet keys that need to be synced.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	failedPodsBackoff *flowcontrol.Backoff
 }
@@ -159,7 +159,12 @@ func NewDaemonSetsController(
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "daemonset",
+			},
+		),
 	}
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -326,7 +331,7 @@ func (dsc *DaemonSetsController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer dsc.queue.Done(dsKey)
 
-	err := dsc.syncHandler(ctx, dsKey.(string))
+	err := dsc.syncHandler(ctx, dsKey)
 	if err == nil {
 		dsc.queue.Forget(dsKey)
 		return true

@@ -2,7 +2,7 @@
 
 package v1
 
-// ImageManifestApplyConfiguration represents an declarative configuration of the ImageManifest type for use
+// ImageManifestApplyConfiguration represents a declarative configuration of the ImageManifest type for use
 // with apply.
 type ImageManifestApplyConfiguration struct {
 	Digest       *string `json:"digest,omitempty"`
@@ -13,7 +13,7 @@ type ImageManifestApplyConfiguration struct {
 	Variant      *string `json:"variant,omitempty"`
 }
 
-// ImageManifestApplyConfiguration constructs an declarative configuration of the ImageManifest type for use with
+// ImageManifestApplyConfiguration constructs a declarative configuration of the ImageManifest type for use with
 // apply.
 func ImageManifest() *ImageManifestApplyConfiguration {
 	return &ImageManifestApplyConfiguration{}

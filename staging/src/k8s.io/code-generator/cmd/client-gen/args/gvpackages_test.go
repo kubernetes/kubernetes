@@ -71,9 +71,9 @@ func TestGVPackageFlag(t *testing.T) {
 		{
 			args: []string{"api/v1", "api"},
 			expectedGroups: []types.GroupVersions{
-				{PackageName: "core", Group: types.Group("api"), Versions: []types.PackageVersion{
-					{Version: "v1", Package: "core/v1"},
-					{Version: "", Package: "core"},
+				{PackageName: "api", Group: types.Group("api"), Versions: []types.PackageVersion{
+					{Version: "v1", Package: "api/v1"},
+					{Version: "", Package: "api"},
 				}},
 			},
 		},

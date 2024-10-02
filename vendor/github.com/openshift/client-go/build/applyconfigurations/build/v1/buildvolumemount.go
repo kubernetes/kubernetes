@@ -2,13 +2,13 @@
 
 package v1
 
-// BuildVolumeMountApplyConfiguration represents an declarative configuration of the BuildVolumeMount type for use
+// BuildVolumeMountApplyConfiguration represents a declarative configuration of the BuildVolumeMount type for use
 // with apply.
 type BuildVolumeMountApplyConfiguration struct {
 	DestinationPath *string `json:"destinationPath,omitempty"`
 }
 
-// BuildVolumeMountApplyConfiguration constructs an declarative configuration of the BuildVolumeMount type for use with
+// BuildVolumeMountApplyConfiguration constructs a declarative configuration of the BuildVolumeMount type for use with
 // apply.
 func BuildVolumeMount() *BuildVolumeMountApplyConfiguration {
 	return &BuildVolumeMountApplyConfiguration{}

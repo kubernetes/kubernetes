@@ -6,7 +6,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// VSpherePlatformSpecApplyConfiguration represents an declarative configuration of the VSpherePlatformSpec type for use
+// VSpherePlatformSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformSpec type for use
 // with apply.
 type VSpherePlatformSpecApplyConfiguration struct {
 	VCenters             []VSpherePlatformVCenterSpecApplyConfiguration       `json:"vcenters,omitempty"`
@@ -17,7 +17,7 @@ type VSpherePlatformSpecApplyConfiguration struct {
 	MachineNetworks      []configv1.CIDR                                      `json:"machineNetworks,omitempty"`
 }
 
-// VSpherePlatformSpecApplyConfiguration constructs an declarative configuration of the VSpherePlatformSpec type for use with
+// VSpherePlatformSpecApplyConfiguration constructs a declarative configuration of the VSpherePlatformSpec type for use with
 // apply.
 func VSpherePlatformSpec() *VSpherePlatformSpecApplyConfiguration {
 	return &VSpherePlatformSpecApplyConfiguration{}

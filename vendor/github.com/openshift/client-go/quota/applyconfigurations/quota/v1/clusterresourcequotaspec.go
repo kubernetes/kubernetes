@@ -6,14 +6,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// ClusterResourceQuotaSpecApplyConfiguration represents an declarative configuration of the ClusterResourceQuotaSpec type for use
+// ClusterResourceQuotaSpecApplyConfiguration represents a declarative configuration of the ClusterResourceQuotaSpec type for use
 // with apply.
 type ClusterResourceQuotaSpecApplyConfiguration struct {
 	Selector *ClusterResourceQuotaSelectorApplyConfiguration `json:"selector,omitempty"`
 	Quota    *corev1.ResourceQuotaSpec                       `json:"quota,omitempty"`
 }
 
-// ClusterResourceQuotaSpecApplyConfiguration constructs an declarative configuration of the ClusterResourceQuotaSpec type for use with
+// ClusterResourceQuotaSpecApplyConfiguration constructs a declarative configuration of the ClusterResourceQuotaSpec type for use with
 // apply.
 func ClusterResourceQuotaSpec() *ClusterResourceQuotaSpecApplyConfiguration {
 	return &ClusterResourceQuotaSpecApplyConfiguration{}

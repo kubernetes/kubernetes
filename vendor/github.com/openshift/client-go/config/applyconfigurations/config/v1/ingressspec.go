@@ -2,7 +2,7 @@
 
 package v1
 
-// IngressSpecApplyConfiguration represents an declarative configuration of the IngressSpec type for use
+// IngressSpecApplyConfiguration represents a declarative configuration of the IngressSpec type for use
 // with apply.
 type IngressSpecApplyConfiguration struct {
 	Domain               *string                                `json:"domain,omitempty"`
@@ -12,7 +12,7 @@ type IngressSpecApplyConfiguration struct {
 	LoadBalancer         *LoadBalancerApplyConfiguration        `json:"loadBalancer,omitempty"`
 }
 
-// IngressSpecApplyConfiguration constructs an declarative configuration of the IngressSpec type for use with
+// IngressSpecApplyConfiguration constructs a declarative configuration of the IngressSpec type for use with
 // apply.
 func IngressSpec() *IngressSpecApplyConfiguration {
 	return &IngressSpecApplyConfiguration{}

@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// RuntimeClassSpecApplyConfiguration represents an declarative configuration of the RuntimeClassSpec type for use
+// RuntimeClassSpecApplyConfiguration represents a declarative configuration of the RuntimeClassSpec type for use
 // with apply.
 type RuntimeClassSpecApplyConfiguration struct {
 	RuntimeHandler *string                       `json:"runtimeHandler,omitempty"`
@@ -26,7 +26,7 @@ type RuntimeClassSpecApplyConfiguration struct {
 	Scheduling     *SchedulingApplyConfiguration `json:"scheduling,omitempty"`
 }
 
-// RuntimeClassSpecApplyConfiguration constructs an declarative configuration of the RuntimeClassSpec type for use with
+// RuntimeClassSpecApplyConfiguration constructs a declarative configuration of the RuntimeClassSpec type for use with
 // apply.
 func RuntimeClassSpec() *RuntimeClassSpecApplyConfiguration {
 	return &RuntimeClassSpecApplyConfiguration{}

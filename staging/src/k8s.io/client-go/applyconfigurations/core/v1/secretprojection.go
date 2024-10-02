@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// SecretProjectionApplyConfiguration represents an declarative configuration of the SecretProjection type for use
+// SecretProjectionApplyConfiguration represents a declarative configuration of the SecretProjection type for use
 // with apply.
 type SecretProjectionApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -26,7 +26,7 @@ type SecretProjectionApplyConfiguration struct {
 	Optional                               *bool                         `json:"optional,omitempty"`
 }
 
-// SecretProjectionApplyConfiguration constructs an declarative configuration of the SecretProjection type for use with
+// SecretProjectionApplyConfiguration constructs a declarative configuration of the SecretProjection type for use with
 // apply.
 func SecretProjection() *SecretProjectionApplyConfiguration {
 	return &SecretProjectionApplyConfiguration{}

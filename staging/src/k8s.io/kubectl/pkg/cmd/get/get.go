@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // GetOptions contains the input to the get command.
@@ -91,8 +91,8 @@ var (
 
 		Prints a table of the most important information about the specified resources.
 		You can filter the list using a label selector and the --selector flag. If the
-		desired resource type is namespaced you will only see results in your current
-		namespace unless you pass --all-namespaces.
+		desired resource type is namespaced you will only see results in the current
+		namespace if you don't specify any namespace.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`))
@@ -132,7 +132,13 @@ var (
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
 		# List the 'status' subresource for a single pod
-		kubectl get pod web-pod-13je7 --subresource status`))
+		kubectl get pod web-pod-13je7 --subresource status
+
+		# List all deployments in namespace 'backend'
+		kubectl get deployments.apps --namespace backend
+
+		# List all pods existing in all namespaces
+		kubectl get pods --all-namespaces`))
 )
 
 const (
@@ -267,9 +273,13 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	switch {
-	case o.Watch || o.WatchOnly:
+	case o.Watch:
 		if len(o.SortBy) > 0 {
-			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch or --watch-only requested, --sort-by will be ignored\n")
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch requested, --sort-by will be ignored for watch events received\n")
+		}
+	case o.WatchOnly:
+		if len(o.SortBy) > 0 {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch-only requested, --sort-by will be ignored\n")
 		}
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
@@ -627,7 +637,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	outputObjects := utilpointer.BoolPtr(!o.WatchOnly)
+	outputObjects := ptr.To(!o.WatchOnly)
 	printer, err := o.ToPrinter(mapping, outputObjects, o.AllNamespaces, false)
 	if err != nil {
 		return err

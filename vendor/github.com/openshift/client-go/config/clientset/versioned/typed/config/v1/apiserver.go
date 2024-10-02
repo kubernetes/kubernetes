@@ -4,9 +4,6 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
@@ -14,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // APIServersGetter has a method to return a APIServerInterface.
@@ -27,6 +24,7 @@ type APIServersGetter interface {
 type APIServerInterface interface {
 	Create(ctx context.Context, aPIServer *v1.APIServer, opts metav1.CreateOptions) (*v1.APIServer, error)
 	Update(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (*v1.APIServer, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (*v1.APIServer, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -35,193 +33,25 @@ type APIServerInterface interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIServer, err error)
 	Apply(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error)
 	APIServerExpansion
 }
 
 // aPIServers implements APIServerInterface
 type aPIServers struct {
-	client rest.Interface
+	*gentype.ClientWithListAndApply[*v1.APIServer, *v1.APIServerList, *configv1.APIServerApplyConfiguration]
 }
 
 // newAPIServers returns a APIServers
 func newAPIServers(c *ConfigV1Client) *aPIServers {
 	return &aPIServers{
-		client: c.RESTClient(),
+		gentype.NewClientWithListAndApply[*v1.APIServer, *v1.APIServerList, *configv1.APIServerApplyConfiguration](
+			"apiservers",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1.APIServer { return &v1.APIServer{} },
+			func() *v1.APIServerList { return &v1.APIServerList{} }),
 	}
-}
-
-// Get takes name of the aPIServer, and returns the corresponding aPIServer object, and an error if there is any.
-func (c *aPIServers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.APIServer, err error) {
-	result = &v1.APIServer{}
-	err = c.client.Get().
-		Resource("apiservers").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of APIServers that match those selectors.
-func (c *aPIServers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.APIServerList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.APIServerList{}
-	err = c.client.Get().
-		Resource("apiservers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested aPIServers.
-func (c *aPIServers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("apiservers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a aPIServer and creates it.  Returns the server's representation of the aPIServer, and an error, if there is any.
-func (c *aPIServers) Create(ctx context.Context, aPIServer *v1.APIServer, opts metav1.CreateOptions) (result *v1.APIServer, err error) {
-	result = &v1.APIServer{}
-	err = c.client.Post().
-		Resource("apiservers").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIServer).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a aPIServer and updates it. Returns the server's representation of the aPIServer, and an error, if there is any.
-func (c *aPIServers) Update(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (result *v1.APIServer, err error) {
-	result = &v1.APIServer{}
-	err = c.client.Put().
-		Resource("apiservers").
-		Name(aPIServer.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIServer).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *aPIServers) UpdateStatus(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (result *v1.APIServer, err error) {
-	result = &v1.APIServer{}
-	err = c.client.Put().
-		Resource("apiservers").
-		Name(aPIServer.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIServer).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the aPIServer and deletes it. Returns an error if one occurs.
-func (c *aPIServers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("apiservers").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *aPIServers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("apiservers").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched aPIServer.
-func (c *aPIServers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIServer, err error) {
-	result = &v1.APIServer{}
-	err = c.client.Patch(pt).
-		Resource("apiservers").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied aPIServer.
-func (c *aPIServers) Apply(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error) {
-	if aPIServer == nil {
-		return nil, fmt.Errorf("aPIServer provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(aPIServer)
-	if err != nil {
-		return nil, err
-	}
-	name := aPIServer.Name
-	if name == nil {
-		return nil, fmt.Errorf("aPIServer.Name must be provided to Apply")
-	}
-	result = &v1.APIServer{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("apiservers").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *aPIServers) ApplyStatus(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error) {
-	if aPIServer == nil {
-		return nil, fmt.Errorf("aPIServer provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(aPIServer)
-	if err != nil {
-		return nil, err
-	}
-
-	name := aPIServer.Name
-	if name == nil {
-		return nil, fmt.Errorf("aPIServer.Name must be provided to Apply")
-	}
-
-	result = &v1.APIServer{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("apiservers").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

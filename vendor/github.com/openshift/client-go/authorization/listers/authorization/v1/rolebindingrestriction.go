@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -22,25 +22,17 @@ type RoleBindingRestrictionLister interface {
 
 // roleBindingRestrictionLister implements the RoleBindingRestrictionLister interface.
 type roleBindingRestrictionLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.RoleBindingRestriction]
 }
 
 // NewRoleBindingRestrictionLister returns a new RoleBindingRestrictionLister.
 func NewRoleBindingRestrictionLister(indexer cache.Indexer) RoleBindingRestrictionLister {
-	return &roleBindingRestrictionLister{indexer: indexer}
-}
-
-// List lists all RoleBindingRestrictions in the indexer.
-func (s *roleBindingRestrictionLister) List(selector labels.Selector) (ret []*v1.RoleBindingRestriction, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RoleBindingRestriction))
-	})
-	return ret, err
+	return &roleBindingRestrictionLister{listers.New[*v1.RoleBindingRestriction](indexer, v1.Resource("rolebindingrestriction"))}
 }
 
 // RoleBindingRestrictions returns an object that can list and get RoleBindingRestrictions.
 func (s *roleBindingRestrictionLister) RoleBindingRestrictions(namespace string) RoleBindingRestrictionNamespaceLister {
-	return roleBindingRestrictionNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return roleBindingRestrictionNamespaceLister{listers.NewNamespaced[*v1.RoleBindingRestriction](s.ResourceIndexer, namespace)}
 }
 
 // RoleBindingRestrictionNamespaceLister helps list and get RoleBindingRestrictions.
@@ -58,26 +50,5 @@ type RoleBindingRestrictionNamespaceLister interface {
 // roleBindingRestrictionNamespaceLister implements the RoleBindingRestrictionNamespaceLister
 // interface.
 type roleBindingRestrictionNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all RoleBindingRestrictions in the indexer for a given namespace.
-func (s roleBindingRestrictionNamespaceLister) List(selector labels.Selector) (ret []*v1.RoleBindingRestriction, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RoleBindingRestriction))
-	})
-	return ret, err
-}
-
-// Get retrieves the RoleBindingRestriction from the indexer for a given namespace and name.
-func (s roleBindingRestrictionNamespaceLister) Get(name string) (*v1.RoleBindingRestriction, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("rolebindingrestriction"), name)
-	}
-	return obj.(*v1.RoleBindingRestriction), nil
+	listers.ResourceIndexer[*v1.RoleBindingRestriction]
 }

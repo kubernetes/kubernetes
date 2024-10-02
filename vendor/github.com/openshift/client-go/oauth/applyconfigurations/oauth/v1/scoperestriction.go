@@ -2,14 +2,14 @@
 
 package v1
 
-// ScopeRestrictionApplyConfiguration represents an declarative configuration of the ScopeRestriction type for use
+// ScopeRestrictionApplyConfiguration represents a declarative configuration of the ScopeRestriction type for use
 // with apply.
 type ScopeRestrictionApplyConfiguration struct {
 	ExactValues []string                                       `json:"literals,omitempty"`
 	ClusterRole *ClusterRoleScopeRestrictionApplyConfiguration `json:"clusterRole,omitempty"`
 }
 
-// ScopeRestrictionApplyConfiguration constructs an declarative configuration of the ScopeRestriction type for use with
+// ScopeRestrictionApplyConfiguration constructs a declarative configuration of the ScopeRestriction type for use with
 // apply.
 func ScopeRestriction() *ScopeRestrictionApplyConfiguration {
 	return &ScopeRestrictionApplyConfiguration{}

@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// CommonSpecApplyConfiguration represents an declarative configuration of the CommonSpec type for use
+// CommonSpecApplyConfiguration represents a declarative configuration of the CommonSpec type for use
 // with apply.
 type CommonSpecApplyConfiguration struct {
 	ServiceAccount            *string                                `json:"serviceAccount,omitempty"`
@@ -22,7 +22,7 @@ type CommonSpecApplyConfiguration struct {
 	MountTrustedCA            *bool                                  `json:"mountTrustedCA,omitempty"`
 }
 
-// CommonSpecApplyConfiguration constructs an declarative configuration of the CommonSpec type for use with
+// CommonSpecApplyConfiguration constructs a declarative configuration of the CommonSpec type for use with
 // apply.
 func CommonSpec() *CommonSpecApplyConfiguration {
 	return &CommonSpecApplyConfiguration{}

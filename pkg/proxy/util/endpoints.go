@@ -18,7 +18,6 @@ package util
 
 import (
 	"net"
-	"strconv"
 
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -45,20 +44,4 @@ func IPPart(s string) string {
 		return ""
 	}
 	return ip.String()
-}
-
-// PortPart returns just the port part of an endpoint string.
-func PortPart(s string) (int, error) {
-	// Must be IP:port
-	_, port, err := net.SplitHostPort(s)
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse host-port", "input", s)
-		return -1, err
-	}
-	portNumber, err := strconv.Atoi(port)
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse port", "input", port)
-		return -1, err
-	}
-	return portNumber, nil
 }

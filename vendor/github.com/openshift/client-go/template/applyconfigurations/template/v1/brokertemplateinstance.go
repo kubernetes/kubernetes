@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// BrokerTemplateInstanceApplyConfiguration represents an declarative configuration of the BrokerTemplateInstance type for use
+// BrokerTemplateInstanceApplyConfiguration represents a declarative configuration of the BrokerTemplateInstance type for use
 // with apply.
 type BrokerTemplateInstanceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -19,7 +19,7 @@ type BrokerTemplateInstanceApplyConfiguration struct {
 	Spec                             *BrokerTemplateInstanceSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// BrokerTemplateInstance constructs an declarative configuration of the BrokerTemplateInstance type for use with
+// BrokerTemplateInstance constructs a declarative configuration of the BrokerTemplateInstance type for use with
 // apply.
 func BrokerTemplateInstance(name string) *BrokerTemplateInstanceApplyConfiguration {
 	b := &BrokerTemplateInstanceApplyConfiguration{}
@@ -228,4 +228,10 @@ func (b *BrokerTemplateInstanceApplyConfiguration) ensureObjectMetaApplyConfigur
 func (b *BrokerTemplateInstanceApplyConfiguration) WithSpec(value *BrokerTemplateInstanceSpecApplyConfiguration) *BrokerTemplateInstanceApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *BrokerTemplateInstanceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

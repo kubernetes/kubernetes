@@ -6,7 +6,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// RollingDeploymentStrategyParamsApplyConfiguration represents an declarative configuration of the RollingDeploymentStrategyParams type for use
+// RollingDeploymentStrategyParamsApplyConfiguration represents a declarative configuration of the RollingDeploymentStrategyParams type for use
 // with apply.
 type RollingDeploymentStrategyParamsApplyConfiguration struct {
 	UpdatePeriodSeconds *int64                           `json:"updatePeriodSeconds,omitempty"`
@@ -18,7 +18,7 @@ type RollingDeploymentStrategyParamsApplyConfiguration struct {
 	Post                *LifecycleHookApplyConfiguration `json:"post,omitempty"`
 }
 
-// RollingDeploymentStrategyParamsApplyConfiguration constructs an declarative configuration of the RollingDeploymentStrategyParams type for use with
+// RollingDeploymentStrategyParamsApplyConfiguration constructs a declarative configuration of the RollingDeploymentStrategyParams type for use with
 // apply.
 func RollingDeploymentStrategyParams() *RollingDeploymentStrategyParamsApplyConfiguration {
 	return &RollingDeploymentStrategyParamsApplyConfiguration{}

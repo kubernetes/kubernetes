@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
-// TODO: move to reconstruct.go and remove old code there.
-
 // readyToUnmount returns true when reconciler can start unmounting volumes.
 func (rc *reconciler) readyToUnmount() bool {
 	// During kubelet startup, all volumes present on disk are added as uncertain to ASW.
@@ -91,18 +89,15 @@ func (rc *reconciler) reconstructVolumes() {
 
 	if len(reconstructedVolumes) > 0 {
 		// Add the volumes to ASW
-		rc.updateStatesNew(reconstructedVolumes)
+		rc.updateStates(reconstructedVolumes)
 
-		// The reconstructed volumes are mounted, hence a previous kubelet must have already put it into node.status.volumesInUse.
-		// Remember to update DSW with this information.
-		rc.volumesNeedReportedInUse = reconstructedVolumeNames
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
 	}
 	klog.V(2).InfoS("Volume reconstruction finished")
 }
 
-func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
+func (rc *reconciler) updateStates(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
 	for _, gvl := range reconstructedVolumes {
 		err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108

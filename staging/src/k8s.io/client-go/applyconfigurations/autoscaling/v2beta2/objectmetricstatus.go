@@ -18,7 +18,7 @@ limitations under the License.
 
 package v2beta2
 
-// ObjectMetricStatusApplyConfiguration represents an declarative configuration of the ObjectMetricStatus type for use
+// ObjectMetricStatusApplyConfiguration represents a declarative configuration of the ObjectMetricStatus type for use
 // with apply.
 type ObjectMetricStatusApplyConfiguration struct {
 	Metric          *MetricIdentifierApplyConfiguration            `json:"metric,omitempty"`
@@ -26,7 +26,7 @@ type ObjectMetricStatusApplyConfiguration struct {
 	DescribedObject *CrossVersionObjectReferenceApplyConfiguration `json:"describedObject,omitempty"`
 }
 
-// ObjectMetricStatusApplyConfiguration constructs an declarative configuration of the ObjectMetricStatus type for use with
+// ObjectMetricStatusApplyConfiguration constructs a declarative configuration of the ObjectMetricStatus type for use with
 // apply.
 func ObjectMetricStatus() *ObjectMetricStatusApplyConfiguration {
 	return &ObjectMetricStatusApplyConfiguration{}

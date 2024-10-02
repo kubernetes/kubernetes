@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -756,7 +757,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 					tc.expectedDesiredReplicas,
 					(int64(tc.reportedLevels[0])*100)/tc.reportedCPURequests[0].MilliValue(), tc.specReplicas), obj.Message)
 			default:
-				assert.False(t, true, fmt.Sprintf("Unexpected event: %s / %s", obj.Reason, obj.Message))
+				assert.False(t, true, "Unexpected event: %s / %s", obj.Reason, obj.Message)
 			}
 		}
 		tc.eventCreated = true
@@ -2816,6 +2817,10 @@ func TestUpscaleCap(t *testing.T) {
 }
 
 func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:     1,
 		maxReplicas:     20,
@@ -2847,6 +2852,10 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 }
 
 func TestMoreReplicasThanSpecNoScale(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             8,
@@ -3854,7 +3863,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, calculated, int32(2))
+	assert.Equal(t, int32(2), calculated)
 }
 
 func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
@@ -3876,7 +3885,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 			},
 		},
 	})
-	assert.Equal(t, calculated, int32(3))
+	assert.Equal(t, int32(3), calculated)
 }
 
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
@@ -5284,5 +5293,5 @@ func TestMultipleHPAs(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, hpaCount, len(processedHPA), "Expected to process all HPAs")
+	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 }

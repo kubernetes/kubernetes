@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// GroupApplyConfiguration represents an declarative configuration of the Group type for use
+// GroupApplyConfiguration represents a declarative configuration of the Group type for use
 // with apply.
 type GroupApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -19,7 +19,7 @@ type GroupApplyConfiguration struct {
 	Users                            *userv1.OptionalNames `json:"users,omitempty"`
 }
 
-// Group constructs an declarative configuration of the Group type for use with
+// Group constructs a declarative configuration of the Group type for use with
 // apply.
 func Group(name string) *GroupApplyConfiguration {
 	b := &GroupApplyConfiguration{}
@@ -228,4 +228,10 @@ func (b *GroupApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 func (b *GroupApplyConfiguration) WithUsers(value userv1.OptionalNames) *GroupApplyConfiguration {
 	b.Users = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *GroupApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

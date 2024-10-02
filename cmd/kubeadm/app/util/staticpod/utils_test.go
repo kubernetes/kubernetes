@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -573,54 +572,6 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 	}
 	if volumeMountSlice[1].Name != "foo" {
 		t.Errorf("Expected second volume name \"foo\", got %s", volumeMountSlice[1].Name)
-	}
-}
-
-func TestGetExtraParameters(t *testing.T) {
-	var tests = []struct {
-		name      string
-		overrides map[string]string
-		defaults  map[string]string
-		expected  []string
-	}{
-		{
-			name: "with admission-control default NamespaceLifecycle",
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-			},
-			defaults: map[string]string{
-				"admission-control": "NamespaceLifecycle",
-				"allow-privileged":  "true",
-			},
-			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--allow-privileged=true",
-			},
-		},
-		{
-			name: "without admission-control default",
-			overrides: map[string]string{
-				"admission-control": "NamespaceLifecycle,LimitRanger",
-			},
-			defaults: map[string]string{
-				"allow-privileged": "true",
-			},
-			expected: []string{
-				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--allow-privileged=true",
-			},
-		},
-	}
-
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			actual := GetExtraParameters(rt.overrides, rt.defaults)
-			sort.Strings(actual)
-			sort.Strings(rt.expected)
-			if !reflect.DeepEqual(actual, rt.expected) {
-				t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
-			}
-		})
 	}
 }
 

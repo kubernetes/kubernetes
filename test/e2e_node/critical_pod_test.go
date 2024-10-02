@@ -91,7 +91,7 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 			}
 		})
 
-		f.It("should add DisruptionTarget condition to the preempted pod", nodefeature.PodDisruptionConditions, func(ctx context.Context) {
+		f.It("should add DisruptionTarget condition to the preempted pod", func(ctx context.Context) {
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(ctx, f)
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{

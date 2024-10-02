@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ImageDigestMirrorsApplyConfiguration represents an declarative configuration of the ImageDigestMirrors type for use
+// ImageDigestMirrorsApplyConfiguration represents a declarative configuration of the ImageDigestMirrors type for use
 // with apply.
 type ImageDigestMirrorsApplyConfiguration struct {
 	Source             *string                `json:"source,omitempty"`
@@ -14,7 +14,7 @@ type ImageDigestMirrorsApplyConfiguration struct {
 	MirrorSourcePolicy *v1.MirrorSourcePolicy `json:"mirrorSourcePolicy,omitempty"`
 }
 
-// ImageDigestMirrorsApplyConfiguration constructs an declarative configuration of the ImageDigestMirrors type for use with
+// ImageDigestMirrorsApplyConfiguration constructs a declarative configuration of the ImageDigestMirrors type for use with
 // apply.
 func ImageDigestMirrors() *ImageDigestMirrorsApplyConfiguration {
 	return &ImageDigestMirrorsApplyConfiguration{}

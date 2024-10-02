@@ -107,3 +107,57 @@ func getMainModuleAnd114(ctx context.Context, inv Invocation, r *Runner) (*Modul
 	}
 	return mod, lines[4] == "go1.14", nil
 }
+
+// WorkspaceVendorEnabled reports whether workspace vendoring is enabled. It takes a *Runner to execute Go commands
+// with the supplied context.Context and Invocation. The Invocation can contain pre-defined fields,
+// of which only Verb and Args are modified to run the appropriate Go command.
+// Inspired by setDefaultBuildMod in modload/init.go
+func WorkspaceVendorEnabled(ctx context.Context, inv Invocation, r *Runner) (bool, []*ModuleJSON, error) {
+	inv.Verb = "env"
+	inv.Args = []string{"GOWORK"}
+	stdout, err := r.Run(ctx, inv)
+	if err != nil {
+		return false, nil, err
+	}
+	goWork := string(bytes.TrimSpace(stdout.Bytes()))
+	if fi, err := os.Stat(filepath.Join(filepath.Dir(goWork), "vendor")); err == nil && fi.IsDir() {
+		mainMods, err := getWorkspaceMainModules(ctx, inv, r)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, mainMods, nil
+	}
+	return false, nil, nil
+}
+
+// getWorkspaceMainModules gets the main modules' information.
+// This is the information needed to figure out if vendoring should be enabled.
+func getWorkspaceMainModules(ctx context.Context, inv Invocation, r *Runner) ([]*ModuleJSON, error) {
+	const format = `{{.Path}}
+{{.Dir}}
+{{.GoMod}}
+{{.GoVersion}}
+`
+	inv.Verb = "list"
+	inv.Args = []string{"-m", "-f", format}
+	stdout, err := r.Run(ctx, inv)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+	if len(lines) < 4 {
+		return nil, fmt.Errorf("unexpected stdout: %q", stdout.String())
+	}
+	mods := make([]*ModuleJSON, 0, len(lines)/4)
+	for i := 0; i < len(lines); i += 4 {
+		mods = append(mods, &ModuleJSON{
+			Path:      lines[i],
+			Dir:       lines[i+1],
+			GoMod:     lines[i+2],
+			GoVersion: lines[i+3],
+			Main:      true,
+		})
+	}
+	return mods, nil
+}

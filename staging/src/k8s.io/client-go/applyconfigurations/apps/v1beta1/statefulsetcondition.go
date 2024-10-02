@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StatefulSetConditionApplyConfiguration represents an declarative configuration of the StatefulSetCondition type for use
+// StatefulSetConditionApplyConfiguration represents a declarative configuration of the StatefulSetCondition type for use
 // with apply.
 type StatefulSetConditionApplyConfiguration struct {
 	Type               *v1beta1.StatefulSetConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type StatefulSetConditionApplyConfiguration struct {
 	Message            *string                           `json:"message,omitempty"`
 }
 
-// StatefulSetConditionApplyConfiguration constructs an declarative configuration of the StatefulSetCondition type for use with
+// StatefulSetConditionApplyConfiguration constructs a declarative configuration of the StatefulSetCondition type for use with
 // apply.
 func StatefulSetCondition() *StatefulSetConditionApplyConfiguration {
 	return &StatefulSetConditionApplyConfiguration{}

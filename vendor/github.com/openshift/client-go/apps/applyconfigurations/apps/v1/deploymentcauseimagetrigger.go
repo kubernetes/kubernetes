@@ -6,13 +6,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// DeploymentCauseImageTriggerApplyConfiguration represents an declarative configuration of the DeploymentCauseImageTrigger type for use
+// DeploymentCauseImageTriggerApplyConfiguration represents a declarative configuration of the DeploymentCauseImageTrigger type for use
 // with apply.
 type DeploymentCauseImageTriggerApplyConfiguration struct {
 	From *v1.ObjectReference `json:"from,omitempty"`
 }
 
-// DeploymentCauseImageTriggerApplyConfiguration constructs an declarative configuration of the DeploymentCauseImageTrigger type for use with
+// DeploymentCauseImageTriggerApplyConfiguration constructs a declarative configuration of the DeploymentCauseImageTrigger type for use with
 // apply.
 func DeploymentCauseImageTrigger() *DeploymentCauseImageTriggerApplyConfiguration {
 	return &DeploymentCauseImageTriggerApplyConfiguration{}

@@ -78,6 +78,8 @@ const (
 	ECHOPRT                          = 0x400
 	EFD_CLOEXEC                      = 0x80000
 	EFD_NONBLOCK                     = 0x800
+	EPIOCGPARAMS                     = 0x80088a02
+	EPIOCSPARAMS                     = 0x40088a01
 	EPOLL_CLOEXEC                    = 0x80000
 	EXTPROC                          = 0x10000
 	FF1                              = 0x8000
@@ -118,6 +120,7 @@ const (
 	IXOFF                            = 0x1000
 	IXON                             = 0x400
 	MAP_32BIT                        = 0x40
+	MAP_ABOVE4G                      = 0x80
 	MAP_ANON                         = 0x20
 	MAP_ANONYMOUS                    = 0x20
 	MAP_DENYWRITE                    = 0x800

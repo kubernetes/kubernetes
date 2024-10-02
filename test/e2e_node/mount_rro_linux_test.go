@@ -36,7 +36,7 @@ import (
 
 // Usage:
 // make test-e2e-node TEST_ARGS='--service-feature-gates=RecursiveReadOnlyMounts=true --kubelet-flags="--feature-gates=RecursiveReadOnlyMounts=true"' FOCUS="Mount recursive read-only" SKIP=""
-var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSerial(), nodefeature.RecursiveReadOnlyMounts, func() {
+var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", nodefeature.RecursiveReadOnlyMounts, func() {
 	f := framework.NewDefaultFramework("mount-rro")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Mount recursive read-only", func() {

@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// JenkinsPipelineBuildStrategyApplyConfiguration represents an declarative configuration of the JenkinsPipelineBuildStrategy type for use
+// JenkinsPipelineBuildStrategyApplyConfiguration represents a declarative configuration of the JenkinsPipelineBuildStrategy type for use
 // with apply.
 type JenkinsPipelineBuildStrategyApplyConfiguration struct {
 	JenkinsfilePath *string     `json:"jenkinsfilePath,omitempty"`
@@ -14,7 +14,7 @@ type JenkinsPipelineBuildStrategyApplyConfiguration struct {
 	Env             []v1.EnvVar `json:"env,omitempty"`
 }
 
-// JenkinsPipelineBuildStrategyApplyConfiguration constructs an declarative configuration of the JenkinsPipelineBuildStrategy type for use with
+// JenkinsPipelineBuildStrategyApplyConfiguration constructs a declarative configuration of the JenkinsPipelineBuildStrategy type for use with
 // apply.
 func JenkinsPipelineBuildStrategy() *JenkinsPipelineBuildStrategyApplyConfiguration {
 	return &JenkinsPipelineBuildStrategyApplyConfiguration{}

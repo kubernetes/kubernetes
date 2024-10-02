@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -40,11 +40,11 @@ func newTestAllocator(cidr *net.IPNet) (*Allocator, error) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
-	ipInformer := informerFactory.Networking().V1alpha1().IPAddresses()
+	ipInformer := informerFactory.Networking().V1beta1().IPAddresses()
 	ipStore := ipInformer.Informer().GetIndexer()
 
 	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
-		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1alpha1.IPAddress)
+		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1beta1.IPAddress)
 		_, exists, err := ipStore.GetByKey(ip.Name)
 		if exists && err != nil {
 			return false, nil, fmt.Errorf("ip already exist")
@@ -56,15 +56,15 @@ func newTestAllocator(cidr *net.IPNet) (*Allocator, error) {
 	client.PrependReactor("delete", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		name := action.(k8stesting.DeleteAction).GetName()
 		obj, exists, err := ipStore.GetByKey(name)
-		ip := &networkingv1alpha1.IPAddress{}
+		ip := &networkingv1beta1.IPAddress{}
 		if exists && err == nil {
-			ip = obj.(*networkingv1alpha1.IPAddress)
+			ip = obj.(*networkingv1beta1.IPAddress)
 			err = ipStore.Delete(ip)
 		}
 		return false, ip, err
 	}))
 
-	c, err := NewIPAllocator(cidr, client.NetworkingV1alpha1(), ipInformer)
+	c, err := NewIPAllocator(cidr, client.NetworkingV1beta1(), ipInformer)
 	if err != nil {
 		return nil, err
 	}

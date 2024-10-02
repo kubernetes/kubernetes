@@ -33,7 +33,8 @@ type nftablesError struct {
 // wrapError wraps an error resulting from running nft
 func wrapError(err error) error {
 	nerr := &nftablesError{wrapped: err, msg: err.Error()}
-	if ee, ok := err.(*exec.ExitError); ok {
+	ee := &exec.ExitError{}
+	if errors.As(err, &ee) {
 		if len(ee.Stderr) > 0 {
 			nerr.msg = string(ee.Stderr)
 			eol := strings.Index(nerr.msg, "\n")

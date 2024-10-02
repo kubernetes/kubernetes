@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterOperatorStatusConditionApplyConfiguration represents an declarative configuration of the ClusterOperatorStatusCondition type for use
+// ClusterOperatorStatusConditionApplyConfiguration represents a declarative configuration of the ClusterOperatorStatusCondition type for use
 // with apply.
 type ClusterOperatorStatusConditionApplyConfiguration struct {
 	Type               *v1.ClusterStatusConditionType `json:"type,omitempty"`
@@ -17,7 +17,7 @@ type ClusterOperatorStatusConditionApplyConfiguration struct {
 	Message            *string                        `json:"message,omitempty"`
 }
 
-// ClusterOperatorStatusConditionApplyConfiguration constructs an declarative configuration of the ClusterOperatorStatusCondition type for use with
+// ClusterOperatorStatusConditionApplyConfiguration constructs a declarative configuration of the ClusterOperatorStatusCondition type for use with
 // apply.
 func ClusterOperatorStatusCondition() *ClusterOperatorStatusConditionApplyConfiguration {
 	return &ClusterOperatorStatusConditionApplyConfiguration{}

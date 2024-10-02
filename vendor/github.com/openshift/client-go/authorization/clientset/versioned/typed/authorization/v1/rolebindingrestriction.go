@@ -4,9 +4,6 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "github.com/openshift/api/authorization/v1"
 	authorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
@@ -14,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // RoleBindingRestrictionsGetter has a method to return a RoleBindingRestrictionInterface.
@@ -39,154 +36,18 @@ type RoleBindingRestrictionInterface interface {
 
 // roleBindingRestrictions implements RoleBindingRestrictionInterface
 type roleBindingRestrictions struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.RoleBindingRestriction, *v1.RoleBindingRestrictionList, *authorizationv1.RoleBindingRestrictionApplyConfiguration]
 }
 
 // newRoleBindingRestrictions returns a RoleBindingRestrictions
 func newRoleBindingRestrictions(c *AuthorizationV1Client, namespace string) *roleBindingRestrictions {
 	return &roleBindingRestrictions{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.RoleBindingRestriction, *v1.RoleBindingRestrictionList, *authorizationv1.RoleBindingRestrictionApplyConfiguration](
+			"rolebindingrestrictions",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.RoleBindingRestriction { return &v1.RoleBindingRestriction{} },
+			func() *v1.RoleBindingRestrictionList { return &v1.RoleBindingRestrictionList{} }),
 	}
-}
-
-// Get takes name of the roleBindingRestriction, and returns the corresponding roleBindingRestriction object, and an error if there is any.
-func (c *roleBindingRestrictions) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RoleBindingRestriction, err error) {
-	result = &v1.RoleBindingRestriction{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of RoleBindingRestrictions that match those selectors.
-func (c *roleBindingRestrictions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.RoleBindingRestrictionList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.RoleBindingRestrictionList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested roleBindingRestrictions.
-func (c *roleBindingRestrictions) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a roleBindingRestriction and creates it.  Returns the server's representation of the roleBindingRestriction, and an error, if there is any.
-func (c *roleBindingRestrictions) Create(ctx context.Context, roleBindingRestriction *v1.RoleBindingRestriction, opts metav1.CreateOptions) (result *v1.RoleBindingRestriction, err error) {
-	result = &v1.RoleBindingRestriction{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(roleBindingRestriction).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a roleBindingRestriction and updates it. Returns the server's representation of the roleBindingRestriction, and an error, if there is any.
-func (c *roleBindingRestrictions) Update(ctx context.Context, roleBindingRestriction *v1.RoleBindingRestriction, opts metav1.UpdateOptions) (result *v1.RoleBindingRestriction, err error) {
-	result = &v1.RoleBindingRestriction{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		Name(roleBindingRestriction.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(roleBindingRestriction).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the roleBindingRestriction and deletes it. Returns an error if one occurs.
-func (c *roleBindingRestrictions) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *roleBindingRestrictions) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched roleBindingRestriction.
-func (c *roleBindingRestrictions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBindingRestriction, err error) {
-	result = &v1.RoleBindingRestriction{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied roleBindingRestriction.
-func (c *roleBindingRestrictions) Apply(ctx context.Context, roleBindingRestriction *authorizationv1.RoleBindingRestrictionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.RoleBindingRestriction, err error) {
-	if roleBindingRestriction == nil {
-		return nil, fmt.Errorf("roleBindingRestriction provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(roleBindingRestriction)
-	if err != nil {
-		return nil, err
-	}
-	name := roleBindingRestriction.Name
-	if name == nil {
-		return nil, fmt.Errorf("roleBindingRestriction.Name must be provided to Apply")
-	}
-	result = &v1.RoleBindingRestriction{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("rolebindingrestrictions").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

@@ -2,13 +2,13 @@
 
 package v1
 
-// GitLabWebHookCauseApplyConfiguration represents an declarative configuration of the GitLabWebHookCause type for use
+// GitLabWebHookCauseApplyConfiguration represents a declarative configuration of the GitLabWebHookCause type for use
 // with apply.
 type GitLabWebHookCauseApplyConfiguration struct {
 	CommonWebHookCauseApplyConfiguration `json:",inline"`
 }
 
-// GitLabWebHookCauseApplyConfiguration constructs an declarative configuration of the GitLabWebHookCause type for use with
+// GitLabWebHookCauseApplyConfiguration constructs a declarative configuration of the GitLabWebHookCause type for use with
 // apply.
 func GitLabWebHookCause() *GitLabWebHookCauseApplyConfiguration {
 	return &GitLabWebHookCauseApplyConfiguration{}

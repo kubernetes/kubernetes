@@ -41,7 +41,7 @@ const ControllerName = "validatingadmissionpolicy-status"
 // This controller runs type checks against referred types for each policy definition.
 type Controller struct {
 	policyInformer informerv1.ValidatingAdmissionPolicyInformer
-	policyQueue    workqueue.RateLimitingInterface
+	policyQueue    workqueue.TypedRateLimitingInterface[string]
 	policySynced   cache.InformerSynced
 	policyClient   admissionregistrationv1.ValidatingAdmissionPolicyInterface
 
@@ -69,9 +69,12 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
 	c := &Controller{
 		policyInformer: policyInformer,
-		policyQueue:    workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: ControllerName}),
-		policyClient:   policyClient,
-		typeChecker:    typeChecker,
+		policyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: ControllerName},
+		),
+		policyClient: policyClient,
+		typeChecker:  typeChecker,
 	}
 	reg, err := policyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -112,10 +115,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer c.policyQueue.Done(key)
 
 	err := func() error {
-		key, ok := key.(string)
-		if !ok {
-			return fmt.Errorf("expect a string but got %v", key)
-		}
 		policy, err := c.policyInformer.Lister().Get(key)
 		if err != nil {
 			if kerrors.IsNotFound(err) {

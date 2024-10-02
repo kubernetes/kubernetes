@@ -27,20 +27,22 @@ var featuregatesKind = v1.SchemeGroupVersion.WithKind("FeatureGate")
 
 // Get takes name of the featureGate, and returns the corresponding featureGate object, and an error if there is any.
 func (c *FakeFeatureGates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.FeatureGate, err error) {
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(featuregatesResource, name), &v1.FeatureGate{})
+		Invokes(testing.NewRootGetActionWithOptions(featuregatesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
 
 // List takes label and field selectors, and returns the list of FeatureGates that match those selectors.
 func (c *FakeFeatureGates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.FeatureGateList, err error) {
+	emptyResult := &v1.FeatureGateList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(featuregatesResource, featuregatesKind, opts), &v1.FeatureGateList{})
+		Invokes(testing.NewRootListActionWithOptions(featuregatesResource, featuregatesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeFeatureGates) List(ctx context.Context, opts metav1.ListOptions) (r
 // Watch returns a watch.Interface that watches the requested featureGates.
 func (c *FakeFeatureGates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(featuregatesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(featuregatesResource, opts))
 }
 
 // Create takes the representation of a featureGate and creates it.  Returns the server's representation of the featureGate, and an error, if there is any.
 func (c *FakeFeatureGates) Create(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.CreateOptions) (result *v1.FeatureGate, err error) {
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(featuregatesResource, featureGate), &v1.FeatureGate{})
+		Invokes(testing.NewRootCreateActionWithOptions(featuregatesResource, featureGate, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
 
 // Update takes the representation of a featureGate and updates it. Returns the server's representation of the featureGate, and an error, if there is any.
 func (c *FakeFeatureGates) Update(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (result *v1.FeatureGate, err error) {
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(featuregatesResource, featureGate), &v1.FeatureGate{})
+		Invokes(testing.NewRootUpdateActionWithOptions(featuregatesResource, featureGate, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFeatureGates) UpdateStatus(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (*v1.FeatureGate, error) {
+func (c *FakeFeatureGates) UpdateStatus(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (result *v1.FeatureGate, err error) {
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(featuregatesResource, "status", featureGate), &v1.FeatureGate{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(featuregatesResource, "status", featureGate, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
@@ -102,7 +107,7 @@ func (c *FakeFeatureGates) Delete(ctx context.Context, name string, opts metav1.
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeFeatureGates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(featuregatesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(featuregatesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.FeatureGateList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeFeatureGates) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched featureGate.
 func (c *FakeFeatureGates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.FeatureGate, err error) {
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(featuregatesResource, name, pt, data, subresources...), &v1.FeatureGate{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
@@ -131,10 +137,11 @@ func (c *FakeFeatureGates) Apply(ctx context.Context, featureGate *configv1.Feat
 	if name == nil {
 		return nil, fmt.Errorf("featureGate.Name must be provided to Apply")
 	}
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(featuregatesResource, *name, types.ApplyPatchType, data), &v1.FeatureGate{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }
@@ -153,10 +160,11 @@ func (c *FakeFeatureGates) ApplyStatus(ctx context.Context, featureGate *configv
 	if name == nil {
 		return nil, fmt.Errorf("featureGate.Name must be provided to Apply")
 	}
+	emptyResult := &v1.FeatureGate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(featuregatesResource, *name, types.ApplyPatchType, data, "status"), &v1.FeatureGate{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.FeatureGate), err
 }

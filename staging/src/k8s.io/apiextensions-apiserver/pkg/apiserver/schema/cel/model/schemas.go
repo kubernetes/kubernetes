@@ -49,9 +49,11 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 		return s
 	}
 	result := &schema.Structural{
-		Generic:         s.Generic,
-		Extensions:      s.Extensions,
-		ValueValidation: s.ValueValidation,
+		AdditionalProperties: s.AdditionalProperties,
+		Generic:              s.Generic,
+		Extensions:           s.Extensions,
+		ValueValidation:      s.ValueValidation,
+		ValidationExtensions: s.ValidationExtensions,
 	}
 	props := make(map[string]schema.Structural, len(s.Properties))
 	for k, prop := range s.Properties {

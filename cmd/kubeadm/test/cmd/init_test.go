@@ -156,6 +156,11 @@ func TestCmdInitConfig(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "can load v1beta4 config",
+			args:     "--config=testdata/init/v1beta4.yaml",
+			expected: true,
+		},
+		{
 			name:     "don't allow mixed arguments v1beta3",
 			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta3.yaml",
 			expected: false,

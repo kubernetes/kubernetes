@@ -6,7 +6,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// SchedulerSpecApplyConfiguration represents an declarative configuration of the SchedulerSpec type for use
+// SchedulerSpecApplyConfiguration represents a declarative configuration of the SchedulerSpec type for use
 // with apply.
 type SchedulerSpecApplyConfiguration struct {
 	Policy                *ConfigMapNameReferenceApplyConfiguration `json:"policy,omitempty"`
@@ -16,7 +16,7 @@ type SchedulerSpecApplyConfiguration struct {
 	MastersSchedulable    *bool                                     `json:"mastersSchedulable,omitempty"`
 }
 
-// SchedulerSpecApplyConfiguration constructs an declarative configuration of the SchedulerSpec type for use with
+// SchedulerSpecApplyConfiguration constructs a declarative configuration of the SchedulerSpec type for use with
 // apply.
 func SchedulerSpec() *SchedulerSpecApplyConfiguration {
 	return &SchedulerSpecApplyConfiguration{}

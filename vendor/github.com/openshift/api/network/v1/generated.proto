@@ -11,9 +11,9 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "github.com/openshift/api/network/v1";
 
-// ClusterNetwork describes the cluster network. There is normally only one object of this type,
-// named "default", which is created by the SDN network plugin based on the master configuration
-// when the cluster is brought up for the first time.
+// ClusterNetwork was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -27,7 +27,7 @@ option go_package = "github.com/openshift/api/network/v1";
 message ClusterNetwork {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Network is a CIDR string specifying the global overlay network's L3 space
   // +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
@@ -85,17 +85,15 @@ message ClusterNetworkEntry {
 message ClusterNetworkList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of cluster networks
   repeated ClusterNetwork items = 2;
 }
 
-// EgressNetworkPolicy describes the current egress network policy for a Namespace. When using
-// the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address
-// outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's
-// namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy
-// is present) then the traffic will be allowed by default.
+// EgressNetworkPolicy was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -106,7 +104,7 @@ message ClusterNetworkList {
 message EgressNetworkPolicy {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification of the current egress network policy
   optional EgressNetworkPolicySpec spec = 2;
@@ -119,7 +117,7 @@ message EgressNetworkPolicy {
 message EgressNetworkPolicyList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of policies
   repeated EgressNetworkPolicy items = 2;
@@ -154,8 +152,9 @@ message EgressNetworkPolicySpec {
   repeated EgressNetworkPolicyRule egress = 1;
 }
 
-// HostSubnet describes the container subnet network on a node. The HostSubnet object must have the
-// same name as the Node object it corresponds to.
+// HostSubnet was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -171,7 +170,7 @@ message EgressNetworkPolicySpec {
 message HostSubnet {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Host is the name of the node. (This is the same as the object's name, but both fields must be set.)
   // +kubebuilder:validation:Pattern=`^[a-z0-9.-]+$`
@@ -205,15 +204,15 @@ message HostSubnet {
 message HostSubnetList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of host subnets
   repeated HostSubnet items = 2;
 }
 
-// NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant
-// plugin, every Namespace will have a corresponding NetNamespace object with the same name.
-// (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)
+// NetNamespace was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -226,7 +225,7 @@ message HostSubnetList {
 message NetNamespace {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // NetName is the name of the network namespace. (This is the same as the object's name, but both fields must be set.)
   // +kubebuilder:validation:Pattern=`^[a-z0-9.-]+$`
@@ -250,7 +249,7 @@ message NetNamespace {
 message NetNamespaceList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of net namespaces
   repeated NetNamespace items = 2;

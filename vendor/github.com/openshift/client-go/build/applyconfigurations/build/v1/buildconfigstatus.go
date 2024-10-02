@@ -2,14 +2,14 @@
 
 package v1
 
-// BuildConfigStatusApplyConfiguration represents an declarative configuration of the BuildConfigStatus type for use
+// BuildConfigStatusApplyConfiguration represents a declarative configuration of the BuildConfigStatus type for use
 // with apply.
 type BuildConfigStatusApplyConfiguration struct {
 	LastVersion         *int64                                       `json:"lastVersion,omitempty"`
 	ImageChangeTriggers []ImageChangeTriggerStatusApplyConfiguration `json:"imageChangeTriggers,omitempty"`
 }
 
-// BuildConfigStatusApplyConfiguration constructs an declarative configuration of the BuildConfigStatus type for use with
+// BuildConfigStatusApplyConfiguration constructs a declarative configuration of the BuildConfigStatus type for use with
 // apply.
 func BuildConfigStatus() *BuildConfigStatusApplyConfiguration {
 	return &BuildConfigStatusApplyConfiguration{}

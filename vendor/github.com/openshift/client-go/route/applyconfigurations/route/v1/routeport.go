@@ -6,13 +6,13 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// RoutePortApplyConfiguration represents an declarative configuration of the RoutePort type for use
+// RoutePortApplyConfiguration represents a declarative configuration of the RoutePort type for use
 // with apply.
 type RoutePortApplyConfiguration struct {
 	TargetPort *intstr.IntOrString `json:"targetPort,omitempty"`
 }
 
-// RoutePortApplyConfiguration constructs an declarative configuration of the RoutePort type for use with
+// RoutePortApplyConfiguration constructs a declarative configuration of the RoutePort type for use with
 // apply.
 func RoutePort() *RoutePortApplyConfiguration {
 	return &RoutePortApplyConfiguration{}

@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// DNSPlatformSpecApplyConfiguration represents an declarative configuration of the DNSPlatformSpec type for use
+// DNSPlatformSpecApplyConfiguration represents a declarative configuration of the DNSPlatformSpec type for use
 // with apply.
 type DNSPlatformSpecApplyConfiguration struct {
 	Type *v1.PlatformType              `json:"type,omitempty"`
 	AWS  *AWSDNSSpecApplyConfiguration `json:"aws,omitempty"`
 }
 
-// DNSPlatformSpecApplyConfiguration constructs an declarative configuration of the DNSPlatformSpec type for use with
+// DNSPlatformSpecApplyConfiguration constructs a declarative configuration of the DNSPlatformSpec type for use with
 // apply.
 func DNSPlatformSpec() *DNSPlatformSpecApplyConfiguration {
 	return &DNSPlatformSpecApplyConfiguration{}

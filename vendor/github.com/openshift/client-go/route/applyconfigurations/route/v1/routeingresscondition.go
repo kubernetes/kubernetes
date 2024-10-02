@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RouteIngressConditionApplyConfiguration represents an declarative configuration of the RouteIngressCondition type for use
+// RouteIngressConditionApplyConfiguration represents a declarative configuration of the RouteIngressCondition type for use
 // with apply.
 type RouteIngressConditionApplyConfiguration struct {
 	Type               *v1.RouteIngressConditionType `json:"type,omitempty"`
@@ -18,7 +18,7 @@ type RouteIngressConditionApplyConfiguration struct {
 	LastTransitionTime *metav1.Time                  `json:"lastTransitionTime,omitempty"`
 }
 
-// RouteIngressConditionApplyConfiguration constructs an declarative configuration of the RouteIngressCondition type for use with
+// RouteIngressConditionApplyConfiguration constructs a declarative configuration of the RouteIngressCondition type for use with
 // apply.
 func RouteIngressCondition() *RouteIngressConditionApplyConfiguration {
 	return &RouteIngressConditionApplyConfiguration{}

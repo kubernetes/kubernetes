@@ -29,10 +29,12 @@ func TestProcMount(t *testing.T) {
 
 	hostUsers := false
 	tests := []struct {
-		name         string
-		pod          *corev1.Pod
-		expectReason string
-		expectDetail string
+		name           string
+		pod            *corev1.Pod
+		expectReason   string
+		expectDetail   string
+		expectAllowed  bool
+		relaxForUserNS bool
 	}{
 		{
 			name: "procMount",
@@ -46,16 +48,40 @@ func TestProcMount(t *testing.T) {
 				},
 				HostUsers: &hostUsers,
 			}},
-			expectReason: `procMount`,
-			expectDetail: `containers "d", "e" must not set securityContext.procMount to "Unmasked", "other"`,
+			expectReason:  `procMount`,
+			expectAllowed: false,
+			expectDetail:  `containers "d", "e" must not set securityContext.procMount to "Unmasked", "other"`,
+		},
+		{
+			name: "procMount",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "a", SecurityContext: nil},
+					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{ProcMount: &defaultValue}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{ProcMount: &unmaskedValue}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{ProcMount: &otherValue}},
+				},
+				HostUsers: &hostUsers,
+			}},
+			expectReason:   "",
+			expectDetail:   "",
+			expectAllowed:  true,
+			relaxForUserNS: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.relaxForUserNS {
+				RelaxPolicyForUserNamespacePods(true)
+				t.Cleanup(func() {
+					RelaxPolicyForUserNamespacePods(false)
+				})
+			}
 			result := procMount_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
-			if result.Allowed {
-				t.Fatal("expected disallowed")
+			if result.Allowed != tc.expectAllowed {
+				t.Fatalf("expected Allowed to be %v was %v", tc.expectAllowed, result.Allowed)
 			}
 			if e, a := tc.expectReason, result.ForbiddenReason; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)

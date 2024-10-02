@@ -2,7 +2,7 @@
 
 package v1
 
-// OAuthSpecApplyConfiguration represents an declarative configuration of the OAuthSpec type for use
+// OAuthSpecApplyConfiguration represents a declarative configuration of the OAuthSpec type for use
 // with apply.
 type OAuthSpecApplyConfiguration struct {
 	IdentityProviders []IdentityProviderApplyConfiguration `json:"identityProviders,omitempty"`
@@ -10,7 +10,7 @@ type OAuthSpecApplyConfiguration struct {
 	Templates         *OAuthTemplatesApplyConfiguration    `json:"templates,omitempty"`
 }
 
-// OAuthSpecApplyConfiguration constructs an declarative configuration of the OAuthSpec type for use with
+// OAuthSpecApplyConfiguration constructs a declarative configuration of the OAuthSpec type for use with
 // apply.
 func OAuthSpec() *OAuthSpecApplyConfiguration {
 	return &OAuthSpecApplyConfiguration{}

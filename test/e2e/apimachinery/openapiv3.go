@@ -42,9 +42,6 @@ import (
 	samplev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	// ensure libs have a chance to initialize
-	_ "github.com/stretchr/testify/assert"
 )
 
 var _ = SIGDescribe("OpenAPIV3", func() {

@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// AuthenticationApplyConfiguration represents an declarative configuration of the Authentication type for use
+// AuthenticationApplyConfiguration represents a declarative configuration of the Authentication type for use
 // with apply.
 type AuthenticationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type AuthenticationApplyConfiguration struct {
 	Status                           *AuthenticationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Authentication constructs an declarative configuration of the Authentication type for use with
+// Authentication constructs a declarative configuration of the Authentication type for use with
 // apply.
 func Authentication(name string) *AuthenticationApplyConfiguration {
 	b := &AuthenticationApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *AuthenticationApplyConfiguration) WithSpec(value *AuthenticationSpecApp
 func (b *AuthenticationApplyConfiguration) WithStatus(value *AuthenticationStatusApplyConfiguration) *AuthenticationApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *AuthenticationApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

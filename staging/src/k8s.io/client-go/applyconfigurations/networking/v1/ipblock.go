@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// IPBlockApplyConfiguration represents an declarative configuration of the IPBlock type for use
+// IPBlockApplyConfiguration represents a declarative configuration of the IPBlock type for use
 // with apply.
 type IPBlockApplyConfiguration struct {
 	CIDR   *string  `json:"cidr,omitempty"`
 	Except []string `json:"except,omitempty"`
 }
 
-// IPBlockApplyConfiguration constructs an declarative configuration of the IPBlock type for use with
+// IPBlockApplyConfiguration constructs a declarative configuration of the IPBlock type for use with
 // apply.
 func IPBlock() *IPBlockApplyConfiguration {
 	return &IPBlockApplyConfiguration{}

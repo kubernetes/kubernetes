@@ -27,6 +27,7 @@ type PodSecurityContextAccessor interface {
 	HostNetwork() bool
 	HostPID() bool
 	HostIPC() bool
+	HostUsers() *bool
 	SELinuxOptions() *api.SELinuxOptions
 	RunAsUser() *int64
 	RunAsGroup() *int64
@@ -43,6 +44,7 @@ type PodSecurityContextMutator interface {
 	SetHostNetwork(bool)
 	SetHostPID(bool)
 	SetHostIPC(bool)
+	SetHostUsers(*bool)
 	SetSELinuxOptions(*api.SELinuxOptions)
 	SetRunAsUser(*int64)
 	SetRunAsGroup(*int64)
@@ -119,6 +121,19 @@ func (w *podSecurityContextWrapper) SetHostIPC(v bool) {
 	}
 	w.ensurePodSC()
 	w.podSC.HostIPC = v
+}
+func (w *podSecurityContextWrapper) HostUsers() *bool {
+	if w.podSC == nil {
+		return nil
+	}
+	return w.podSC.HostUsers
+}
+func (w *podSecurityContextWrapper) SetHostUsers(v *bool) {
+	if w.podSC == nil && v == nil {
+		return
+	}
+	w.ensurePodSC()
+	w.podSC.HostUsers = v
 }
 func (w *podSecurityContextWrapper) SELinuxOptions() *api.SELinuxOptions {
 	if w.podSC == nil {

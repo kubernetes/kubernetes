@@ -25,12 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 
-var encModeNames = map[cbor.EncMode]string{
+var encModeNames = map[modes.EncMode]string{
 	modes.Encode:                 "Encode",
 	modes.EncodeNondeterministic: "EncodeNondeterministic",
 }
 
-var allEncModes = []cbor.EncMode{
+var allEncModes = []modes.EncMode{
 	modes.Encode,
 	modes.EncodeNondeterministic,
 }
@@ -59,6 +59,18 @@ func assertOnConcreteError[E error](fn func(*testing.T, E)) func(t *testing.T, e
 			return
 		}
 		fn(t, ec)
+	}
+}
+
+func assertErrorMessage(want string) func(*testing.T, error) {
+	return func(t *testing.T, got error) {
+		if got == nil {
+			t.Error("expected non-nil error")
+			return
+		}
+		if got.Error() != want {
+			t.Errorf("got error %q, want %q", got.Error(), want)
+		}
 	}
 }
 

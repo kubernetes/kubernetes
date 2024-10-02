@@ -129,13 +129,13 @@ func TestPackageDir(t *testing.T) {
 			GoFiles:      []string{"/src/prj/file.go"},
 			IgnoredFiles: []string{"/otherdir/file.go"},
 		},
-		expect: "/src/prj",
+		expect: filepath.Clean("/src/prj"),
 	}, {
 		input: &packages.Package{
 			PkgPath:      "example.com/foo/bar/qux",
 			IgnoredFiles: []string{"/src/prj/file.go"},
 		},
-		expect: "/src/prj",
+		expect: filepath.Clean("/src/prj"),
 	}, {
 		input: &packages.Package{
 			PkgPath: "example.com/foo/bar/qux",

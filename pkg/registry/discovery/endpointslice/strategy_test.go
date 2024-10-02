@@ -29,7 +29,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	ptr "k8s.io/utils/ptr"
 )
 
 func Test_dropDisabledFieldsOnCreate(t *testing.T) {
@@ -44,20 +44,20 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 			eps: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
@@ -66,7 +66,7 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
@@ -101,20 +101,20 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
@@ -124,30 +124,30 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1-old"),
+						NodeName: ptr.To("node-1-old"),
 					},
 					{
-						NodeName: utilpointer.String("node-2-old"),
+						NodeName: ptr.To("node-2-old"),
 					},
 				},
 			},
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: utilpointer.String("node-1"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						NodeName: utilpointer.String("node-2"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
@@ -282,7 +282,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
 
 			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
 			if !apiequality.Semantic.DeepEqual(testcase.newEPS, testcase.expectedEPS) {
@@ -398,14 +398,14 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			v1Request: true,
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
-					{Hostname: utilpointer.String("hostname-1")},
-					{Hostname: utilpointer.String("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
-					{Hostname: utilpointer.String("hostname-1")},
-					{Hostname: utilpointer.String("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
 				},
 			},
 		},
@@ -413,14 +413,14 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			name: "v1beta1 request, without deprecated topology",
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
-					{Hostname: utilpointer.String("hostname-1")},
-					{Hostname: utilpointer.String("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
-					{Hostname: utilpointer.String("hostname-1")},
-					{Hostname: utilpointer.String("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
 				},
 			},
 		},
@@ -458,11 +458,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -473,11 +473,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 				},
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -488,11 +488,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 				},
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -503,11 +503,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -518,11 +518,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 				},
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -533,11 +533,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 				},
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 					{
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 						DeprecatedTopology: map[string]string{"key": "value"},
 					},
 				},
@@ -555,19 +555,19 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
-					{Hostname: utilpointer.String("hostname-1")},
-					{Hostname: utilpointer.String("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
+					{Hostname: ptr.To("hostname-1")},
 				},
 			},
 		},
@@ -582,11 +582,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -594,11 +594,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -610,11 +610,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1", "other": "value"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1", "foo": "bar"},
 					},
 				},
@@ -622,11 +622,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1a"),
+						Hostname:           ptr.To("hostname-1a"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1", "other": "value"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
+						Hostname:           ptr.To("hostname-1b"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1", "foo": "bar"},
 					},
 				},
@@ -634,12 +634,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1a"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -650,11 +650,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -662,11 +662,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1a"),
+						Hostname:           ptr.To("hostname-1a"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
+						Hostname:           ptr.To("hostname-1b"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -674,12 +674,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1a"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -690,11 +690,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-2"},
 					},
 				},
@@ -702,11 +702,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1a"),
+						Hostname:           ptr.To("hostname-1a"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-2"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
+						Hostname:           ptr.To("hostname-1b"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -714,12 +714,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
-						NodeName: utilpointer.String("node-2"),
+						Hostname: ptr.To("hostname-1a"),
+						NodeName: ptr.To("node-2"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -730,11 +730,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-2"},
 					},
 				},
@@ -742,12 +742,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
+						Hostname: ptr.To("hostname-1a"),
 						// Invalid node name because it did not exist in previous version of EndpointSlice
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-3"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
+						Hostname:           ptr.To("hostname-1b"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -755,11 +755,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
+						Hostname: ptr.To("hostname-1a"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -770,11 +770,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -782,12 +782,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1a"),
+						Hostname:           ptr.To("hostname-1a"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
-						NodeName:           utilpointer.String("node-2"),
+						Hostname:           ptr.To("hostname-1b"),
+						NodeName:           ptr.To("node-2"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -795,12 +795,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1a"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-2"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
@@ -811,11 +811,11 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -823,13 +823,13 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1a"),
+						Hostname:           ptr.To("hostname-1a"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
-						NodeName:           utilpointer.String("node-1"),
+						NodeName:           ptr.To("node-1"),
 					},
 					{
-						Hostname:           utilpointer.String("hostname-1b"),
-						NodeName:           utilpointer.String("node-2"),
+						Hostname:           ptr.To("hostname-1b"),
+						NodeName:           ptr.To("node-2"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "node-1"},
 					},
 				},
@@ -837,12 +837,12 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1a"),
-						NodeName: utilpointer.String("node-1"),
+						Hostname: ptr.To("hostname-1a"),
+						NodeName: ptr.To("node-1"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-1b"),
-						NodeName: utilpointer.String("node-2"),
+						Hostname: ptr.To("hostname-1b"),
+						NodeName: ptr.To("node-2"),
 					},
 				},
 			},
@@ -853,19 +853,19 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			originalEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "valid-node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-2"),
+						Hostname:           ptr.To("hostname-2"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "invalid node-2"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-3"),
+						Hostname:           ptr.To("hostname-3"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "valid-node-3"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-4"),
+						Hostname:           ptr.To("hostname-4"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "invalid node-4"},
 					},
 				},
@@ -873,39 +873,39 @@ func Test_dropTopologyOnV1(t *testing.T) {
 			newEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname:           utilpointer.String("hostname-1"),
+						Hostname:           ptr.To("hostname-1"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "valid-node-1"},
 					},
 					{
-						Hostname:           utilpointer.String("hostname-2"),
+						Hostname:           ptr.To("hostname-2"),
 						DeprecatedTopology: map[string]string{corev1.LabelHostname: "invalid node-2"},
 					},
 					{
-						Hostname: utilpointer.String("hostname-3"),
-						NodeName: utilpointer.String("node-3"),
+						Hostname: ptr.To("hostname-3"),
+						NodeName: ptr.To("node-3"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-4"),
-						NodeName: utilpointer.String("node-4"),
+						Hostname: ptr.To("hostname-4"),
+						NodeName: ptr.To("node-4"),
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						Hostname: utilpointer.String("hostname-1"),
-						NodeName: utilpointer.String("valid-node-1"),
+						Hostname: ptr.To("hostname-1"),
+						NodeName: ptr.To("valid-node-1"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-2"),
+						Hostname: ptr.To("hostname-2"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-3"),
-						NodeName: utilpointer.String("node-3"),
+						Hostname: ptr.To("hostname-3"),
+						NodeName: ptr.To("node-3"),
 					},
 					{
-						Hostname: utilpointer.String("hostname-4"),
-						NodeName: utilpointer.String("node-4"),
+						Hostname: ptr.To("hostname-4"),
+						NodeName: ptr.To("node-4"),
 					},
 				},
 			},

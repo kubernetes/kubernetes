@@ -98,6 +98,21 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 			&ColonSeparatedMultimapStringString{
 				initialized: true,
 				Multimap:    &map[string][]string{}}, ""},
+		{"empty key no colon", []string{"foo"},
+			NewColonSeparatedMultimapStringString(&nilMap),
+			&ColonSeparatedMultimapStringString{
+				initialized: true,
+				Multimap: &map[string][]string{
+					"": {"foo"},
+				}}, "malformed pair, expect string:string"},
+		{"empty key no colon allowed", []string{"foo"},
+			NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&nilMap),
+			&ColonSeparatedMultimapStringString{
+				initialized:          true,
+				allowDefaultEmptyKey: true,
+				Multimap: &map[string][]string{
+					"": {"foo"},
+				}}, ""},
 		{"empty key", []string{":foo"},
 			NewColonSeparatedMultimapStringString(&nilMap),
 			&ColonSeparatedMultimapStringString{

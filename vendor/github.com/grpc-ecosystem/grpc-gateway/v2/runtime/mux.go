@@ -57,6 +57,7 @@ type ServeMux struct {
 	marshalers                marshalerRegistry
 	incomingHeaderMatcher     HeaderMatcherFunc
 	outgoingHeaderMatcher     HeaderMatcherFunc
+	outgoingTrailerMatcher    HeaderMatcherFunc
 	metadataAnnotators        []func(context.Context, *http.Request) metadata.MD
 	errorHandler              ErrorHandlerFunc
 	streamErrorHandler        StreamErrorHandlerFunc
@@ -114,10 +115,18 @@ func DefaultHeaderMatcher(key string) (string, bool) {
 	return "", false
 }
 
+func defaultOutgoingHeaderMatcher(key string) (string, bool) {
+	return fmt.Sprintf("%s%s", MetadataHeaderPrefix, key), true
+}
+
+func defaultOutgoingTrailerMatcher(key string) (string, bool) {
+	return fmt.Sprintf("%s%s", MetadataTrailerPrefix, key), true
+}
+
 // WithIncomingHeaderMatcher returns a ServeMuxOption representing a headerMatcher for incoming request to gateway.
 //
 // This matcher will be called with each header in http.Request. If matcher returns true, that header will be
-// passed to gRPC context. To transform the header before passing to gRPC context, matcher should return modified header.
+// passed to gRPC context. To transform the header before passing to gRPC context, matcher should return the modified header.
 func WithIncomingHeaderMatcher(fn HeaderMatcherFunc) ServeMuxOption {
 	for _, header := range fn.matchedMalformedHeaders() {
 		grpclog.Warningf("The configured forwarding filter would allow %q to be sent to the gRPC server, which will likely cause errors. See https://github.com/grpc/grpc-go/pull/4803#issuecomment-986093310 for more information.", header)
@@ -147,10 +156,21 @@ func (fn HeaderMatcherFunc) matchedMalformedHeaders() []string {
 //
 // This matcher will be called with each header in response header metadata. If matcher returns true, that header will be
 // passed to http response returned from gateway. To transform the header before passing to response,
-// matcher should return modified header.
+// matcher should return the modified header.
 func WithOutgoingHeaderMatcher(fn HeaderMatcherFunc) ServeMuxOption {
 	return func(mux *ServeMux) {
 		mux.outgoingHeaderMatcher = fn
+	}
+}
+
+// WithOutgoingTrailerMatcher returns a ServeMuxOption representing a headerMatcher for outgoing response from gateway.
+//
+// This matcher will be called with each header in response trailer metadata. If matcher returns true, that header will be
+// passed to http response returned from gateway. To transform the header before passing to response,
+// matcher should return the modified header.
+func WithOutgoingTrailerMatcher(fn HeaderMatcherFunc) ServeMuxOption {
+	return func(mux *ServeMux) {
+		mux.outgoingTrailerMatcher = fn
 	}
 }
 
@@ -273,11 +293,11 @@ func NewServeMux(opts ...ServeMuxOption) *ServeMux {
 	if serveMux.incomingHeaderMatcher == nil {
 		serveMux.incomingHeaderMatcher = DefaultHeaderMatcher
 	}
-
 	if serveMux.outgoingHeaderMatcher == nil {
-		serveMux.outgoingHeaderMatcher = func(key string) (string, bool) {
-			return fmt.Sprintf("%s%s", MetadataHeaderPrefix, key), true
-		}
+		serveMux.outgoingHeaderMatcher = defaultOutgoingHeaderMatcher
+	}
+	if serveMux.outgoingTrailerMatcher == nil {
+		serveMux.outgoingTrailerMatcher = defaultOutgoingTrailerMatcher
 	}
 
 	return serveMux
@@ -321,13 +341,13 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if override := r.Header.Get("X-HTTP-Method-Override"); override != "" && s.isPathLengthFallback(r) {
-		r.Method = strings.ToUpper(override)
 		if err := r.ParseForm(); err != nil {
 			_, outboundMarshaler := MarshalerForRequest(s, r)
 			sterr := status.Error(codes.InvalidArgument, err.Error())
 			s.errorHandler(ctx, s, outboundMarshaler, w, r, sterr)
 			return
 		}
+		r.Method = strings.ToUpper(override)
 	}
 
 	var pathComponents []string

@@ -2,7 +2,7 @@
 
 package v1
 
-// NutanixPlatformSpecApplyConfiguration represents an declarative configuration of the NutanixPlatformSpec type for use
+// NutanixPlatformSpecApplyConfiguration represents a declarative configuration of the NutanixPlatformSpec type for use
 // with apply.
 type NutanixPlatformSpecApplyConfiguration struct {
 	PrismCentral   *NutanixPrismEndpointApplyConfiguration         `json:"prismCentral,omitempty"`
@@ -10,7 +10,7 @@ type NutanixPlatformSpecApplyConfiguration struct {
 	FailureDomains []NutanixFailureDomainApplyConfiguration        `json:"failureDomains,omitempty"`
 }
 
-// NutanixPlatformSpecApplyConfiguration constructs an declarative configuration of the NutanixPlatformSpec type for use with
+// NutanixPlatformSpecApplyConfiguration constructs a declarative configuration of the NutanixPlatformSpec type for use with
 // apply.
 func NutanixPlatformSpec() *NutanixPlatformSpecApplyConfiguration {
 	return &NutanixPlatformSpecApplyConfiguration{}

@@ -95,112 +95,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
           elementRelationship: atomic
-- name: com.github.openshift.api.authorization.v1.LocalResourceAccessReview
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: content
-      type:
-        namedType: __untyped_atomic_
-      default: {}
-    - name: isNonResourceURL
-      type:
-        scalar: boolean
-      default: false
-    - name: kind
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-      default: ""
-    - name: resource
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIGroup
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIVersion
-      type:
-        scalar: string
-      default: ""
-    - name: resourceName
-      type:
-        scalar: string
-      default: ""
-    - name: verb
-      type:
-        scalar: string
-      default: ""
-- name: com.github.openshift.api.authorization.v1.LocalSubjectAccessReview
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: content
-      type:
-        namedType: __untyped_atomic_
-      default: {}
-    - name: groups
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: isNonResourceURL
-      type:
-        scalar: boolean
-      default: false
-    - name: kind
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-      default: ""
-    - name: resource
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIGroup
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIVersion
-      type:
-        scalar: string
-      default: ""
-    - name: resourceName
-      type:
-        scalar: string
-      default: ""
-    - name: scopes
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: user
-      type:
-        scalar: string
-      default: ""
-    - name: verb
-      type:
-        scalar: string
-      default: ""
 - name: com.github.openshift.api.authorization.v1.PolicyRule
   map:
     fields:
@@ -213,7 +107,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: attributeRestrictions
       type:
         namedType: __untyped_atomic_
-      default: {}
     - name: nonResourceURLs
       type:
         list:
@@ -238,51 +131,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
-- name: com.github.openshift.api.authorization.v1.ResourceAccessReview
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: content
-      type:
-        namedType: __untyped_atomic_
-      default: {}
-    - name: isNonResourceURL
-      type:
-        scalar: boolean
-      default: false
-    - name: kind
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-      default: ""
-    - name: resource
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIGroup
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIVersion
-      type:
-        scalar: string
-      default: ""
-    - name: resourceName
-      type:
-        scalar: string
-      default: ""
-    - name: verb
-      type:
-        scalar: string
-      default: ""
 - name: com.github.openshift.api.authorization.v1.Role
   map:
     fields:
@@ -392,67 +240,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.openshift.api.authorization.v1.ServiceAccountReference
           elementRelationship: atomic
-- name: com.github.openshift.api.authorization.v1.SubjectAccessReview
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: content
-      type:
-        namedType: __untyped_atomic_
-      default: {}
-    - name: groups
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: isNonResourceURL
-      type:
-        scalar: boolean
-      default: false
-    - name: kind
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
-      default: ""
-    - name: path
-      type:
-        scalar: string
-      default: ""
-    - name: resource
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIGroup
-      type:
-        scalar: string
-      default: ""
-    - name: resourceAPIVersion
-      type:
-        scalar: string
-      default: ""
-    - name: resourceName
-      type:
-        scalar: string
-      default: ""
-    - name: scopes
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: user
-      type:
-        scalar: string
-      default: ""
-    - name: verb
-      type:
-        scalar: string
-      default: ""
 - name: com.github.openshift.api.authorization.v1.UserRestriction
   map:
     fields:
@@ -587,7 +374,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric

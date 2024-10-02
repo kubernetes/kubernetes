@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// RepositoryDigestMirrorsApplyConfiguration represents an declarative configuration of the RepositoryDigestMirrors type for use
+// RepositoryDigestMirrorsApplyConfiguration represents a declarative configuration of the RepositoryDigestMirrors type for use
 // with apply.
 type RepositoryDigestMirrorsApplyConfiguration struct {
 	Source            *string     `json:"source,omitempty"`
@@ -14,7 +14,7 @@ type RepositoryDigestMirrorsApplyConfiguration struct {
 	Mirrors           []v1.Mirror `json:"mirrors,omitempty"`
 }
 
-// RepositoryDigestMirrorsApplyConfiguration constructs an declarative configuration of the RepositoryDigestMirrors type for use with
+// RepositoryDigestMirrorsApplyConfiguration constructs a declarative configuration of the RepositoryDigestMirrors type for use with
 // apply.
 func RepositoryDigestMirrors() *RepositoryDigestMirrorsApplyConfiguration {
 	return &RepositoryDigestMirrorsApplyConfiguration{}

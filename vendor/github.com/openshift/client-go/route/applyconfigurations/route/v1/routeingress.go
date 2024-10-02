@@ -6,7 +6,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-// RouteIngressApplyConfiguration represents an declarative configuration of the RouteIngress type for use
+// RouteIngressApplyConfiguration represents a declarative configuration of the RouteIngress type for use
 // with apply.
 type RouteIngressApplyConfiguration struct {
 	Host                    *string                                   `json:"host,omitempty"`
@@ -16,7 +16,7 @@ type RouteIngressApplyConfiguration struct {
 	RouterCanonicalHostname *string                                   `json:"routerCanonicalHostname,omitempty"`
 }
 
-// RouteIngressApplyConfiguration constructs an declarative configuration of the RouteIngress type for use with
+// RouteIngressApplyConfiguration constructs a declarative configuration of the RouteIngress type for use with
 // apply.
 func RouteIngress() *RouteIngressApplyConfiguration {
 	return &RouteIngressApplyConfiguration{}

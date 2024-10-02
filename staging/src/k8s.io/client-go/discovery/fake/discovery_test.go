@@ -63,3 +63,48 @@ func TestFakingServerVersionWithError(t *testing.T) {
 		t.Fatal("ServerVersion should return expected error, returned different error instead")
 	}
 }
+
+func TestFakingServerResourcesForGroupVersionWithError(t *testing.T) {
+	expectedError := errors.New("an error occurred")
+	fakeClient := fakeclientset.NewClientset()
+	fakeClient.Discovery().(*fakediscovery.FakeDiscovery).PrependReactor("*", "*", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, expectedError
+	})
+
+	result, err := fakeClient.Discovery().ServerResourcesForGroupVersion("dummy.group.io/v1beta2")
+	if result != nil {
+		t.Errorf(`expect result to be nil but got "%v" instead`, result)
+	}
+	if !errors.Is(err, expectedError) {
+		t.Errorf(`expect error to be "%v" but got "%v" instead`, expectedError, err)
+	}
+}
+
+func TestFakingServerGroupsWithError(t *testing.T) {
+	expectedError := errors.New("an error occurred")
+	fakeClient := fakeclientset.NewClientset()
+	fakeClient.Discovery().(*fakediscovery.FakeDiscovery).PrependReactor("*", "*", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, expectedError
+	})
+
+	result, err := fakeClient.Discovery().ServerGroups()
+	if result != nil {
+		t.Errorf(`expect result to be nil but got "%v" instead`, result)
+	}
+	if !errors.Is(err, expectedError) {
+		t.Errorf(`expect error to be "%v" but got "%v" instead`, expectedError, err)
+	}
+}
+
+func TestFakingServerGroupsAndResourcesWithError(t *testing.T) {
+	expectedError := errors.New("an error occurred")
+	fakeClient := fakeclientset.NewClientset()
+	fakeClient.Discovery().(*fakediscovery.FakeDiscovery).PrependReactor("get", "resource", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, expectedError
+	})
+
+	_, _, err := fakeClient.Discovery().ServerGroupsAndResources()
+	if !errors.Is(err, expectedError) {
+		t.Errorf(`expect error to be "%v" but got "%v" instead`, expectedError, err)
+	}
+}

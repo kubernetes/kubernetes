@@ -23,6 +23,7 @@ import (
 	"net"
 	"path/filepath"
 	"testing"
+	"time"
 
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
@@ -37,7 +38,20 @@ func SetupCertificateAuthority(t *testing.T) (*x509.Certificate, crypto.Signer) 
 		Config: certutil.Config{CommonName: "kubernetes"},
 	})
 	if err != nil {
-		t.Fatalf("failure while generating CA certificate and key: %v", err)
+		t.Fatalf("Failure while generating CA certificate and key: %v", err)
+	}
+
+	return caCert, caKey
+}
+
+// SetupIntermediateCertificateAuthority is a utility function for kubeadm testing that creates a
+// Intermediate CertificateAuthority cert/key pair
+func SetupIntermediateCertificateAuthority(t *testing.T, parentCert *x509.Certificate, parentKey crypto.Signer, cn string) (*x509.Certificate, crypto.Signer) {
+	caCert, caKey, err := pkiutil.NewIntermediateCertificateAuthority(parentCert, parentKey, &pkiutil.CertConfig{
+		Config: certutil.Config{CommonName: cn},
+	})
+	if err != nil {
+		t.Fatalf("Failure while generating intermediate CA certificate and key: %v", err)
 	}
 
 	return caCert, caKey
@@ -48,6 +62,26 @@ func SetupCertificateAuthority(t *testing.T) (*x509.Certificate, crypto.Signer) 
 func AssertCertificateIsSignedByCa(t *testing.T, cert *x509.Certificate, signingCa *x509.Certificate) {
 	if err := cert.CheckSignatureFrom(signingCa); err != nil {
 		t.Error("cert is not signed by signing CA as expected")
+	}
+}
+
+// AssertCertificateHasNotBefore is a utility function for kubeadm testing that asserts if a given certificate has
+// the expected NotBefore. Truncate (round) expectedNotBefore to 1 second, since the certificate stores
+// with seconds as the maximum precision.
+func AssertCertificateHasNotBefore(t *testing.T, cert *x509.Certificate, expectedNotBefore time.Time) {
+	truncated := expectedNotBefore.Truncate(time.Second)
+	if !cert.NotBefore.Equal(truncated) {
+		t.Errorf("cert has NotBefore %v, expected %v", cert.NotBefore, truncated)
+	}
+}
+
+// AssertCertificateHasNotAfter is a utility function for kubeadm testing that asserts if a given certificate has
+// the expected NotAfter. Truncate (round) expectedNotAfter to 1 second, since the certificate stores
+// with seconds as the maximum precision.
+func AssertCertificateHasNotAfter(t *testing.T, cert *x509.Certificate, expectedNotAfter time.Time) {
+	truncated := expectedNotAfter.Truncate(time.Second)
+	if !cert.NotAfter.Equal(truncated) {
+		t.Errorf("cert has NotAfter %v, expected %v", cert.NotAfter, truncated)
 	}
 }
 

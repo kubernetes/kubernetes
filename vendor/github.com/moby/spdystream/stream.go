@@ -305,6 +305,8 @@ func (s *Stream) Identifier() uint32 {
 // IsFinished returns whether the stream has finished
 // sending data
 func (s *Stream) IsFinished() bool {
+	s.finishLock.Lock()
+	defer s.finishLock.Unlock()
 	return s.finished
 }
 

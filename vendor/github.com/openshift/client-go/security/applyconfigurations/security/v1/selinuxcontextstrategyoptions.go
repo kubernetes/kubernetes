@@ -7,14 +7,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// SELinuxContextStrategyOptionsApplyConfiguration represents an declarative configuration of the SELinuxContextStrategyOptions type for use
+// SELinuxContextStrategyOptionsApplyConfiguration represents a declarative configuration of the SELinuxContextStrategyOptions type for use
 // with apply.
 type SELinuxContextStrategyOptionsApplyConfiguration struct {
 	Type           *v1.SELinuxContextStrategyType `json:"type,omitempty"`
 	SELinuxOptions *corev1.SELinuxOptions         `json:"seLinuxOptions,omitempty"`
 }
 
-// SELinuxContextStrategyOptionsApplyConfiguration constructs an declarative configuration of the SELinuxContextStrategyOptions type for use with
+// SELinuxContextStrategyOptionsApplyConfiguration constructs a declarative configuration of the SELinuxContextStrategyOptions type for use with
 // apply.
 func SELinuxContextStrategyOptions() *SELinuxContextStrategyOptionsApplyConfiguration {
 	return &SELinuxContextStrategyOptionsApplyConfiguration{}

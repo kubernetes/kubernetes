@@ -118,14 +118,14 @@ func DumpNodeDebugInfo(ctx context.Context, c clientset.Interface, nodeNames []s
 			logFunc("source %v type %v message %v reason %v first ts %v last ts %v, involved obj %+v",
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
-		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
+		logFunc("\nLogging pods the kubelet thinks are on node %v", n)
 		podList, err := getKubeletPods(ctx, c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
 		}
 		for _, p := range podList.Items {
-			logFunc("%v started at %v (%d+%d container statuses recorded)", p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
+			logFunc("%s/%s started at %v (%d+%d container statuses recorded)", p.Namespace, p.Name, p.Status.StartTime, len(p.Status.InitContainerStatuses), len(p.Status.ContainerStatuses))
 			for _, c := range p.Status.InitContainerStatuses {
 				logFunc("\tInit container %v ready: %v, restart count %v",
 					c.Name, c.Ready, c.RestartCount)

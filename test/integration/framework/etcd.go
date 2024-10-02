@@ -207,6 +207,14 @@ func EtcdMain(tests func() int) {
 		// Both names occurred in practice.
 		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
 		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
+		// If there is an error during connection shutdown, SPDY keeps a
+		// goroutine around for ten minutes, which gets reported as a leak
+		// (the goroutine is cleaned up after the ten minutes).
+		//
+		// https://github.com/kubernetes/kubernetes/blob/master/vendor/github.com/moby/spdystream/connection.go#L732-L744
+		//
+		// Ignore this reported leak.
+		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
 	stop, err := startEtcd(nil)

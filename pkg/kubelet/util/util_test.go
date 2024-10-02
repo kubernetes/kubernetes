@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestGetNodenameForKernel(t *testing.T) {
@@ -85,4 +87,59 @@ func TestGetNodenameForKernel(t *testing.T) {
 		assert.Equal(t, tc.expectedHostname, outputHostname)
 	}
 
+}
+
+func TestGetContainerByIndex(t *testing.T) {
+	testCases := []struct {
+		title             string
+		containers        []v1.Container
+		statuses          []v1.ContainerStatus
+		idx               int
+		expectedContainer v1.Container
+		expectedOK        bool
+	}{
+		{
+			title:             "idx is less than zero",
+			containers:        []v1.Container{{Name: "container-1"}},
+			statuses:          []v1.ContainerStatus{{Name: "container-1"}},
+			idx:               -1,
+			expectedContainer: v1.Container{},
+			expectedOK:        false,
+		}, {
+			title:             "idx is large then number of containers",
+			containers:        []v1.Container{{Name: "container-1"}},
+			statuses:          []v1.ContainerStatus{{Name: "container-1"}},
+			idx:               2,
+			expectedContainer: v1.Container{},
+			expectedOK:        false,
+		}, {
+			title:             "idx is large then number of statuses",
+			containers:        []v1.Container{{Name: "container-1"}, {Name: "container-2"}},
+			statuses:          []v1.ContainerStatus{{Name: "container-1"}},
+			idx:               2,
+			expectedContainer: v1.Container{},
+			expectedOK:        false,
+		}, {
+			title:             "names do not match",
+			containers:        []v1.Container{{Name: "container-1"}},
+			statuses:          []v1.ContainerStatus{{Name: "invalid-container"}},
+			idx:               0,
+			expectedContainer: v1.Container{},
+			expectedOK:        false,
+		}, {
+			title:             "valid container index",
+			containers:        []v1.Container{{Name: "container-1"}, {Name: "container-2"}},
+			statuses:          []v1.ContainerStatus{{Name: "container-1"}, {Name: "container-2"}},
+			idx:               1,
+			expectedContainer: v1.Container{Name: "container-2"},
+			expectedOK:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		container, ok := GetContainerByIndex(tc.containers, tc.statuses, tc.idx)
+		if container.Name != tc.expectedContainer.Name || ok != tc.expectedOK {
+			t.Errorf("%s - Expected container: %v, got container: %v, expected ok: %v, got ok: %v", tc.title, tc.expectedContainer, container, tc.expectedOK, ok)
+		}
+	}
 }

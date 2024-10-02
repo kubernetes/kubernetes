@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StageInfoApplyConfiguration represents an declarative configuration of the StageInfo type for use
+// StageInfoApplyConfiguration represents a declarative configuration of the StageInfo type for use
 // with apply.
 type StageInfoApplyConfiguration struct {
 	Name                 *v1.StageName                `json:"name,omitempty"`
@@ -16,7 +16,7 @@ type StageInfoApplyConfiguration struct {
 	Steps                []StepInfoApplyConfiguration `json:"steps,omitempty"`
 }
 
-// StageInfoApplyConfiguration constructs an declarative configuration of the StageInfo type for use with
+// StageInfoApplyConfiguration constructs a declarative configuration of the StageInfo type for use with
 // apply.
 func StageInfo() *StageInfoApplyConfiguration {
 	return &StageInfoApplyConfiguration{}

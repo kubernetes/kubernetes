@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// AzureDiskVolumeSourceApplyConfiguration represents an declarative configuration of the AzureDiskVolumeSource type for use
+// AzureDiskVolumeSourceApplyConfiguration represents a declarative configuration of the AzureDiskVolumeSource type for use
 // with apply.
 type AzureDiskVolumeSourceApplyConfiguration struct {
 	DiskName    *string                      `json:"diskName,omitempty"`
@@ -33,7 +33,7 @@ type AzureDiskVolumeSourceApplyConfiguration struct {
 	Kind        *v1.AzureDataDiskKind        `json:"kind,omitempty"`
 }
 
-// AzureDiskVolumeSourceApplyConfiguration constructs an declarative configuration of the AzureDiskVolumeSource type for use with
+// AzureDiskVolumeSourceApplyConfiguration constructs a declarative configuration of the AzureDiskVolumeSource type for use with
 // apply.
 func AzureDiskVolumeSource() *AzureDiskVolumeSourceApplyConfiguration {
 	return &AzureDiskVolumeSourceApplyConfiguration{}

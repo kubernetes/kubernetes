@@ -2,13 +2,13 @@
 
 package v1
 
-// SecretLocalReferenceApplyConfiguration represents an declarative configuration of the SecretLocalReference type for use
+// SecretLocalReferenceApplyConfiguration represents a declarative configuration of the SecretLocalReference type for use
 // with apply.
 type SecretLocalReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// SecretLocalReferenceApplyConfiguration constructs an declarative configuration of the SecretLocalReference type for use with
+// SecretLocalReferenceApplyConfiguration constructs a declarative configuration of the SecretLocalReference type for use with
 // apply.
 func SecretLocalReference() *SecretLocalReferenceApplyConfiguration {
 	return &SecretLocalReferenceApplyConfiguration{}

@@ -66,7 +66,7 @@ func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleSt
 	rp.numUnreserveCalled += 1
 }
 
-func (rp *ReservePlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (rp *ReservePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{
 			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
@@ -74,7 +74,7 @@ func (rp *ReservePlugin) EventsToRegister() []framework.ClusterEventWithHint {
 				return framework.Queue, nil
 			},
 		},
-	}
+	}, nil
 }
 
 type PermitPlugin struct {
@@ -103,7 +103,7 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState,
 	return nil, 0
 }
 
-func (pp *PermitPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{
 			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
@@ -111,7 +111,7 @@ func (pp *PermitPlugin) EventsToRegister() []framework.ClusterEventWithHint {
 				return framework.Queue, nil
 			},
 		},
-	}
+	}, nil
 }
 
 func TestReScheduling(t *testing.T) {
@@ -223,7 +223,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -244,7 +244,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}

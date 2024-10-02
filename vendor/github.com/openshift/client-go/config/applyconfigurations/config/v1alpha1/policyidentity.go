@@ -6,7 +6,7 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// PolicyIdentityApplyConfiguration represents an declarative configuration of the PolicyIdentity type for use
+// PolicyIdentityApplyConfiguration represents a declarative configuration of the PolicyIdentity type for use
 // with apply.
 type PolicyIdentityApplyConfiguration struct {
 	MatchPolicy                *v1alpha1.IdentityMatchPolicy                 `json:"matchPolicy,omitempty"`
@@ -14,7 +14,7 @@ type PolicyIdentityApplyConfiguration struct {
 	PolicyMatchRemapIdentity   *PolicyMatchRemapIdentityApplyConfiguration   `json:"remapIdentity,omitempty"`
 }
 
-// PolicyIdentityApplyConfiguration constructs an declarative configuration of the PolicyIdentity type for use with
+// PolicyIdentityApplyConfiguration constructs a declarative configuration of the PolicyIdentity type for use with
 // apply.
 func PolicyIdentity() *PolicyIdentityApplyConfiguration {
 	return &PolicyIdentityApplyConfiguration{}

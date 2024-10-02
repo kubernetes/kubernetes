@@ -155,7 +155,8 @@ func (l *linuxStandardInit) Init() error {
 			return &os.SyscallError{Syscall: "prctl(SET_NO_NEW_PRIVS)", Err: err}
 		}
 	}
-	// Tell our parent that we're ready to Execv. This must be done before the
+
+	// Tell our parent that we're ready to exec. This must be done before the
 	// Seccomp rules have been applied, because we need to be able to read and
 	// write to a socket.
 	if err := syncParentReady(l.pipe); err != nil {

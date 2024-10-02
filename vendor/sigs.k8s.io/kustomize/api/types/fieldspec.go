@@ -30,6 +30,8 @@ type FieldSpec struct {
 	resid.Gvk          `json:",inline,omitempty" yaml:",inline,omitempty"`
 	Path               string `json:"path,omitempty" yaml:"path,omitempty"`
 	CreateIfNotPresent bool   `json:"create,omitempty" yaml:"create,omitempty"`
+
+	// Note: If any new pointer based members are added, FsSlice.DeepCopy needs to be updated
 }
 
 func (fs FieldSpec) String() string {
@@ -48,6 +50,13 @@ func (s FsSlice) Len() int      { return len(s) }
 func (s FsSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s FsSlice) Less(i, j int) bool {
 	return s[i].Gvk.IsLessThan(s[j].Gvk)
+}
+
+// DeepCopy returns a new copy of FsSlice
+func (s FsSlice) DeepCopy() FsSlice {
+	ret := make(FsSlice, len(s))
+	copy(ret, s)
+	return ret
 }
 
 // MergeAll merges the argument into this, returning the result.

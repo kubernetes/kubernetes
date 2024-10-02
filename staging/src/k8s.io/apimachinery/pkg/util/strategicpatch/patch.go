@@ -1361,6 +1361,10 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		// original. Otherwise, check if we want to preserve it or skip it.
 		// Preserving the null value is useful when we want to send an explicit
 		// delete to the API server.
+		// In some cases, this may lead to inconsistent behavior with create.
+		// ref: https://github.com/kubernetes/kubernetes/issues/123304
+		// To avoid breaking compatibility,
+		// we made corresponding changes on the client side to ensure that the create and patch behaviors are idempotent.
 		if patchV == nil {
 			delete(original, k)
 			if mergeOptions.IgnoreUnmatchedNulls {

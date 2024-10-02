@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ProjectedVolumeSourceApplyConfiguration represents an declarative configuration of the ProjectedVolumeSource type for use
+// ProjectedVolumeSourceApplyConfiguration represents a declarative configuration of the ProjectedVolumeSource type for use
 // with apply.
 type ProjectedVolumeSourceApplyConfiguration struct {
 	Sources     []VolumeProjectionApplyConfiguration `json:"sources,omitempty"`
 	DefaultMode *int32                               `json:"defaultMode,omitempty"`
 }
 
-// ProjectedVolumeSourceApplyConfiguration constructs an declarative configuration of the ProjectedVolumeSource type for use with
+// ProjectedVolumeSourceApplyConfiguration constructs a declarative configuration of the ProjectedVolumeSource type for use with
 // apply.
 func ProjectedVolumeSource() *ProjectedVolumeSourceApplyConfiguration {
 	return &ProjectedVolumeSourceApplyConfiguration{}

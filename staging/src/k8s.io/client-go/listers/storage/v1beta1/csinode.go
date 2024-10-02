@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type CSINodeLister interface {
 
 // cSINodeLister implements the CSINodeLister interface.
 type cSINodeLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1beta1.CSINode]
 }
 
 // NewCSINodeLister returns a new CSINodeLister.
 func NewCSINodeLister(indexer cache.Indexer) CSINodeLister {
-	return &cSINodeLister{indexer: indexer}
-}
-
-// List lists all CSINodes in the indexer.
-func (s *cSINodeLister) List(selector labels.Selector) (ret []*v1beta1.CSINode, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.CSINode))
-	})
-	return ret, err
-}
-
-// Get retrieves the CSINode from the index for a given name.
-func (s *cSINodeLister) Get(name string) (*v1beta1.CSINode, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("csinode"), name)
-	}
-	return obj.(*v1beta1.CSINode), nil
+	return &cSINodeLister{listers.New[*v1beta1.CSINode](indexer, v1beta1.Resource("csinode"))}
 }

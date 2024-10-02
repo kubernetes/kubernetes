@@ -209,6 +209,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.security.v1.SupplementalGroupsStrategyOptions
       default: {}
+    - name: userNamespaceLevel
+      type:
+        scalar: string
+      default: AllowHostLevel
     - name: users
       type:
         list:
@@ -295,7 +299,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric

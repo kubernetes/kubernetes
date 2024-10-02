@@ -2,13 +2,13 @@
 
 package v1
 
-// HTPasswdIdentityProviderApplyConfiguration represents an declarative configuration of the HTPasswdIdentityProvider type for use
+// HTPasswdIdentityProviderApplyConfiguration represents a declarative configuration of the HTPasswdIdentityProvider type for use
 // with apply.
 type HTPasswdIdentityProviderApplyConfiguration struct {
 	FileData *SecretNameReferenceApplyConfiguration `json:"fileData,omitempty"`
 }
 
-// HTPasswdIdentityProviderApplyConfiguration constructs an declarative configuration of the HTPasswdIdentityProvider type for use with
+// HTPasswdIdentityProviderApplyConfiguration constructs a declarative configuration of the HTPasswdIdentityProvider type for use with
 // apply.
 func HTPasswdIdentityProvider() *HTPasswdIdentityProviderApplyConfiguration {
 	return &HTPasswdIdentityProviderApplyConfiguration{}

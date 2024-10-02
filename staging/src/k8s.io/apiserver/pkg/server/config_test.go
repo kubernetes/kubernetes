@@ -17,6 +17,8 @@ limitations under the License.
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,10 +40,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -79,11 +84,15 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 }
 
 func TestNewWithDelegate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test is done"))
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
+	delegateConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
@@ -116,6 +125,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
+	wrappingConfig.EffectiveVersion = utilversion.NewEffectiveVersion("")
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
 		return fmt.Errorf("wrapping failed healthcheck")
@@ -136,10 +146,8 @@ func TestNewWithDelegate(t *testing.T) {
 		return nil
 	})
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	wrappingServer.PrepareRun()
-	wrappingServer.RunPostStartHooks(stopCh)
+	wrappingServer.RunPostStartHooks(ctx)
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
@@ -301,6 +309,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
 		lifecycleSignals:               newLifecycleSignals(),
 		TracerProvider:                 tracing.NewNoopTracerProvider(),
+		FeatureGate:                    utilfeature.DefaultFeatureGate,
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

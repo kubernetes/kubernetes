@@ -2,14 +2,14 @@
 
 package v1
 
-// ImageSourcePathApplyConfiguration represents an declarative configuration of the ImageSourcePath type for use
+// ImageSourcePathApplyConfiguration represents a declarative configuration of the ImageSourcePath type for use
 // with apply.
 type ImageSourcePathApplyConfiguration struct {
 	SourcePath     *string `json:"sourcePath,omitempty"`
 	DestinationDir *string `json:"destinationDir,omitempty"`
 }
 
-// ImageSourcePathApplyConfiguration constructs an declarative configuration of the ImageSourcePath type for use with
+// ImageSourcePathApplyConfiguration constructs a declarative configuration of the ImageSourcePath type for use with
 // apply.
 func ImageSourcePath() *ImageSourcePathApplyConfiguration {
 	return &ImageSourcePathApplyConfiguration{}

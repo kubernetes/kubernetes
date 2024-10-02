@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -400,8 +401,7 @@ func validateInsecureEdgeTerminationPolicy(tls *routev1.TLSConfig, fldPath *fiel
 }
 
 var (
-	allowedWildcardPolicies    = []string{string(routev1.WildcardPolicyNone), string(routev1.WildcardPolicySubdomain)}
-	allowedWildcardPoliciesSet = sets.New(allowedWildcardPolicies...)
+	allowedWildcardPolicies = []routev1.WildcardPolicyType{routev1.WildcardPolicyNone, routev1.WildcardPolicySubdomain}
 )
 
 // validateWildcardPolicy tests that the wildcard policy is either empty or one of the supported types.
@@ -411,7 +411,7 @@ func validateWildcardPolicy(host string, policy routev1.WildcardPolicyType, fldP
 	}
 
 	// Check if policy is one of None or Subdomain.
-	if !allowedWildcardPoliciesSet.Has(string(policy)) {
+	if !slices.Contains(allowedWildcardPolicies, policy) {
 		return field.NotSupported(fldPath, policy, allowedWildcardPolicies)
 	}
 
@@ -424,7 +424,6 @@ func validateWildcardPolicy(host string, policy routev1.WildcardPolicyType, fldP
 
 var (
 	notAllowedHTTPHeaders        = []string{"strict-transport-security", "proxy", "cookie", "set-cookie"}
-	notAllowedHTTPHeaderSet      = sets.New(notAllowedHTTPHeaders...)
 	notAllowedHTTPHeadersMessage = fmt.Sprintf("the following headers may not be modified using this API: %v", strings.Join(notAllowedHTTPHeaders, ", "))
 )
 
@@ -451,7 +450,7 @@ func validateHeaders(fldPath *field.Path, headers []routev1.RouteHTTPHeader, val
 		case nameLength > maxHeaderNameSize:
 			err := field.Invalid(idxPath.Child("name"), header.Name, fmt.Sprintf("name exceeds the maximum length, which is %d", maxHeaderNameSize))
 			allErrs = append(allErrs, err)
-		case notAllowedHTTPHeaderSet.Has(strings.ToLower(header.Name)):
+		case slices.Contains(notAllowedHTTPHeaders, strings.ToLower(header.Name)):
 			err := field.Forbidden(idxPath.Child("name"), notAllowedHTTPHeadersMessage)
 			allErrs = append(allErrs, err)
 		case !permittedHeaderNameRE.MatchString(header.Name):

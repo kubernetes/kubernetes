@@ -6,7 +6,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// UsernameClaimMappingApplyConfiguration represents an declarative configuration of the UsernameClaimMapping type for use
+// UsernameClaimMappingApplyConfiguration represents a declarative configuration of the UsernameClaimMapping type for use
 // with apply.
 type UsernameClaimMappingApplyConfiguration struct {
 	TokenClaimMappingApplyConfiguration `json:",inline"`
@@ -14,7 +14,7 @@ type UsernameClaimMappingApplyConfiguration struct {
 	Prefix                              *UsernamePrefixApplyConfiguration `json:"prefix,omitempty"`
 }
 
-// UsernameClaimMappingApplyConfiguration constructs an declarative configuration of the UsernameClaimMapping type for use with
+// UsernameClaimMappingApplyConfiguration constructs a declarative configuration of the UsernameClaimMapping type for use with
 // apply.
 func UsernameClaimMapping() *UsernameClaimMappingApplyConfiguration {
 	return &UsernameClaimMappingApplyConfiguration{}

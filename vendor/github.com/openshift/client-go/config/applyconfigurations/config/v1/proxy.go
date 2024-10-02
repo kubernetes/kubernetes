@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ProxyApplyConfiguration represents an declarative configuration of the Proxy type for use
+// ProxyApplyConfiguration represents a declarative configuration of the Proxy type for use
 // with apply.
 type ProxyApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ProxyApplyConfiguration struct {
 	Status                           *ProxyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Proxy constructs an declarative configuration of the Proxy type for use with
+// Proxy constructs a declarative configuration of the Proxy type for use with
 // apply.
 func Proxy(name string) *ProxyApplyConfiguration {
 	b := &ProxyApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ProxyApplyConfiguration) WithSpec(value *ProxySpecApplyConfiguration) *
 func (b *ProxyApplyConfiguration) WithStatus(value *ProxyStatusApplyConfiguration) *ProxyApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ProxyApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -32,6 +35,248 @@ var mockType = &types.Type{
 		"It should be used just when you need something different than 42",
 	},
 	SecondClosestCommentLines: []string{},
+}
+
+func TestArgsFromType(t *testing.T) {
+	type testcase struct {
+		name          string
+		t             *types.Type
+		expected      generator.Args
+		expectedError string
+	}
+
+	tests := []testcase{
+		{
+			name: "no comments",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1",
+				},
+			},
+			expectedError: `missing`,
+		},
+		{
+			name: "GA type",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+			},
+		},
+		{
+			name: "GA type v2",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v2",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+			},
+		},
+		{
+			name: "GA type - explicit deprecated",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:deprecated=1.7",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 7,
+			},
+		},
+		{
+			name: "GA type - explicit removed",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:removed=1.9",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"removedMajor":    1,
+				"removedMinor":    9,
+			},
+		},
+		{
+			name: "GA type - explicit",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:deprecated=1.7",
+					"+k8s:prerelease-lifecycle-gen:removed=1.9",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 7,
+				"removedMajor":    1,
+				"removedMinor":    9,
+			},
+		},
+		{
+			name: "beta type - defaulted",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1beta1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 8,
+				"removedMajor":    1,
+				"removedMinor":    11,
+			},
+		},
+		{
+			name: "beta type - explicit",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1beta1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:deprecated=1.7",
+					"+k8s:prerelease-lifecycle-gen:removed=1.9",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 7,
+				"removedMajor":    1,
+				"removedMinor":    9,
+			},
+		},
+		{
+			name: "beta type - explicit deprecated only",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1beta1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:deprecated=1.7",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 7,
+				"removedMajor":    1,
+				"removedMinor":    10,
+			},
+		},
+		{
+			name: "beta type - explicit removed only",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1beta1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:removed=1.9",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 8,
+				"removedMajor":    1,
+				"removedMinor":    9,
+			},
+		},
+		{
+			name: "alpha type - defaulted",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1alpha1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 8,
+				"removedMajor":    1,
+				"removedMinor":    11,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.expected != nil {
+				test.expected["type"] = test.t
+			}
+			gen := genPreleaseLifecycle{}
+			args, err := gen.argsFromType(nil, test.t)
+			if test.expectedError != "" {
+				if err == nil {
+					t.Errorf("expected error, got none")
+				} else if !strings.Contains(err.Error(), test.expectedError) {
+					t.Errorf("expected error %q, got %q", test.expectedError, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(test.expected, args); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
 }
 
 func Test_extractKubeVersionTag(t *testing.T) {

@@ -2,14 +2,14 @@
 
 package v1
 
-// InfrastructureSpecApplyConfiguration represents an declarative configuration of the InfrastructureSpec type for use
+// InfrastructureSpecApplyConfiguration represents a declarative configuration of the InfrastructureSpec type for use
 // with apply.
 type InfrastructureSpecApplyConfiguration struct {
 	CloudConfig  *ConfigMapFileReferenceApplyConfiguration `json:"cloudConfig,omitempty"`
 	PlatformSpec *PlatformSpecApplyConfiguration           `json:"platformSpec,omitempty"`
 }
 
-// InfrastructureSpecApplyConfiguration constructs an declarative configuration of the InfrastructureSpec type for use with
+// InfrastructureSpecApplyConfiguration constructs a declarative configuration of the InfrastructureSpec type for use with
 // apply.
 func InfrastructureSpec() *InfrastructureSpecApplyConfiguration {
 	return &InfrastructureSpecApplyConfiguration{}

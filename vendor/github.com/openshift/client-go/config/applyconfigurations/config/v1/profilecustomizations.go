@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ProfileCustomizationsApplyConfiguration represents an declarative configuration of the ProfileCustomizations type for use
+// ProfileCustomizationsApplyConfiguration represents a declarative configuration of the ProfileCustomizations type for use
 // with apply.
 type ProfileCustomizationsApplyConfiguration struct {
 	DynamicResourceAllocation *v1.DRAEnablement `json:"dynamicResourceAllocation,omitempty"`
 }
 
-// ProfileCustomizationsApplyConfiguration constructs an declarative configuration of the ProfileCustomizations type for use with
+// ProfileCustomizationsApplyConfiguration constructs a declarative configuration of the ProfileCustomizations type for use with
 // apply.
 func ProfileCustomizations() *ProfileCustomizationsApplyConfiguration {
 	return &ProfileCustomizationsApplyConfiguration{}

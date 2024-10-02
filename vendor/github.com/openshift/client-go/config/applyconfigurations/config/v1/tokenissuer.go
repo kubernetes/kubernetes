@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// TokenIssuerApplyConfiguration represents an declarative configuration of the TokenIssuer type for use
+// TokenIssuerApplyConfiguration represents a declarative configuration of the TokenIssuer type for use
 // with apply.
 type TokenIssuerApplyConfiguration struct {
 	URL                  *string                                   `json:"issuerURL,omitempty"`
@@ -14,7 +14,7 @@ type TokenIssuerApplyConfiguration struct {
 	CertificateAuthority *ConfigMapNameReferenceApplyConfiguration `json:"issuerCertificateAuthority,omitempty"`
 }
 
-// TokenIssuerApplyConfiguration constructs an declarative configuration of the TokenIssuer type for use with
+// TokenIssuerApplyConfiguration constructs a declarative configuration of the TokenIssuer type for use with
 // apply.
 func TokenIssuer() *TokenIssuerApplyConfiguration {
 	return &TokenIssuerApplyConfiguration{}

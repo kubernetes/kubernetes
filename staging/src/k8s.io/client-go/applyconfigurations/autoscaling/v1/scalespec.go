@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// ScaleSpecApplyConfiguration represents an declarative configuration of the ScaleSpec type for use
+// ScaleSpecApplyConfiguration represents a declarative configuration of the ScaleSpec type for use
 // with apply.
 type ScaleSpecApplyConfiguration struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-// ScaleSpecApplyConfiguration constructs an declarative configuration of the ScaleSpec type for use with
+// ScaleSpecApplyConfiguration constructs a declarative configuration of the ScaleSpec type for use with
 // apply.
 func ScaleSpec() *ScaleSpecApplyConfiguration {
 	return &ScaleSpecApplyConfiguration{}

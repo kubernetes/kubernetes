@@ -20,8 +20,6 @@ package grpcutil
 
 import (
 	"strings"
-
-	"google.golang.org/grpc/internal/envconfig"
 )
 
 // RegisteredCompressorNames holds names of the registered compressors.
@@ -40,8 +38,5 @@ func IsCompressorNameRegistered(name string) bool {
 // RegisteredCompressors returns a string of registered compressor names
 // separated by comma.
 func RegisteredCompressors() string {
-	if !envconfig.AdvertiseCompressors {
-		return ""
-	}
 	return strings.Join(RegisteredCompressorNames, ",")
 }

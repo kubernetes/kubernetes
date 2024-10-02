@@ -4,8 +4,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type BackupLister interface {
 
 // backupLister implements the BackupLister interface.
 type backupLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha1.Backup]
 }
 
 // NewBackupLister returns a new BackupLister.
 func NewBackupLister(indexer cache.Indexer) BackupLister {
-	return &backupLister{indexer: indexer}
-}
-
-// List lists all Backups in the indexer.
-func (s *backupLister) List(selector labels.Selector) (ret []*v1alpha1.Backup, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.Backup))
-	})
-	return ret, err
-}
-
-// Get retrieves the Backup from the index for a given name.
-func (s *backupLister) Get(name string) (*v1alpha1.Backup, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("backup"), name)
-	}
-	return obj.(*v1alpha1.Backup), nil
+	return &backupLister{listers.New[*v1alpha1.Backup](indexer, v1alpha1.Resource("backup"))}
 }

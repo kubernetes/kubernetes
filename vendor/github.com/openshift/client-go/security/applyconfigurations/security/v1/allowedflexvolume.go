@@ -2,13 +2,13 @@
 
 package v1
 
-// AllowedFlexVolumeApplyConfiguration represents an declarative configuration of the AllowedFlexVolume type for use
+// AllowedFlexVolumeApplyConfiguration represents a declarative configuration of the AllowedFlexVolume type for use
 // with apply.
 type AllowedFlexVolumeApplyConfiguration struct {
 	Driver *string `json:"driver,omitempty"`
 }
 
-// AllowedFlexVolumeApplyConfiguration constructs an declarative configuration of the AllowedFlexVolume type for use with
+// AllowedFlexVolumeApplyConfiguration constructs a declarative configuration of the AllowedFlexVolume type for use with
 // apply.
 func AllowedFlexVolume() *AllowedFlexVolumeApplyConfiguration {
 	return &AllowedFlexVolumeApplyConfiguration{}

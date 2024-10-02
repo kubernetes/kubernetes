@@ -29,7 +29,7 @@ import (
 )
 
 func TestWorkEstimator(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 
 	defaultCfg := DefaultWorkEstimatorConfig()
 

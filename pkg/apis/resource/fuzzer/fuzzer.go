@@ -18,23 +18,43 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 // Funcs contains the fuzzer functions for the resource group.
+//
+// Leaving fields empty which then get replaced by the default
+// leads to errors during roundtrip tests.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *resource.ResourceClaimSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(r *resource.DeviceRequest, c fuzz.Continue) {
+			c.FuzzNoCustom(r) // fuzz self without calling this function again
 
-			// Custom fuzzing for allocation mode: pick one valid mode randomly.
-			modes := []resource.AllocationMode{
-				resource.AllocationModeImmediate,
-				resource.AllocationModeWaitForFirstConsumer,
+			if r.AllocationMode == "" {
+				r.AllocationMode = []resource.DeviceAllocationMode{
+					resource.DeviceAllocationModeAll,
+					resource.DeviceAllocationModeExactCount,
+				}[c.Int31n(2)]
 			}
-			obj.AllocationMode = modes[c.Rand.Intn(len(modes))]
+		},
+		func(r *resource.DeviceAllocationConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			if r.Source == "" {
+				r.Source = []resource.AllocationConfigSource{
+					resource.AllocationConfigSourceClass,
+					resource.AllocationConfigSourceClaim,
+				}[c.Int31n(2)]
+			}
+		},
+		func(r *resource.OpaqueDeviceConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// Match the fuzzer default content for runtime.Object.
+			//
+			// This is necessary because randomly generated content
+			// might be valid JSON which changes during re-encoding.
+			r.Parameters = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
 		},
 	}
 }

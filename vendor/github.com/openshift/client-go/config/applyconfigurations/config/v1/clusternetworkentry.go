@@ -2,14 +2,14 @@
 
 package v1
 
-// ClusterNetworkEntryApplyConfiguration represents an declarative configuration of the ClusterNetworkEntry type for use
+// ClusterNetworkEntryApplyConfiguration represents a declarative configuration of the ClusterNetworkEntry type for use
 // with apply.
 type ClusterNetworkEntryApplyConfiguration struct {
 	CIDR       *string `json:"cidr,omitempty"`
 	HostPrefix *uint32 `json:"hostPrefix,omitempty"`
 }
 
-// ClusterNetworkEntryApplyConfiguration constructs an declarative configuration of the ClusterNetworkEntry type for use with
+// ClusterNetworkEntryApplyConfiguration constructs a declarative configuration of the ClusterNetworkEntry type for use with
 // apply.
 func ClusterNetworkEntry() *ClusterNetworkEntryApplyConfiguration {
 	return &ClusterNetworkEntryApplyConfiguration{}

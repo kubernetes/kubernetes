@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
@@ -144,11 +133,12 @@ type Int64Histogram interface {
 	Record(ctx context.Context, incr int64, options ...RecordOption)
 }
 
-// Int64HistogramConfig contains options for synchronous counter instruments
+// Int64HistogramConfig contains options for synchronous histogram instruments
 // that record int64 values.
 type Int64HistogramConfig struct {
-	description string
-	unit        string
+	description              string
+	unit                     string
+	explicitBucketBoundaries []float64
 }
 
 // NewInt64HistogramConfig returns a new [Int64HistogramConfig] with all opts
@@ -171,9 +161,66 @@ func (c Int64HistogramConfig) Unit() string {
 	return c.unit
 }
 
+// ExplicitBucketBoundaries returns the configured explicit bucket boundaries.
+func (c Int64HistogramConfig) ExplicitBucketBoundaries() []float64 {
+	return c.explicitBucketBoundaries
+}
+
 // Int64HistogramOption applies options to a [Int64HistogramConfig]. See
 // [InstrumentOption] for other options that can be used as an
 // Int64HistogramOption.
 type Int64HistogramOption interface {
 	applyInt64Histogram(Int64HistogramConfig) Int64HistogramConfig
+}
+
+// Int64Gauge is an instrument that records instantaneous int64 values.
+//
+// Warning: Methods may be added to this interface in minor releases. See
+// package documentation on API implementation for information on how to set
+// default behavior for unimplemented methods.
+type Int64Gauge interface {
+	// Users of the interface can ignore this. This embedded type is only used
+	// by implementations of this interface. See the "API Implementations"
+	// section of the package documentation for more information.
+	embedded.Int64Gauge
+
+	// Record records the instantaneous value.
+	//
+	// Use the WithAttributeSet (or, if performance is not a concern,
+	// the WithAttributes) option to include measurement attributes.
+	Record(ctx context.Context, value int64, options ...RecordOption)
+}
+
+// Int64GaugeConfig contains options for synchronous gauge instruments that
+// record int64 values.
+type Int64GaugeConfig struct {
+	description string
+	unit        string
+}
+
+// NewInt64GaugeConfig returns a new [Int64GaugeConfig] with all opts
+// applied.
+func NewInt64GaugeConfig(opts ...Int64GaugeOption) Int64GaugeConfig {
+	var config Int64GaugeConfig
+	for _, o := range opts {
+		config = o.applyInt64Gauge(config)
+	}
+	return config
+}
+
+// Description returns the configured description.
+func (c Int64GaugeConfig) Description() string {
+	return c.description
+}
+
+// Unit returns the configured unit.
+func (c Int64GaugeConfig) Unit() string {
+	return c.unit
+}
+
+// Int64GaugeOption applies options to a [Int64GaugeConfig]. See
+// [InstrumentOption] for other options that can be used as a
+// Int64GaugeOption.
+type Int64GaugeOption interface {
+	applyInt64Gauge(Int64GaugeConfig) Int64GaugeConfig
 }

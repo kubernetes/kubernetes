@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// NodeSpecApplyConfiguration represents an declarative configuration of the NodeSpec type for use
+// NodeSpecApplyConfiguration represents a declarative configuration of the NodeSpec type for use
 // with apply.
 type NodeSpecApplyConfiguration struct {
 	CgroupMode           *v1.CgroupMode               `json:"cgroupMode,omitempty"`
 	WorkerLatencyProfile *v1.WorkerLatencyProfileType `json:"workerLatencyProfile,omitempty"`
 }
 
-// NodeSpecApplyConfiguration constructs an declarative configuration of the NodeSpec type for use with
+// NodeSpecApplyConfiguration constructs a declarative configuration of the NodeSpec type for use with
 // apply.
 func NodeSpec() *NodeSpecApplyConfiguration {
 	return &NodeSpecApplyConfiguration{}

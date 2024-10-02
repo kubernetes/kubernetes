@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// UpdateApplyConfiguration represents an declarative configuration of the Update type for use
+// UpdateApplyConfiguration represents a declarative configuration of the Update type for use
 // with apply.
 type UpdateApplyConfiguration struct {
 	Architecture *v1.ClusterVersionArchitecture `json:"architecture,omitempty"`
@@ -15,7 +15,7 @@ type UpdateApplyConfiguration struct {
 	Force        *bool                          `json:"force,omitempty"`
 }
 
-// UpdateApplyConfiguration constructs an declarative configuration of the Update type for use with
+// UpdateApplyConfiguration constructs a declarative configuration of the Update type for use with
 // apply.
 func Update() *UpdateApplyConfiguration {
 	return &UpdateApplyConfiguration{}

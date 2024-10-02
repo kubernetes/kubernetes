@@ -40,6 +40,8 @@ var (
 	knownResizeConditions = map[v1.PersistentVolumeClaimConditionType]bool{
 		v1.PersistentVolumeClaimFileSystemResizePending: true,
 		v1.PersistentVolumeClaimResizing:                true,
+		v1.PersistentVolumeClaimControllerResizeError:   true,
+		v1.PersistentVolumeClaimNodeResizeError:         true,
 	}
 
 	// AnnPreResizeCapacity annotation is added to a PV when expanding volume.
@@ -140,7 +142,7 @@ func MarkResizeInProgressWithResizer(
 	}
 	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
 	newPVC := pvc.DeepCopy()
-	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
+	newPVC = MergeResizeConditionOnPVC(newPVC, conditions, false /* keepOldResizeConditions */)
 	newPVC = setResizer(newPVC, resizerName)
 	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
 }
@@ -154,7 +156,7 @@ func MarkControllerReisizeInProgress(pvc *v1.PersistentVolumeClaim, resizerName 
 	}
 	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
 	newPVC := pvc.DeepCopy()
-	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
+	newPVC = MergeResizeConditionOnPVC(newPVC, conditions, false /* keepOldResizeConditions */)
 	newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimControllerResizeInProgress)
 	newPVC = mergeStorageAllocatedResources(newPVC, newSize)
 	newPVC = setResizer(newPVC, resizerName)
@@ -196,7 +198,7 @@ func MarkForFSResize(
 		newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizePending)
 	}
 
-	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
+	newPVC = MergeResizeConditionOnPVC(newPVC, conditions, true /* keepOldResizeConditions */)
 	updatedPVC, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
 	return updatedPVC, err
 }
@@ -229,16 +231,25 @@ func MarkFSResizeFinished(
 		}
 	}
 
-	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{})
+	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{}, false /* keepOldResizeConditions */)
 	updatedPVC, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
 	return updatedPVC, err
 }
 
-// MarkNodeExpansionFailed marks a PVC for node expansion as failed. Kubelet should not retry expansion
+// MarkNodeExpansionInfeasible marks a PVC for node expansion as failed. Kubelet should not retry expansion
 // of volumes which are in failed state.
-func MarkNodeExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+func MarkNodeExpansionInfeasible(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface, err error) (*v1.PersistentVolumeClaim, error) {
 	newPVC := pvc.DeepCopy()
-	newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizeFailed)
+	newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizeInfeasible)
+	errorCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimNodeResizeError,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("failed to expand pvc with %v", err),
+	}
+	newPVC = MergeResizeConditionOnPVC(newPVC,
+		[]v1.PersistentVolumeClaimCondition{errorCondition},
+		true /* keepOldResizeConditions */)
 
 	patchBytes, err := createPVCPatch(pvc, newPVC, false /* addResourceVersionCheck */)
 	if err != nil {
@@ -249,6 +260,30 @@ func MarkNodeExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset
 		Patch(context.TODO(), pvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if updateErr != nil {
 		return pvc, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", pvc.Name, updateErr)
+	}
+	return updatedClaim, nil
+}
+
+func MarkNodeExpansionFailedCondition(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface, err error) (*v1.PersistentVolumeClaim, error) {
+	newPVC := pvc.DeepCopy()
+	errorCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimNodeResizeError,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("failed to expand pvc with %v", err),
+	}
+	newPVC = MergeResizeConditionOnPVC(newPVC,
+		[]v1.PersistentVolumeClaimCondition{errorCondition},
+		true /* keepOldResizeConditions */)
+	patchBytes, err := createPVCPatch(pvc, newPVC, false /* addResourceVersionCheck */)
+	if err != nil {
+		return pvc, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %w", pvc.Name, err)
+	}
+
+	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).
+		Patch(context.TODO(), pvc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	if updateErr != nil {
+		return pvc, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %w", pvc.Name, updateErr)
 	}
 	return updatedClaim, nil
 }
@@ -333,7 +368,7 @@ func addResourceVersion(patchBytes []byte, resourceVersion string) ([]byte, erro
 // leaving other conditions untouched.
 func MergeResizeConditionOnPVC(
 	pvc *v1.PersistentVolumeClaim,
-	resizeConditions []v1.PersistentVolumeClaimCondition) *v1.PersistentVolumeClaim {
+	resizeConditions []v1.PersistentVolumeClaimCondition, keepOldResizeConditions bool) *v1.PersistentVolumeClaim {
 	resizeConditionMap := map[v1.PersistentVolumeClaimConditionType]*resizeProcessStatus{}
 
 	for _, condition := range resizeConditions {
@@ -356,6 +391,10 @@ func MergeResizeConditionOnPVC(
 				newConditions = append(newConditions, condition)
 			}
 			newCondition.processed = true
+		} else if keepOldResizeConditions {
+			// if keepOldResizeConditions is true, we keep the old resize conditions that were present in the
+			// existing pvc.Status.Conditions field.
+			newConditions = append(newConditions, condition)
 		}
 	}
 

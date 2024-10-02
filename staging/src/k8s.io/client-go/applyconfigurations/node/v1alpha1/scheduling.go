@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// SchedulingApplyConfiguration represents an declarative configuration of the Scheduling type for use
+// SchedulingApplyConfiguration represents a declarative configuration of the Scheduling type for use
 // with apply.
 type SchedulingApplyConfiguration struct {
 	NodeSelector map[string]string                 `json:"nodeSelector,omitempty"`
 	Tolerations  []v1.TolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
 
-// SchedulingApplyConfiguration constructs an declarative configuration of the Scheduling type for use with
+// SchedulingApplyConfiguration constructs a declarative configuration of the Scheduling type for use with
 // apply.
 func Scheduling() *SchedulingApplyConfiguration {
 	return &SchedulingApplyConfiguration{}

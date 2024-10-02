@@ -20,17 +20,14 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	networkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -43,6 +40,7 @@ type IngressesGetter interface {
 type IngressInterface interface {
 	Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (*v1beta1.Ingress, error)
 	Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
@@ -51,206 +49,25 @@ type IngressInterface interface {
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error)
 	Apply(ctx context.Context, ingress *networkingv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, ingress *networkingv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
 	IngressExpansion
 }
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1beta1.Ingress, *v1beta1.IngressList, *networkingv1beta1.IngressApplyConfiguration]
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *NetworkingV1beta1Client, namespace string) *ingresses {
 	return &ingresses{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1beta1.Ingress, *v1beta1.IngressList, *networkingv1beta1.IngressApplyConfiguration](
+			"ingresses",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1beta1.Ingress { return &v1beta1.Ingress{} },
+			func() *v1beta1.IngressList { return &v1beta1.IngressList{} }),
 	}
-}
-
-// Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1beta1.IngressList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(ingress).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(ingress.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(ingress).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(ingress.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(ingress).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *ingresses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied ingress.
-func (c *ingresses) Apply(ctx context.Context, ingress *networkingv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error) {
-	if ingress == nil {
-		return nil, fmt.Errorf("ingress provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(ingress)
-	if err != nil {
-		return nil, err
-	}
-	name := ingress.Name
-	if name == nil {
-		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
-	}
-	result = &v1beta1.Ingress{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *ingresses) ApplyStatus(ctx context.Context, ingress *networkingv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error) {
-	if ingress == nil {
-		return nil, fmt.Errorf("ingress provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(ingress)
-	if err != nil {
-		return nil, err
-	}
-
-	name := ingress.Name
-	if name == nil {
-		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
-	}
-
-	result = &v1beta1.Ingress{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

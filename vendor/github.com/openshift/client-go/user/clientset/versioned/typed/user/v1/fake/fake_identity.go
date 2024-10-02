@@ -27,20 +27,22 @@ var identitiesKind = v1.SchemeGroupVersion.WithKind("Identity")
 
 // Get takes name of the identity, and returns the corresponding identity object, and an error if there is any.
 func (c *FakeIdentities) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Identity, err error) {
+	emptyResult := &v1.Identity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(identitiesResource, name), &v1.Identity{})
+		Invokes(testing.NewRootGetActionWithOptions(identitiesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Identity), err
 }
 
 // List takes label and field selectors, and returns the list of Identities that match those selectors.
 func (c *FakeIdentities) List(ctx context.Context, opts metav1.ListOptions) (result *v1.IdentityList, err error) {
+	emptyResult := &v1.IdentityList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(identitiesResource, identitiesKind, opts), &v1.IdentityList{})
+		Invokes(testing.NewRootListActionWithOptions(identitiesResource, identitiesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,25 +61,27 @@ func (c *FakeIdentities) List(ctx context.Context, opts metav1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested identities.
 func (c *FakeIdentities) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(identitiesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(identitiesResource, opts))
 }
 
 // Create takes the representation of a identity and creates it.  Returns the server's representation of the identity, and an error, if there is any.
 func (c *FakeIdentities) Create(ctx context.Context, identity *v1.Identity, opts metav1.CreateOptions) (result *v1.Identity, err error) {
+	emptyResult := &v1.Identity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(identitiesResource, identity), &v1.Identity{})
+		Invokes(testing.NewRootCreateActionWithOptions(identitiesResource, identity, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Identity), err
 }
 
 // Update takes the representation of a identity and updates it. Returns the server's representation of the identity, and an error, if there is any.
 func (c *FakeIdentities) Update(ctx context.Context, identity *v1.Identity, opts metav1.UpdateOptions) (result *v1.Identity, err error) {
+	emptyResult := &v1.Identity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(identitiesResource, identity), &v1.Identity{})
+		Invokes(testing.NewRootUpdateActionWithOptions(identitiesResource, identity, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Identity), err
 }
@@ -91,7 +95,7 @@ func (c *FakeIdentities) Delete(ctx context.Context, name string, opts metav1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeIdentities) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(identitiesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(identitiesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.IdentityList{})
 	return err
@@ -99,10 +103,11 @@ func (c *FakeIdentities) DeleteCollection(ctx context.Context, opts metav1.Delet
 
 // Patch applies the patch and returns the patched identity.
 func (c *FakeIdentities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Identity, err error) {
+	emptyResult := &v1.Identity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, name, pt, data, subresources...), &v1.Identity{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(identitiesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Identity), err
 }
@@ -120,10 +125,11 @@ func (c *FakeIdentities) Apply(ctx context.Context, identity *userv1.IdentityApp
 	if name == nil {
 		return nil, fmt.Errorf("identity.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Identity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, *name, types.ApplyPatchType, data), &v1.Identity{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(identitiesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Identity), err
 }

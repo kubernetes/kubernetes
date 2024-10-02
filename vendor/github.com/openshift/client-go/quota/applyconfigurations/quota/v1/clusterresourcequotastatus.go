@@ -7,14 +7,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ClusterResourceQuotaStatusApplyConfiguration represents an declarative configuration of the ClusterResourceQuotaStatus type for use
+// ClusterResourceQuotaStatusApplyConfiguration represents a declarative configuration of the ClusterResourceQuotaStatus type for use
 // with apply.
 type ClusterResourceQuotaStatusApplyConfiguration struct {
 	Total      *v1.ResourceQuotaStatus                  `json:"total,omitempty"`
 	Namespaces *quotav1.ResourceQuotasStatusByNamespace `json:"namespaces,omitempty"`
 }
 
-// ClusterResourceQuotaStatusApplyConfiguration constructs an declarative configuration of the ClusterResourceQuotaStatus type for use with
+// ClusterResourceQuotaStatusApplyConfiguration constructs a declarative configuration of the ClusterResourceQuotaStatus type for use with
 // apply.
 func ClusterResourceQuotaStatus() *ClusterResourceQuotaStatusApplyConfiguration {
 	return &ClusterResourceQuotaStatusApplyConfiguration{}

@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TemplateInstanceConditionApplyConfiguration represents an declarative configuration of the TemplateInstanceCondition type for use
+// TemplateInstanceConditionApplyConfiguration represents a declarative configuration of the TemplateInstanceCondition type for use
 // with apply.
 type TemplateInstanceConditionApplyConfiguration struct {
 	Type               *v1.TemplateInstanceConditionType `json:"type,omitempty"`
@@ -18,7 +18,7 @@ type TemplateInstanceConditionApplyConfiguration struct {
 	Message            *string                           `json:"message,omitempty"`
 }
 
-// TemplateInstanceConditionApplyConfiguration constructs an declarative configuration of the TemplateInstanceCondition type for use with
+// TemplateInstanceConditionApplyConfiguration constructs a declarative configuration of the TemplateInstanceCondition type for use with
 // apply.
 func TemplateInstanceCondition() *TemplateInstanceConditionApplyConfiguration {
 	return &TemplateInstanceConditionApplyConfiguration{}

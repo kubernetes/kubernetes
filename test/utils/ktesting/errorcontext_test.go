@@ -108,7 +108,7 @@ second error`,
 			assert.Equal(t, !tc.expectNoFail, tCtx.Failed(), "Failed()")
 			if tc.expectError == "" {
 				assert.NoError(t, err)
-			} else if assert.NotNil(t, err) {
+			} else if assert.Error(t, err) {
 				assert.Equal(t, tc.expectError, err.Error())
 			}
 		})

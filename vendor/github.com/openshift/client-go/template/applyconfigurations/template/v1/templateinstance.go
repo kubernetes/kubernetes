@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// TemplateInstanceApplyConfiguration represents an declarative configuration of the TemplateInstance type for use
+// TemplateInstanceApplyConfiguration represents a declarative configuration of the TemplateInstance type for use
 // with apply.
 type TemplateInstanceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type TemplateInstanceApplyConfiguration struct {
 	Status                           *TemplateInstanceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// TemplateInstance constructs an declarative configuration of the TemplateInstance type for use with
+// TemplateInstance constructs a declarative configuration of the TemplateInstance type for use with
 // apply.
 func TemplateInstance(name, namespace string) *TemplateInstanceApplyConfiguration {
 	b := &TemplateInstanceApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *TemplateInstanceApplyConfiguration) WithSpec(value *TemplateInstanceSpe
 func (b *TemplateInstanceApplyConfiguration) WithStatus(value *TemplateInstanceStatusApplyConfiguration) *TemplateInstanceApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *TemplateInstanceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

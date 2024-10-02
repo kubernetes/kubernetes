@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// TemplateApplyConfiguration represents an declarative configuration of the Template type for use
+// TemplateApplyConfiguration represents a declarative configuration of the Template type for use
 // with apply.
 type TemplateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -23,7 +23,7 @@ type TemplateApplyConfiguration struct {
 	ObjectLabels                     map[string]string             `json:"labels,omitempty"`
 }
 
-// Template constructs an declarative configuration of the Template type for use with
+// Template constructs a declarative configuration of the Template type for use with
 // apply.
 func Template(name, namespace string) *TemplateApplyConfiguration {
 	b := &TemplateApplyConfiguration{}
@@ -271,4 +271,10 @@ func (b *TemplateApplyConfiguration) WithObjectLabels(entries map[string]string)
 		b.ObjectLabels[k] = v
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *TemplateApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -2,13 +2,13 @@
 
 package v1
 
-// ImageTagMirrorSetSpecApplyConfiguration represents an declarative configuration of the ImageTagMirrorSetSpec type for use
+// ImageTagMirrorSetSpecApplyConfiguration represents a declarative configuration of the ImageTagMirrorSetSpec type for use
 // with apply.
 type ImageTagMirrorSetSpecApplyConfiguration struct {
 	ImageTagMirrors []ImageTagMirrorsApplyConfiguration `json:"imageTagMirrors,omitempty"`
 }
 
-// ImageTagMirrorSetSpecApplyConfiguration constructs an declarative configuration of the ImageTagMirrorSetSpec type for use with
+// ImageTagMirrorSetSpecApplyConfiguration constructs a declarative configuration of the ImageTagMirrorSetSpec type for use with
 // apply.
 func ImageTagMirrorSetSpec() *ImageTagMirrorSetSpecApplyConfiguration {
 	return &ImageTagMirrorSetSpecApplyConfiguration{}

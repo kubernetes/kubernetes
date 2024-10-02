@@ -9,6 +9,7 @@ for general contribution guidelines.
 
 ## Maintainers (in alphabetical order)
 
+- [atollena](https://github.com/atollena), Datadog, Inc.
 - [cesarghali](https://github.com/cesarghali), Google LLC
 - [dfawley](https://github.com/dfawley), Google LLC
 - [easwars](https://github.com/easwars), Google LLC

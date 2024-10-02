@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterImagePolicyApplyConfiguration represents an declarative configuration of the ClusterImagePolicy type for use
+// ClusterImagePolicyApplyConfiguration represents a declarative configuration of the ClusterImagePolicy type for use
 // with apply.
 type ClusterImagePolicyApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ClusterImagePolicyApplyConfiguration struct {
 	Status                           *ClusterImagePolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ClusterImagePolicy constructs an declarative configuration of the ClusterImagePolicy type for use with
+// ClusterImagePolicy constructs a declarative configuration of the ClusterImagePolicy type for use with
 // apply.
 func ClusterImagePolicy(name string) *ClusterImagePolicyApplyConfiguration {
 	b := &ClusterImagePolicyApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ClusterImagePolicyApplyConfiguration) WithSpec(value *ClusterImagePolic
 func (b *ClusterImagePolicyApplyConfiguration) WithStatus(value *ClusterImagePolicyStatusApplyConfiguration) *ClusterImagePolicyApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterImagePolicyApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

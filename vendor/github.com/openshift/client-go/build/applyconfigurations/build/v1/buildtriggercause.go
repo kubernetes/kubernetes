@@ -2,7 +2,7 @@
 
 package v1
 
-// BuildTriggerCauseApplyConfiguration represents an declarative configuration of the BuildTriggerCause type for use
+// BuildTriggerCauseApplyConfiguration represents a declarative configuration of the BuildTriggerCause type for use
 // with apply.
 type BuildTriggerCauseApplyConfiguration struct {
 	Message          *string                                  `json:"message,omitempty"`
@@ -13,7 +13,7 @@ type BuildTriggerCauseApplyConfiguration struct {
 	BitbucketWebHook *BitbucketWebHookCauseApplyConfiguration `json:"bitbucketWebHook,omitempty"`
 }
 
-// BuildTriggerCauseApplyConfiguration constructs an declarative configuration of the BuildTriggerCause type for use with
+// BuildTriggerCauseApplyConfiguration constructs a declarative configuration of the BuildTriggerCause type for use with
 // apply.
 func BuildTriggerCause() *BuildTriggerCauseApplyConfiguration {
 	return &BuildTriggerCauseApplyConfiguration{}

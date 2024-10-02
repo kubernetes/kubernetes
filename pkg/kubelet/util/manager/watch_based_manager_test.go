@@ -189,7 +189,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 		store.DeleteReference("ns", "name", types.UID(fmt.Sprintf("pod-%d", i)))
 	}
 	actions := fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 2, "unexpected actions")
 
 	// Final delete also doesn't trigger any action.
 	store.DeleteReference("ns", "name", "pod")
@@ -198,7 +198,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	actions = fakeClient.Actions()
-	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
+	assert.Len(t, actions, 2, "unexpected actions")
 }
 
 func TestImmutableSecretStopsTheReflector(t *testing.T) {

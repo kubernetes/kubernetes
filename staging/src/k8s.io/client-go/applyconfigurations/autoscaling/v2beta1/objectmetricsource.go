@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ObjectMetricSourceApplyConfiguration represents an declarative configuration of the ObjectMetricSource type for use
+// ObjectMetricSourceApplyConfiguration represents a declarative configuration of the ObjectMetricSource type for use
 // with apply.
 type ObjectMetricSourceApplyConfiguration struct {
 	Target       *CrossVersionObjectReferenceApplyConfiguration `json:"target,omitempty"`
@@ -33,7 +33,7 @@ type ObjectMetricSourceApplyConfiguration struct {
 	AverageValue *resource.Quantity                             `json:"averageValue,omitempty"`
 }
 
-// ObjectMetricSourceApplyConfiguration constructs an declarative configuration of the ObjectMetricSource type for use with
+// ObjectMetricSourceApplyConfiguration constructs a declarative configuration of the ObjectMetricSource type for use with
 // apply.
 func ObjectMetricSource() *ObjectMetricSourceApplyConfiguration {
 	return &ObjectMetricSourceApplyConfiguration{}

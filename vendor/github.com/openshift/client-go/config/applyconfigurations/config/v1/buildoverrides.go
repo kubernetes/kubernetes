@@ -6,7 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildOverridesApplyConfiguration represents an declarative configuration of the BuildOverrides type for use
+// BuildOverridesApplyConfiguration represents a declarative configuration of the BuildOverrides type for use
 // with apply.
 type BuildOverridesApplyConfiguration struct {
 	ImageLabels  []ImageLabelApplyConfiguration `json:"imageLabels,omitempty"`
@@ -15,7 +15,7 @@ type BuildOverridesApplyConfiguration struct {
 	ForcePull    *bool                          `json:"forcePull,omitempty"`
 }
 
-// BuildOverridesApplyConfiguration constructs an declarative configuration of the BuildOverrides type for use with
+// BuildOverridesApplyConfiguration constructs a declarative configuration of the BuildOverrides type for use with
 // apply.
 func BuildOverrides() *BuildOverridesApplyConfiguration {
 	return &BuildOverridesApplyConfiguration{}

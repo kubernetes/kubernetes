@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// CronJobStatusApplyConfiguration represents an declarative configuration of the CronJobStatus type for use
+// CronJobStatusApplyConfiguration represents a declarative configuration of the CronJobStatus type for use
 // with apply.
 type CronJobStatusApplyConfiguration struct {
 	Active             []v1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
@@ -31,7 +31,7 @@ type CronJobStatusApplyConfiguration struct {
 	LastSuccessfulTime *metav1.Time                           `json:"lastSuccessfulTime,omitempty"`
 }
 
-// CronJobStatusApplyConfiguration constructs an declarative configuration of the CronJobStatus type for use with
+// CronJobStatusApplyConfiguration constructs a declarative configuration of the CronJobStatus type for use with
 // apply.
 func CronJobStatus() *CronJobStatusApplyConfiguration {
 	return &CronJobStatusApplyConfiguration{}

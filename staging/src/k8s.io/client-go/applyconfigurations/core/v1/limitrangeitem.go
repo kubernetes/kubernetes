@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// LimitRangeItemApplyConfiguration represents an declarative configuration of the LimitRangeItem type for use
+// LimitRangeItemApplyConfiguration represents a declarative configuration of the LimitRangeItem type for use
 // with apply.
 type LimitRangeItemApplyConfiguration struct {
 	Type                 *v1.LimitType    `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type LimitRangeItemApplyConfiguration struct {
 	MaxLimitRequestRatio *v1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
 }
 
-// LimitRangeItemApplyConfiguration constructs an declarative configuration of the LimitRangeItem type for use with
+// LimitRangeItemApplyConfiguration constructs a declarative configuration of the LimitRangeItem type for use with
 // apply.
 func LimitRangeItem() *LimitRangeItemApplyConfiguration {
 	return &LimitRangeItemApplyConfiguration{}

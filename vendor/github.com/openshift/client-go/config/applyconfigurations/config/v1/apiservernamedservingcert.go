@@ -2,14 +2,14 @@
 
 package v1
 
-// APIServerNamedServingCertApplyConfiguration represents an declarative configuration of the APIServerNamedServingCert type for use
+// APIServerNamedServingCertApplyConfiguration represents a declarative configuration of the APIServerNamedServingCert type for use
 // with apply.
 type APIServerNamedServingCertApplyConfiguration struct {
 	Names              []string                               `json:"names,omitempty"`
 	ServingCertificate *SecretNameReferenceApplyConfiguration `json:"servingCertificate,omitempty"`
 }
 
-// APIServerNamedServingCertApplyConfiguration constructs an declarative configuration of the APIServerNamedServingCert type for use with
+// APIServerNamedServingCertApplyConfiguration constructs a declarative configuration of the APIServerNamedServingCert type for use with
 // apply.
 func APIServerNamedServingCert() *APIServerNamedServingCertApplyConfiguration {
 	return &APIServerNamedServingCertApplyConfiguration{}

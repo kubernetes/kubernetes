@@ -6,9 +6,9 @@
 
 CBOR is a [trusted alternative](https://www.rfc-editor.org/rfc/rfc8949.html#name-comparison-of-other-binary-) to JSON, MessagePack, Protocol Buffers, etc.&nbsp; CBOR is an Internet&nbsp;Standard defined by [IETF&nbsp;STD&nbsp;94 (RFC&nbsp;8949)](https://www.rfc-editor.org/info/std94) and is designed to be relevant for decades.
 
-`fxamacker/cbor` is used in projects by Arm Ltd., Cisco, Dapper Labs, EdgeX&nbsp;Foundry, Fraunhofer&#8209;AISEC, Let's&nbsp;Encrypt (ISRG), Linux&nbsp;Foundation, Microsoft, Mozilla, Oasis&nbsp;Protocol, Tailscale, Teleport, [and&nbsp;others](https://github.com/fxamacker/cbor#who-uses-fxamackercbor).
+`fxamacker/cbor` is used in projects by Arm Ltd., Cisco, EdgeX&nbsp;Foundry, Flow Foundation, Fraunhofer&#8209;AISEC, Kubernetes, Let's&nbsp;Encrypt (ISRG), Linux&nbsp;Foundation, Microsoft, Mozilla, Oasis&nbsp;Protocol, Tailscale, Teleport, [etc](https://github.com/fxamacker/cbor#who-uses-fxamackercbor).
 
-See [Quick&nbsp;Start](#quick-start) and [Releases](https://github.com/fxamacker/cbor/releases/).  🆕 `UnmarshalFirst` and `DiagnoseFirst` can decode CBOR Sequences.
+See [Quick&nbsp;Start](#quick-start) and [Releases](https://github.com/fxamacker/cbor/releases/).  🆕 `UnmarshalFirst` and `DiagnoseFirst` can decode CBOR Sequences.  `cbor.MarshalToBuffer()` and `UserBufferEncMode` accepts user-specified buffer.
 
 ## fxamacker/cbor
 
@@ -17,7 +17,6 @@ See [Quick&nbsp;Start](#quick-start) and [Releases](https://github.com/fxamacker
 [![CodeQL](https://github.com/fxamacker/cbor/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/fxamacker/cbor/actions/workflows/codeql-analysis.yml)
 [![](https://img.shields.io/badge/fuzzing-passing-44c010)](#fuzzing-and-code-coverage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fxamacker/cbor)](https://goreportcard.com/report/github.com/fxamacker/cbor)
-[![](https://img.shields.io/ossf-scorecard/github.com/fxamacker/cbor?label=openssf%20scorecard)](https://github.com/fxamacker/cbor#fuzzing-and-code-coverage) 
 
 `fxamacker/cbor` is a CBOR codec in full conformance with [IETF STD&nbsp;94 (RFC&nbsp;8949)](https://www.rfc-editor.org/info/std94). It also supports CBOR Sequences ([RFC&nbsp;8742](https://www.rfc-editor.org/rfc/rfc8742.html)) and Extended Diagnostic Notation ([Appendix G of RFC&nbsp;8610](https://www.rfc-editor.org/rfc/rfc8610.html#appendix-G)).
 
@@ -221,7 +220,7 @@ __Install__: `go get github.com/fxamacker/cbor/v2` and `import "github.com/fxama
 
 This library can encode and decode CBOR (RFC 8949) and CBOR Sequences (RFC 8742).
 
-- __CBOR data item__ is a single piece of CBOR data and its structure may contain zero, one, or more nested data items.
+- __CBOR data item__ is a single piece of CBOR data and its structure may contain 0 or more nested data items.
 - __CBOR sequence__ is a concatenation of 0 or more encoded CBOR data items.
 
 Configurable limits and options can be used to balance trade-offs.
@@ -241,6 +240,9 @@ b, err = cbor.Marshal(v)        // encode v to []byte b
 err = cbor.Unmarshal(b, &v)     // decode []byte b to v
 decoder = cbor.NewDecoder(r)    // create decoder with io.Reader r
 err = decoder.Decode(&v)        // decode a CBOR data item to v
+
+// v2.7.0 added MarshalToBuffer() and UserBufferEncMode interface.
+err = cbor.MarshalToBuffer(v, b) // encode v to b instead of using built-in buf pool.
 
 // v2.5.0 added new functions that return remaining bytes.
 
@@ -296,6 +298,17 @@ err := encoder.Encode(v)           // encode v to io.Writer w
 ```
 
 Default mode and custom modes automatically apply struct tags.
+
+### User Specified Buffer for Encoding (v2.7.0)
+
+`UserBufferEncMode` interface extends `EncMode` interface to add `MarshalToBuffer()`. It accepts a user-specified buffer instead of using built-in buffer pool.
+
+```Go
+em, err := myEncOptions.UserBufferEncMode() // create UserBufferEncMode mode
+
+var buf bytes.Buffer
+err = em.MarshalToBuffer(v, &buf) // encode v to provided buf
+```
 
 ### Struct Tags
 
@@ -459,11 +472,13 @@ Default limits may need to be increased for systems handling very large data (e.
 
 ## Status
 
-v2.6.0 (February 2024) adds important new features, optimizations, and bug fixes. It is especially useful to systems that need to convert data between CBOR and JSON.  New options and optimizations improve handling of bignum, integers, maps, and strings.
+v2.7.0 (June 23, 2024) adds features and improvements that help large projects (e.g. Kubernetes) use CBOR as an alternative to JSON and Protocol Buffers. Other improvements include speedups, improved memory use, bug fixes, new serialization options, etc.   It passed fuzz tests (5+ billion executions) and is production quality.
 
 For more details, see [release notes](https://github.com/fxamacker/cbor/releases).
 
 ### Prior Release
+
+[v2.6.0](https://github.com/fxamacker/cbor/releases/tag/v2.6.0) (February 2024) adds important new features, optimizations, and bug fixes. It is especially useful to systems that need to convert data between CBOR and JSON.  New options and optimizations improve handling of bignum, integers, maps, and strings.
 
 v2.5.0 was released on Sunday, August 13, 2023 with new features and important bug fixes.  It is fuzz tested and production quality after extended beta [v2.5.0-beta](https://github.com/fxamacker/cbor/releases/tag/v2.5.0-beta) (Dec 2022) -> [v2.5.0](https://github.com/fxamacker/cbor/releases/tag/v2.5.0) (Aug 2023).
 
@@ -534,7 +549,7 @@ geomean                                                      2.782              
 
 ## Who uses fxamacker/cbor
 
-`fxamacker/cbor` is used in projects by Arm Ltd., Berlin Institute of Health at Charité, Chainlink, Cisco, Confidential Computing Consortium, ConsenSys, Dapper&nbsp;Labs, EdgeX&nbsp;Foundry, F5, FIDO Alliance, Fraunhofer&#8209;AISEC, Let's Encrypt (ISRG), Linux&nbsp;Foundation, Matrix.org, Microsoft, Mozilla, National&nbsp;Cybersecurity&nbsp;Agency&nbsp;of&nbsp;France (govt), Netherlands (govt), Oasis Protocol, Smallstep, Tailscale, Taurus SA, Teleport, TIBCO, and others.
+`fxamacker/cbor` is used in projects by Arm Ltd., Berlin Institute of Health at Charité, Chainlink, Cisco, Confidential Computing Consortium, ConsenSys, Dapper&nbsp;Labs, EdgeX&nbsp;Foundry, F5, FIDO Alliance, Fraunhofer&#8209;AISEC, Kubernetes, Let's Encrypt (ISRG), Linux&nbsp;Foundation, Matrix.org, Microsoft, Mozilla, National&nbsp;Cybersecurity&nbsp;Agency&nbsp;of&nbsp;France (govt), Netherlands (govt), Oasis Protocol, Smallstep, Tailscale, Taurus SA, Teleport, TIBCO, and others.
 
 `fxamacker/cbor` passed multiple confidential security assessments.  A [nonconfidential security assessment](https://github.com/veraison/go-cose/blob/v1.0.0-rc.1/reports/NCC_Microsoft-go-cose-Report_2022-05-26_v1.0.pdf) (prepared by NCC Group for Microsoft Corporation) includes a subset of fxamacker/cbor v2.4.0 in its scope.
 
@@ -656,6 +671,8 @@ Many thanks to all the contributors on this project!
 I'm especially grateful to Bastian Müller and Dieter Shirley for suggesting and collaborating on CBOR stream mode, and much more.
 
 I'm very grateful to Stefan Tatschner, Yawning Angel, Jernej Kos, x448, ZenGround0, and Jakob Borg for their contributions or support in the very early days.
+
+Big thanks to Ben Luddy for his contributions in v2.6.0 and v2.7.0.
 
 This library clearly wouldn't be possible without Carsten Bormann authoring CBOR RFCs.
 

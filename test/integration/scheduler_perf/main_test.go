@@ -31,9 +31,15 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+// Run with -v=2, this is the default log level in production.
+//
+// In a PR this can be bumped up temporarily to run pull-kubernetes-scheduler-perf
+// with more log output.
+const defaultVerbosity = 2
+
 func TestMain(m *testing.M) {
 	// Run with -v=2, this is the default log level in production.
-	ktesting.SetDefaultVerbosity(2)
+	ktesting.SetDefaultVerbosity(defaultVerbosity)
 
 	// test/integration/framework/flags.go unconditionally initializes the
 	// logging flags. That's correct for most tests, but in the
@@ -56,6 +62,7 @@ func TestMain(m *testing.M) {
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 			"Options are:\n"+strings.Join(featureGate.KnownFeatures(), "\n"))
 	c := logsapi.NewLoggingConfiguration()
+	c.Verbosity = defaultVerbosity
 
 	// This would fail if we hadn't removed the logging flags above.
 	logsapi.AddGoFlags(c, flag.CommandLine)

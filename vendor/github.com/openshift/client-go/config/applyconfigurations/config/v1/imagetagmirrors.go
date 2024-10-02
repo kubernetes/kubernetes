@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ImageTagMirrorsApplyConfiguration represents an declarative configuration of the ImageTagMirrors type for use
+// ImageTagMirrorsApplyConfiguration represents a declarative configuration of the ImageTagMirrors type for use
 // with apply.
 type ImageTagMirrorsApplyConfiguration struct {
 	Source             *string                `json:"source,omitempty"`
@@ -14,7 +14,7 @@ type ImageTagMirrorsApplyConfiguration struct {
 	MirrorSourcePolicy *v1.MirrorSourcePolicy `json:"mirrorSourcePolicy,omitempty"`
 }
 
-// ImageTagMirrorsApplyConfiguration constructs an declarative configuration of the ImageTagMirrors type for use with
+// ImageTagMirrorsApplyConfiguration constructs a declarative configuration of the ImageTagMirrors type for use with
 // apply.
 func ImageTagMirrors() *ImageTagMirrorsApplyConfiguration {
 	return &ImageTagMirrorsApplyConfiguration{}

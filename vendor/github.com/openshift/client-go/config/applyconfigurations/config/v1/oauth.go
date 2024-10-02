@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// OAuthApplyConfiguration represents an declarative configuration of the OAuth type for use
+// OAuthApplyConfiguration represents a declarative configuration of the OAuth type for use
 // with apply.
 type OAuthApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type OAuthApplyConfiguration struct {
 	Status                           *apiconfigv1.OAuthStatus     `json:"status,omitempty"`
 }
 
-// OAuth constructs an declarative configuration of the OAuth type for use with
+// OAuth constructs a declarative configuration of the OAuth type for use with
 // apply.
 func OAuth(name string) *OAuthApplyConfiguration {
 	b := &OAuthApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *OAuthApplyConfiguration) WithSpec(value *OAuthSpecApplyConfiguration) *
 func (b *OAuthApplyConfiguration) WithStatus(value apiconfigv1.OAuthStatus) *OAuthApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *OAuthApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

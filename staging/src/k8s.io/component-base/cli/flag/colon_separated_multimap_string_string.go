@@ -33,14 +33,21 @@ import (
 // while still allowing the distribution of key-value pairs across multiple flag invocations.
 // For example: `--flag "a:hello" --flag "b:again" --flag "b:beautiful" --flag "c:world"` results in `{"a": ["hello"], "b": ["again", "beautiful"], "c": ["world"]}`
 type ColonSeparatedMultimapStringString struct {
-	Multimap    *map[string][]string
-	initialized bool // set to true after the first Set call
+	Multimap             *map[string][]string
+	initialized          bool // set to true after the first Set call
+	allowDefaultEmptyKey bool
 }
 
 // NewColonSeparatedMultimapStringString takes a pointer to a map[string][]string and returns the
 // ColonSeparatedMultimapStringString flag parsing shim for that map.
 func NewColonSeparatedMultimapStringString(m *map[string][]string) *ColonSeparatedMultimapStringString {
 	return &ColonSeparatedMultimapStringString{Multimap: m}
+}
+
+// NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey takes a pointer to a map[string][]string and returns the
+// ColonSeparatedMultimapStringString flag parsing shim for that map. It allows default empty key with no colon in the flag.
+func NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(m *map[string][]string) *ColonSeparatedMultimapStringString {
+	return &ColonSeparatedMultimapStringString{Multimap: m, allowDefaultEmptyKey: true}
 }
 
 // Set implements github.com/spf13/pflag.Value
@@ -58,11 +65,16 @@ func (m *ColonSeparatedMultimapStringString) Set(value string) error {
 			continue
 		}
 		kv := strings.SplitN(pair, ":", 2)
-		if len(kv) != 2 {
-			return fmt.Errorf("malformed pair, expect string:string")
+		var k, v string
+		if m.allowDefaultEmptyKey && len(kv) == 1 {
+			v = strings.TrimSpace(kv[0])
+		} else {
+			if len(kv) != 2 {
+				return fmt.Errorf("malformed pair, expect string:string")
+			}
+			k = strings.TrimSpace(kv[0])
+			v = strings.TrimSpace(kv[1])
 		}
-		k := strings.TrimSpace(kv[0])
-		v := strings.TrimSpace(kv[1])
 		(*m.Multimap)[k] = append((*m.Multimap)[k], v)
 	}
 	return nil

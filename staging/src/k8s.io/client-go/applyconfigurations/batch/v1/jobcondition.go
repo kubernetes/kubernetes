@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// JobConditionApplyConfiguration represents an declarative configuration of the JobCondition type for use
+// JobConditionApplyConfiguration represents a declarative configuration of the JobCondition type for use
 // with apply.
 type JobConditionApplyConfiguration struct {
 	Type               *v1.JobConditionType    `json:"type,omitempty"`
@@ -35,7 +35,7 @@ type JobConditionApplyConfiguration struct {
 	Message            *string                 `json:"message,omitempty"`
 }
 
-// JobConditionApplyConfiguration constructs an declarative configuration of the JobCondition type for use with
+// JobConditionApplyConfiguration constructs a declarative configuration of the JobCondition type for use with
 // apply.
 func JobCondition() *JobConditionApplyConfiguration {
 	return &JobConditionApplyConfiguration{}

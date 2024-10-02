@@ -234,7 +234,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		}
 	}
 
-	err = m.aquireInhibitLock()
+	err = m.acquireInhibitLock()
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 
 					m.processShutdownEvent()
 				} else {
-					m.aquireInhibitLock()
+					_ = m.acquireInhibitLock()
 				}
 			}
 		}
@@ -295,7 +295,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 	return stop, nil
 }
 
-func (m *managerImpl) aquireInhibitLock() error {
+func (m *managerImpl) acquireInhibitLock() error {
 	lock, err := m.dbusCon.InhibitShutdown()
 	if err != nil {
 		return err
@@ -381,14 +381,12 @@ func (m *managerImpl) processShutdownEvent() error {
 					}
 					status.Message = nodeShutdownMessage
 					status.Reason = nodeShutdownReason
-					if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-						podutil.UpdatePodCondition(status, &v1.PodCondition{
-							Type:    v1.DisruptionTarget,
-							Status:  v1.ConditionTrue,
-							Reason:  v1.PodReasonTerminationByKubelet,
-							Message: nodeShutdownMessage,
-						})
-					}
+					podutil.UpdatePodCondition(status, &v1.PodCondition{
+						Type:    v1.DisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonTerminationByKubelet,
+						Message: nodeShutdownMessage,
+					})
 				}); err != nil {
 					m.logger.V(1).Info("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {

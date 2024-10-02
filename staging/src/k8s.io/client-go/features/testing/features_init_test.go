@@ -30,24 +30,123 @@ func TestDriveInitDefaultFeatureGates(t *testing.T) {
 	featureGates := features.FeatureGates()
 	assertFunctionPanicsWithMessage(t, func() { featureGates.Enabled("FakeFeatureGate") }, "features.FeatureGates().Enabled", fmt.Sprintf("feature %q is not registered in FeatureGate", "FakeFeatureGate"))
 
-	fakeFeatureGates := &alwaysEnabledFakeGates{}
-	require.True(t, fakeFeatureGates.Enabled("FakeFeatureGate"))
+	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
+	require.True(t, fakeGates.Enabled("FakeFeatureGate"))
 
-	features.ReplaceFeatureGates(fakeFeatureGates)
+	features.ReplaceFeatureGates(fakeGates)
 	featureGates = features.FeatureGates()
 
 	assertFeatureGatesType(t, featureGates)
 	require.True(t, featureGates.Enabled("FakeFeatureGate"))
 }
 
-type alwaysEnabledFakeGates struct{}
+func TestSetFeatureGatesDuringTest(t *testing.T) {
+	featureA := features.Feature("FeatureA")
+	featureB := features.Feature("FeatureB")
+	fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true, featureB: true}}
+	features.ReplaceFeatureGates(fakeGates)
+	t.Cleanup(func() {
+		// since cleanup functions will be called in last added, first called order.
+		// check if the original feature wasn't restored
+		require.True(t, features.FeatureGates().Enabled(featureA), "the original feature = %v wasn't restored", featureA)
+	})
 
-func (f *alwaysEnabledFakeGates) Enabled(features.Feature) bool {
-	return true
+	SetFeatureDuringTest(t, featureA, false)
+
+	require.False(t, features.FeatureGates().Enabled(featureA))
+	require.True(t, features.FeatureGates().Enabled(featureB))
+}
+
+func TestSetFeatureGatesDuringTestPanics(t *testing.T) {
+	fakeGates := &fakeFeatureGates{features: map[features.Feature]bool{"FakeFeatureGate": true}}
+
+	features.ReplaceFeatureGates(fakeGates)
+	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "UnknownFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("feature %q is not registered in featureGates", "UnknownFeature"))
+
+	readOnlyGates := &readOnlyAlwaysDisabledFeatureGates{}
+	features.ReplaceFeatureGates(readOnlyGates)
+	assertFunctionPanicsWithMessage(t, func() { SetFeatureDuringTest(t, "FakeFeature", false) }, "SetFeatureDuringTest", fmt.Sprintf("clientfeatures.FeatureGates(): %T does not implement featureGatesSetter interface", readOnlyGates))
+}
+
+func TestOverridesForSetFeatureGatesDuringTest(t *testing.T) {
+	scenarios := []struct {
+		name           string
+		firstTestName  string
+		secondTestName string
+		expectError    bool
+	}{
+		{
+			name:           "concurrent tests setting the same feature fail",
+			firstTestName:  "fooTest",
+			secondTestName: "barTest",
+			expectError:    true,
+		},
+
+		{
+			name:           "same test setting the same feature does not fail",
+			firstTestName:  "fooTest",
+			secondTestName: "fooTest",
+			expectError:    false,
+		},
+
+		{
+			name:           "subtests setting the same feature don't not fail",
+			firstTestName:  "fooTest",
+			secondTestName: "fooTest/scenario1",
+			expectError:    false,
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			featureA := features.Feature("FeatureA")
+			fakeGates := &fakeFeatureGates{map[features.Feature]bool{featureA: true}}
+			fakeTesting := &fakeT{fakeTestName: scenario.firstTestName, TB: t}
+
+			features.ReplaceFeatureGates(fakeGates)
+			require.NoError(t, setFeatureDuringTestInternal(fakeTesting, featureA, true))
+			require.True(t, features.FeatureGates().Enabled(featureA))
+
+			fakeTesting.fakeTestName = scenario.secondTestName
+			err := setFeatureDuringTestInternal(fakeTesting, featureA, false)
+			require.Equal(t, scenario.expectError, err != nil)
+		})
+	}
+}
+
+type fakeFeatureGates struct {
+	features map[features.Feature]bool
+}
+
+func (f *fakeFeatureGates) Enabled(feature features.Feature) bool {
+	featureValue, ok := f.features[feature]
+	if !ok {
+		panic(fmt.Errorf("feature %q is not registered in featureGates", feature))
+	}
+	return featureValue
+}
+
+func (f *fakeFeatureGates) Set(feature features.Feature, value bool) error {
+	f.features[feature] = value
+	return nil
+}
+
+type readOnlyAlwaysDisabledFeatureGates struct{}
+
+func (f *readOnlyAlwaysDisabledFeatureGates) Enabled(feature features.Feature) bool {
+	return false
+}
+
+type fakeT struct {
+	fakeTestName string
+	testing.TB
+}
+
+func (t *fakeT) Name() string {
+	return t.fakeTestName
 }
 
 func assertFeatureGatesType(t *testing.T, fg features.Gates) {
-	_, ok := fg.(*alwaysEnabledFakeGates)
+	_, ok := fg.(*fakeFeatureGates)
 	if !ok {
 		t.Fatalf("passed features.FeatureGates() is NOT of type *alwaysEnabledFakeGates, it is of type = %T", fg)
 	}

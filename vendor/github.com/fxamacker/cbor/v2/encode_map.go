@@ -6,6 +6,7 @@
 package cbor
 
 import (
+	"bytes"
 	"reflect"
 	"sync"
 )
@@ -15,8 +16,7 @@ type mapKeyValueEncodeFunc struct {
 	kpool, vpool sync.Pool
 }
 
-func (me *mapKeyValueEncodeFunc) encodeKeyValues(e *encoderBuffer, em *encMode, v reflect.Value, kvs []keyValue) error {
-	trackKeyValueLength := len(kvs) == v.Len()
+func (me *mapKeyValueEncodeFunc) encodeKeyValues(e *bytes.Buffer, em *encMode, v reflect.Value, kvs []keyValue) error {
 	iterk := me.kpool.Get().(*reflect.Value)
 	defer func() {
 		iterk.SetZero()
@@ -27,24 +27,39 @@ func (me *mapKeyValueEncodeFunc) encodeKeyValues(e *encoderBuffer, em *encMode, 
 		iterv.SetZero()
 		me.vpool.Put(iterv)
 	}()
-	iter := v.MapRange()
-	for i := 0; iter.Next(); i++ {
-		off := e.Len()
+
+	if kvs == nil {
+		for i, iter := 0, v.MapRange(); iter.Next(); i++ {
+			iterk.SetIterKey(iter)
+			iterv.SetIterValue(iter)
+
+			if err := me.kf(e, em, *iterk); err != nil {
+				return err
+			}
+			if err := me.ef(e, em, *iterv); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	initial := e.Len()
+	for i, iter := 0, v.MapRange(); iter.Next(); i++ {
 		iterk.SetIterKey(iter)
 		iterv.SetIterValue(iter)
 
+		offset := e.Len()
 		if err := me.kf(e, em, *iterk); err != nil {
 			return err
 		}
-		if trackKeyValueLength {
-			kvs[i].keyLen = e.Len() - off
-		}
-
+		valueOffset := e.Len()
 		if err := me.ef(e, em, *iterv); err != nil {
 			return err
 		}
-		if trackKeyValueLength {
-			kvs[i].keyValueLen = e.Len() - off
+		kvs[i] = keyValue{
+			offset:      offset - initial,
+			valueOffset: valueOffset - initial,
+			nextOffset:  e.Len() - initial,
 		}
 	}
 

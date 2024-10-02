@@ -31,12 +31,12 @@ func (p ParentDeathSignal) Set() error {
 	return SetParentDeathSignal(uintptr(p))
 }
 
+// Deprecated: Execv is not used in runc anymore, it will be removed in v1.2.0.
 func Execv(cmd string, args []string, env []string) error {
 	name, err := exec.LookPath(cmd)
 	if err != nil {
 		return err
 	}
-
 	return Exec(name, args, env)
 }
 

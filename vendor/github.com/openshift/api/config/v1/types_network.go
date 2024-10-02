@@ -55,11 +55,11 @@ type NetworkSpec struct {
 	// +listType=atomic
 	ServiceNetwork []string `json:"serviceNetwork"`
 
-	// NetworkType is the plugin that is to be deployed (e.g. OpenShiftSDN).
+	// NetworkType is the plugin that is to be deployed (e.g. OVNKubernetes).
 	// This should match a value that the cluster-network-operator understands,
 	// or else no networking will be installed.
 	// Currently supported values are:
-	// - OpenShiftSDN
+	// - OVNKubernetes
 	// This field is immutable after installation.
 	NetworkType string `json:"networkType"`
 
@@ -101,7 +101,7 @@ type NetworkStatus struct {
 	// +listType=atomic
 	ServiceNetwork []string `json:"serviceNetwork,omitempty"`
 
-	// NetworkType is the plugin that is deployed (e.g. OpenShiftSDN).
+	// NetworkType is the plugin that is deployed (e.g. OVNKubernetes).
 	NetworkType string `json:"networkType,omitempty"`
 
 	// ClusterNetworkMTU is the MTU for inter-pod networking.
@@ -111,15 +111,12 @@ type NetworkStatus struct {
 	Migration *NetworkMigration `json:"migration,omitempty"`
 
 	// conditions represents the observations of a network.config current state.
-	// Known .status.conditions.type are: "NetworkTypeMigrationInProgress", "NetworkTypeMigrationMTUReady",
-	// "NetworkTypeMigrationTargetCNIAvailable", "NetworkTypeMigrationTargetCNIInUse",
-	// "NetworkTypeMigrationOriginalCNIPurged" and "NetworkDiagnosticsAvailable"
+	// Known .status.conditions.type are: "NetworkDiagnosticsAvailable"
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +openshift:enable:FeatureGate=NetworkLiveMigration
 	// +openshift:enable:FeatureGate=NetworkDiagnosticsConfig
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
@@ -186,15 +183,15 @@ type NetworkList struct {
 	Items []Network `json:"items"`
 }
 
-// NetworkMigration represents the cluster network configuration.
+// NetworkMigration represents the network migration status.
 type NetworkMigration struct {
-	// NetworkType is the target plugin that is to be deployed.
-	// Currently supported values are: OpenShiftSDN, OVNKubernetes
-	// +kubebuilder:validation:Enum={"OpenShiftSDN","OVNKubernetes"}
+	// NetworkType is the target plugin that is being deployed.
+	// DEPRECATED: network type migration is no longer supported,
+	// so this should always be unset.
 	// +optional
 	NetworkType string `json:"networkType,omitempty"`
 
-	// MTU contains the MTU migration configuration.
+	// MTU is the MTU configuration that is being deployed.
 	// +optional
 	MTU *MTUMigration `json:"mtu,omitempty"`
 }

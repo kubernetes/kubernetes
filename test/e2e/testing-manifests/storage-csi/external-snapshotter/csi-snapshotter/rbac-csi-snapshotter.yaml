@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-snapshotter/raw/v7.0.1/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
-# for csi-driver-host-path release-1.13
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-snapshotter/raw/v8.0.1/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+# for csi-driver-host-path release-1.14
 # by ./update-hostpath.sh
 #
 # Together with the RBAC file for external-provisioner, this YAML file

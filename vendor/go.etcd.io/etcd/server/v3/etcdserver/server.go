@@ -35,6 +35,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.etcd.io/etcd/server/v3/config"
+	"go.etcd.io/etcd/server/v3/wal/walpb"
 	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
@@ -392,7 +393,7 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 	}
 
 	defer func() {
-		if err != nil {
+		if be != nil && err != nil {
 			be.Close()
 		}
 	}()
@@ -485,13 +486,14 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 		}
 
 		// Find a snapshot to start/restart a raft node
-		walSnaps, err := wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
+		var walSnaps []walpb.Snapshot
+		walSnaps, err = wal.ValidSnapshotEntries(cfg.Logger, cfg.WALDir())
 		if err != nil {
 			return nil, err
 		}
 		// snapshot files can be orphaned if etcd crashes after writing them but before writing the corresponding
 		// wal log entries
-		snapshot, err := ss.LoadNewestAvailable(walSnaps)
+		snapshot, err = ss.LoadNewestAvailable(walSnaps)
 		if err != nil && err != snap.ErrNoSnapshot {
 			return nil, err
 		}
@@ -658,8 +660,15 @@ func NewServer(cfg config.ServerConfig) (srv *EtcdServer, err error) {
 
 	if srv.Cfg.EnableLeaseCheckpoint {
 		// setting checkpointer enables lease checkpoint feature.
-		srv.lessor.SetCheckpointer(func(ctx context.Context, cp *pb.LeaseCheckpointRequest) {
+		srv.lessor.SetCheckpointer(func(ctx context.Context, cp *pb.LeaseCheckpointRequest) error {
+			if !srv.ensureLeadership() {
+				srv.lg.Warn("Ignore the checkpoint request because current member isn't a leader",
+					zap.Uint64("local-member-id", uint64(srv.ID())))
+				return lease.ErrNotPrimary
+			}
+
 			srv.raftRequestOnce(ctx, pb.InternalRaftRequest{LeaseCheckpoint: cp})
+			return nil
 		})
 	}
 
@@ -722,6 +731,10 @@ func (s *EtcdServer) Logger() *zap.Logger {
 	l := s.lg
 	s.lgMu.RUnlock()
 	return l
+}
+
+func (s *EtcdServer) Config() config.ServerConfig {
+	return s.Cfg
 }
 
 func tickToDur(ticks int, tickMs uint) string {
@@ -869,8 +882,8 @@ func (s *EtcdServer) purgeFile() {
 	var dberrc, serrc, werrc <-chan error
 	var dbdonec, sdonec, wdonec <-chan struct{}
 	if s.Cfg.MaxSnapFiles > 0 {
-		dbdonec, dberrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.SnapDir(), "snap.db", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
-		sdonec, serrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.SnapDir(), "snap", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
+		dbdonec, dberrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap.db", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
+		sdonec, serrc = fileutil.PurgeFileWithoutFlock(lg, s.Cfg.SnapDir(), "snap", s.Cfg.MaxSnapFiles, purgeFileInterval, s.stopping)
 	}
 	if s.Cfg.MaxWALFiles > 0 {
 		wdonec, werrc = fileutil.PurgeFileWithDoneNotify(lg, s.Cfg.WALDir(), "wal", s.Cfg.MaxWALFiles, purgeFileInterval, s.stopping)
@@ -1139,7 +1152,19 @@ func (s *EtcdServer) run() {
 
 func (s *EtcdServer) revokeExpiredLeases(leases []*lease.Lease) {
 	s.GoAttach(func() {
+		// We shouldn't revoke any leases if current member isn't a leader,
+		// because the operation should only be performed by the leader. When
+		// the leader gets blocked on the raft loop, such as writing WAL entries,
+		// it can't process any events or messages from raft. It may think it
+		// is still the leader even the leader has already changed.
+		// Refer to https://github.com/etcd-io/etcd/issues/15247
 		lg := s.Logger()
+		if !s.ensureLeadership() {
+			lg.Warn("Ignore the lease revoking request because current member isn't a leader",
+				zap.Uint64("local-member-id", uint64(s.ID())))
+			return
+		}
+
 		// Increases throughput of expired leases deletion process through parallelization
 		c := make(chan struct{}, maxPendingRevokes)
 		for _, curLease := range leases {
@@ -1170,6 +1195,29 @@ func (s *EtcdServer) revokeExpiredLeases(leases []*lease.Lease) {
 			f(int64(curLease.ID))
 		}
 	})
+}
+
+// ensureLeadership checks whether current member is still the leader.
+func (s *EtcdServer) ensureLeadership() bool {
+	lg := s.Logger()
+
+	ctx, cancel := context.WithTimeout(s.ctx, s.Cfg.ReqTimeout())
+	defer cancel()
+	if err := s.linearizableReadNotify(ctx); err != nil {
+		lg.Warn("Failed to check current member's leadership",
+			zap.Error(err))
+		return false
+	}
+
+	newLeaderId := s.raftStatus().Lead
+	if newLeaderId != uint64(s.ID()) {
+		lg.Warn("Current member isn't a leader",
+			zap.Uint64("local-member-id", uint64(s.ID())),
+			zap.Uint64("new-lead", newLeaderId))
+		return false
+	}
+
+	return true
 }
 
 // Cleanup removes allocated objects by EtcdServer.NewServer in
@@ -2148,6 +2196,7 @@ func (s *EtcdServer) apply(
 			zap.Stringer("type", e.Type))
 		switch e.Type {
 		case raftpb.EntryNormal:
+			// gofail: var beforeApplyOneEntryNormal struct{}
 			s.applyEntryNormal(&e)
 			s.setAppliedIndex(e.Index)
 			s.setTerm(e.Term)

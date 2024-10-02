@@ -56,8 +56,6 @@ func TestAppendixA(t *testing.T) {
 	const (
 		reasonArrayFixedLength  = "indefinite-length arrays are re-encoded with fixed length"
 		reasonByteString        = "strings are encoded as the byte string major type"
-		reasonFloatPacked       = "floats are packed into the smallest value-preserving width"
-		reasonNaN               = "all NaN values are represented with a single encoding"
 		reasonMapFixedLength    = "indefinite-length maps are re-encoded with fixed length"
 		reasonMapSorted         = "map entries are sorted"
 		reasonStringFixedLength = "indefinite-length strings are re-encoded with fixed length"
@@ -71,10 +69,6 @@ func TestAppendixA(t *testing.T) {
 		reject  string   // reason the decoder rejects the example
 		encoded []byte   // re-encoded object (only if different from example encoding)
 		reasons []string // reasons for re-encode difference
-
-		// TODO: The cases with nonempty fixme are known to be not working and fixing them
-		// is an alpha criteria. They're present and skipped for visibility.
-		fixme string
 	}{
 		{
 			example: hex("00"),
@@ -123,7 +117,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c249010000000000000000"),
 			reject:  "decoding tagged positive bigint value to interface{} can't reproduce this value without losing distinction between float and integer",
-			fixme:   "decoding bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("3bffffffffffffffff"),
@@ -132,7 +125,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c349010000000000000000"),
 			reject:  "-18446744073709551617 overflows int64 and falling back to float64 (as with JSON) loses distinction between float and integer",
-			fixme:   "decoding negative bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("20"),
@@ -202,68 +194,41 @@ func TestAppendixA(t *testing.T) {
 			example: hex("fbc010666666666666"),
 			decoded: -4.1,
 		},
-		// TODO: Should Inf/-Inf/NaN be supported? Current Protobuf will encode this, but
-		// JSON will produce an error.  This is less than ideal -- we can't transcode
-		// everything to JSON.
 		{
 			example: hex("f97c00"),
-			decoded: math.Inf(1),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f97e00"),
-			decoded: math.Float64frombits(0x7ff8000000000000),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f9fc00"),
-			decoded: math.Inf(-1),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fa7f800000"),
-			decoded: math.Inf(1),
-			encoded: hex("f97c00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fa7fc00000"),
-			decoded: math.NaN(),
-			encoded: hex("f97e00"),
-			reasons: []string{
-				reasonNaN,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("faff800000"),
-			decoded: math.Inf(-1),
-			encoded: hex("f9fc00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fb7ff0000000000000"),
-			decoded: math.Inf(1),
-			encoded: hex("f97c00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fb7ff8000000000000"),
-			decoded: math.NaN(),
-			encoded: hex("f97e00"),
-			reasons: []string{
-				reasonNaN,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fbfff0000000000000"),
-			decoded: math.Inf(-1),
-			encoded: hex("f9fc00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f4"),
@@ -280,17 +245,14 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("f7"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "the undefined simple value should not successfully decode as nil",
 		},
 		{
 			example: hex("f0"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("f8ff"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("c074323031332d30332d32315432303a30343a30305a"),
@@ -300,17 +262,15 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c11a514b67b0"),
-			decoded: "2013-03-21T16:04:00Z",
-			encoded: hex("54323031332d30332d32315431363a30343a30305a"),
+			decoded: "2013-03-21T20:04:00Z",
+			encoded: hex("54323031332d30332d32315432303a30343a30305a"),
 			reasons: []string{
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c1fb41d452d9ec200000"),
@@ -320,14 +280,13 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
-			example: hex("d74401020304"),
-			decoded: "\x01\x02\x03\x04",
-			encoded: hex("4401020304"),
+			example: hex("d74401020304"), // 23(h'01020304')
+			decoded: "01020304",
+			encoded: hex("483031303230333034"), // '01020304'
 			reasons: []string{
-				reasonTagIgnored,
+				"decoding a byte string enclosed in an expected later encoding tag into an interface{} value automatically converts to the specified encoding for JSON interoperability",
 			},
 		},
 		{
@@ -595,10 +554,6 @@ func TestAppendixA(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%x", tc.example), func(t *testing.T) {
-			if tc.fixme != "" {
-				t.Skip(tc.fixme) // TODO: Remove once all cases are fixed.
-			}
-
 			var decoded interface{}
 			err := modes.Decode.Unmarshal(tc.example, &decoded)
 			if err != nil {

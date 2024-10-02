@@ -619,6 +619,40 @@ func WaitForGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.Gro
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
 }
 
+// EnsureGVRDeletion checks that no object as defined by the group/version/kind and name is ever found during the given time period
+func EnsureGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration, namespace string) error {
+	var resourceClient dynamic.ResourceInterface
+	if namespace != "" {
+		resourceClient = c.Resource(gvr).Namespace(namespace)
+	} else {
+		resourceClient = c.Resource(gvr)
+	}
+
+	err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+		_, err := resourceClient.Get(ctx, objectName, metav1.GetOptions{})
+		return err
+	}).WithTimeout(timeout).WithPolling(poll).Should(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("failed to delete %s %s", gvr, objectName)))
+	return err
+}
+
+// EnsureNoGVRDeletion checks that an object as defined by the group/version/kind and name has not been deleted during the given time period
+func EnsureNoGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration, namespace string) error {
+	var resourceClient dynamic.ResourceInterface
+	if namespace != "" {
+		resourceClient = c.Resource(gvr).Namespace(namespace)
+	} else {
+		resourceClient = c.Resource(gvr)
+	}
+	err := framework.Gomega().Consistently(ctx, func(ctx context.Context) error {
+		_, err := resourceClient.Get(ctx, objectName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get %s %s: %w", gvr.Resource, objectName, err)
+		}
+		return nil
+	}).WithTimeout(timeout).WithPolling(poll).Should(gomega.Succeed())
+	return err
+}
+
 // WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
 func WaitForNamespacedGVRDeletion(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)

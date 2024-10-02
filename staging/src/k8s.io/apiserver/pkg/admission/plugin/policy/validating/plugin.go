@@ -19,6 +19,7 @@ package validating
 import (
 	"context"
 	"io"
+	"sync"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,23 +45,34 @@ const (
 )
 
 var (
-	compositionEnvTemplateWithStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
-		compositionEnvTemplateWithStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-		if err != nil {
-			panic(err)
-		}
+	lazyCompositionEnvTemplateWithStrictCostInit sync.Once
+	lazyCompositionEnvTemplateWithStrictCost     *cel.CompositionEnv
 
-		return compositionEnvTemplateWithStrictCost
-	}()
-	compositionEnvTemplateWithoutStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
-		compositionEnvTemplateWithoutStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
-		if err != nil {
-			panic(err)
-		}
-
-		return compositionEnvTemplateWithoutStrictCost
-	}()
+	lazyCompositionEnvTemplateWithoutStrictCostInit sync.Once
+	lazyCompositionEnvTemplateWithoutStrictCost     *cel.CompositionEnv
 )
+
+func getCompositionEnvTemplateWithStrictCost() *cel.CompositionEnv {
+	lazyCompositionEnvTemplateWithStrictCostInit.Do(func() {
+		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+		if err != nil {
+			panic(err)
+		}
+		lazyCompositionEnvTemplateWithStrictCost = env
+	})
+	return lazyCompositionEnvTemplateWithStrictCost
+}
+
+func getCompositionEnvTemplateWithoutStrictCost() *cel.CompositionEnv {
+	lazyCompositionEnvTemplateWithoutStrictCostInit.Do(func() {
+		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
+		if err != nil {
+			panic(err)
+		}
+		lazyCompositionEnvTemplateWithoutStrictCost = env
+	})
+	return lazyCompositionEnvTemplateWithoutStrictCost
+}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -131,9 +143,9 @@ func compilePolicy(policy *Policy) Validator {
 	matchConditions := policy.Spec.MatchConditions
 	var compositionEnvTemplate *cel.CompositionEnv
 	if strictCost {
-		compositionEnvTemplate = compositionEnvTemplateWithStrictCost
+		compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
 	} else {
-		compositionEnvTemplate = compositionEnvTemplateWithoutStrictCost
+		compositionEnvTemplate = getCompositionEnvTemplateWithoutStrictCost()
 	}
 	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)

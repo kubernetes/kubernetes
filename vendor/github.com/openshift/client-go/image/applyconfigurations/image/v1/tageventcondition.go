@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TagEventConditionApplyConfiguration represents an declarative configuration of the TagEventCondition type for use
+// TagEventConditionApplyConfiguration represents a declarative configuration of the TagEventCondition type for use
 // with apply.
 type TagEventConditionApplyConfiguration struct {
 	Type               *v1.TagEventConditionType `json:"type,omitempty"`
@@ -19,7 +19,7 @@ type TagEventConditionApplyConfiguration struct {
 	Generation         *int64                    `json:"generation,omitempty"`
 }
 
-// TagEventConditionApplyConfiguration constructs an declarative configuration of the TagEventCondition type for use with
+// TagEventConditionApplyConfiguration constructs a declarative configuration of the TagEventCondition type for use with
 // apply.
 func TagEventCondition() *TagEventConditionApplyConfiguration {
 	return &TagEventConditionApplyConfiguration{}

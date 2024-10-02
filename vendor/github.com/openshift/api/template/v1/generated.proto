@@ -21,7 +21,7 @@ option go_package = "github.com/openshift/api/template/v1";
 message BrokerTemplateInstance {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes the state of this BrokerTemplateInstance.
   optional BrokerTemplateInstanceSpec spec = 2;
@@ -34,7 +34,7 @@ message BrokerTemplateInstance {
 message BrokerTemplateInstanceList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of BrokerTemplateInstances
   repeated BrokerTemplateInstance items = 2;
@@ -44,11 +44,11 @@ message BrokerTemplateInstanceList {
 message BrokerTemplateInstanceSpec {
   // templateinstance is a reference to a TemplateInstance object residing
   // in a namespace.
-  optional k8s.io.api.core.v1.ObjectReference templateInstance = 1;
+  optional .k8s.io.api.core.v1.ObjectReference templateInstance = 1;
 
   // secret is a reference to a Secret object residing in a namespace,
   // containing the necessary template parameters.
-  optional k8s.io.api.core.v1.ObjectReference secret = 2;
+  optional .k8s.io.api.core.v1.ObjectReference secret = 2;
 
   // bindingids is a list of 'binding_id's provided during successive bind
   // calls to the template service broker.
@@ -115,7 +115,7 @@ message Parameter {
 message Template {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // message is an optional instructional message that will
   // be displayed when this template is instantiated.
@@ -132,7 +132,7 @@ message Template {
   // value after parameter substitution will be respected and the object
   // will be created in that namespace.
   // +kubebuilder:pruning:PreserveUnknownFields
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
 
   // parameters is an optional array of Parameters used during the
   // Template to Config transformation.
@@ -151,7 +151,7 @@ message Template {
 message TemplateInstance {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes the desired state of this TemplateInstance.
   optional TemplateInstanceSpec spec = 2;
@@ -172,7 +172,7 @@ message TemplateInstanceCondition {
 
   // LastTransitionTime is the last time a condition status transitioned from
   // one state to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // Reason is a brief machine readable explanation for the condition's last
   // transition.
@@ -190,7 +190,7 @@ message TemplateInstanceCondition {
 message TemplateInstanceList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of Templateinstances
   repeated TemplateInstance items = 2;
@@ -201,7 +201,7 @@ message TemplateInstanceObject {
   // ref is a reference to the created object.  When used under .spec, only
   // name and namespace are used; these can contain references to parameters
   // which will be substituted following the usual rules.
-  optional k8s.io.api.core.v1.ObjectReference ref = 1;
+  optional .k8s.io.api.core.v1.ObjectReference ref = 1;
 }
 
 // TemplateInstanceRequester holds the identity of an agent requesting a
@@ -229,7 +229,7 @@ message TemplateInstanceSpec {
 
   // secret is a reference to a Secret object containing the necessary
   // template parameters.
-  optional k8s.io.api.core.v1.LocalObjectReference secret = 2;
+  optional .k8s.io.api.core.v1.LocalObjectReference secret = 2;
 
   // requester holds the identity of the agent requesting the template
   // instantiation.
@@ -254,7 +254,7 @@ message TemplateInstanceStatus {
 message TemplateList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of templates
   repeated Template items = 2;

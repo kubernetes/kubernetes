@@ -40,8 +40,6 @@ import (
 )
 
 var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage          = imageutils.GetE2EImage(imageutils.BusyBox)
 	durationForStuckMount = 110 * time.Second
 )
 
@@ -211,7 +209,7 @@ func getFlexVolumePod(volumeSource v1.VolumeSource, nodeName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:       "flexvolume-detach-test" + "-client",
-					Image:      BusyBoxImage,
+					Image:      imageutils.GetE2EImage(imageutils.BusyBox),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads vol contents for
 					// us to scan in the tests or by eye.

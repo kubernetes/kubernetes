@@ -111,7 +111,7 @@ func newMatchConditionHandler(recorder *admissionRecorder) http.Handler {
 
 // TestMatchConditions tests ValidatingWebhookConfigurations and MutatingWebhookConfigurations that validates different cases of matchCondition fields
 func TestMatchConditions(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, false)
 	fail := admissionregistrationv1.Fail
 	ignore := admissionregistrationv1.Ignore
 
@@ -599,7 +599,7 @@ func TestMatchConditions(t *testing.T) {
 }
 
 func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, true)
 
 	testcases := []struct {
 		name            string

@@ -487,7 +487,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 			case "error":
 				return nil, false, errors.New("authn err")
 			case "anonymous":
-				return anonymous.NewAuthenticator().AuthenticateRequest(r)
+				return anonymous.NewAuthenticator(nil).AuthenticateRequest(r)
 			case "anonymous_group":
 				return &authenticator.Response{User: &user.DefaultInfo{Groups: []string{user.AllUnauthenticated}}}, true, nil
 			default:
@@ -590,7 +590,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := func(t *testing.T, nextProto string, expectConnections uint64) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnauthenticatedHTTP2DOSMitigation, !tc.skipHTTP2DOSMitigation)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UnauthenticatedHTTP2DOSMitigation, !tc.skipHTTP2DOSMitigation)
 
 				var localAddrs atomic.Uint64 // indicates how many TCP connection set up
 

@@ -2,7 +2,7 @@
 
 package v1
 
-// ClusterVersionStatusApplyConfiguration represents an declarative configuration of the ClusterVersionStatus type for use
+// ClusterVersionStatusApplyConfiguration represents a declarative configuration of the ClusterVersionStatus type for use
 // with apply.
 type ClusterVersionStatusApplyConfiguration struct {
 	Desired            *ReleaseApplyConfiguration                          `json:"desired,omitempty"`
@@ -15,7 +15,7 @@ type ClusterVersionStatusApplyConfiguration struct {
 	ConditionalUpdates []ConditionalUpdateApplyConfiguration               `json:"conditionalUpdates,omitempty"`
 }
 
-// ClusterVersionStatusApplyConfiguration constructs an declarative configuration of the ClusterVersionStatus type for use with
+// ClusterVersionStatusApplyConfiguration constructs a declarative configuration of the ClusterVersionStatus type for use with
 // apply.
 func ClusterVersionStatus() *ClusterVersionStatusApplyConfiguration {
 	return &ClusterVersionStatusApplyConfiguration{}

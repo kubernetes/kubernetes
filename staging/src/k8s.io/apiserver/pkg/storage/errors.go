@@ -25,7 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-var ErrResourceVersionSetOnCreate = errors.New("resourceVersion should not be set on objects to be created")
+var (
+	ErrResourceVersionSetOnCreate = errors.New("resourceVersion should not be set on objects to be created")
+	ErrStorageNotReady            = errors.New("storage not ready")
+)
 
 const (
 	ErrCodeKeyNotFound int = iota + 1

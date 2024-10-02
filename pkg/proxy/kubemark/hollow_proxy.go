@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -67,7 +68,9 @@ func NewHollowProxy(
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
 				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				OOMScoreAdj:      ptr.To[int32](0),
+				Linux: proxyconfigapi.KubeProxyLinuxConfiguration{
+					OOMScoreAdj: ptr.To[int32](0),
+				},
 			},
 
 			Client:      client,
@@ -85,7 +88,8 @@ func NewHollowProxy(
 }
 
 func (hp *HollowProxy) Run() error {
-	if err := hp.ProxyServer.Run(); err != nil {
+
+	if err := hp.ProxyServer.Run(context.TODO()); err != nil {
 		return fmt.Errorf("Error while running proxy: %w", err)
 	}
 	return nil

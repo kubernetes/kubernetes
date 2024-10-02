@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PodReadinessGateApplyConfiguration represents an declarative configuration of the PodReadinessGate type for use
+// PodReadinessGateApplyConfiguration represents a declarative configuration of the PodReadinessGate type for use
 // with apply.
 type PodReadinessGateApplyConfiguration struct {
 	ConditionType *v1.PodConditionType `json:"conditionType,omitempty"`
 }
 
-// PodReadinessGateApplyConfiguration constructs an declarative configuration of the PodReadinessGate type for use with
+// PodReadinessGateApplyConfiguration constructs a declarative configuration of the PodReadinessGate type for use with
 // apply.
 func PodReadinessGate() *PodReadinessGateApplyConfiguration {
 	return &PodReadinessGateApplyConfiguration{}

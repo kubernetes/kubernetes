@@ -113,7 +113,7 @@ func NewOrderedKubeAdmissionPlugins(kubeAdmissionOrder []string) []string {
 	return ret
 }
 
-func NewDefaultOffPluginsFunc(kubeDefaultOffAdmission sets.String) func() sets.Set[string] {
+func NewDefaultOffPluginsFunc(kubeDefaultOffAdmission sets.Set[string]) func() sets.Set[string] {
 	return func() sets.Set[string] {
 		kubeOff := sets.New[string](kubeDefaultOffAdmission.UnsortedList()...)
 		kubeOff.Delete(additionalDefaultOnPlugins.List()...)

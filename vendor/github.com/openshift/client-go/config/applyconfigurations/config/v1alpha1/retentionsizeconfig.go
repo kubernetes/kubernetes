@@ -2,13 +2,13 @@
 
 package v1alpha1
 
-// RetentionSizeConfigApplyConfiguration represents an declarative configuration of the RetentionSizeConfig type for use
+// RetentionSizeConfigApplyConfiguration represents a declarative configuration of the RetentionSizeConfig type for use
 // with apply.
 type RetentionSizeConfigApplyConfiguration struct {
 	MaxSizeOfBackupsGb *int `json:"maxSizeOfBackupsGb,omitempty"`
 }
 
-// RetentionSizeConfigApplyConfiguration constructs an declarative configuration of the RetentionSizeConfig type for use with
+// RetentionSizeConfigApplyConfiguration constructs a declarative configuration of the RetentionSizeConfig type for use with
 // apply.
 func RetentionSizeConfig() *RetentionSizeConfigApplyConfiguration {
 	return &RetentionSizeConfigApplyConfiguration{}

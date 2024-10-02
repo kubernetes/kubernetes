@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// FlowSchemaConditionApplyConfiguration represents an declarative configuration of the FlowSchemaCondition type for use
+// FlowSchemaConditionApplyConfiguration represents a declarative configuration of the FlowSchemaCondition type for use
 // with apply.
 type FlowSchemaConditionApplyConfiguration struct {
 	Type               *v1beta1.FlowSchemaConditionType `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type FlowSchemaConditionApplyConfiguration struct {
 	Message            *string                          `json:"message,omitempty"`
 }
 
-// FlowSchemaConditionApplyConfiguration constructs an declarative configuration of the FlowSchemaCondition type for use with
+// FlowSchemaConditionApplyConfiguration constructs a declarative configuration of the FlowSchemaCondition type for use with
 // apply.
 func FlowSchemaCondition() *FlowSchemaConditionApplyConfiguration {
 	return &FlowSchemaConditionApplyConfiguration{}

@@ -2,14 +2,14 @@
 
 package v1
 
-// AWSResourceTagApplyConfiguration represents an declarative configuration of the AWSResourceTag type for use
+// AWSResourceTagApplyConfiguration represents a declarative configuration of the AWSResourceTag type for use
 // with apply.
 type AWSResourceTagApplyConfiguration struct {
 	Key   *string `json:"key,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// AWSResourceTagApplyConfiguration constructs an declarative configuration of the AWSResourceTag type for use with
+// AWSResourceTagApplyConfiguration constructs a declarative configuration of the AWSResourceTag type for use with
 // apply.
 func AWSResourceTag() *AWSResourceTagApplyConfiguration {
 	return &AWSResourceTagApplyConfiguration{}

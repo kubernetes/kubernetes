@@ -10,4 +10,7 @@ const (
 	// This annotation pins required SCCs for core OpenShift workloads to prevent preemption of custom SCCs.
 	// It is being used in the SCC admission plugin.
 	RequiredSCCAnnotation = "openshift.io/required-scc"
+
+	// MinimallySufficientPodSecurityStandard indicates the PodSecurityStandard that matched the SCCs available to the users of the namespace.
+	MinimallySufficientPodSecurityStandard = "security.openshift.io/MinimallySufficientPodSecurityStandard"
 )

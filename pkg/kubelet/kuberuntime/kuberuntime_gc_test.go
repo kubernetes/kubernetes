@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -440,13 +439,10 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	podStateProvider.removed["789"] = struct{}{}
 	podStateProvider.removed["654"] = struct{}{}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	fakeOS.ReadDirFn = func(string) ([]os.DirEntry, error) {
 		var dirEntries []os.DirEntry
 		for _, file := range files {
-			mockDE := containertest.NewMockDirEntry(ctrl)
+			mockDE := containertest.NewMockDirEntry(t)
 			mockDE.EXPECT().Name().Return(file)
 			dirEntries = append(dirEntries, mockDE)
 		}

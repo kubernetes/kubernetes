@@ -155,7 +155,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, testCase.enableRecoverFromExpansion)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, testCase.enableRecoverFromExpansion)
 			actual, err := evaluator.Usage(testCase.pvc)
 			if err != nil {
 				t.Errorf("%s unexpected error: %v", testName, err)

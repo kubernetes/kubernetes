@@ -8,7 +8,7 @@ import (
 	v1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // ImageStreamImportsGetter has a method to return a ImageStreamImportInterface.
@@ -25,27 +25,17 @@ type ImageStreamImportInterface interface {
 
 // imageStreamImports implements ImageStreamImportInterface
 type imageStreamImports struct {
-	client rest.Interface
-	ns     string
+	*gentype.Client[*v1.ImageStreamImport]
 }
 
 // newImageStreamImports returns a ImageStreamImports
 func newImageStreamImports(c *ImageV1Client, namespace string) *imageStreamImports {
 	return &imageStreamImports{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClient[*v1.ImageStreamImport](
+			"imagestreamimports",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.ImageStreamImport { return &v1.ImageStreamImport{} }),
 	}
-}
-
-// Create takes the representation of a imageStreamImport and creates it.  Returns the server's representation of the imageStreamImport, and an error, if there is any.
-func (c *imageStreamImports) Create(ctx context.Context, imageStreamImport *v1.ImageStreamImport, opts metav1.CreateOptions) (result *v1.ImageStreamImport, err error) {
-	result = &v1.ImageStreamImport{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("imagestreamimports").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(imageStreamImport).
-		Do(ctx).
-		Into(result)
-	return
 }

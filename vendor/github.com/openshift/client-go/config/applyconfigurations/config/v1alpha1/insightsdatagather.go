@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// InsightsDataGatherApplyConfiguration represents an declarative configuration of the InsightsDataGather type for use
+// InsightsDataGatherApplyConfiguration represents a declarative configuration of the InsightsDataGather type for use
 // with apply.
 type InsightsDataGatherApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type InsightsDataGatherApplyConfiguration struct {
 	Status                           *configv1alpha1.InsightsDataGatherStatus  `json:"status,omitempty"`
 }
 
-// InsightsDataGather constructs an declarative configuration of the InsightsDataGather type for use with
+// InsightsDataGather constructs a declarative configuration of the InsightsDataGather type for use with
 // apply.
 func InsightsDataGather(name string) *InsightsDataGatherApplyConfiguration {
 	b := &InsightsDataGatherApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *InsightsDataGatherApplyConfiguration) WithSpec(value *InsightsDataGathe
 func (b *InsightsDataGatherApplyConfiguration) WithStatus(value configv1alpha1.InsightsDataGatherStatus) *InsightsDataGatherApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *InsightsDataGatherApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

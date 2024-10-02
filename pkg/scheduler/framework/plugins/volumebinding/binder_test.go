@@ -45,6 +45,7 @@ import (
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 var (
@@ -130,8 +131,6 @@ type testEnv struct {
 	internalPodInformer     coreinformers.PodInformer
 	internalNodeInformer    coreinformers.NodeInformer
 	internalCSINodeInformer storageinformers.CSINodeInformer
-	internalPVCache         *assumeCache
-	internalPVCCache        *assumeCache
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
@@ -250,18 +249,6 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		t.Fatalf("Failed to convert to internal binder")
 	}
 
-	pvCache := internalBinder.pvCache
-	internalPVCache, ok := pvCache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to convert to internal PV cache")
-	}
-
-	pvcCache := internalBinder.pvcCache
-	internalPVCCache, ok := pvcCache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to convert to internal PVC cache")
-	}
-
 	return &testEnv{
 		client:                  client,
 		reactor:                 reactor,
@@ -270,8 +257,6 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		internalPodInformer:     podInformer,
 		internalNodeInformer:    nodeInformer,
 		internalCSINodeInformer: csiNodeInformer,
-		internalPVCache:         internalPVCache,
-		internalPVCCache:        internalPVCCache,
 
 		internalCSIDriverInformer:          csiDriverInformer,
 		internalCSIStorageCapacityInformer: csiStorageCapacityInformer,
@@ -305,9 +290,8 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 }
 
 func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
-	internalPVCCache := env.internalPVCCache
 	for _, pvc := range cachedPVCs {
-		internalPVCCache.add(pvc)
+		assumecache.AddTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 		if apiPVCs == nil {
 			env.reactor.AddClaim(pvc)
 		}
@@ -318,9 +302,8 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 }
 
 func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
-	internalPVCache := env.internalPVCache
 	for _, pv := range cachedPVs {
-		internalPVCache.add(pv)
+		assumecache.AddTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 		if apiPVs == nil {
 			env.reactor.AddVolume(pv)
 		}
@@ -341,7 +324,7 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
-			obj, err := env.internalPVCache.GetAPIObj(pv.Name)
+			obj, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
 			if obj == nil || err != nil {
 				return false, nil
 			}
@@ -367,7 +350,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
-			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
+			obj, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
 			if obj == nil || err != nil {
 				return false, nil
 			}
@@ -385,13 +368,13 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 
 func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		env.internalPVCache.delete(pv)
+		assumecache.DeleteTestObject(env.internalBinder.pvCache.AssumeCache, pv)
 	}
 }
 
 func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		env.internalPVCCache.delete(pvc)
+		assumecache.DeleteTestObject(env.internalBinder.pvcCache.AssumeCache, pvc)
 	}
 }
 

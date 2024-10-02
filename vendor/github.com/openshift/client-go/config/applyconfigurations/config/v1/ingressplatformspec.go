@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// IngressPlatformSpecApplyConfiguration represents an declarative configuration of the IngressPlatformSpec type for use
+// IngressPlatformSpecApplyConfiguration represents a declarative configuration of the IngressPlatformSpec type for use
 // with apply.
 type IngressPlatformSpecApplyConfiguration struct {
 	Type *v1.PlatformType                  `json:"type,omitempty"`
 	AWS  *AWSIngressSpecApplyConfiguration `json:"aws,omitempty"`
 }
 
-// IngressPlatformSpecApplyConfiguration constructs an declarative configuration of the IngressPlatformSpec type for use with
+// IngressPlatformSpecApplyConfiguration constructs a declarative configuration of the IngressPlatformSpec type for use with
 // apply.
 func IngressPlatformSpec() *IngressPlatformSpecApplyConfiguration {
 	return &IngressPlatformSpecApplyConfiguration{}

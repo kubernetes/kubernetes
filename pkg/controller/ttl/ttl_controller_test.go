@@ -86,7 +86,7 @@ func TestPatchNode(t *testing.T) {
 			continue
 		}
 		actions := fakeClient.Actions()
-		assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+		assert.Len(t, actions, 1, "unexpected actions: %#v", actions)
 		patchAction := actions[0].(core.PatchActionImpl)
 		assert.Equal(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
 	}
@@ -145,9 +145,9 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		}
 		actions := fakeClient.Actions()
 		if testCase.patch == "" {
-			assert.Equal(t, 0, len(actions), "unexpected actions: %#v", actions)
+			assert.Empty(t, actions, "unexpected actions")
 		} else {
-			assert.Equal(t, 1, len(actions), "unexpected actions: %#v", actions)
+			assert.Len(t, actions, 1, "unexpected actions: %#v", actions)
 			patchAction := actions[0].(core.PatchActionImpl)
 			assert.Equal(t, testCase.patch, string(patchAction.Patch), "%d: unexpected patch: %s", i, string(patchAction.Patch))
 		}
@@ -230,7 +230,7 @@ func TestDesiredTTL(t *testing.T) {
 
 	for i, testCase := range testCases {
 		ttlController := &Controller{
-			queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,
 			boundaryStep:      testCase.boundaryStep,

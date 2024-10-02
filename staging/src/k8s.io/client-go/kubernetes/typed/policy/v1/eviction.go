@@ -19,7 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	rest "k8s.io/client-go/rest"
+	v1 "k8s.io/api/policy/v1"
+	gentype "k8s.io/client-go/gentype"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // EvictionsGetter has a method to return a EvictionInterface.
@@ -35,14 +37,17 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	client rest.Interface
-	ns     string
+	*gentype.Client[*v1.Eviction]
 }
 
 // newEvictions returns a Evictions
 func newEvictions(c *PolicyV1Client, namespace string) *evictions {
 	return &evictions{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClient[*v1.Eviction](
+			"evictions",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.Eviction { return &v1.Eviction{} }),
 	}
 }

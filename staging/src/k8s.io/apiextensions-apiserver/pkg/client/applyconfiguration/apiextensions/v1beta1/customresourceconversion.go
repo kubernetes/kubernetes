@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
-// CustomResourceConversionApplyConfiguration represents an declarative configuration of the CustomResourceConversion type for use
+// CustomResourceConversionApplyConfiguration represents a declarative configuration of the CustomResourceConversion type for use
 // with apply.
 type CustomResourceConversionApplyConfiguration struct {
 	Strategy                 *v1beta1.ConversionStrategyType        `json:"strategy,omitempty"`
@@ -30,7 +30,7 @@ type CustomResourceConversionApplyConfiguration struct {
 	ConversionReviewVersions []string                               `json:"conversionReviewVersions,omitempty"`
 }
 
-// CustomResourceConversionApplyConfiguration constructs an declarative configuration of the CustomResourceConversion type for use with
+// CustomResourceConversionApplyConfiguration constructs a declarative configuration of the CustomResourceConversion type for use with
 // apply.
 func CustomResourceConversion() *CustomResourceConversionApplyConfiguration {
 	return &CustomResourceConversionApplyConfiguration{}

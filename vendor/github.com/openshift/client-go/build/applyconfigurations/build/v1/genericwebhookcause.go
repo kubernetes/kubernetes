@@ -2,14 +2,14 @@
 
 package v1
 
-// GenericWebHookCauseApplyConfiguration represents an declarative configuration of the GenericWebHookCause type for use
+// GenericWebHookCauseApplyConfiguration represents a declarative configuration of the GenericWebHookCause type for use
 // with apply.
 type GenericWebHookCauseApplyConfiguration struct {
 	Revision *SourceRevisionApplyConfiguration `json:"revision,omitempty"`
 	Secret   *string                           `json:"secret,omitempty"`
 }
 
-// GenericWebHookCauseApplyConfiguration constructs an declarative configuration of the GenericWebHookCause type for use with
+// GenericWebHookCauseApplyConfiguration constructs a declarative configuration of the GenericWebHookCause type for use with
 // apply.
 func GenericWebHookCause() *GenericWebHookCauseApplyConfiguration {
 	return &GenericWebHookCauseApplyConfiguration{}

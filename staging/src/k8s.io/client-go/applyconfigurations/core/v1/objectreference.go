@@ -22,7 +22,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-// ObjectReferenceApplyConfiguration represents an declarative configuration of the ObjectReference type for use
+// ObjectReferenceApplyConfiguration represents a declarative configuration of the ObjectReference type for use
 // with apply.
 type ObjectReferenceApplyConfiguration struct {
 	Kind            *string    `json:"kind,omitempty"`
@@ -34,7 +34,7 @@ type ObjectReferenceApplyConfiguration struct {
 	FieldPath       *string    `json:"fieldPath,omitempty"`
 }
 
-// ObjectReferenceApplyConfiguration constructs an declarative configuration of the ObjectReference type for use with
+// ObjectReferenceApplyConfiguration constructs a declarative configuration of the ObjectReference type for use with
 // apply.
 func ObjectReference() *ObjectReferenceApplyConfiguration {
 	return &ObjectReferenceApplyConfiguration{}

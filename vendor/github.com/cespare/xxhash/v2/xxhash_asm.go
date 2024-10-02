@@ -6,7 +6,7 @@
 
 package xxhash
 
-// Sum64 computes the 64-bit xxHash digest of b.
+// Sum64 computes the 64-bit xxHash digest of b with a zero seed.
 //
 //go:noescape
 func Sum64(b []byte) uint64

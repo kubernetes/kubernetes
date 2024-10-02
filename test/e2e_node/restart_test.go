@@ -241,6 +241,8 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 							}
 
 							trap _term SIGTERM
+							touch /tmp/trap-marker
+
 							wait $PID
 							trap - TERM
 
@@ -250,6 +252,14 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 							exit 0
 							`,
 							},
+							ReadinessProbe: &v1.Probe{
+								PeriodSeconds: 1,
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/sh", "-c", "cat /tmp/trap-marker"},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -257,8 +267,8 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			ginkgo.By(fmt.Sprintf("Creating a pod (%v/%v) with restart policy: %v", f.Namespace.Name, podName, podSpec.Spec.RestartPolicy))
 			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
 
-			ginkgo.By(fmt.Sprintf("Waiting for the pod (%v/%v) to be running", f.Namespace.Name, pod.Name))
-			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			ginkgo.By(fmt.Sprintf("Waiting for the pod (%v/%v) to be running, and with the SIGTERM trap registered", f.Namespace.Name, pod.Name))
+			err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%v/%v)", f.Namespace.Name, pod.Name)
 
 			w := &cache.ListWatch{
@@ -271,7 +281,6 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			framework.ExpectNoError(err, "Failed to list pods in namespace: %s", f.Namespace.Name)
 
 			ginkgo.By(fmt.Sprintf("Deleting the pod (%v/%v) to set a deletion timestamp", pod.Namespace, pod.Name))
-			time.Sleep(time.Second)
 			err = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 			framework.ExpectNoError(err, "Failed to delete the pod: %q", pod.Name)
 

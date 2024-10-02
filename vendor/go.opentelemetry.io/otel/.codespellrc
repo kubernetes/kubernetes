@@ -5,6 +5,6 @@ check-filenames =
 check-hidden =
 ignore-words = .codespellignore
 interactive = 1
-skip = .git,go.mod,go.sum,semconv,venv,.tools
+skip = .git,go.mod,go.sum,go.work,go.work.sum,semconv,venv,.tools
 uri-ignore-words-list = *
 write =

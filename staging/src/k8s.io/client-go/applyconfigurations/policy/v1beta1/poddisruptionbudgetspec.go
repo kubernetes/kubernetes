@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodDisruptionBudgetSpecApplyConfiguration represents an declarative configuration of the PodDisruptionBudgetSpec type for use
+// PodDisruptionBudgetSpecApplyConfiguration represents a declarative configuration of the PodDisruptionBudgetSpec type for use
 // with apply.
 type PodDisruptionBudgetSpecApplyConfiguration struct {
 	MinAvailable               *intstr.IntOrString                     `json:"minAvailable,omitempty"`
@@ -33,7 +33,7 @@ type PodDisruptionBudgetSpecApplyConfiguration struct {
 	UnhealthyPodEvictionPolicy *v1beta1.UnhealthyPodEvictionPolicyType `json:"unhealthyPodEvictionPolicy,omitempty"`
 }
 
-// PodDisruptionBudgetSpecApplyConfiguration constructs an declarative configuration of the PodDisruptionBudgetSpec type for use with
+// PodDisruptionBudgetSpecApplyConfiguration constructs a declarative configuration of the PodDisruptionBudgetSpec type for use with
 // apply.
 func PodDisruptionBudgetSpec() *PodDisruptionBudgetSpecApplyConfiguration {
 	return &PodDisruptionBudgetSpecApplyConfiguration{}

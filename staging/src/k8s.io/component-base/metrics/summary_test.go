@@ -87,7 +87,7 @@ func TestSummary(t *testing.T) {
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
@@ -176,7 +176,7 @@ func TestSummaryVec(t *testing.T) {
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Observe(1.0)
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
@@ -190,7 +190,7 @@ func TestSummaryVec(t *testing.T) {
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 2 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 2 as the count", len(mf.GetMetric()))
 				for _, m := range mf.GetMetric() {
 					assert.Equalf(t, uint64(1), m.GetSummary().GetSampleCount(), "Got %v metrics, wanted 1 as the summary sample count", m.GetSummary().GetSampleCount())
 				}

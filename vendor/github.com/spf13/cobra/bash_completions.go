@@ -85,7 +85,7 @@ __%[1]s_handle_go_custom_completion()
     local out requestComp lastParam lastChar comp directive args
 
     # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly %[1]s allows to handle aliases
+    # Calling ${words[0]} instead of directly %[1]s allows handling aliases
     args=("${words[@]:1}")
     # Disable ActiveHelp which is not supported for bash completion v1
     requestComp="%[8]s=0 ${words[0]} %[2]s ${args[*]}"
@@ -597,19 +597,16 @@ func writeRequiredFlag(buf io.StringWriter, cmd *Command) {
 		if nonCompletableFlag(flag) {
 			return
 		}
-		for key := range flag.Annotations {
-			switch key {
-			case BashCompOneRequiredFlag:
-				format := "    must_have_one_flag+=(\"--%s"
-				if flag.Value.Type() != "bool" {
-					format += "="
-				}
-				format += cbn
-				WriteStringAndCheck(buf, fmt.Sprintf(format, flag.Name))
+		if _, ok := flag.Annotations[BashCompOneRequiredFlag]; ok {
+			format := "    must_have_one_flag+=(\"--%s"
+			if flag.Value.Type() != "bool" {
+				format += "="
+			}
+			format += cbn
+			WriteStringAndCheck(buf, fmt.Sprintf(format, flag.Name))
 
-				if len(flag.Shorthand) > 0 {
-					WriteStringAndCheck(buf, fmt.Sprintf("    must_have_one_flag+=(\"-%s"+cbn, flag.Shorthand))
-				}
+			if len(flag.Shorthand) > 0 {
+				WriteStringAndCheck(buf, fmt.Sprintf("    must_have_one_flag+=(\"-%s"+cbn, flag.Shorthand))
 			}
 		}
 	})
@@ -621,7 +618,7 @@ func writeRequiredNouns(buf io.StringWriter, cmd *Command) {
 	for _, value := range cmd.ValidArgs {
 		// Remove any description that may be included following a tab character.
 		// Descriptions are not supported by bash completion.
-		value = strings.Split(value, "\t")[0]
+		value = strings.SplitN(value, "\t", 2)[0]
 		WriteStringAndCheck(buf, fmt.Sprintf("    must_have_one_noun+=(%q)\n", value))
 	}
 	if cmd.ValidArgsFunction != nil {

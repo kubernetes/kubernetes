@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
-// JSONSchemaPropsApplyConfiguration represents an declarative configuration of the JSONSchemaProps type for use
+// JSONSchemaPropsApplyConfiguration represents a declarative configuration of the JSONSchemaProps type for use
 // with apply.
 type JSONSchemaPropsApplyConfiguration struct {
 	ID                     *string                                      `json:"id,omitempty"`
@@ -71,7 +71,7 @@ type JSONSchemaPropsApplyConfiguration struct {
 	XValidations           *v1beta1.ValidationRules                     `json:"x-kubernetes-validations,omitempty"`
 }
 
-// JSONSchemaPropsApplyConfiguration constructs an declarative configuration of the JSONSchemaProps type for use with
+// JSONSchemaPropsApplyConfiguration constructs a declarative configuration of the JSONSchemaProps type for use with
 // apply.
 func JSONSchemaProps() *JSONSchemaPropsApplyConfiguration {
 	return &JSONSchemaPropsApplyConfiguration{}

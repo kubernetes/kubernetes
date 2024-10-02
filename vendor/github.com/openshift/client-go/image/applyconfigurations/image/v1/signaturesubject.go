@@ -2,14 +2,14 @@
 
 package v1
 
-// SignatureSubjectApplyConfiguration represents an declarative configuration of the SignatureSubject type for use
+// SignatureSubjectApplyConfiguration represents a declarative configuration of the SignatureSubject type for use
 // with apply.
 type SignatureSubjectApplyConfiguration struct {
 	SignatureGenericEntityApplyConfiguration `json:",inline"`
 	PublicKeyID                              *string `json:"publicKeyID,omitempty"`
 }
 
-// SignatureSubjectApplyConfiguration constructs an declarative configuration of the SignatureSubject type for use with
+// SignatureSubjectApplyConfiguration constructs a declarative configuration of the SignatureSubject type for use with
 // apply.
 func SignatureSubject() *SignatureSubjectApplyConfiguration {
 	return &SignatureSubjectApplyConfiguration{}

@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// FeatureGateAttributesApplyConfiguration represents an declarative configuration of the FeatureGateAttributes type for use
+// FeatureGateAttributesApplyConfiguration represents a declarative configuration of the FeatureGateAttributes type for use
 // with apply.
 type FeatureGateAttributesApplyConfiguration struct {
 	Name *v1.FeatureGateName `json:"name,omitempty"`
 }
 
-// FeatureGateAttributesApplyConfiguration constructs an declarative configuration of the FeatureGateAttributes type for use with
+// FeatureGateAttributesApplyConfiguration constructs a declarative configuration of the FeatureGateAttributes type for use with
 // apply.
 func FeatureGateAttributes() *FeatureGateAttributesApplyConfiguration {
 	return &FeatureGateAttributesApplyConfiguration{}

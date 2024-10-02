@@ -37,6 +37,7 @@ enforceNodeAllocatable:
 eventBurst: 100
 eventRecordQPS: 50
 evictionPressureTransitionPeriod: 5m0s
+failCgroupV1: false
 failSwapOn: true
 fileCheckFrequency: 20s
 hairpinMode: promiscuous-bridge

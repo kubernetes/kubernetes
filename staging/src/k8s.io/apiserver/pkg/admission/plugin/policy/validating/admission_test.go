@@ -516,7 +516,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	require.Equal(t, 0, warningRecorder.len())
 
 	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
-	require.Equal(t, 0, len(annotations))
+	require.Empty(t, annotations)
 
 	require.ErrorContains(t, err, `Denied`)
 }
@@ -824,7 +824,7 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 		`failed to configure policy: failed to find resource referenced by paramKind: 'example.com/v1, Kind=BadParamKind'`)
 
 	close(passedParams)
-	require.Len(t, passedParams, 0)
+	require.Empty(t, passedParams)
 }
 
 // Shows that an error is surfaced if a param specified in a binding does not
@@ -868,7 +868,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	// is not existing
 	require.ErrorContains(t, err,
 		"no params found for policy binding with `Deny` parameterNotFoundAction")
-	require.Len(t, passedParams, 0)
+	require.Empty(t, passedParams)
 }
 
 // Show that policy still gets evaluated with `nil` param if paramRef & namespaceParamRef
@@ -1199,7 +1199,7 @@ func TestAuditValidationAction(t *testing.T) {
 	require.Equal(t, 0, warningRecorder.len())
 
 	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
-	require.Equal(t, 1, len(annotations))
+	require.Len(t, annotations, 1)
 	valueJson, ok := annotations["validation.policy.admission.k8s.io/validation_failure"]
 	require.True(t, ok)
 	var value []validating.ValidationFailureValue
@@ -1254,7 +1254,7 @@ func TestWarnValidationAction(t *testing.T) {
 	require.True(t, warningRecorder.hasWarning("Validation failed for ValidatingAdmissionPolicy 'denypolicy.example.com' with binding 'denybinding.example.com': I'm sorry Dave"))
 
 	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
-	require.Equal(t, 0, len(annotations))
+	require.Empty(t, annotations)
 
 	require.NoError(t, err)
 }
@@ -1296,7 +1296,7 @@ func TestAllValidationActions(t *testing.T) {
 	require.True(t, warningRecorder.hasWarning("Validation failed for ValidatingAdmissionPolicy 'denypolicy.example.com' with binding 'denybinding.example.com': I'm sorry Dave"))
 
 	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
-	require.Equal(t, 1, len(annotations))
+	require.Len(t, annotations, 1)
 	valueJson, ok := annotations["validation.policy.admission.k8s.io/validation_failure"]
 	require.True(t, ok)
 	var value []validating.ValidationFailureValue
@@ -1509,6 +1509,7 @@ func TestParamRef(t *testing.T) {
 						}
 
 						t.Run(name, func(t *testing.T) {
+							t.Parallel()
 							// Test creating a policy with a cluster or namesapce-scoped param
 							// and binding with the provided configuration. Test will ensure
 							// that the provided configuration is capable of matching
@@ -1925,10 +1926,10 @@ func TestAuditAnnotations(t *testing.T) {
 	)
 
 	annotations := attr.GetAnnotations(auditinternal.LevelMetadata)
-	require.Equal(t, 1, len(annotations))
+	require.Len(t, annotations, 1)
 	value := annotations[policy.Name+"/example-key"]
 	parts := strings.Split(value, ", ")
-	require.Equal(t, 2, len(parts))
+	require.Len(t, parts, 2)
 	require.Contains(t, parts, "normal-value", "special-value")
 
 	require.ErrorContains(t, err, "example error")

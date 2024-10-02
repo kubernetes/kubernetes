@@ -2,7 +2,7 @@
 
 package v1
 
-// OIDCClientReferenceApplyConfiguration represents an declarative configuration of the OIDCClientReference type for use
+// OIDCClientReferenceApplyConfiguration represents a declarative configuration of the OIDCClientReference type for use
 // with apply.
 type OIDCClientReferenceApplyConfiguration struct {
 	OIDCProviderName *string `json:"oidcProviderName,omitempty"`
@@ -10,7 +10,7 @@ type OIDCClientReferenceApplyConfiguration struct {
 	ClientID         *string `json:"clientID,omitempty"`
 }
 
-// OIDCClientReferenceApplyConfiguration constructs an declarative configuration of the OIDCClientReference type for use with
+// OIDCClientReferenceApplyConfiguration constructs a declarative configuration of the OIDCClientReference type for use with
 // apply.
 func OIDCClientReference() *OIDCClientReferenceApplyConfiguration {
 	return &OIDCClientReferenceApplyConfiguration{}

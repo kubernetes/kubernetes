@@ -2,13 +2,13 @@
 
 package v1
 
-// UsernamePrefixApplyConfiguration represents an declarative configuration of the UsernamePrefix type for use
+// UsernamePrefixApplyConfiguration represents a declarative configuration of the UsernamePrefix type for use
 // with apply.
 type UsernamePrefixApplyConfiguration struct {
 	PrefixString *string `json:"prefixString,omitempty"`
 }
 
-// UsernamePrefixApplyConfiguration constructs an declarative configuration of the UsernamePrefix type for use with
+// UsernamePrefixApplyConfiguration constructs a declarative configuration of the UsernamePrefix type for use with
 // apply.
 func UsernamePrefix() *UsernamePrefixApplyConfiguration {
 	return &UsernamePrefixApplyConfiguration{}

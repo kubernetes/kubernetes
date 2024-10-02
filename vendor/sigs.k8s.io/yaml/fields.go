@@ -16,53 +16,53 @@ import (
 	"unicode/utf8"
 )
 
-// indirect walks down v allocating pointers as needed,
+// indirect walks down 'value' allocating pointers as needed,
 // until it gets to a non-pointer.
 // if it encounters an Unmarshaler, indirect stops and returns that.
 // if decodingNull is true, indirect stops at the last pointer so it can be set to nil.
-func indirect(v reflect.Value, decodingNull bool) (json.Unmarshaler, encoding.TextUnmarshaler, reflect.Value) {
-	// If v is a named type and is addressable,
+func indirect(value reflect.Value, decodingNull bool) (json.Unmarshaler, encoding.TextUnmarshaler, reflect.Value) {
+	// If 'value' is a named type and is addressable,
 	// start with its address, so that if the type has pointer methods,
 	// we find them.
-	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
-		v = v.Addr()
+	if value.Kind() != reflect.Ptr && value.Type().Name() != "" && value.CanAddr() {
+		value = value.Addr()
 	}
 	for {
 		// Load value from interface, but only if the result will be
 		// usefully addressable.
-		if v.Kind() == reflect.Interface && !v.IsNil() {
-			e := v.Elem()
-			if e.Kind() == reflect.Ptr && !e.IsNil() && (!decodingNull || e.Elem().Kind() == reflect.Ptr) {
-				v = e
+		if value.Kind() == reflect.Interface && !value.IsNil() {
+			element := value.Elem()
+			if element.Kind() == reflect.Ptr && !element.IsNil() && (!decodingNull || element.Elem().Kind() == reflect.Ptr) {
+				value = element
 				continue
 			}
 		}
 
-		if v.Kind() != reflect.Ptr {
+		if value.Kind() != reflect.Ptr {
 			break
 		}
 
-		if v.Elem().Kind() != reflect.Ptr && decodingNull && v.CanSet() {
+		if value.Elem().Kind() != reflect.Ptr && decodingNull && value.CanSet() {
 			break
 		}
-		if v.IsNil() {
-			if v.CanSet() {
-				v.Set(reflect.New(v.Type().Elem()))
+		if value.IsNil() {
+			if value.CanSet() {
+				value.Set(reflect.New(value.Type().Elem()))
 			} else {
-				v = reflect.New(v.Type().Elem())
+				value = reflect.New(value.Type().Elem())
 			}
 		}
-		if v.Type().NumMethod() > 0 {
-			if u, ok := v.Interface().(json.Unmarshaler); ok {
+		if value.Type().NumMethod() > 0 {
+			if u, ok := value.Interface().(json.Unmarshaler); ok {
 				return u, nil, reflect.Value{}
 			}
-			if u, ok := v.Interface().(encoding.TextUnmarshaler); ok {
+			if u, ok := value.Interface().(encoding.TextUnmarshaler); ok {
 				return nil, u, reflect.Value{}
 			}
 		}
-		v = v.Elem()
+		value = value.Elem()
 	}
-	return nil, nil, v
+	return nil, nil, value
 }
 
 // A field represents a single field found in a struct.
@@ -134,8 +134,8 @@ func typeFields(t reflect.Type) []field {
 	next := []field{{typ: t}}
 
 	// Count of queued names for current level and the next.
-	count := map[reflect.Type]int{}
-	nextCount := map[reflect.Type]int{}
+	var count map[reflect.Type]int
+	var nextCount map[reflect.Type]int
 
 	// Types already visited at an earlier level.
 	visited := map[reflect.Type]bool{}
@@ -348,8 +348,9 @@ const (
 // 4) simpleLetterEqualFold, no specials, no non-letters.
 //
 // The letters S and K are special because they map to 3 runes, not just 2:
-//  * S maps to s and to U+017F 'ſ' Latin small letter long s
-//  * k maps to K and to U+212A 'K' Kelvin sign
+//   - S maps to s and to U+017F 'ſ' Latin small letter long s
+//   - k maps to K and to U+212A 'K' Kelvin sign
+//
 // See http://play.golang.org/p/tTxjOc0OGo
 //
 // The returned function is specialized for matching against s and
@@ -420,10 +421,8 @@ func equalFoldRight(s, t []byte) bool {
 		t = t[size:]
 
 	}
-	if len(t) > 0 {
-		return false
-	}
-	return true
+
+	return len(t) <= 0
 }
 
 // asciiEqualFold is a specialization of bytes.EqualFold for use when

@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
-	y1_1 "gopkg.in/yaml.v2"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	y1_2 "sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
+	y1_1 "sigs.k8s.io/yaml/goyaml.v2"
+	y1_2 "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 // typeToTag maps OpenAPI schema types to yaml 1.2 tags
@@ -47,7 +47,7 @@ func FormatNonStringStyle(node *Node, schema spec.Schema) {
 	}
 
 	// if the node tag is null, make sure we don't add any non-null tags
-	// https://github.com/GoogleContainerTools/kpt/issues/2321
+	// https://github.com/kptdev/kpt/issues/2321
 	if node.Tag == NodeTagNull {
 		// must NOT quote null values
 		node.Style = 0

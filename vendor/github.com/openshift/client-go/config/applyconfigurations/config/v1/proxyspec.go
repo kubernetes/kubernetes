@@ -2,7 +2,7 @@
 
 package v1
 
-// ProxySpecApplyConfiguration represents an declarative configuration of the ProxySpec type for use
+// ProxySpecApplyConfiguration represents a declarative configuration of the ProxySpec type for use
 // with apply.
 type ProxySpecApplyConfiguration struct {
 	HTTPProxy          *string                                   `json:"httpProxy,omitempty"`
@@ -12,7 +12,7 @@ type ProxySpecApplyConfiguration struct {
 	TrustedCA          *ConfigMapNameReferenceApplyConfiguration `json:"trustedCA,omitempty"`
 }
 
-// ProxySpecApplyConfiguration constructs an declarative configuration of the ProxySpec type for use with
+// ProxySpecApplyConfiguration constructs a declarative configuration of the ProxySpec type for use with
 // apply.
 func ProxySpec() *ProxySpecApplyConfiguration {
 	return &ProxySpecApplyConfiguration{}

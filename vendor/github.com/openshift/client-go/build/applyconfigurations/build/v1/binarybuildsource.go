@@ -2,13 +2,13 @@
 
 package v1
 
-// BinaryBuildSourceApplyConfiguration represents an declarative configuration of the BinaryBuildSource type for use
+// BinaryBuildSourceApplyConfiguration represents a declarative configuration of the BinaryBuildSource type for use
 // with apply.
 type BinaryBuildSourceApplyConfiguration struct {
 	AsFile *string `json:"asFile,omitempty"`
 }
 
-// BinaryBuildSourceApplyConfiguration constructs an declarative configuration of the BinaryBuildSource type for use with
+// BinaryBuildSourceApplyConfiguration constructs a declarative configuration of the BinaryBuildSource type for use with
 // apply.
 func BinaryBuildSource() *BinaryBuildSourceApplyConfiguration {
 	return &BinaryBuildSourceApplyConfiguration{}

@@ -198,7 +198,8 @@ func TestNewNodeLease(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.controller.newLeasePostProcessFunc = setNodeOwnerFunc(tc.controller.client, node.Name)
+			logger, _ := ktesting.NewTestContext(t)
+			tc.controller.newLeasePostProcessFunc = setNodeOwnerFunc(logger, tc.controller.client, node.Name)
 			tc.controller.leaseNamespace = corev1.NamespaceNodeLease
 			newLease, _ := tc.controller.newLease(tc.base)
 			if newLease == tc.base {
@@ -286,7 +287,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			cl := tc.client
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -302,7 +303,7 @@ func TestRetryUpdateNodeLease(t *testing.T) {
 				leaseNamespace:             corev1.NamespaceNodeLease,
 				leaseDurationSeconds:       10,
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
-				newLeasePostProcessFunc:    setNodeOwnerFunc(cl, node.Name),
+				newLeasePostProcessFunc:    setNodeOwnerFunc(logger, cl, node.Name),
 			}
 			if err := c.retryUpdateLease(ctx, nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
@@ -422,7 +423,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			cl := fake.NewSimpleClientset(tc.existingObjs...)
 			if tc.updateReactor != nil {
 				cl.PrependReactor("update", "leases", tc.updateReactor)
@@ -441,7 +442,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				leaseNamespace:          corev1.NamespaceNodeLease,
 				leaseDurationSeconds:    10,
 				latestLease:             tc.latestLease,
-				newLeasePostProcessFunc: setNodeOwnerFunc(cl, node.Name),
+				newLeasePostProcessFunc: setNodeOwnerFunc(logger, cl, node.Name),
 			}
 
 			c.sync(ctx)
@@ -461,7 +462,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 
 // setNodeOwnerFunc helps construct a newLeasePostProcessFunc which sets
 // a node OwnerReference to the given lease object
-func setNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
+func setNodeOwnerFunc(logger klog.Logger, c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
 	return func(lease *coordinationv1.Lease) error {
 		// Setting owner reference needs node's UID. Note that it is different from
 		// kubelet.nodeRef.UID. When lease is initially created, it is possible that
@@ -478,7 +479,7 @@ func setNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordi
 					},
 				}
 			} else {
-				klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", nodeName, err)
+				logger.Error(err, "failed to get node when trying to set owner ref to the node lease", "node", nodeName)
 				return err
 			}
 		}

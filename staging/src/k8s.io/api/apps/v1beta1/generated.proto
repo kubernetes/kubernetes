@@ -45,10 +45,10 @@ message ControllerRevision {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // data is the serialized representation of the state.
-  optional k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 2;
 
   // revision indicates the revision of the state represented by Data.
   optional int64 revision = 3;
@@ -58,7 +58,7 @@ message ControllerRevision {
 message ControllerRevisionList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ControllerRevisions
   repeated ControllerRevision items = 2;
@@ -70,7 +70,7 @@ message ControllerRevisionList {
 message Deployment {
   // Standard object metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
   // +optional
@@ -90,10 +90,10 @@ message DeploymentCondition {
   optional string status = 2;
 
   // The last time this condition was updated.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
   optional string reason = 4;
@@ -106,7 +106,7 @@ message DeploymentCondition {
 message DeploymentList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Deployments.
   repeated Deployment items = 2;
@@ -136,11 +136,11 @@ message DeploymentSpec {
   // selector is the label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
   // The only allowed template.spec.restartPolicy value is "Always".
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
@@ -254,7 +254,7 @@ message RollingUpdateDeployment {
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
@@ -268,7 +268,7 @@ message RollingUpdateDeployment {
   // new ReplicaSet can be scaled up further, ensuring that total number of pods running
   // at any time during the update is at most 130% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
@@ -287,14 +287,14 @@ message RollingUpdateStatefulSetStrategy {
   // Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
   // will be counted towards MaxUnavailable.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 2;
 }
 
 // Scale represents a scaling request for a resource.
 message Scale {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional
@@ -342,7 +342,7 @@ message ScaleStatus {
 // map to the same storage identity.
 message StatefulSet {
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired identities of pods in this set.
   // +optional
@@ -364,7 +364,7 @@ message StatefulSetCondition {
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -378,7 +378,7 @@ message StatefulSetCondition {
 // StatefulSetList is a collection of StatefulSets.
 message StatefulSetList {
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated StatefulSet items = 2;
 }
@@ -429,7 +429,7 @@ message StatefulSetSpec {
   // If empty, defaulted to labels on the pod template.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // template is the object that describes the pod that will be created if
   // insufficient replicas are detected. Each pod stamped out by the StatefulSet
@@ -437,7 +437,7 @@ message StatefulSetSpec {
   // of the StatefulSet. Each pod will be named with the format
   // <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
   // "web" with index number "3" would be named "web-3".
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // volumeClaimTemplates is a list of claims that pods are allowed to reference.
   // The StatefulSet controller is responsible for mapping network identities to
@@ -448,7 +448,7 @@ message StatefulSetSpec {
   // TODO: Define the behavior if a claim already exists with the same name.
   // +optional
   // +listType=atomic
-  repeated k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
+  repeated .k8s.io.api.core.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
   // serviceName is the name of the service that governs this StatefulSet.
   // This service must exist before the StatefulSet, and is responsible for
@@ -493,9 +493,7 @@ message StatefulSetSpec {
 
   // ordinals controls the numbering of replica indices in a StatefulSet. The
   // default ordinals behavior assigns a "0" index to the first replica and
-  // increments the index by one for each additional replica requested. Using
-  // the ordinals field requires the StatefulSetStartOrdinal feature gate to be
-  // enabled, which is beta.
+  // increments the index by one for each additional replica requested.
   // +optional
   optional StatefulSetOrdinals ordinals = 11;
 }

@@ -22,9 +22,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
@@ -183,12 +186,32 @@ func getFinishedTime(p *v1.Pod) time.Time {
 }
 
 func getFinishTimeFromContainers(p *v1.Pod) *time.Time {
-	var finishTime *time.Time
-	for _, containerState := range p.Status.ContainerStatuses {
-		if containerState.State.Terminated == nil {
-			return nil
+	finishTime := latestFinishTime(nil, p.Status.ContainerStatuses, nil)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		// We need to check InitContainerStatuses here also,
+		// because with the sidecar (restartable init) containers,
+		// sidecar containers will always finish later than regular containers.
+		names := sets.New[string]()
+		for _, c := range p.Spec.InitContainers {
+			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+				names.Insert(c.Name)
+			}
 		}
-		if containerState.State.Terminated.FinishedAt.Time.IsZero() {
+		finishTime = latestFinishTime(finishTime, p.Status.InitContainerStatuses, func(status v1.ContainerStatus) bool {
+			return names.Has(status.Name)
+		})
+	}
+	return finishTime
+}
+
+func latestFinishTime(prevFinishTime *time.Time, cs []v1.ContainerStatus, check func(status v1.ContainerStatus) bool) *time.Time {
+	var finishTime = prevFinishTime
+	for _, containerState := range cs {
+		if check != nil && !check(containerState) {
+			continue
+		}
+		if containerState.State.Terminated == nil ||
+			containerState.State.Terminated.FinishedAt.Time.IsZero() {
 			return nil
 		}
 		if finishTime == nil || finishTime.Before(containerState.State.Terminated.FinishedAt.Time) {

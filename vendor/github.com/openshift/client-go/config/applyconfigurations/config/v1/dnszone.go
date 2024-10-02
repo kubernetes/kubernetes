@@ -2,14 +2,14 @@
 
 package v1
 
-// DNSZoneApplyConfiguration represents an declarative configuration of the DNSZone type for use
+// DNSZoneApplyConfiguration represents a declarative configuration of the DNSZone type for use
 // with apply.
 type DNSZoneApplyConfiguration struct {
 	ID   *string           `json:"id,omitempty"`
 	Tags map[string]string `json:"tags,omitempty"`
 }
 
-// DNSZoneApplyConfiguration constructs an declarative configuration of the DNSZone type for use with
+// DNSZoneApplyConfiguration constructs a declarative configuration of the DNSZone type for use with
 // apply.
 func DNSZone() *DNSZoneApplyConfiguration {
 	return &DNSZoneApplyConfiguration{}

@@ -2,7 +2,7 @@
 
 package v1
 
-// LDAPIdentityProviderApplyConfiguration represents an declarative configuration of the LDAPIdentityProvider type for use
+// LDAPIdentityProviderApplyConfiguration represents a declarative configuration of the LDAPIdentityProvider type for use
 // with apply.
 type LDAPIdentityProviderApplyConfiguration struct {
 	URL          *string                                   `json:"url,omitempty"`
@@ -13,7 +13,7 @@ type LDAPIdentityProviderApplyConfiguration struct {
 	Attributes   *LDAPAttributeMappingApplyConfiguration   `json:"attributes,omitempty"`
 }
 
-// LDAPIdentityProviderApplyConfiguration constructs an declarative configuration of the LDAPIdentityProvider type for use with
+// LDAPIdentityProviderApplyConfiguration constructs a declarative configuration of the LDAPIdentityProvider type for use with
 // apply.
 func LDAPIdentityProvider() *LDAPIdentityProviderApplyConfiguration {
 	return &LDAPIdentityProviderApplyConfiguration{}

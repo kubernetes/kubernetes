@@ -6,13 +6,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// TemplateInstanceObjectApplyConfiguration represents an declarative configuration of the TemplateInstanceObject type for use
+// TemplateInstanceObjectApplyConfiguration represents a declarative configuration of the TemplateInstanceObject type for use
 // with apply.
 type TemplateInstanceObjectApplyConfiguration struct {
 	Ref *v1.ObjectReference `json:"ref,omitempty"`
 }
 
-// TemplateInstanceObjectApplyConfiguration constructs an declarative configuration of the TemplateInstanceObject type for use with
+// TemplateInstanceObjectApplyConfiguration constructs a declarative configuration of the TemplateInstanceObject type for use with
 // apply.
 func TemplateInstanceObject() *TemplateInstanceObjectApplyConfiguration {
 	return &TemplateInstanceObjectApplyConfiguration{}

@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// CustomResourceDefinitionStatusApplyConfiguration represents an declarative configuration of the CustomResourceDefinitionStatus type for use
+// CustomResourceDefinitionStatusApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionStatus type for use
 // with apply.
 type CustomResourceDefinitionStatusApplyConfiguration struct {
 	Conditions     []CustomResourceDefinitionConditionApplyConfiguration `json:"conditions,omitempty"`
@@ -26,7 +26,7 @@ type CustomResourceDefinitionStatusApplyConfiguration struct {
 	StoredVersions []string                                              `json:"storedVersions,omitempty"`
 }
 
-// CustomResourceDefinitionStatusApplyConfiguration constructs an declarative configuration of the CustomResourceDefinitionStatus type for use with
+// CustomResourceDefinitionStatusApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionStatus type for use with
 // apply.
 func CustomResourceDefinitionStatus() *CustomResourceDefinitionStatusApplyConfiguration {
 	return &CustomResourceDefinitionStatusApplyConfiguration{}

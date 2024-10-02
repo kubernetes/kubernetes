@@ -26,11 +26,6 @@ func (in *PersistentVolumeBinderControllerConfiguration) DeepCopyInto(out *Persi
 	*out = *in
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	out.VolumeConfiguration = in.VolumeConfiguration
-	if in.VolumeHostCIDRDenylist != nil {
-		in, out := &in.VolumeHostCIDRDenylist, &out.VolumeHostCIDRDenylist
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

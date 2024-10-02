@@ -22,13 +22,15 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -89,20 +91,27 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			if validityPeriod > kubeadmconstants.CertificateValidity {
+			if validityPeriod > kubeadmconstants.CertificateValidityPeriod {
 				klog.Warningf("WARNING: the specified certificate validity period %v is longer than the default duration %v, this may increase security risks.",
-					validityPeriod, kubeadmconstants.CertificateValidity)
+					validityPeriod, kubeadmconstants.CertificateValidityPeriod)
+			}
+			internalCfg.ClusterConfiguration.CertificateValidityPeriod = &metav1.Duration{
+				Duration: validityPeriod,
 			}
 
-			notAfter := time.Now().Add(validityPeriod).UTC()
+			startTime := kubeadmutil.StartTimeUTC()
+			notAfter := startTime.Add(kubeadmconstants.CertificateValidityPeriod)
+			if internalCfg.ClusterConfiguration.CertificateValidityPeriod != nil {
+				notAfter = startTime.Add(validityPeriod)
+			}
 
 			// if the kubeconfig file for an additional user has to use a token, use it
 			if token != "" {
-				return kubeconfigphase.WriteKubeConfigWithToken(out, internalCfg, clientName, token, &notAfter)
+				return kubeconfigphase.WriteKubeConfigWithToken(out, internalCfg, clientName, token, notAfter)
 			}
 
 			// Otherwise, write a kubeconfig file with a generate client cert
-			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalCfg, clientName, organizations, &notAfter)
+			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalCfg, clientName, organizations, notAfter)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -113,7 +122,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&token, options.TokenStr, token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 	cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The organizations of the client certificate. It will be used as the O if client certificates are created")
-	cmd.Flags().DurationVar(&validityPeriod, "validity-period", kubeadmconstants.CertificateValidity, "The validity period of the client certificate. It is an offset from the current time.")
+	cmd.Flags().DurationVar(&validityPeriod, "validity-period", kubeadmconstants.CertificateValidityPeriod, "The validity period of the client certificate. It is an offset from the current time.")
 
 	cmd.MarkFlagRequired("client-name")
 	return cmd

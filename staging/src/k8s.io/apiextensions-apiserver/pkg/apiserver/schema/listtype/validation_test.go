@@ -202,18 +202,18 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 			schema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{
-						Structural: &schema.Structural{
+				},
+				AdditionalProperties: &schema.StructuralOrBool{
+					Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Extensions: schema.Extensions{
+							XListType: strPtr("set"),
+						},
+						Items: &schema.Structural{
 							Generic: schema.Generic{
-								Type: "array",
-							},
-							Extensions: schema.Extensions{
-								XListType: strPtr("set"),
-							},
-							Items: &schema.Structural{
-								Generic: schema.Generic{
-									Type: "string",
-								},
+								Type: "string",
 							},
 						},
 					},
@@ -387,11 +387,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -407,11 +407,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -427,12 +427,12 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type:     "string",
-											Nullable: true,
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type:     "string",
+										Nullable: true,
 									},
 								},
 							},
@@ -485,11 +485,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -670,11 +670,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -691,11 +691,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -712,11 +712,11 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type: "string",
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type: "string",
 									},
 								},
 							},
@@ -733,12 +733,12 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type:     "string",
-											Nullable: true,
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type:     "string",
+										Nullable: true,
 									},
 								},
 							},
@@ -856,12 +856,12 @@ func TestValidateListSetsAndMaps(t *testing.T) {
 						Items: &schema.Structural{
 							Generic: schema.Generic{
 								Type: "object",
-								AdditionalProperties: &schema.StructuralOrBool{
-									Structural: &schema.Structural{
-										Generic: schema.Generic{
-											Type:     "string",
-											Nullable: true,
-										},
+							},
+							AdditionalProperties: &schema.StructuralOrBool{
+								Structural: &schema.Structural{
+									Generic: schema.Generic{
+										Type:     "string",
+										Nullable: true,
 									},
 								},
 							},

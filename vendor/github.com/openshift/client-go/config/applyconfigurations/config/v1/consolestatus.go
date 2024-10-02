@@ -2,13 +2,13 @@
 
 package v1
 
-// ConsoleStatusApplyConfiguration represents an declarative configuration of the ConsoleStatus type for use
+// ConsoleStatusApplyConfiguration represents a declarative configuration of the ConsoleStatus type for use
 // with apply.
 type ConsoleStatusApplyConfiguration struct {
 	ConsoleURL *string `json:"consoleURL,omitempty"`
 }
 
-// ConsoleStatusApplyConfiguration constructs an declarative configuration of the ConsoleStatus type for use with
+// ConsoleStatusApplyConfiguration constructs a declarative configuration of the ConsoleStatus type for use with
 // apply.
 func ConsoleStatus() *ConsoleStatusApplyConfiguration {
 	return &ConsoleStatusApplyConfiguration{}

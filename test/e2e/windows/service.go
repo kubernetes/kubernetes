@@ -30,6 +30,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -75,7 +76,7 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
-		testPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+		testPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
 		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")

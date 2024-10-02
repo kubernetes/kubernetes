@@ -99,8 +99,63 @@ type StatuspageProvider struct {
 	PageID string `json:"pageID"`
 }
 
+// ConsoleCapabilityName defines name of UI capability in the console UI.
+type ConsoleCapabilityName string
+
+const (
+	// lightspeedButton is the name for the Lightspeed button HTML element.
+	LightspeedButton ConsoleCapabilityName = "LightspeedButton"
+
+	// gettingStartedBanner is the name of the 'Getting started resources' banner in the console UI Overview page.
+	GettingStartedBanner ConsoleCapabilityName = "GettingStartedBanner"
+)
+
+// CapabilityState defines the state of the capability in the console UI.
+type CapabilityState string
+
+const (
+	// "Enabled" means that the capability will be rendered in the console UI.
+	CapabilityEnabled CapabilityState = "Enabled"
+	// "Disabled" means that the capability will not be rendered in the console UI.
+	CapabilityDisabled CapabilityState = "Disabled"
+)
+
+// CapabilityVisibility defines the criteria to enable/disable a capability.
+// +union
+type CapabilityVisibility struct {
+	// state defines if the capability is enabled or disabled in the console UI.
+	// Enabling the capability in the console UI is represented by the "Enabled" value.
+	// Disabling the capability in the console UI is represented by the "Disabled" value.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Enum:="Enabled";"Disabled"
+	// +kubebuilder:validation:Required
+	State CapabilityState `json:"state"`
+}
+
+// Capabilities contains set of UI capabilities and their state in the console UI.
+type Capability struct {
+	// name is the unique name of a capability.
+	// Available capabilities are LightspeedButton and GettingStartedBanner.
+	// +kubebuilder:validation:Enum:="LightspeedButton";"GettingStartedBanner"
+	// +kubebuilder:validation:Required
+	Name ConsoleCapabilityName `json:"name"`
+	// visibility defines the visibility state of the capability.
+	// +kubebuilder:validation:Required
+	Visibility CapabilityVisibility `json:"visibility"`
+}
+
 // ConsoleCustomization defines a list of optional configuration for the console UI.
 type ConsoleCustomization struct {
+	// capabilities defines an array of capabilities that can be interacted with in the console UI.
+	// Each capability defines a visual state that can be interacted with the console to render in the UI.
+	// Available capabilities are LightspeedButton and GettingStartedBanner.
+	// Each of the available capabilities may appear only once in the list.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=2
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Capabilities []Capability `json:"capabilities,omitempty"`
 	// brand is the default branding of the web console which can be overridden by
 	// providing the brand field.  There is a limited set of specific brand options.
 	// This field controls elements of the console such as the logo.

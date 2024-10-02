@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -124,6 +125,12 @@ type ResourceAttributes struct {
 	// Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,7,opt,name=name"`
+	// fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
+	// +optional
+	FieldSelector *authorizationv1.FieldSelectorAttributes `json:"fieldSelector,omitempty" protobuf:"bytes,8,opt,name=fieldSelector"`
+	// labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
+	// +optional
+	LabelSelector *authorizationv1.LabelSelectorAttributes `json:"labelSelector,omitempty" protobuf:"bytes,9,opt,name=labelSelector"`
 }
 
 // NonResourceAttributes includes the authorization attributes available for non-resource requests to the Authorizer interface

@@ -1,0 +1,13 @@
+---
+dir: .
+filename: mock_{{.InterfaceName | snakecase}}.go
+boilerplate-file: ../../../../hack/boilerplate/boilerplate.generatego.txt
+inpackage: true
+with-expecter: true
+packages:
+  k8s.io/kubernetes/test/utils/oidc/handlers:
+    interfaces:
+      JWKsHandler:
+        config:
+          filename: mock_jwks_handler.go
+      TokenHandler:

@@ -36,7 +36,7 @@ import (
 
 // Verifies that the 'spec.signerName' field can be correctly used as a field selector on LIST requests
 func TestCSRSignerNameFieldSelector(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(server.ClientConfig)

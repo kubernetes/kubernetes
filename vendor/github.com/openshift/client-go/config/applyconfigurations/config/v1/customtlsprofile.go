@@ -6,13 +6,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// CustomTLSProfileApplyConfiguration represents an declarative configuration of the CustomTLSProfile type for use
+// CustomTLSProfileApplyConfiguration represents a declarative configuration of the CustomTLSProfile type for use
 // with apply.
 type CustomTLSProfileApplyConfiguration struct {
 	TLSProfileSpecApplyConfiguration `json:",inline"`
 }
 
-// CustomTLSProfileApplyConfiguration constructs an declarative configuration of the CustomTLSProfile type for use with
+// CustomTLSProfileApplyConfiguration constructs a declarative configuration of the CustomTLSProfile type for use with
 // apply.
 func CustomTLSProfile() *CustomTLSProfileApplyConfiguration {
 	return &CustomTLSProfileApplyConfiguration{}

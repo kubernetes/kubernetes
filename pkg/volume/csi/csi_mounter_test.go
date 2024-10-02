@@ -108,7 +108,6 @@ func TestMounterGetPath(t *testing.T) {
 		mounter, err := plug.NewMounter(
 			spec,
 			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
-			volume.VolumeOptions{},
 		)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mounter: %v", err)
@@ -215,7 +214,7 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)
 
 			modes := []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
@@ -244,7 +243,6 @@ func TestMounterSetUp(t *testing.T) {
 						ServiceAccountName: testAccount,
 					},
 				},
-				volume.VolumeOptions{},
 			)
 			if err != nil {
 				t.Fatalf("failed to make a new Mounter: %v", err)
@@ -441,7 +439,6 @@ func TestMounterSetUpSimple(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
-				volume.VolumeOptions{},
 			)
 			if tc.newMounterShouldFail && err != nil {
 				t.Log(err)
@@ -623,7 +620,6 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec("ext4", []string{}),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
-				volume.VolumeOptions{},
 			)
 			if err != nil {
 				t.Fatalf("failed to create CSI mounter: %v", err)
@@ -724,7 +720,6 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
-				volume.VolumeOptions{},
 			)
 			if tc.shouldFail && err != nil {
 				t.Log(err)
@@ -988,7 +983,6 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		mounter, err := plug.NewMounter(
 			spec,
 			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
-			volume.VolumeOptions{},
 		)
 		if err != nil {
 			t.Fatalf("Failed to make a new Mounter: %v", err)
@@ -1272,7 +1266,6 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 						ServiceAccountName: testAccount,
 					},
 				},
-				volume.VolumeOptions{},
 			)
 			if err != nil {
 				t.Fatalf("Failed to create a csi mounter, err: %v", err)
@@ -1489,7 +1482,6 @@ func TestMounterGetFSGroupPolicy(t *testing.T) {
 		mounter, err := plug.NewMounter(
 			volume.NewSpecFromPersistentVolume(makeTestPV("test.vol.id", 20, testDriver, "testvol-handle1"), true),
 			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: "1", Namespace: testns}},
-			volume.VolumeOptions{},
 		)
 		if err != nil {
 			t.Fatalf("Error creating a new mounter: %s", err)

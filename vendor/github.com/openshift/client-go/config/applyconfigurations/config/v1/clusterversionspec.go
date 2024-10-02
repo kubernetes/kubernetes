@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ClusterVersionSpecApplyConfiguration represents an declarative configuration of the ClusterVersionSpec type for use
+// ClusterVersionSpecApplyConfiguration represents a declarative configuration of the ClusterVersionSpec type for use
 // with apply.
 type ClusterVersionSpecApplyConfiguration struct {
 	ClusterID       *v1.ClusterID                                     `json:"clusterID,omitempty"`
@@ -18,7 +18,7 @@ type ClusterVersionSpecApplyConfiguration struct {
 	Overrides       []ComponentOverrideApplyConfiguration             `json:"overrides,omitempty"`
 }
 
-// ClusterVersionSpecApplyConfiguration constructs an declarative configuration of the ClusterVersionSpec type for use with
+// ClusterVersionSpecApplyConfiguration constructs a declarative configuration of the ClusterVersionSpec type for use with
 // apply.
 func ClusterVersionSpec() *ClusterVersionSpecApplyConfiguration {
 	return &ClusterVersionSpecApplyConfiguration{}

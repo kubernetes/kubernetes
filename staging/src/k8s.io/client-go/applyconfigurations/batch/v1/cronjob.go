@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CronJobApplyConfiguration represents an declarative configuration of the CronJob type for use
+// CronJobApplyConfiguration represents a declarative configuration of the CronJob type for use
 // with apply.
 type CronJobApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type CronJobApplyConfiguration struct {
 	Status                           *CronJobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// CronJob constructs an declarative configuration of the CronJob type for use with
+// CronJob constructs a declarative configuration of the CronJob type for use with
 // apply.
 func CronJob(name, namespace string) *CronJobApplyConfiguration {
 	b := &CronJobApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *CronJobApplyConfiguration) WithSpec(value *CronJobSpecApplyConfiguratio
 func (b *CronJobApplyConfiguration) WithStatus(value *CronJobStatusApplyConfiguration) *CronJobApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *CronJobApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

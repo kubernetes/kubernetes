@@ -2,14 +2,14 @@
 
 package v1
 
-// HubSourceApplyConfiguration represents an declarative configuration of the HubSource type for use
+// HubSourceApplyConfiguration represents a declarative configuration of the HubSource type for use
 // with apply.
 type HubSourceApplyConfiguration struct {
 	Name     *string `json:"name,omitempty"`
 	Disabled *bool   `json:"disabled,omitempty"`
 }
 
-// HubSourceApplyConfiguration constructs an declarative configuration of the HubSource type for use with
+// HubSourceApplyConfiguration constructs a declarative configuration of the HubSource type for use with
 // apply.
 func HubSource() *HubSourceApplyConfiguration {
 	return &HubSourceApplyConfiguration{}

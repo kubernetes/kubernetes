@@ -2,7 +2,7 @@
 
 package v1
 
-// WebHookTriggerApplyConfiguration represents an declarative configuration of the WebHookTrigger type for use
+// WebHookTriggerApplyConfiguration represents a declarative configuration of the WebHookTrigger type for use
 // with apply.
 type WebHookTriggerApplyConfiguration struct {
 	Secret          *string                                 `json:"secret,omitempty"`
@@ -10,7 +10,7 @@ type WebHookTriggerApplyConfiguration struct {
 	SecretReference *SecretLocalReferenceApplyConfiguration `json:"secretReference,omitempty"`
 }
 
-// WebHookTriggerApplyConfiguration constructs an declarative configuration of the WebHookTrigger type for use with
+// WebHookTriggerApplyConfiguration constructs a declarative configuration of the WebHookTrigger type for use with
 // apply.
 func WebHookTrigger() *WebHookTriggerApplyConfiguration {
 	return &WebHookTriggerApplyConfiguration{}

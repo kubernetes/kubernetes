@@ -42,6 +42,7 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -63,34 +64,18 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcd3testing.E
 }
 
 func validNewPod() *api.Pod {
-	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
-	return &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
 
-			TerminationGracePeriodSeconds: &grace,
-			Containers: []api.Container{
-				{
-					Name:            "foo",
-					Image:           "test",
-					ImagePullPolicy: api.PullAlways,
+	pod := podtest.MakePod("foo",
+		podtest.SetContainers(podtest.MakeContainer("foo",
+			podtest.SetContainerSecurityContext(*securitycontext.ValidInternalSecurityContextWithContainerDefaults()))),
+		podtest.SetSecurityContext(&api.PodSecurityContext{}),
+	)
+	pod.Spec.SchedulerName = v1.DefaultSchedulerName
+	pod.Spec.EnableServiceLinks = &enableServiceLinks
+	pod.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
 
-					TerminationMessagePath:   api.TerminationMessagePathDefault,
-					TerminationMessagePolicy: api.TerminationMessageReadFile,
-					SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
-				},
-			},
-			SecurityContext:    &api.PodSecurityContext{},
-			SchedulerName:      v1.DefaultSchedulerName,
-			EnableServiceLinks: &enableServiceLinks,
-		},
-	}
+	return pod
 }
 
 func validChangedPod() *api.Pod {

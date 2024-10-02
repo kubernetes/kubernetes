@@ -2,14 +2,14 @@
 
 package v1
 
-// GCPResourceLabelApplyConfiguration represents an declarative configuration of the GCPResourceLabel type for use
+// GCPResourceLabelApplyConfiguration represents a declarative configuration of the GCPResourceLabel type for use
 // with apply.
 type GCPResourceLabelApplyConfiguration struct {
 	Key   *string `json:"key,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// GCPResourceLabelApplyConfiguration constructs an declarative configuration of the GCPResourceLabel type for use with
+// GCPResourceLabelApplyConfiguration constructs a declarative configuration of the GCPResourceLabel type for use with
 // apply.
 func GCPResourceLabel() *GCPResourceLabelApplyConfiguration {
 	return &GCPResourceLabelApplyConfiguration{}

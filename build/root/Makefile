@@ -33,10 +33,12 @@ endif
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 BASH_ENV := ./hack/lib/logging.sh
 
-# Define variables so `make --warn-undefined-variables` works.
+# Define optional user-input variables so `make --warn-undefined-variables` works.
+# Usage is described below with each target that respects these
 PRINT_HELP ?=
 WHAT ?=
 TESTS ?=
+BRANCH ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
@@ -269,6 +271,9 @@ define TEST_E2E_NODE_HELP_INFO
 #  INSTANCE_TYPE: For REMOTE=true only. Machine type to use.
 #  NODE_ENV: For REMOTE=true only. Additional metadata keys to add the instance.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
+#  E2E_TEST_DEBUG_TOOL: one of dlv/delve/gdb. Runs the test/e2e_node test binary
+#    interactively under the chosen debugger. Only works for REMOTE=false and
+#    in combination with DBG=1.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container

@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/apps/v1"
 )
 
-// DeploymentCauseApplyConfiguration represents an declarative configuration of the DeploymentCause type for use
+// DeploymentCauseApplyConfiguration represents a declarative configuration of the DeploymentCause type for use
 // with apply.
 type DeploymentCauseApplyConfiguration struct {
 	Type         *v1.DeploymentTriggerType                      `json:"type,omitempty"`
 	ImageTrigger *DeploymentCauseImageTriggerApplyConfiguration `json:"imageTrigger,omitempty"`
 }
 
-// DeploymentCauseApplyConfiguration constructs an declarative configuration of the DeploymentCause type for use with
+// DeploymentCauseApplyConfiguration constructs a declarative configuration of the DeploymentCause type for use with
 // apply.
 func DeploymentCause() *DeploymentCauseApplyConfiguration {
 	return &DeploymentCauseApplyConfiguration{}

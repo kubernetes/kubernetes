@@ -20,9 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Checks whether app armor is required for the pod to run. AppArmor is considered required if any
@@ -54,10 +52,6 @@ func isRequired(pod *v1.Pod) bool {
 
 // GetProfileName returns the name of the profile to use with the container.
 func GetProfile(pod *v1.Pod, container *v1.Container) *v1.AppArmorProfile {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
-		return getProfileFromPodAnnotations(pod.Annotations, container.Name)
-	}
-
 	if container.SecurityContext != nil && container.SecurityContext.AppArmorProfile != nil {
 		return container.SecurityContext.AppArmorProfile
 	}

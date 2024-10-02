@@ -69,6 +69,15 @@ func SetDefaults_Volume(obj *v1.Volume) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && obj.Image != nil && obj.Image.PullPolicy == "" {
+		// PullPolicy defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+		_, tag, _, _ := parsers.ParseImageName(obj.Image.Reference)
+		if tag == "latest" {
+			obj.Image.PullPolicy = v1.PullAlways
+		} else {
+			obj.Image.PullPolicy = v1.PullIfNotPresent
+		}
+	}
 }
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
@@ -228,12 +237,6 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
-		if obj.HostNetwork {
-			defaultHostNetworkPorts(&obj.Containers)
-			defaultHostNetworkPorts(&obj.InitContainers)
-		}
-	}
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &v1.PodSecurityContext{}
 	}
@@ -315,34 +318,6 @@ func SetDefaults_PersistentVolumeClaimSpec(obj *v1.PersistentVolumeClaimSpec) {
 	if obj.VolumeMode == nil {
 		obj.VolumeMode = new(v1.PersistentVolumeMode)
 		*obj.VolumeMode = v1.PersistentVolumeFilesystem
-	}
-}
-func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
-	if obj.ISCSIInterface == "" {
-		obj.ISCSIInterface = "default"
-	}
-}
-func SetDefaults_ISCSIPersistentVolumeSource(obj *v1.ISCSIPersistentVolumeSource) {
-	if obj.ISCSIInterface == "" {
-		obj.ISCSIInterface = "default"
-	}
-}
-func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
-	if obj.CachingMode == nil {
-		obj.CachingMode = new(v1.AzureDataDiskCachingMode)
-		*obj.CachingMode = v1.AzureDataDiskCachingReadWrite
-	}
-	if obj.Kind == nil {
-		obj.Kind = new(v1.AzureDataDiskKind)
-		*obj.Kind = v1.AzureSharedBlobDisk
-	}
-	if obj.FSType == nil {
-		obj.FSType = new(string)
-		*obj.FSType = "ext4"
-	}
-	if obj.ReadOnly == nil {
-		obj.ReadOnly = new(bool)
-		*obj.ReadOnly = false
 	}
 }
 func SetDefaults_Endpoints(obj *v1.Endpoints) {
@@ -445,48 +420,6 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
 			}
 		}
-	}
-}
-
-func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
-	if obj.RBDPool == "" {
-		obj.RBDPool = "rbd"
-	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
-	}
-	if obj.Keyring == "" {
-		obj.Keyring = "/etc/ceph/keyring"
-	}
-}
-
-func SetDefaults_RBDPersistentVolumeSource(obj *v1.RBDPersistentVolumeSource) {
-	if obj.RBDPool == "" {
-		obj.RBDPool = "rbd"
-	}
-	if obj.RadosUser == "" {
-		obj.RadosUser = "admin"
-	}
-	if obj.Keyring == "" {
-		obj.Keyring = "/etc/ceph/keyring"
-	}
-}
-
-func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
-	if obj.StorageMode == "" {
-		obj.StorageMode = "ThinProvisioned"
-	}
-	if obj.FSType == "" {
-		obj.FSType = "xfs"
-	}
-}
-
-func SetDefaults_ScaleIOPersistentVolumeSource(obj *v1.ScaleIOPersistentVolumeSource) {
-	if obj.StorageMode == "" {
-		obj.StorageMode = "ThinProvisioned"
-	}
-	if obj.FSType == "" {
-		obj.FSType = "xfs"
 	}
 }
 

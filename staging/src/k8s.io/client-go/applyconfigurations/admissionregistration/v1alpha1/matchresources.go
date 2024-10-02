@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// MatchResourcesApplyConfiguration represents an declarative configuration of the MatchResources type for use
+// MatchResourcesApplyConfiguration represents a declarative configuration of the MatchResources type for use
 // with apply.
 type MatchResourcesApplyConfiguration struct {
 	NamespaceSelector    *v1.LabelSelectorApplyConfiguration            `json:"namespaceSelector,omitempty"`
@@ -33,7 +33,7 @@ type MatchResourcesApplyConfiguration struct {
 	MatchPolicy          *admissionregistrationv1alpha1.MatchPolicyType `json:"matchPolicy,omitempty"`
 }
 
-// MatchResourcesApplyConfiguration constructs an declarative configuration of the MatchResources type for use with
+// MatchResourcesApplyConfiguration constructs a declarative configuration of the MatchResources type for use with
 // apply.
 func MatchResources() *MatchResourcesApplyConfiguration {
 	return &MatchResourcesApplyConfiguration{}

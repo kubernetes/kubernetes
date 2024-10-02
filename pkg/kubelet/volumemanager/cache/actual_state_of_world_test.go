@@ -220,12 +220,12 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -296,12 +296,12 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -404,12 +404,12 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
-	mounter1, err := plugin.NewMounter(volumeSpec1, pod1, volume.VolumeOptions{})
+	mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper1, err := plugin.NewBlockVolumeMapper(volumeSpec1, pod1, volume.VolumeOptions{})
+	mapper1, err := plugin.NewBlockVolumeMapper(volumeSpec1, pod1)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -430,12 +430,12 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 
 	podName2 := util.GetUniquePodName(pod2)
 
-	mounter2, err := plugin.NewMounter(volumeSpec2, pod2, volume.VolumeOptions{})
+	mounter2, err := plugin.NewMounter(volumeSpec2, pod2)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper2, err := plugin.NewBlockVolumeMapper(volumeSpec2, pod2, volume.VolumeOptions{})
+	mapper2, err := plugin.NewBlockVolumeMapper(volumeSpec2, pod2)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -591,12 +591,12 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			}
 			podName1 := util.GetUniquePodName(pod1)
 
-			mounter1, err := plugin.NewMounter(volumeSpec1, pod1, volume.VolumeOptions{})
+			mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
 			if err != nil {
 				t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 			}
 
-			mapper1, err := plugin.NewBlockVolumeMapper(volumeSpec1, pod1, volume.VolumeOptions{})
+			mapper1, err := plugin.NewBlockVolumeMapper(volumeSpec1, pod1)
 			if err != nil {
 				t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -675,12 +675,12 @@ func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
 	}
 
 	podName := util.GetUniquePodName(pod)
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -781,12 +781,12 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper, err := blockplugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	mapper, err := blockplugin.NewBlockVolumeMapper(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -877,7 +877,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 // Verifies volume/pod combo exist using PodExistsInVolume()
 func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	devicePath := "fake/device/path"
@@ -912,12 +912,12 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 
-	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod)
 	if err != nil {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -955,7 +955,7 @@ func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
 // Verifies newly added volume exists in GetGloballyMountedVolumes()
 func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
 	// Arrange
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
 	pod := &v1.Pod{
@@ -1037,7 +1037,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	}
 	podName1 := util.GetUniquePodName(pod1)
 
-	mounter1, err := plugin.NewMounter(volumeSpec1, pod1, volume.VolumeOptions{})
+	mounter1, err := plugin.NewMounter(volumeSpec1, pod1)
 	if err != nil {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}

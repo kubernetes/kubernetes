@@ -14,7 +14,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +kubebuilder:subresource:status
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1457
 // +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
-// +openshift:enable:FeatureGate=ImagePolicy
+// +openshift:enable:FeatureGate=SigstoreImageVerification
 // +openshift:compatibility-gen:level=4
 type ClusterImagePolicy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -38,8 +38,9 @@ type ClusterImagePolicySpec struct {
 	// More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository
 	// namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number).
 	// Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not.
-	// Please be aware that the scopes should not be nested under the repositories of OpenShift Container Platform images.
-	// If configured, the policies for OpenShift Container Platform repositories will not be in effect.
+	// If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored.
+	// In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories
+	// quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation.
 	// For additional details about the format, please refer to the document explaining the docker transport field,
 	// which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker
 	// +kubebuilder:validation:Required

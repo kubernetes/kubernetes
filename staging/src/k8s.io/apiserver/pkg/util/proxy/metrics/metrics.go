@@ -33,7 +33,7 @@ var registerMetricsOnce sync.Once
 
 var (
 	// streamTranslatorRequestsTotal counts the number of requests that were handled by
-	// the StreamTranslatorProxy.
+	// the StreamTranslatorProxy (RemoteCommand subprotocol).
 	streamTranslatorRequestsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      subsystem,
@@ -43,19 +43,37 @@ var (
 		},
 		[]string{statuscode},
 	)
+	// streamTunnelRequestsTotal counts the number of requests that were handled by
+	// the StreamTunnelProxy (PortForward subprotocol).
+	streamTunnelRequestsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "stream_tunnel_requests_total",
+			Help:           "Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{statuscode},
+	)
 )
 
 func Register() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(streamTranslatorRequestsTotal)
+		legacyregistry.MustRegister(streamTunnelRequestsTotal)
 	})
 }
 
 func ResetForTest() {
 	streamTranslatorRequestsTotal.Reset()
+	streamTunnelRequestsTotal.Reset()
 }
 
 // IncStreamTranslatorRequest increments the # of requests handled by the StreamTranslatorProxy.
 func IncStreamTranslatorRequest(ctx context.Context, status string) {
 	streamTranslatorRequestsTotal.WithContext(ctx).WithLabelValues(status).Add(1)
+}
+
+// IncStreamTunnelRequest increments the # of requests handled by the StreamTunnelProxy.
+func IncStreamTunnelRequest(ctx context.Context, status string) {
+	streamTunnelRequestsTotal.WithContext(ctx).WithLabelValues(status).Add(1)
 }

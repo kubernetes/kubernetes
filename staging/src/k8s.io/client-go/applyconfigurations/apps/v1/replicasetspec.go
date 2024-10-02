@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ReplicaSetSpecApplyConfiguration represents an declarative configuration of the ReplicaSetSpec type for use
+// ReplicaSetSpecApplyConfiguration represents a declarative configuration of the ReplicaSetSpec type for use
 // with apply.
 type ReplicaSetSpecApplyConfiguration struct {
 	Replicas        *int32                                    `json:"replicas,omitempty"`
@@ -32,7 +32,7 @@ type ReplicaSetSpecApplyConfiguration struct {
 	Template        *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
-// ReplicaSetSpecApplyConfiguration constructs an declarative configuration of the ReplicaSetSpec type for use with
+// ReplicaSetSpecApplyConfiguration constructs a declarative configuration of the ReplicaSetSpec type for use with
 // apply.
 func ReplicaSetSpec() *ReplicaSetSpecApplyConfiguration {
 	return &ReplicaSetSpecApplyConfiguration{}

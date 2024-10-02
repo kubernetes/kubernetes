@@ -21,10 +21,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
@@ -76,13 +74,8 @@ func New(pr net.PortRange, allocatorFactory allocator.AllocatorWithOffsetFactory
 		metrics:   &emptyMetricsRecorder{},
 	}
 
-	var offset = 0
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceNodePortStaticSubrange) {
-		offset = calculateRangeOffset(pr)
-	}
-
 	var err error
-	a.alloc, err = allocatorFactory(max, rangeSpec, offset)
+	a.alloc, err = allocatorFactory(max, rangeSpec, calculateRangeOffset(pr))
 	if err != nil {
 		return nil, err
 	}

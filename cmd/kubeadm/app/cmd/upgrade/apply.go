@@ -175,7 +175,7 @@ func runApply(flagSet *pflag.FlagSet, flags *applyFlags, args []string) error {
 	if !flags.dryRun {
 		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		fmt.Println("[upgrade/prepull] You can also perform this action beforehand using 'kubeadm config images pull'")
 		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, sets.New(upgradeCfg.Apply.IgnorePreflightErrors...)); err != nil {
 			return err
 		}

@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type StorageClassLister interface {
 
 // storageClassLister implements the StorageClassLister interface.
 type storageClassLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.StorageClass]
 }
 
 // NewStorageClassLister returns a new StorageClassLister.
 func NewStorageClassLister(indexer cache.Indexer) StorageClassLister {
-	return &storageClassLister{indexer: indexer}
-}
-
-// List lists all StorageClasses in the indexer.
-func (s *storageClassLister) List(selector labels.Selector) (ret []*v1.StorageClass, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.StorageClass))
-	})
-	return ret, err
-}
-
-// Get retrieves the StorageClass from the index for a given name.
-func (s *storageClassLister) Get(name string) (*v1.StorageClass, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("storageclass"), name)
-	}
-	return obj.(*v1.StorageClass), nil
+	return &storageClassLister{listers.New[*v1.StorageClass](indexer, v1.Resource("storageclass"))}
 }

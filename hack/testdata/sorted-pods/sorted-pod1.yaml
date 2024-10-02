@@ -8,8 +8,8 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause2
-    image: registry.k8s.io/pause:3.9
-    resources: 
+    image: registry.k8s.io/pause:3.10
+    resources:
       requests:
         memory: "64Mi"
         cpu: "250m"

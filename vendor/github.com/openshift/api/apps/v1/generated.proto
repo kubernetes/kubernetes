@@ -19,7 +19,7 @@ message CustomDeploymentStrategyParams {
   optional string image = 1;
 
   // Environment holds the environment which will be given to the container for Image.
-  repeated k8s.io.api.core.v1.EnvVar environment = 2;
+  repeated .k8s.io.api.core.v1.EnvVar environment = 2;
 
   // Command is optional and overrides CMD in the container Image.
   repeated string command = 3;
@@ -39,7 +39,7 @@ message DeploymentCause {
 message DeploymentCauseImageTrigger {
   // From is a reference to the changed object which triggered a deployment. The field may have
   // the kinds DockerImage, ImageStreamTag, or ImageStreamImage.
-  optional k8s.io.api.core.v1.ObjectReference from = 1;
+  optional .k8s.io.api.core.v1.ObjectReference from = 1;
 }
 
 // DeploymentCondition describes the state of a deployment config at a certain point.
@@ -51,10 +51,10 @@ message DeploymentCondition {
   optional string status = 2;
 
   // The last time this condition was updated.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // The last time the condition transitioned from one status to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   optional string reason = 4;
@@ -79,7 +79,7 @@ message DeploymentCondition {
 message DeploymentConfig {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec represents a desired deployment state and how to deploy to it.
   optional DeploymentConfigSpec spec = 2;
@@ -96,7 +96,7 @@ message DeploymentConfig {
 message DeploymentConfigList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of deployment configs
   repeated DeploymentConfig items = 2;
@@ -120,7 +120,7 @@ message DeploymentConfigRollback {
 // DeploymentConfigRollbackSpec represents the options for rollback generation.
 message DeploymentConfigRollbackSpec {
   // From points to a ReplicationController which is a deployment.
-  optional k8s.io.api.core.v1.ObjectReference from = 1;
+  optional .k8s.io.api.core.v1.ObjectReference from = 1;
 
   // Revision to rollback to. If set to 0, rollback to the last revision.
   optional int64 revision = 2;
@@ -179,7 +179,7 @@ message DeploymentConfigSpec {
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 8;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 8;
 }
 
 // DeploymentConfigStatus represents the current deployment state.
@@ -258,7 +258,7 @@ message DeploymentLogOptions {
   // precedes the time a pod was started, only logs since the pod start will be returned.
   // If this value is in the future, no logs will be returned.
   // Only one of sinceSeconds or sinceTime may be specified.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time sinceTime = 5;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time sinceTime = 5;
 
   // If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
   // of log output. Defaults to false.
@@ -321,7 +321,7 @@ message DeploymentStrategy {
   optional RollingDeploymentStrategyParams rollingParams = 4;
 
   // Resources contains resource requirements to execute the deployment and any hooks.
-  optional k8s.io.api.core.v1.ResourceRequirements resources = 5;
+  optional .k8s.io.api.core.v1.ResourceRequirements resources = 5;
 
   // Labels is a set of key, value pairs added to custom deployer and lifecycle pre/post hook pods.
   map<string, string> labels = 6;
@@ -349,7 +349,7 @@ message DeploymentTriggerImageChangeParams {
   // From is a reference to an image stream tag to watch for changes. From.Name is the only
   // required subfield - if From.Namespace is blank, the namespace of the current deployment
   // trigger will be used.
-  optional k8s.io.api.core.v1.ObjectReference from = 3;
+  optional .k8s.io.api.core.v1.ObjectReference from = 3;
 
   // LastTriggeredImage is the last image to be triggered.
   optional string lastTriggeredImage = 4;
@@ -381,7 +381,7 @@ message ExecNewPodHook {
   repeated string command = 1;
 
   // Env is a set of environment variables to supply to the hook pod's container.
-  repeated k8s.io.api.core.v1.EnvVar env = 2;
+  repeated .k8s.io.api.core.v1.EnvVar env = 2;
 
   // ContainerName is the name of a container in the deployment pod template
   // whose container image will be used for the hook pod's container.
@@ -452,7 +452,7 @@ message RollingDeploymentStrategyParams {
   // RC can be scaled down further, followed by scaling up the new RC,
   // ensuring that at least 70% of original number of pods are available at
   // all times during the update.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 4;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 4;
 
   // MaxSurge is the maximum number of pods that can be scheduled above the
   // original number of pods. Value can be an absolute number (ex: 5) or a
@@ -466,7 +466,7 @@ message RollingDeploymentStrategyParams {
   // killed, new RC can be scaled up further, ensuring that total number of
   // pods running at any time during the update is atmost 130% of original
   // pods.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 5;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 5;
 
   // Pre is a lifecycle hook which is executed before the deployment process
   // begins. All LifecycleHookFailurePolicy values are supported.
@@ -485,6 +485,6 @@ message TagImageHook {
   optional string containerName = 1;
 
   // To is the target ImageStreamTag to set the container's image onto.
-  optional k8s.io.api.core.v1.ObjectReference to = 2;
+  optional .k8s.io.api.core.v1.ObjectReference to = 2;
 }
 

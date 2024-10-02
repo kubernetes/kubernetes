@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/security/v1"
 )
 
-// RunAsUserStrategyOptionsApplyConfiguration represents an declarative configuration of the RunAsUserStrategyOptions type for use
+// RunAsUserStrategyOptionsApplyConfiguration represents a declarative configuration of the RunAsUserStrategyOptions type for use
 // with apply.
 type RunAsUserStrategyOptionsApplyConfiguration struct {
 	Type        *v1.RunAsUserStrategyType `json:"type,omitempty"`
@@ -15,7 +15,7 @@ type RunAsUserStrategyOptionsApplyConfiguration struct {
 	UIDRangeMax *int64                    `json:"uidRangeMax,omitempty"`
 }
 
-// RunAsUserStrategyOptionsApplyConfiguration constructs an declarative configuration of the RunAsUserStrategyOptions type for use with
+// RunAsUserStrategyOptionsApplyConfiguration constructs a declarative configuration of the RunAsUserStrategyOptions type for use with
 // apply.
 func RunAsUserStrategyOptions() *RunAsUserStrategyOptionsApplyConfiguration {
 	return &RunAsUserStrategyOptionsApplyConfiguration{}

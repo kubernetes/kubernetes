@@ -23,8 +23,8 @@ import (
 
 	v1beta1 "k8s.io/api/authentication/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // TokenReviewsGetter has a method to return a TokenReviewInterface.
@@ -41,24 +41,17 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client rest.Interface
+	*gentype.Client[*v1beta1.TokenReview]
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationV1beta1Client) *tokenReviews {
 	return &tokenReviews{
-		client: c.RESTClient(),
+		gentype.NewClient[*v1beta1.TokenReview](
+			"tokenreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1beta1.TokenReview { return &v1beta1.TokenReview{} }),
 	}
-}
-
-// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
-func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (result *v1beta1.TokenReview, err error) {
-	result = &v1beta1.TokenReview{}
-	err = c.client.Post().
-		Resource("tokenreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(tokenReview).
-		Do(ctx).
-		Into(result)
-	return
 }

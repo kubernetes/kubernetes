@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DNSNameResolverResolvedAddressApplyConfiguration represents an declarative configuration of the DNSNameResolverResolvedAddress type for use
+// DNSNameResolverResolvedAddressApplyConfiguration represents a declarative configuration of the DNSNameResolverResolvedAddress type for use
 // with apply.
 type DNSNameResolverResolvedAddressApplyConfiguration struct {
 	IP             *string  `json:"ip,omitempty"`
@@ -14,7 +14,7 @@ type DNSNameResolverResolvedAddressApplyConfiguration struct {
 	LastLookupTime *v1.Time `json:"lastLookupTime,omitempty"`
 }
 
-// DNSNameResolverResolvedAddressApplyConfiguration constructs an declarative configuration of the DNSNameResolverResolvedAddress type for use with
+// DNSNameResolverResolvedAddressApplyConfiguration constructs a declarative configuration of the DNSNameResolverResolvedAddress type for use with
 // apply.
 func DNSNameResolverResolvedAddress() *DNSNameResolverResolvedAddressApplyConfiguration {
 	return &DNSNameResolverResolvedAddressApplyConfiguration{}

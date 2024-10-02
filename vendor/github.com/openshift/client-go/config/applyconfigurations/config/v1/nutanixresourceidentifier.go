@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// NutanixResourceIdentifierApplyConfiguration represents an declarative configuration of the NutanixResourceIdentifier type for use
+// NutanixResourceIdentifierApplyConfiguration represents a declarative configuration of the NutanixResourceIdentifier type for use
 // with apply.
 type NutanixResourceIdentifierApplyConfiguration struct {
 	Type *v1.NutanixIdentifierType `json:"type,omitempty"`
@@ -14,7 +14,7 @@ type NutanixResourceIdentifierApplyConfiguration struct {
 	Name *string                   `json:"name,omitempty"`
 }
 
-// NutanixResourceIdentifierApplyConfiguration constructs an declarative configuration of the NutanixResourceIdentifier type for use with
+// NutanixResourceIdentifierApplyConfiguration constructs a declarative configuration of the NutanixResourceIdentifier type for use with
 // apply.
 func NutanixResourceIdentifier() *NutanixResourceIdentifierApplyConfiguration {
 	return &NutanixResourceIdentifierApplyConfiguration{}

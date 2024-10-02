@@ -118,9 +118,6 @@ var _ = common.SIGDescribe("Networking", func() {
 			{path: "/version"},
 			// TODO: test proxy links here
 		}
-		if !framework.ProviderIs("gke", "skeleton") {
-			tests = append(tests, struct{ path string }{path: "/logs"})
-		}
 		for _, test := range tests {
 			ginkgo.By(fmt.Sprintf("testing: %s", test.path))
 			data, err := f.ClientSet.CoreV1().RESTClient().Get().

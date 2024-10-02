@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NamespaceConditionApplyConfiguration represents an declarative configuration of the NamespaceCondition type for use
+// NamespaceConditionApplyConfiguration represents a declarative configuration of the NamespaceCondition type for use
 // with apply.
 type NamespaceConditionApplyConfiguration struct {
 	Type               *v1.NamespaceConditionType `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type NamespaceConditionApplyConfiguration struct {
 	Message            *string                    `json:"message,omitempty"`
 }
 
-// NamespaceConditionApplyConfiguration constructs an declarative configuration of the NamespaceCondition type for use with
+// NamespaceConditionApplyConfiguration constructs a declarative configuration of the NamespaceCondition type for use with
 // apply.
 func NamespaceCondition() *NamespaceConditionApplyConfiguration {
 	return &NamespaceConditionApplyConfiguration{}

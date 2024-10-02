@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/security/v1"
 )
 
-// SupplementalGroupsStrategyOptionsApplyConfiguration represents an declarative configuration of the SupplementalGroupsStrategyOptions type for use
+// SupplementalGroupsStrategyOptionsApplyConfiguration represents a declarative configuration of the SupplementalGroupsStrategyOptions type for use
 // with apply.
 type SupplementalGroupsStrategyOptionsApplyConfiguration struct {
 	Type   *v1.SupplementalGroupsStrategyType `json:"type,omitempty"`
 	Ranges []IDRangeApplyConfiguration        `json:"ranges,omitempty"`
 }
 
-// SupplementalGroupsStrategyOptionsApplyConfiguration constructs an declarative configuration of the SupplementalGroupsStrategyOptions type for use with
+// SupplementalGroupsStrategyOptionsApplyConfiguration constructs a declarative configuration of the SupplementalGroupsStrategyOptions type for use with
 // apply.
 func SupplementalGroupsStrategyOptions() *SupplementalGroupsStrategyOptionsApplyConfiguration {
 	return &SupplementalGroupsStrategyOptionsApplyConfiguration{}

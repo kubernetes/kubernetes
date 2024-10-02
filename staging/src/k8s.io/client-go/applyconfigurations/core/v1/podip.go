@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// PodIPApplyConfiguration represents an declarative configuration of the PodIP type for use
+// PodIPApplyConfiguration represents a declarative configuration of the PodIP type for use
 // with apply.
 type PodIPApplyConfiguration struct {
 	IP *string `json:"ip,omitempty"`
 }
 
-// PodIPApplyConfiguration constructs an declarative configuration of the PodIP type for use with
+// PodIPApplyConfiguration constructs a declarative configuration of the PodIP type for use with
 // apply.
 func PodIP() *PodIPApplyConfiguration {
 	return &PodIPApplyConfiguration{}

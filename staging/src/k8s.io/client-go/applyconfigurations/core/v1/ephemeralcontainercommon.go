@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// EphemeralContainerCommonApplyConfiguration represents an declarative configuration of the EphemeralContainerCommon type for use
+// EphemeralContainerCommonApplyConfiguration represents a declarative configuration of the EphemeralContainerCommon type for use
 // with apply.
 type EphemeralContainerCommonApplyConfiguration struct {
 	Name                     *string                                   `json:"name,omitempty"`
@@ -51,7 +51,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	TTY                      *bool                                     `json:"tty,omitempty"`
 }
 
-// EphemeralContainerCommonApplyConfiguration constructs an declarative configuration of the EphemeralContainerCommon type for use with
+// EphemeralContainerCommonApplyConfiguration constructs a declarative configuration of the EphemeralContainerCommon type for use with
 // apply.
 func EphemeralContainerCommon() *EphemeralContainerCommonApplyConfiguration {
 	return &EphemeralContainerCommonApplyConfiguration{}

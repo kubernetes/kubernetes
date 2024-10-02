@@ -27,20 +27,22 @@ var infrastructuresKind = v1.SchemeGroupVersion.WithKind("Infrastructure")
 
 // Get takes name of the infrastructure, and returns the corresponding infrastructure object, and an error if there is any.
 func (c *FakeInfrastructures) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Infrastructure, err error) {
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(infrastructuresResource, name), &v1.Infrastructure{})
+		Invokes(testing.NewRootGetActionWithOptions(infrastructuresResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
 
 // List takes label and field selectors, and returns the list of Infrastructures that match those selectors.
 func (c *FakeInfrastructures) List(ctx context.Context, opts metav1.ListOptions) (result *v1.InfrastructureList, err error) {
+	emptyResult := &v1.InfrastructureList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(infrastructuresResource, infrastructuresKind, opts), &v1.InfrastructureList{})
+		Invokes(testing.NewRootListActionWithOptions(infrastructuresResource, infrastructuresKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeInfrastructures) List(ctx context.Context, opts metav1.ListOptions)
 // Watch returns a watch.Interface that watches the requested infrastructures.
 func (c *FakeInfrastructures) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(infrastructuresResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(infrastructuresResource, opts))
 }
 
 // Create takes the representation of a infrastructure and creates it.  Returns the server's representation of the infrastructure, and an error, if there is any.
 func (c *FakeInfrastructures) Create(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.CreateOptions) (result *v1.Infrastructure, err error) {
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(infrastructuresResource, infrastructure), &v1.Infrastructure{})
+		Invokes(testing.NewRootCreateActionWithOptions(infrastructuresResource, infrastructure, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
 
 // Update takes the representation of a infrastructure and updates it. Returns the server's representation of the infrastructure, and an error, if there is any.
 func (c *FakeInfrastructures) Update(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.UpdateOptions) (result *v1.Infrastructure, err error) {
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(infrastructuresResource, infrastructure), &v1.Infrastructure{})
+		Invokes(testing.NewRootUpdateActionWithOptions(infrastructuresResource, infrastructure, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeInfrastructures) UpdateStatus(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.UpdateOptions) (*v1.Infrastructure, error) {
+func (c *FakeInfrastructures) UpdateStatus(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.UpdateOptions) (result *v1.Infrastructure, err error) {
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(infrastructuresResource, "status", infrastructure), &v1.Infrastructure{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(infrastructuresResource, "status", infrastructure, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
@@ -102,7 +107,7 @@ func (c *FakeInfrastructures) Delete(ctx context.Context, name string, opts meta
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeInfrastructures) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(infrastructuresResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(infrastructuresResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.InfrastructureList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeInfrastructures) DeleteCollection(ctx context.Context, opts metav1.
 
 // Patch applies the patch and returns the patched infrastructure.
 func (c *FakeInfrastructures) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Infrastructure, err error) {
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, name, pt, data, subresources...), &v1.Infrastructure{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(infrastructuresResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
@@ -131,10 +137,11 @@ func (c *FakeInfrastructures) Apply(ctx context.Context, infrastructure *configv
 	if name == nil {
 		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, *name, types.ApplyPatchType, data), &v1.Infrastructure{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(infrastructuresResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }
@@ -153,10 +160,11 @@ func (c *FakeInfrastructures) ApplyStatus(ctx context.Context, infrastructure *c
 	if name == nil {
 		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Infrastructure{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, *name, types.ApplyPatchType, data, "status"), &v1.Infrastructure{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(infrastructuresResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Infrastructure), err
 }

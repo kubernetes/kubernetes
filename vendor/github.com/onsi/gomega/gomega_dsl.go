@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.31.0"
+const GOMEGA_VERSION = "1.33.1"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -372,11 +372,11 @@ You can ensure that you get a number of consecutive successful tries before succ
 
 Finally, in addition to passing timeouts and a context to Eventually you can be more explicit with Eventually's chaining configuration methods:
 
-	Eventually(..., "1s", "2s", ctx).Should(...)
+	Eventually(..., "10s", "2s", ctx).Should(...)
 
 is equivalent to
 
-	Eventually(...).WithTimeout(time.Second).WithPolling(2*time.Second).WithContext(ctx).Should(...)
+	Eventually(...).WithTimeout(10*time.Second).WithPolling(2*time.Second).WithContext(ctx).Should(...)
 */
 func Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()

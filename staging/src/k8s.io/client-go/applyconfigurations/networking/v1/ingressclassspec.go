@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// IngressClassSpecApplyConfiguration represents an declarative configuration of the IngressClassSpec type for use
+// IngressClassSpecApplyConfiguration represents a declarative configuration of the IngressClassSpec type for use
 // with apply.
 type IngressClassSpecApplyConfiguration struct {
 	Controller *string                                            `json:"controller,omitempty"`
 	Parameters *IngressClassParametersReferenceApplyConfiguration `json:"parameters,omitempty"`
 }
 
-// IngressClassSpecApplyConfiguration constructs an declarative configuration of the IngressClassSpec type for use with
+// IngressClassSpecApplyConfiguration constructs a declarative configuration of the IngressClassSpec type for use with
 // apply.
 func IngressClassSpec() *IngressClassSpecApplyConfiguration {
 	return &IngressClassSpecApplyConfiguration{}

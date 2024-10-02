@@ -2,14 +2,14 @@
 
 package v1alpha1
 
-// PolicyFulcioSubjectApplyConfiguration represents an declarative configuration of the PolicyFulcioSubject type for use
+// PolicyFulcioSubjectApplyConfiguration represents a declarative configuration of the PolicyFulcioSubject type for use
 // with apply.
 type PolicyFulcioSubjectApplyConfiguration struct {
 	OIDCIssuer  *string `json:"oidcIssuer,omitempty"`
 	SignedEmail *string `json:"signedEmail,omitempty"`
 }
 
-// PolicyFulcioSubjectApplyConfiguration constructs an declarative configuration of the PolicyFulcioSubject type for use with
+// PolicyFulcioSubjectApplyConfiguration constructs a declarative configuration of the PolicyFulcioSubject type for use with
 // apply.
 func PolicyFulcioSubject() *PolicyFulcioSubjectApplyConfiguration {
 	return &PolicyFulcioSubjectApplyConfiguration{}

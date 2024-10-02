@@ -5,9 +5,9 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -126,5 +126,5 @@ func HostnameMatchSpecCandidates(hostname string) []string {
 
 // HostnameMatches returns true if the given hostname is matched by the given matchSpec
 func HostnameMatches(hostname string, matchSpec string) bool {
-	return sets.New(HostnameMatchSpecCandidates(hostname)...).Has(matchSpec)
+	return slices.Contains(HostnameMatchSpecCandidates(hostname), matchSpec)
 }

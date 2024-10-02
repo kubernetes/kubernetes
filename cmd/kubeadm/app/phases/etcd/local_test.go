@@ -129,13 +129,22 @@ spec:
       failureThreshold: 8
       httpGet:
         host: 127.0.0.1
-        path: /health?exclude=NOSPACE&serializable=true
+        path: /livez
         port: 2381
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
       timeoutSeconds: 15
     name: etcd
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        host: 127.0.0.1
+        path: /readyz
+        port: 2381
+        scheme: HTTP
+      periodSeconds: 1
+      timeoutSeconds: 15
     resources:
       requests:
         cpu: 100m
@@ -144,7 +153,7 @@ spec:
       failureThreshold: 24
       httpGet:
         host: 127.0.0.1
-        path: /health?serializable=false
+        path: /readyz
         port: 2381
         scheme: HTTP
       initialDelaySeconds: 10

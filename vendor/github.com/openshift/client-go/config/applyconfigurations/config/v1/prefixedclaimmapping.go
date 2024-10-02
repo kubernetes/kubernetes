@@ -2,14 +2,14 @@
 
 package v1
 
-// PrefixedClaimMappingApplyConfiguration represents an declarative configuration of the PrefixedClaimMapping type for use
+// PrefixedClaimMappingApplyConfiguration represents a declarative configuration of the PrefixedClaimMapping type for use
 // with apply.
 type PrefixedClaimMappingApplyConfiguration struct {
 	TokenClaimMappingApplyConfiguration `json:",inline"`
 	Prefix                              *string `json:"prefix,omitempty"`
 }
 
-// PrefixedClaimMappingApplyConfiguration constructs an declarative configuration of the PrefixedClaimMapping type for use with
+// PrefixedClaimMappingApplyConfiguration constructs a declarative configuration of the PrefixedClaimMapping type for use with
 // apply.
 func PrefixedClaimMapping() *PrefixedClaimMappingApplyConfiguration {
 	return &PrefixedClaimMappingApplyConfiguration{}

@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/internal/unittests/bugs"
 )
 
-func TestListTests(t *testing.T) {
+func TestListLabels(t *testing.T) {
 	// TODO(soltysh): we need to figure out how we want to handle labels
 	// https://issues.redhat.com/browse/OCPBUGS-25641
 	t.Skip("temporarily disabled")

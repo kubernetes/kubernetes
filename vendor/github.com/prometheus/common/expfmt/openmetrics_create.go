@@ -22,10 +22,46 @@ import (
 	"strconv"
 	"strings"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/prometheus/common/model"
 
 	dto "github.com/prometheus/client_model/go"
 )
+
+type encoderOption struct {
+	withCreatedLines bool
+	withUnit         bool
+}
+
+type EncoderOption func(*encoderOption)
+
+// WithCreatedLines is an EncoderOption that configures the OpenMetrics encoder
+// to include _created lines (See
+// https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#counter-1).
+// Created timestamps can improve the accuracy of series reset detection, but
+// come with a bandwidth cost.
+//
+// At the time of writing, created timestamp ingestion is still experimental in
+// Prometheus and need to be enabled with the feature-flag
+// `--feature-flag=created-timestamp-zero-ingestion`, and breaking changes are
+// still possible. Therefore, it is recommended to use this feature with caution.
+func WithCreatedLines() EncoderOption {
+	return func(t *encoderOption) {
+		t.withCreatedLines = true
+	}
+}
+
+// WithUnit is an EncoderOption enabling a set unit to be written to the output
+// and to be added to the metric name, if it's not there already, as a suffix.
+// Without opting in this way, the unit will not be added to the metric name and,
+// on top of that, the unit will not be passed onto the output, even if it
+// were declared in the *dto.MetricFamily struct, i.e. even if in.Unit !=nil.
+func WithUnit() EncoderOption {
+	return func(t *encoderOption) {
+		t.withUnit = true
+	}
+}
 
 // MetricFamilyToOpenMetrics converts a MetricFamily proto message into the
 // OpenMetrics text format and writes the resulting lines to 'out'. It returns
@@ -34,6 +70,18 @@ import (
 // this function assumes the input is already sanitized and does not perform any
 // sanity checks. If the input contains duplicate metrics or invalid metric or
 // label names, the conversion will result in invalid text format output.
+//
+// If metric names conform to the legacy validation pattern, they will be placed
+// outside the brackets in the traditional way, like `foo{}`. If the metric name
+// fails the legacy validation check, it will be placed quoted inside the
+// brackets: `{"foo"}`. As stated above, the input is assumed to be santized and
+// no error will be thrown in this case.
+//
+// Similar to metric names, if label names conform to the legacy validation
+// pattern, they will be unquoted as normal, like `foo{bar="baz"}`. If the label
+// name fails the legacy validation check, it will be quoted:
+// `foo{"bar"="baz"}`. As stated above, the input is assumed to be santized and
+// no error will be thrown in this case.
 //
 // This function fulfills the type 'expfmt.encoder'.
 //
@@ -47,20 +95,34 @@ import (
 // Prometheus to OpenMetrics or vice versa:
 //
 //   - Counters are expected to have the `_total` suffix in their metric name. In
-//     the output, the suffix will be truncated from the `# TYPE` and `# HELP`
-//     line. A counter with a missing `_total` suffix is not an error. However,
+//     the output, the suffix will be truncated from the `# TYPE`, `# HELP` and `# UNIT`
+//     lines. A counter with a missing `_total` suffix is not an error. However,
 //     its type will be set to `unknown` in that case to avoid invalid OpenMetrics
 //     output.
 //
-//   - No support for the following (optional) features: `# UNIT` line, `_created`
-//     line, info type, stateset type, gaugehistogram type.
+//   - According to the OM specs, the `# UNIT` line is optional, but if populated,
+//     the unit has to be present in the metric name as its suffix:
+//     (see https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#unit).
+//     However, in order to accommodate any potential scenario where such a change in the
+//     metric name is not desirable, the users are here given the choice of either explicitly
+//     opt in, in case they wish for the unit to be included in the output AND in the metric name
+//     as a suffix (see the description of the WithUnit function above),
+//     or not to opt in, in case they don't want for any of that to happen.
+//
+//   - No support for the following (optional) features: info type,
+//     stateset type, gaugehistogram type.
 //
 //   - The size of exemplar labels is not checked (i.e. it's possible to create
 //     exemplars that are larger than allowed by the OpenMetrics specification).
 //
 //   - The value of Counters is not checked. (OpenMetrics doesn't allow counters
 //     with a `NaN` value.)
-func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int, err error) {
+func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily, options ...EncoderOption) (written int, err error) {
+	toOM := encoderOption{}
+	for _, option := range options {
+		option(&toOM)
+	}
+
 	name := in.GetName()
 	if name == "" {
 		return 0, fmt.Errorf("MetricFamily has no name: %s", in)
@@ -83,12 +145,15 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 	}
 
 	var (
-		n          int
-		metricType = in.GetType()
-		shortName  = name
+		n             int
+		metricType    = in.GetType()
+		compliantName = name
 	)
-	if metricType == dto.MetricType_COUNTER && strings.HasSuffix(shortName, "_total") {
-		shortName = name[:len(name)-6]
+	if metricType == dto.MetricType_COUNTER && strings.HasSuffix(compliantName, "_total") {
+		compliantName = name[:len(name)-6]
+	}
+	if toOM.withUnit && in.Unit != nil && !strings.HasSuffix(compliantName, fmt.Sprintf("_%s", *in.Unit)) {
+		compliantName = compliantName + fmt.Sprintf("_%s", *in.Unit)
 	}
 
 	// Comments, first HELP, then TYPE.
@@ -98,7 +163,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 		if err != nil {
 			return
 		}
-		n, err = w.WriteString(shortName)
+		n, err = writeName(w, compliantName)
 		written += n
 		if err != nil {
 			return
@@ -124,7 +189,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 	if err != nil {
 		return
 	}
-	n, err = w.WriteString(shortName)
+	n, err = writeName(w, compliantName)
 	written += n
 	if err != nil {
 		return
@@ -151,55 +216,89 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 	if err != nil {
 		return
 	}
+	if toOM.withUnit && in.Unit != nil {
+		n, err = w.WriteString("# UNIT ")
+		written += n
+		if err != nil {
+			return
+		}
+		n, err = writeName(w, compliantName)
+		written += n
+		if err != nil {
+			return
+		}
+
+		err = w.WriteByte(' ')
+		written++
+		if err != nil {
+			return
+		}
+		n, err = writeEscapedString(w, *in.Unit, true)
+		written += n
+		if err != nil {
+			return
+		}
+		err = w.WriteByte('\n')
+		written++
+		if err != nil {
+			return
+		}
+	}
+
+	var createdTsBytesWritten int
 
 	// Finally the samples, one line for each.
+	if metricType == dto.MetricType_COUNTER && strings.HasSuffix(name, "_total") {
+		compliantName = compliantName + "_total"
+	}
 	for _, metric := range in.Metric {
 		switch metricType {
 		case dto.MetricType_COUNTER:
 			if metric.Counter == nil {
 				return written, fmt.Errorf(
-					"expected counter in metric %s %s", name, metric,
+					"expected counter in metric %s %s", compliantName, metric,
 				)
 			}
-			// Note that we have ensured above that either the name
-			// ends on `_total` or that the rendered type is
-			// `unknown`. Therefore, no `_total` must be added here.
 			n, err = writeOpenMetricsSample(
-				w, name, "", metric, "", 0,
+				w, compliantName, "", metric, "", 0,
 				metric.Counter.GetValue(), 0, false,
 				metric.Counter.Exemplar,
 			)
+			if toOM.withCreatedLines && metric.Counter.CreatedTimestamp != nil {
+				createdTsBytesWritten, err = writeOpenMetricsCreated(w, compliantName, "_total", metric, "", 0, metric.Counter.GetCreatedTimestamp())
+				n += createdTsBytesWritten
+			}
 		case dto.MetricType_GAUGE:
 			if metric.Gauge == nil {
 				return written, fmt.Errorf(
-					"expected gauge in metric %s %s", name, metric,
+					"expected gauge in metric %s %s", compliantName, metric,
 				)
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "", metric, "", 0,
+				w, compliantName, "", metric, "", 0,
 				metric.Gauge.GetValue(), 0, false,
 				nil,
 			)
 		case dto.MetricType_UNTYPED:
 			if metric.Untyped == nil {
 				return written, fmt.Errorf(
-					"expected untyped in metric %s %s", name, metric,
+					"expected untyped in metric %s %s", compliantName, metric,
 				)
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "", metric, "", 0,
+				w, compliantName, "", metric, "", 0,
 				metric.Untyped.GetValue(), 0, false,
 				nil,
 			)
 		case dto.MetricType_SUMMARY:
 			if metric.Summary == nil {
 				return written, fmt.Errorf(
-					"expected summary in metric %s %s", name, metric,
+					"expected summary in metric %s %s", compliantName, metric,
 				)
 			}
 			for _, q := range metric.Summary.Quantile {
 				n, err = writeOpenMetricsSample(
-					w, name, "", metric,
+					w, compliantName, "", metric,
 					model.QuantileLabel, q.GetQuantile(),
 					q.GetValue(), 0, false,
 					nil,
@@ -210,7 +309,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 				}
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "_sum", metric, "", 0,
+				w, compliantName, "_sum", metric, "", 0,
 				metric.Summary.GetSampleSum(), 0, false,
 				nil,
 			)
@@ -219,20 +318,24 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 				return
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "_count", metric, "", 0,
+				w, compliantName, "_count", metric, "", 0,
 				0, metric.Summary.GetSampleCount(), true,
 				nil,
 			)
+			if toOM.withCreatedLines && metric.Summary.CreatedTimestamp != nil {
+				createdTsBytesWritten, err = writeOpenMetricsCreated(w, compliantName, "", metric, "", 0, metric.Summary.GetCreatedTimestamp())
+				n += createdTsBytesWritten
+			}
 		case dto.MetricType_HISTOGRAM:
 			if metric.Histogram == nil {
 				return written, fmt.Errorf(
-					"expected histogram in metric %s %s", name, metric,
+					"expected histogram in metric %s %s", compliantName, metric,
 				)
 			}
 			infSeen := false
 			for _, b := range metric.Histogram.Bucket {
 				n, err = writeOpenMetricsSample(
-					w, name, "_bucket", metric,
+					w, compliantName, "_bucket", metric,
 					model.BucketLabel, b.GetUpperBound(),
 					0, b.GetCumulativeCount(), true,
 					b.Exemplar,
@@ -247,7 +350,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 			}
 			if !infSeen {
 				n, err = writeOpenMetricsSample(
-					w, name, "_bucket", metric,
+					w, compliantName, "_bucket", metric,
 					model.BucketLabel, math.Inf(+1),
 					0, metric.Histogram.GetSampleCount(), true,
 					nil,
@@ -258,7 +361,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 				}
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "_sum", metric, "", 0,
+				w, compliantName, "_sum", metric, "", 0,
 				metric.Histogram.GetSampleSum(), 0, false,
 				nil,
 			)
@@ -267,13 +370,17 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 				return
 			}
 			n, err = writeOpenMetricsSample(
-				w, name, "_count", metric, "", 0,
+				w, compliantName, "_count", metric, "", 0,
 				0, metric.Histogram.GetSampleCount(), true,
 				nil,
 			)
+			if toOM.withCreatedLines && metric.Histogram.CreatedTimestamp != nil {
+				createdTsBytesWritten, err = writeOpenMetricsCreated(w, compliantName, "", metric, "", 0, metric.Histogram.GetCreatedTimestamp())
+				n += createdTsBytesWritten
+			}
 		default:
 			return written, fmt.Errorf(
-				"unexpected type in metric %s %s", name, metric,
+				"unexpected type in metric %s %s", compliantName, metric,
 			)
 		}
 		written += n
@@ -303,21 +410,9 @@ func writeOpenMetricsSample(
 	floatValue float64, intValue uint64, useIntValue bool,
 	exemplar *dto.Exemplar,
 ) (int, error) {
-	var written int
-	n, err := w.WriteString(name)
-	written += n
-	if err != nil {
-		return written, err
-	}
-	if suffix != "" {
-		n, err = w.WriteString(suffix)
-		written += n
-		if err != nil {
-			return written, err
-		}
-	}
-	n, err = writeOpenMetricsLabelPairs(
-		w, metric.Label, additionalLabelName, additionalLabelValue,
+	written := 0
+	n, err := writeOpenMetricsNameAndLabelPairs(
+		w, name+suffix, metric.Label, additionalLabelName, additionalLabelValue,
 	)
 	written += n
 	if err != nil {
@@ -350,7 +445,7 @@ func writeOpenMetricsSample(
 			return written, err
 		}
 	}
-	if exemplar != nil {
+	if exemplar != nil && len(exemplar.Label) > 0 {
 		n, err = writeExemplar(w, exemplar)
 		written += n
 		if err != nil {
@@ -365,27 +460,58 @@ func writeOpenMetricsSample(
 	return written, nil
 }
 
-// writeOpenMetricsLabelPairs works like writeOpenMetrics but formats the float
-// in OpenMetrics style.
-func writeOpenMetricsLabelPairs(
+// writeOpenMetricsNameAndLabelPairs works like writeOpenMetricsSample but
+// formats the float in OpenMetrics style.
+func writeOpenMetricsNameAndLabelPairs(
 	w enhancedWriter,
+	name string,
 	in []*dto.LabelPair,
 	additionalLabelName string, additionalLabelValue float64,
 ) (int, error) {
-	if len(in) == 0 && additionalLabelName == "" {
-		return 0, nil
-	}
 	var (
-		written   int
-		separator byte = '{'
+		written            int
+		separator          byte = '{'
+		metricInsideBraces      = false
 	)
+
+	if name != "" {
+		// If the name does not pass the legacy validity check, we must put the
+		// metric name inside the braces, quoted.
+		if !model.IsValidLegacyMetricName(model.LabelValue(name)) {
+			metricInsideBraces = true
+			err := w.WriteByte(separator)
+			written++
+			if err != nil {
+				return written, err
+			}
+			separator = ','
+		}
+
+		n, err := writeName(w, name)
+		written += n
+		if err != nil {
+			return written, err
+		}
+	}
+
+	if len(in) == 0 && additionalLabelName == "" {
+		if metricInsideBraces {
+			err := w.WriteByte('}')
+			written++
+			if err != nil {
+				return written, err
+			}
+		}
+		return written, nil
+	}
+
 	for _, lp := range in {
 		err := w.WriteByte(separator)
 		written++
 		if err != nil {
 			return written, err
 		}
-		n, err := w.WriteString(lp.GetName())
+		n, err := writeName(w, lp.GetName())
 		written += n
 		if err != nil {
 			return written, err
@@ -442,6 +568,49 @@ func writeOpenMetricsLabelPairs(
 	return written, nil
 }
 
+// writeOpenMetricsCreated writes the created timestamp for a single time series
+// following OpenMetrics text format to w, given the metric name, the metric proto
+// message itself, optionally a suffix to be removed, e.g. '_total' for counters,
+// an additional label name with a float64 value (use empty string as label name if
+// not required) and the timestamp that represents the created timestamp.
+// The function returns the number of bytes written and any error encountered.
+func writeOpenMetricsCreated(w enhancedWriter,
+	name, suffixToTrim string, metric *dto.Metric,
+	additionalLabelName string, additionalLabelValue float64,
+	createdTimestamp *timestamppb.Timestamp,
+) (int, error) {
+	written := 0
+	n, err := writeOpenMetricsNameAndLabelPairs(
+		w, strings.TrimSuffix(name, suffixToTrim)+"_created", metric.Label, additionalLabelName, additionalLabelValue,
+	)
+	written += n
+	if err != nil {
+		return written, err
+	}
+
+	err = w.WriteByte(' ')
+	written++
+	if err != nil {
+		return written, err
+	}
+
+	// TODO(beorn7): Format this directly from components of ts to
+	// avoid overflow/underflow and precision issues of the float
+	// conversion.
+	n, err = writeOpenMetricsFloat(w, float64(createdTimestamp.AsTime().UnixNano())/1e9)
+	written += n
+	if err != nil {
+		return written, err
+	}
+
+	err = w.WriteByte('\n')
+	written++
+	if err != nil {
+		return written, err
+	}
+	return written, nil
+}
+
 // writeExemplar writes the provided exemplar in OpenMetrics format to w. The
 // function returns the number of bytes written and any error encountered.
 func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
@@ -451,7 +620,7 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 	if err != nil {
 		return written, err
 	}
-	n, err = writeOpenMetricsLabelPairs(w, e.Label, "", 0)
+	n, err = writeOpenMetricsNameAndLabelPairs(w, "", e.Label, "", 0)
 	written += n
 	if err != nil {
 		return written, err

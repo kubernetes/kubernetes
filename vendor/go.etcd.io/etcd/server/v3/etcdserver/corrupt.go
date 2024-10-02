@@ -390,7 +390,12 @@ func (s *EtcdServer) getPeerHashKVs(rev int64) []*peerHashKVResp {
 
 	lg := s.Logger()
 
-	cc := &http.Client{Transport: s.peerRt}
+	cc := &http.Client{
+		Transport: s.peerRt,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	var resps []*peerHashKVResp
 	for _, p := range peers {
 		if len(p.eps) == 0 {

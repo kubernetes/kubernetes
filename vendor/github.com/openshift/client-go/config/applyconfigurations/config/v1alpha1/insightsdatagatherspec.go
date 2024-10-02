@@ -2,13 +2,13 @@
 
 package v1alpha1
 
-// InsightsDataGatherSpecApplyConfiguration represents an declarative configuration of the InsightsDataGatherSpec type for use
+// InsightsDataGatherSpecApplyConfiguration represents a declarative configuration of the InsightsDataGatherSpec type for use
 // with apply.
 type InsightsDataGatherSpecApplyConfiguration struct {
 	GatherConfig *GatherConfigApplyConfiguration `json:"gatherConfig,omitempty"`
 }
 
-// InsightsDataGatherSpecApplyConfiguration constructs an declarative configuration of the InsightsDataGatherSpec type for use with
+// InsightsDataGatherSpecApplyConfiguration constructs a declarative configuration of the InsightsDataGatherSpec type for use with
 // apply.
 func InsightsDataGatherSpec() *InsightsDataGatherSpecApplyConfiguration {
 	return &InsightsDataGatherSpecApplyConfiguration{}

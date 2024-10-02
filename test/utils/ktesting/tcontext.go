@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -36,7 +37,8 @@ import (
 )
 
 // Underlier is the additional interface implemented by the per-test LogSink
-// behind [TContext.Logger].
+// behind [TContext.Logger]. Together with [initoption.BufferLogs] it can be
+// used to capture log output in memory to check it in tests.
 type Underlier = ktesting.Underlier
 
 // CleanupGracePeriod is the time that a [TContext] gets canceled before the
@@ -241,10 +243,23 @@ func Init(tb TB, opts ...InitOption) TContext {
 	if c.PerTestOutput {
 		config := ktesting.NewConfig(
 			ktesting.AnyToString(func(v interface{}) string {
-				return format.Object(v, 1)
+				// For basic types where the string
+				// representation is "obvious" we use
+				// fmt.Sprintf because format.Object always
+				// adds a <"type"> prefix, which is too long
+				// for simple values.
+				switch v := v.(type) {
+				case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
+					return fmt.Sprintf("%v", v)
+				case string:
+					return v
+				default:
+					return strings.TrimSpace(format.Object(v, 1))
+				}
 			}),
 			ktesting.VerbosityFlagName("v"),
 			ktesting.VModuleFlagName("vmodule"),
+			ktesting.BufferLogs(c.BufferLogs),
 		)
 
 		// Copy klog settings instead of making the ktesting logger

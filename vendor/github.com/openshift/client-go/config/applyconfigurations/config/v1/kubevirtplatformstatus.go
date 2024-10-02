@@ -2,14 +2,14 @@
 
 package v1
 
-// KubevirtPlatformStatusApplyConfiguration represents an declarative configuration of the KubevirtPlatformStatus type for use
+// KubevirtPlatformStatusApplyConfiguration represents a declarative configuration of the KubevirtPlatformStatus type for use
 // with apply.
 type KubevirtPlatformStatusApplyConfiguration struct {
 	APIServerInternalIP *string `json:"apiServerInternalIP,omitempty"`
 	IngressIP           *string `json:"ingressIP,omitempty"`
 }
 
-// KubevirtPlatformStatusApplyConfiguration constructs an declarative configuration of the KubevirtPlatformStatus type for use with
+// KubevirtPlatformStatusApplyConfiguration constructs a declarative configuration of the KubevirtPlatformStatus type for use with
 // apply.
 func KubevirtPlatformStatus() *KubevirtPlatformStatusApplyConfiguration {
 	return &KubevirtPlatformStatusApplyConfiguration{}

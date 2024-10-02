@@ -51,31 +51,21 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 	nodeIndex := 1 // the exact node doesn't matter, pick one
 
 	tests := map[string]struct {
-		enablePodDisruptionConditions          bool
 		enableSeparateTaintEvictionController  bool
 		startStandaloneTaintEvictionController bool
 		wantPodEvicted                         bool
 	}{
-		"Test eviction for NoExecute taint added by user; pod condition added when PodDisruptionConditions enabled; separate taint eviction controller disabled": {
-			enablePodDisruptionConditions:          true,
-			enableSeparateTaintEvictionController:  false,
-			startStandaloneTaintEvictionController: false,
-			wantPodEvicted:                         true,
-		},
-		"Test eviction for NoExecute taint added by user; no pod condition added when PodDisruptionConditions disabled; separate taint eviction controller disabled": {
-			enablePodDisruptionConditions:          false,
+		"Test eviction for NoExecute taint added by user; pod condition added; separate taint eviction controller disabled": {
 			enableSeparateTaintEvictionController:  false,
 			startStandaloneTaintEvictionController: false,
 			wantPodEvicted:                         true,
 		},
 		"Test eviction for NoExecute taint added by user; separate taint eviction controller enabled but not started": {
-			enablePodDisruptionConditions:          false,
 			enableSeparateTaintEvictionController:  true,
 			startStandaloneTaintEvictionController: false,
 			wantPodEvicted:                         false,
 		},
 		"Test eviction for NoExecute taint added by user; separate taint eviction controller enabled and started": {
-			enablePodDisruptionConditions:          false,
 			enableSeparateTaintEvictionController:  true,
 			startStandaloneTaintEvictionController: true,
 			wantPodEvicted:                         true,
@@ -124,8 +114,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				},
 			}
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)
 			testCtx := testutils.InitTestAPIServer(t, "taint-no-execute", nil)
 			cs := testCtx.ClientSet
 
@@ -202,9 +191,9 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				t.Fatalf("Test Failed: error: %q, while getting updated pod", err)
 			}
 			_, cond := podutil.GetPodCondition(&testPod.Status, v1.DisruptionTarget)
-			if test.enablePodDisruptionConditions && cond == nil {
+			if test.wantPodEvicted && cond == nil {
 				t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
-			} else if !test.enablePodDisruptionConditions && cond != nil {
+			} else if !test.wantPodEvicted && cond != nil {
 				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(testPod), v1.DisruptionTarget)
 			}
 		})
@@ -333,7 +322,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableSeparateTaintEvictionController)
 
 			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
@@ -436,7 +425,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				}
 			}
 
-			if err := testutils.WaitForNodeTaints(cs, nodes[nodeIndex], test.nodeTaints); err != nil {
+			if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, nodes[nodeIndex], test.nodeTaints); err != nil {
 				t.Errorf("Failed to taint node %q, err: %v", klog.KObj(nodes[nodeIndex]), err)
 			}
 

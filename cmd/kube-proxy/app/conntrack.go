@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strconv"
@@ -33,30 +34,30 @@ import (
 // https://www.kernel.org/doc/Documentation/networking/nf_conntrack-sysctl.txt
 type Conntracker interface {
 	// SetMax adjusts nf_conntrack_max.
-	SetMax(max int) error
+	SetMax(ctx context.Context, max int) error
 	// SetTCPEstablishedTimeout adjusts nf_conntrack_tcp_timeout_established.
-	SetTCPEstablishedTimeout(seconds int) error
+	SetTCPEstablishedTimeout(ctx context.Context, seconds int) error
 	// SetTCPCloseWaitTimeout adjusts nf_conntrack_tcp_timeout_close_wait.
-	SetTCPCloseWaitTimeout(seconds int) error
+	SetTCPCloseWaitTimeout(ctx context.Context, seconds int) error
 	// SetTCPBeLiberal adjusts nf_conntrack_tcp_be_liberal.
-	SetTCPBeLiberal(value int) error
+	SetTCPBeLiberal(ctx context.Context, value int) error
 	// SetUDPTimeout adjusts nf_conntrack_udp_timeout.
-	SetUDPTimeout(seconds int) error
+	SetUDPTimeout(ctx context.Context, seconds int) error
 	// SetUDPStreamTimeout adjusts nf_conntrack_udp_timeout_stream.
-	SetUDPStreamTimeout(seconds int) error
+	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
 type realConntracker struct {
-	logger klog.Logger
 }
 
 var errReadOnlySysFS = errors.New("readOnlySysFS")
 
-func (rct realConntracker) SetMax(max int) error {
-	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
+func (rct realConntracker) SetMax(ctx context.Context, max int) error {
+	logger := klog.FromContext(ctx)
+	if err := rct.setIntSysCtl(ctx, "nf_conntrack_max", max); err != nil {
 		return err
 	}
-	rct.logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
+	logger.Info("Setting nf_conntrack_max", "nfConntrackMax", max)
 
 	// Linux does not support writing to /sys/module/nf_conntrack/parameters/hashsize
 	// when the writer process is not in the initial network namespace
@@ -79,7 +80,7 @@ func (rct realConntracker) SetMax(max int) error {
 	// don't set conntrack hashsize and return a special error
 	// errReadOnlySysFS here. The caller should deal with
 	// errReadOnlySysFS differently.
-	writable, err := rct.isSysFSWritable()
+	writable, err := rct.isSysFSWritable(ctx)
 	if err != nil {
 		return err
 	}
@@ -87,36 +88,37 @@ func (rct realConntracker) SetMax(max int) error {
 		return errReadOnlySysFS
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
-	rct.logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
+	logger.Info("Setting conntrack hashsize", "conntrackHashsize", max/4)
 	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
-func (rct realConntracker) SetTCPEstablishedTimeout(seconds int) error {
-	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_established", seconds)
+func (rct realConntracker) SetTCPEstablishedTimeout(ctx context.Context, seconds int) error {
+	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_timeout_established", seconds)
 }
 
-func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
-	return rct.setIntSysCtl("nf_conntrack_tcp_timeout_close_wait", seconds)
+func (rct realConntracker) SetTCPCloseWaitTimeout(ctx context.Context, seconds int) error {
+	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_timeout_close_wait", seconds)
 }
 
-func (rct realConntracker) SetTCPBeLiberal(value int) error {
-	return rct.setIntSysCtl("nf_conntrack_tcp_be_liberal", value)
+func (rct realConntracker) SetTCPBeLiberal(ctx context.Context, value int) error {
+	return rct.setIntSysCtl(ctx, "nf_conntrack_tcp_be_liberal", value)
 }
 
-func (rct realConntracker) SetUDPTimeout(seconds int) error {
-	return rct.setIntSysCtl("nf_conntrack_udp_timeout", seconds)
+func (rct realConntracker) SetUDPTimeout(ctx context.Context, seconds int) error {
+	return rct.setIntSysCtl(ctx, "nf_conntrack_udp_timeout", seconds)
 }
 
-func (rct realConntracker) SetUDPStreamTimeout(seconds int) error {
-	return rct.setIntSysCtl("nf_conntrack_udp_timeout_stream", seconds)
+func (rct realConntracker) SetUDPStreamTimeout(ctx context.Context, seconds int) error {
+	return rct.setIntSysCtl(ctx, "nf_conntrack_udp_timeout_stream", seconds)
 }
 
-func (rct realConntracker) setIntSysCtl(name string, value int) error {
+func (rct realConntracker) setIntSysCtl(ctx context.Context, name string, value int) error {
+	logger := klog.FromContext(ctx)
 	entry := "net/netfilter/" + name
 
 	sys := sysctl.New()
 	if val, _ := sys.GetSysctl(entry); val != value {
-		rct.logger.Info("Set sysctl", "entry", entry, "value", value)
+		logger.Info("Set sysctl", "entry", entry, "value", value)
 		if err := sys.SetSysctl(entry, value); err != nil {
 			return err
 		}
@@ -125,13 +127,14 @@ func (rct realConntracker) setIntSysCtl(name string, value int) error {
 }
 
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.
-func (rct realConntracker) isSysFSWritable() (bool, error) {
+func (rct realConntracker) isSysFSWritable(ctx context.Context) (bool, error) {
+	logger := klog.FromContext(ctx)
 	const permWritable = "rw"
 	const sysfsDevice = "sysfs"
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
-		rct.logger.Error(err, "Failed to list mount points")
+		logger.Error(err, "Failed to list mount points")
 		return false, err
 	}
 
@@ -143,7 +146,7 @@ func (rct realConntracker) isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		rct.logger.Error(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
+		logger.Error(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
 		return false, errReadOnlySysFS
 	}
 

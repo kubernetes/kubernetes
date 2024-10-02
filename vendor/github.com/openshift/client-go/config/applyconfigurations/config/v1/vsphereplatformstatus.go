@@ -6,7 +6,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// VSpherePlatformStatusApplyConfiguration represents an declarative configuration of the VSpherePlatformStatus type for use
+// VSpherePlatformStatusApplyConfiguration represents a declarative configuration of the VSpherePlatformStatus type for use
 // with apply.
 type VSpherePlatformStatusApplyConfiguration struct {
 	APIServerInternalIP  *string                                        `json:"apiServerInternalIP,omitempty"`
@@ -18,7 +18,7 @@ type VSpherePlatformStatusApplyConfiguration struct {
 	MachineNetworks      []configv1.CIDR                                `json:"machineNetworks,omitempty"`
 }
 
-// VSpherePlatformStatusApplyConfiguration constructs an declarative configuration of the VSpherePlatformStatus type for use with
+// VSpherePlatformStatusApplyConfiguration constructs a declarative configuration of the VSpherePlatformStatus type for use with
 // apply.
 func VSpherePlatformStatus() *VSpherePlatformStatusApplyConfiguration {
 	return &VSpherePlatformStatusApplyConfiguration{}

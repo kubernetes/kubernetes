@@ -22,11 +22,12 @@ var subjectrulesreviewsKind = v1.SchemeGroupVersion.WithKind("SubjectRulesReview
 
 // Create takes the representation of a subjectRulesReview and creates it.  Returns the server's representation of the subjectRulesReview, and an error, if there is any.
 func (c *FakeSubjectRulesReviews) Create(ctx context.Context, subjectRulesReview *v1.SubjectRulesReview, opts metav1.CreateOptions) (result *v1.SubjectRulesReview, err error) {
+	emptyResult := &v1.SubjectRulesReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(subjectrulesreviewsResource, c.ns, subjectRulesReview), &v1.SubjectRulesReview{})
+		Invokes(testing.NewCreateActionWithOptions(subjectrulesreviewsResource, c.ns, subjectRulesReview, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.SubjectRulesReview), err
 }

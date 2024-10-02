@@ -2,13 +2,13 @@
 
 package v1
 
-// ConfigMapNameReferenceApplyConfiguration represents an declarative configuration of the ConfigMapNameReference type for use
+// ConfigMapNameReferenceApplyConfiguration represents a declarative configuration of the ConfigMapNameReference type for use
 // with apply.
 type ConfigMapNameReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// ConfigMapNameReferenceApplyConfiguration constructs an declarative configuration of the ConfigMapNameReference type for use with
+// ConfigMapNameReferenceApplyConfiguration constructs a declarative configuration of the ConfigMapNameReference type for use with
 // apply.
 func ConfigMapNameReference() *ConfigMapNameReferenceApplyConfiguration {
 	return &ConfigMapNameReferenceApplyConfiguration{}

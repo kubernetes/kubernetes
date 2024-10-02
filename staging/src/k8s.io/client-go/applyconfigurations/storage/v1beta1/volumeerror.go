@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// VolumeErrorApplyConfiguration represents an declarative configuration of the VolumeError type for use
+// VolumeErrorApplyConfiguration represents a declarative configuration of the VolumeError type for use
 // with apply.
 type VolumeErrorApplyConfiguration struct {
 	Time    *v1.Time `json:"time,omitempty"`
 	Message *string  `json:"message,omitempty"`
 }
 
-// VolumeErrorApplyConfiguration constructs an declarative configuration of the VolumeError type for use with
+// VolumeErrorApplyConfiguration constructs a declarative configuration of the VolumeError type for use with
 // apply.
 func VolumeError() *VolumeErrorApplyConfiguration {
 	return &VolumeErrorApplyConfiguration{}

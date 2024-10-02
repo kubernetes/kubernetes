@@ -536,7 +536,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 							return false, nil
 						}
 						if status.State.Terminated != nil && status.State.Terminated.ExitCode != 0 {
-							return false, fmt.Errorf("first init container should have exitCode != 0: %s", toDebugJSON(status))
+							return false, fmt.Errorf("first init container should have exitCode == 0: %s", toDebugJSON(status))
 						}
 						status = t.Status.InitContainerStatuses[1]
 						if status.State.Terminated == nil {

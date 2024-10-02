@@ -2,13 +2,13 @@
 
 package v1
 
-// WebhookTokenAuthenticatorApplyConfiguration represents an declarative configuration of the WebhookTokenAuthenticator type for use
+// WebhookTokenAuthenticatorApplyConfiguration represents a declarative configuration of the WebhookTokenAuthenticator type for use
 // with apply.
 type WebhookTokenAuthenticatorApplyConfiguration struct {
 	KubeConfig *SecretNameReferenceApplyConfiguration `json:"kubeConfig,omitempty"`
 }
 
-// WebhookTokenAuthenticatorApplyConfiguration constructs an declarative configuration of the WebhookTokenAuthenticator type for use with
+// WebhookTokenAuthenticatorApplyConfiguration constructs a declarative configuration of the WebhookTokenAuthenticator type for use with
 // apply.
 func WebhookTokenAuthenticator() *WebhookTokenAuthenticatorApplyConfiguration {
 	return &WebhookTokenAuthenticatorApplyConfiguration{}

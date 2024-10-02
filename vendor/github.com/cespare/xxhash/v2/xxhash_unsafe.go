@@ -33,7 +33,7 @@ import (
 //
 // See https://github.com/golang/go/issues/42739 for discussion.
 
-// Sum64String computes the 64-bit xxHash digest of s.
+// Sum64String computes the 64-bit xxHash digest of s with a zero seed.
 // It may be faster than Sum64([]byte(s)) by avoiding a copy.
 func Sum64String(s string) uint64 {
 	b := *(*[]byte)(unsafe.Pointer(&sliceHeader{s, len(s)}))

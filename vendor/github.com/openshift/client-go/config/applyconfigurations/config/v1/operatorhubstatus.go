@@ -2,13 +2,13 @@
 
 package v1
 
-// OperatorHubStatusApplyConfiguration represents an declarative configuration of the OperatorHubStatus type for use
+// OperatorHubStatusApplyConfiguration represents a declarative configuration of the OperatorHubStatus type for use
 // with apply.
 type OperatorHubStatusApplyConfiguration struct {
 	Sources []HubSourceStatusApplyConfiguration `json:"sources,omitempty"`
 }
 
-// OperatorHubStatusApplyConfiguration constructs an declarative configuration of the OperatorHubStatus type for use with
+// OperatorHubStatusApplyConfiguration constructs a declarative configuration of the OperatorHubStatus type for use with
 // apply.
 func OperatorHubStatus() *OperatorHubStatusApplyConfiguration {
 	return &OperatorHubStatusApplyConfiguration{}

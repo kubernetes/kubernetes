@@ -63,6 +63,7 @@ func (e PlaceholderEnum) Options() protoreflect.ProtoMessage        { return des
 func (e PlaceholderEnum) Values() protoreflect.EnumValueDescriptors { return emptyEnumValues }
 func (e PlaceholderEnum) ReservedNames() protoreflect.Names         { return emptyNames }
 func (e PlaceholderEnum) ReservedRanges() protoreflect.EnumRanges   { return emptyEnumRanges }
+func (e PlaceholderEnum) IsClosed() bool                            { return false }
 func (e PlaceholderEnum) ProtoType(protoreflect.EnumDescriptor)     { return }
 func (e PlaceholderEnum) ProtoInternal(pragma.DoNotImplement)       { return }
 

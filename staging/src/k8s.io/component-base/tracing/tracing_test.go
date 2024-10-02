@@ -34,7 +34,8 @@ import (
 
 func init() {
 	klog.InitFlags(flag.CommandLine)
-	flag.CommandLine.Lookup("logtostderr").Value.Set("false")
+	_ = flag.CommandLine.Lookup("logtostderr").Value.Set("false")
+	_ = flag.CommandLine.Lookup("v").Value.Set("2")
 }
 
 func TestOpenTelemetryTracing(t *testing.T) {

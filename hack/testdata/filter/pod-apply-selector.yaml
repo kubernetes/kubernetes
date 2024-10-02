@@ -8,4 +8,4 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: registry.k8s.io/pause:3.9
+    image: registry.k8s.io/pause:3.10

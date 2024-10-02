@@ -78,11 +78,11 @@ func parseMountInfoString(mountString string) (*MountInfo, error) {
 	mountInfo := strings.Split(mountString, " ")
 	mountInfoLength := len(mountInfo)
 	if mountInfoLength < 10 {
-		return nil, fmt.Errorf("couldn't find enough fields in mount string: %s", mountString)
+		return nil, fmt.Errorf("%w: Too few fields in mount string: %s", ErrFileParse, mountString)
 	}
 
 	if mountInfo[mountInfoLength-4] != "-" {
-		return nil, fmt.Errorf("couldn't find separator in expected field: %s", mountInfo[mountInfoLength-4])
+		return nil, fmt.Errorf("%w: couldn't find separator in expected field: %s", ErrFileParse, mountInfo[mountInfoLength-4])
 	}
 
 	mount := &MountInfo{
@@ -98,18 +98,18 @@ func parseMountInfoString(mountString string) (*MountInfo, error) {
 
 	mount.MountID, err = strconv.Atoi(mountInfo[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse mount ID")
+		return nil, fmt.Errorf("%w: mount ID: %q", ErrFileParse, mount.MountID)
 	}
 	mount.ParentID, err = strconv.Atoi(mountInfo[1])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse parent ID")
+		return nil, fmt.Errorf("%w: parent ID: %q", ErrFileParse, mount.ParentID)
 	}
 	// Has optional fields, which is a space separated list of values.
 	// Example: shared:2 master:7
 	if mountInfo[6] != "" {
 		mount.OptionalFields, err = mountOptionsParseOptionalFields(mountInfo[6 : mountInfoLength-4])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", ErrFileParse, err)
 		}
 	}
 	return mount, nil

@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// SubjectApplyConfiguration represents an declarative configuration of the Subject type for use
+// SubjectApplyConfiguration represents a declarative configuration of the Subject type for use
 // with apply.
 type SubjectApplyConfiguration struct {
 	Kind      *string `json:"kind,omitempty"`
@@ -27,7 +27,7 @@ type SubjectApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// SubjectApplyConfiguration constructs an declarative configuration of the Subject type for use with
+// SubjectApplyConfiguration constructs a declarative configuration of the Subject type for use with
 // apply.
 func Subject() *SubjectApplyConfiguration {
 	return &SubjectApplyConfiguration{}

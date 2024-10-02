@@ -584,7 +584,7 @@ func Output(t *testing.T, config OutputConfig) {
 
 			if config.NewLogger == nil {
 				// Test klog.
-				testOutput(t, printWithKlogLine-1, func(buffer *bytes.Buffer) {
+				testOutput(t, printWithKlogLine-1, func(_ *bytes.Buffer) {
 					printWithKlog(test)
 				})
 				return

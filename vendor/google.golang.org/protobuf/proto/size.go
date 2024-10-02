@@ -34,6 +34,7 @@ func (o MarshalOptions) size(m protoreflect.Message) (size int) {
 	if methods != nil && methods.Size != nil {
 		out := methods.Size(protoiface.SizeInput{
 			Message: m,
+			Flags:   o.flags(),
 		})
 		return out.Size
 	}
@@ -42,6 +43,7 @@ func (o MarshalOptions) size(m protoreflect.Message) (size int) {
 		// This case is mainly used for legacy types with a Marshal method.
 		out, _ := methods.Marshal(protoiface.MarshalInput{
 			Message: m,
+			Flags:   o.flags(),
 		})
 		return len(out.Buf)
 	}

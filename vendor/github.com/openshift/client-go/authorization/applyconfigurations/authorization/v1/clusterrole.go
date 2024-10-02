@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterRoleApplyConfiguration represents an declarative configuration of the ClusterRole type for use
+// ClusterRoleApplyConfiguration represents a declarative configuration of the ClusterRole type for use
 // with apply.
 type ClusterRoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -21,7 +21,7 @@ type ClusterRoleApplyConfiguration struct {
 	AggregationRule                  *rbacv1.AggregationRule        `json:"aggregationRule,omitempty"`
 }
 
-// ClusterRole constructs an declarative configuration of the ClusterRole type for use with
+// ClusterRole constructs a declarative configuration of the ClusterRole type for use with
 // apply.
 func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 	b := &ClusterRoleApplyConfiguration{}
@@ -243,4 +243,10 @@ func (b *ClusterRoleApplyConfiguration) WithRules(values ...*PolicyRuleApplyConf
 func (b *ClusterRoleApplyConfiguration) WithAggregationRule(value rbacv1.AggregationRule) *ClusterRoleApplyConfiguration {
 	b.AggregationRule = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

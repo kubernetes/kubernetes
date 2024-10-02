@@ -6,13 +6,13 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterImagePolicyStatusApplyConfiguration represents an declarative configuration of the ClusterImagePolicyStatus type for use
+// ClusterImagePolicyStatusApplyConfiguration represents a declarative configuration of the ClusterImagePolicyStatus type for use
 // with apply.
 type ClusterImagePolicyStatusApplyConfiguration struct {
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ClusterImagePolicyStatusApplyConfiguration constructs an declarative configuration of the ClusterImagePolicyStatus type for use with
+// ClusterImagePolicyStatusApplyConfiguration constructs a declarative configuration of the ClusterImagePolicyStatus type for use with
 // apply.
 func ClusterImagePolicyStatus() *ClusterImagePolicyStatusApplyConfiguration {
 	return &ClusterImagePolicyStatusApplyConfiguration{}

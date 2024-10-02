@@ -12,9 +12,9 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterNetwork describes the cluster network. There is normally only one object of this type,
-// named "default", which is created by the SDN network plugin based on the master configuration
-// when the cluster is brought up for the first time.
+// ClusterNetwork was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -112,8 +112,9 @@ type HostSubnetEgressCIDR string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HostSubnet describes the container subnet network on a node. The HostSubnet object must have the
-// same name as the Node object it corresponds to.
+// HostSubnet was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -184,9 +185,9 @@ type NetNamespaceEgressIP string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant
-// plugin, every Namespace will have a corresponding NetNamespace object with the same name.
-// (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)
+// NetNamespace was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true
@@ -274,11 +275,9 @@ type EgressNetworkPolicySpec struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// EgressNetworkPolicy describes the current egress network policy for a Namespace. When using
-// the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address
-// outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's
-// namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy
-// is present) then the traffic will be allowed by default.
+// EgressNetworkPolicy was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +kubebuilder:object:root=true

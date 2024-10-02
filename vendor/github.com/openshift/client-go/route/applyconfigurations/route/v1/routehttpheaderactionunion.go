@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/route/v1"
 )
 
-// RouteHTTPHeaderActionUnionApplyConfiguration represents an declarative configuration of the RouteHTTPHeaderActionUnion type for use
+// RouteHTTPHeaderActionUnionApplyConfiguration represents a declarative configuration of the RouteHTTPHeaderActionUnion type for use
 // with apply.
 type RouteHTTPHeaderActionUnionApplyConfiguration struct {
 	Type *v1.RouteHTTPHeaderActionType         `json:"type,omitempty"`
 	Set  *RouteSetHTTPHeaderApplyConfiguration `json:"set,omitempty"`
 }
 
-// RouteHTTPHeaderActionUnionApplyConfiguration constructs an declarative configuration of the RouteHTTPHeaderActionUnion type for use with
+// RouteHTTPHeaderActionUnionApplyConfiguration constructs a declarative configuration of the RouteHTTPHeaderActionUnion type for use with
 // apply.
 func RouteHTTPHeaderActionUnion() *RouteHTTPHeaderActionUnionApplyConfiguration {
 	return &RouteHTTPHeaderActionUnionApplyConfiguration{}

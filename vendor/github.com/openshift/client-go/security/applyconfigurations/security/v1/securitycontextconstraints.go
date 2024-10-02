@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// SecurityContextConstraintsApplyConfiguration represents an declarative configuration of the SecurityContextConstraints type for use
+// SecurityContextConstraintsApplyConfiguration represents a declarative configuration of the SecurityContextConstraints type for use
 // with apply.
 type SecurityContextConstraintsApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -29,6 +29,7 @@ type SecurityContextConstraintsApplyConfiguration struct {
 	AllowHostPorts                   *bool                                                `json:"allowHostPorts,omitempty"`
 	AllowHostPID                     *bool                                                `json:"allowHostPID,omitempty"`
 	AllowHostIPC                     *bool                                                `json:"allowHostIPC,omitempty"`
+	UserNamespaceLevel               *securityv1.NamespaceLevelType                       `json:"userNamespaceLevel,omitempty"`
 	DefaultAllowPrivilegeEscalation  *bool                                                `json:"defaultAllowPrivilegeEscalation,omitempty"`
 	AllowPrivilegeEscalation         *bool                                                `json:"allowPrivilegeEscalation,omitempty"`
 	SELinuxContext                   *SELinuxContextStrategyOptionsApplyConfiguration     `json:"seLinuxContext,omitempty"`
@@ -43,7 +44,7 @@ type SecurityContextConstraintsApplyConfiguration struct {
 	ForbiddenSysctls                 []string                                             `json:"forbiddenSysctls,omitempty"`
 }
 
-// SecurityContextConstraints constructs an declarative configuration of the SecurityContextConstraints type for use with
+// SecurityContextConstraints constructs a declarative configuration of the SecurityContextConstraints type for use with
 // apply.
 func SecurityContextConstraints(name string) *SecurityContextConstraintsApplyConfiguration {
 	b := &SecurityContextConstraintsApplyConfiguration{}
@@ -355,6 +356,14 @@ func (b *SecurityContextConstraintsApplyConfiguration) WithAllowHostIPC(value bo
 	return b
 }
 
+// WithUserNamespaceLevel sets the UserNamespaceLevel field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserNamespaceLevel field is set to the value of the last call.
+func (b *SecurityContextConstraintsApplyConfiguration) WithUserNamespaceLevel(value securityv1.NamespaceLevelType) *SecurityContextConstraintsApplyConfiguration {
+	b.UserNamespaceLevel = &value
+	return b
+}
+
 // WithDefaultAllowPrivilegeEscalation sets the DefaultAllowPrivilegeEscalation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DefaultAllowPrivilegeEscalation field is set to the value of the last call.
@@ -459,4 +468,10 @@ func (b *SecurityContextConstraintsApplyConfiguration) WithForbiddenSysctls(valu
 		b.ForbiddenSysctls = append(b.ForbiddenSysctls, values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *SecurityContextConstraintsApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

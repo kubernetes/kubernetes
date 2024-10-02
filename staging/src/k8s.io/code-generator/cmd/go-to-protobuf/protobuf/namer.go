@@ -37,6 +37,11 @@ func (n localNamer) Name(t *types.Type) string {
 	if len(n.localPackage.Package) != 0 && n.localPackage.Package == t.Name.Package {
 		return t.Name.Name
 	}
+	// For non-local and non-fundamental types, use an absolute reference
+	// see https://protobuf.com/docs/language-spec#type-references
+	if strings.Contains(t.Name.Package, ".") {
+		return fmt.Sprintf(".%s", t.Name)
+	}
 	return t.Name.String()
 }
 

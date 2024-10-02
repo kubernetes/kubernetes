@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildConfigSpecApplyConfiguration represents an declarative configuration of the BuildConfigSpec type for use
+// BuildConfigSpecApplyConfiguration represents a declarative configuration of the BuildConfigSpec type for use
 // with apply.
 type BuildConfigSpecApplyConfiguration struct {
 	Triggers                     []BuildTriggerPolicyApplyConfiguration `json:"triggers,omitempty"`
@@ -17,7 +17,7 @@ type BuildConfigSpecApplyConfiguration struct {
 	FailedBuildsHistoryLimit     *int32 `json:"failedBuildsHistoryLimit,omitempty"`
 }
 
-// BuildConfigSpecApplyConfiguration constructs an declarative configuration of the BuildConfigSpec type for use with
+// BuildConfigSpecApplyConfiguration constructs a declarative configuration of the BuildConfigSpec type for use with
 // apply.
 func BuildConfigSpec() *BuildConfigSpecApplyConfiguration {
 	return &BuildConfigSpecApplyConfiguration{}

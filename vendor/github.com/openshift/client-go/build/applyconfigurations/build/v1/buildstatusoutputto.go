@@ -2,13 +2,13 @@
 
 package v1
 
-// BuildStatusOutputToApplyConfiguration represents an declarative configuration of the BuildStatusOutputTo type for use
+// BuildStatusOutputToApplyConfiguration represents a declarative configuration of the BuildStatusOutputTo type for use
 // with apply.
 type BuildStatusOutputToApplyConfiguration struct {
 	ImageDigest *string `json:"imageDigest,omitempty"`
 }
 
-// BuildStatusOutputToApplyConfiguration constructs an declarative configuration of the BuildStatusOutputTo type for use with
+// BuildStatusOutputToApplyConfiguration constructs a declarative configuration of the BuildStatusOutputTo type for use with
 // apply.
 func BuildStatusOutputTo() *BuildStatusOutputToApplyConfiguration {
 	return &BuildStatusOutputToApplyConfiguration{}

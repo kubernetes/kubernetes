@@ -79,11 +79,11 @@ func TestBuildKubeletArgs(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "unix:///var/run/containerd/containerd.sock",
 				},
-				pauseImage: "registry.k8s.io/pause:3.9",
+				pauseImage: "registry.k8s.io/pause:ver",
 			},
 			expected: []kubeadmapi.Arg{
 				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
-				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:3.9"},
+				{Name: "pod-infra-container-image", Value: "registry.k8s.io/pause:ver"},
 			},
 		},
 	}

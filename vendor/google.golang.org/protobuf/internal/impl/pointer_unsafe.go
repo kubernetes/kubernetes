@@ -50,7 +50,7 @@ func pointerOfValue(v reflect.Value) pointer {
 }
 
 // pointerOfIface returns the pointer portion of an interface.
-func pointerOfIface(v interface{}) pointer {
+func pointerOfIface(v any) pointer {
 	type ifaceHeader struct {
 		Type unsafe.Pointer
 		Data unsafe.Pointer
@@ -80,7 +80,7 @@ func (p pointer) AsValueOf(t reflect.Type) reflect.Value {
 
 // AsIfaceOf treats p as a pointer to an object of type t and returns the value.
 // It is equivalent to p.AsValueOf(t).Interface()
-func (p pointer) AsIfaceOf(t reflect.Type) interface{} {
+func (p pointer) AsIfaceOf(t reflect.Type) any {
 	// TODO: Use tricky unsafe magic to directly create ifaceHeader.
 	return p.AsValueOf(t).Interface()
 }

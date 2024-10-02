@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/network/v1"
 )
 
-// EgressNetworkPolicyRuleApplyConfiguration represents an declarative configuration of the EgressNetworkPolicyRule type for use
+// EgressNetworkPolicyRuleApplyConfiguration represents a declarative configuration of the EgressNetworkPolicyRule type for use
 // with apply.
 type EgressNetworkPolicyRuleApplyConfiguration struct {
 	Type *v1.EgressNetworkPolicyRuleType            `json:"type,omitempty"`
 	To   *EgressNetworkPolicyPeerApplyConfiguration `json:"to,omitempty"`
 }
 
-// EgressNetworkPolicyRuleApplyConfiguration constructs an declarative configuration of the EgressNetworkPolicyRule type for use with
+// EgressNetworkPolicyRuleApplyConfiguration constructs a declarative configuration of the EgressNetworkPolicyRule type for use with
 // apply.
 func EgressNetworkPolicyRule() *EgressNetworkPolicyRuleApplyConfiguration {
 	return &EgressNetworkPolicyRuleApplyConfiguration{}

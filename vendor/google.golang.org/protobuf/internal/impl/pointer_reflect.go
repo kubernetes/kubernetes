@@ -16,7 +16,7 @@ import (
 const UnsafeEnabled = false
 
 // Pointer is an opaque pointer type.
-type Pointer interface{}
+type Pointer any
 
 // offset represents the offset to a struct field, accessible from a pointer.
 // The offset is the field index into a struct.
@@ -62,7 +62,7 @@ func pointerOfValue(v reflect.Value) pointer {
 }
 
 // pointerOfIface returns the pointer portion of an interface.
-func pointerOfIface(v interface{}) pointer {
+func pointerOfIface(v any) pointer {
 	return pointer{v: reflect.ValueOf(v)}
 }
 
@@ -93,7 +93,7 @@ func (p pointer) AsValueOf(t reflect.Type) reflect.Value {
 
 // AsIfaceOf treats p as a pointer to an object of type t and returns the value.
 // It is equivalent to p.AsValueOf(t).Interface()
-func (p pointer) AsIfaceOf(t reflect.Type) interface{} {
+func (p pointer) AsIfaceOf(t reflect.Type) any {
 	return p.AsValueOf(t).Interface()
 }
 

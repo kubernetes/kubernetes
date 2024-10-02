@@ -226,7 +226,7 @@ func TestPatchPodStatus(t *testing.T) {
 	}{
 		{
 			name:   "Should update pod conditions successfully",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
@@ -250,7 +250,7 @@ func TestPatchPodStatus(t *testing.T) {
 			// which would fail the 2-way merge patch generation on Pod patches
 			// due to the mergeKey being the name field
 			name:   "Should update pod conditions successfully on a pod Spec with secrets with empty name",
-			client: clientsetfake.NewSimpleClientset(),
+			client: clientsetfake.NewClientset(),
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
@@ -273,7 +273,7 @@ func TestPatchPodStatus(t *testing.T) {
 		{
 			name: "retry patch request when an 'connection refused' error is returned",
 			client: func() *clientsetfake.Clientset {
-				client := clientsetfake.NewSimpleClientset()
+				client := clientsetfake.NewClientset()
 
 				reqcount := 0
 				client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -314,7 +314,7 @@ func TestPatchPodStatus(t *testing.T) {
 		{
 			name: "only 4 retries at most",
 			client: func() *clientsetfake.Clientset {
-				client := clientsetfake.NewSimpleClientset()
+				client := clientsetfake.NewClientset()
 
 				reqcount := 0
 				client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {

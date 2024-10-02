@@ -7,7 +7,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// DockerBuildStrategyApplyConfiguration represents an declarative configuration of the DockerBuildStrategy type for use
+// DockerBuildStrategyApplyConfiguration represents a declarative configuration of the DockerBuildStrategy type for use
 // with apply.
 type DockerBuildStrategyApplyConfiguration struct {
 	From                    *v1.ObjectReference              `json:"from,omitempty"`
@@ -21,7 +21,7 @@ type DockerBuildStrategyApplyConfiguration struct {
 	Volumes                 []BuildVolumeApplyConfiguration  `json:"volumes,omitempty"`
 }
 
-// DockerBuildStrategyApplyConfiguration constructs an declarative configuration of the DockerBuildStrategy type for use with
+// DockerBuildStrategyApplyConfiguration constructs a declarative configuration of the DockerBuildStrategy type for use with
 // apply.
 func DockerBuildStrategy() *DockerBuildStrategyApplyConfiguration {
 	return &DockerBuildStrategyApplyConfiguration{}

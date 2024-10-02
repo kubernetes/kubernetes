@@ -111,7 +111,7 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *NodePorts) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
@@ -122,7 +122,7 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEventWithHint {
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
-	}
+	}, nil
 }
 
 // isSchedulableAfterPodDeleted is invoked whenever a pod deleted. It checks whether
@@ -135,7 +135,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	// If the deleted pod is unscheduled, it doesn't make the target pod schedulable.
 	if deletedPod.Spec.NodeName == "" {
-		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", pod, "deletedPod", deletedPod)
+		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return framework.QueueSkip, nil
 	}
 
@@ -159,7 +159,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	// So, deleting that pod couldn't make `pod` schedulable.
 	nodeInfo := framework.NodeInfo{UsedPorts: usedPorts}
 	if Fits(pod, &nodeInfo) {
-		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", pod, "deletedPod", deletedPod)
+		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return framework.QueueSkip, nil
 	}
 

@@ -23,7 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -200,8 +203,10 @@ func TestNewBackoffRecord(t *testing.T) {
 }
 
 func TestGetFinishedTime(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	defaultTestTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
 	defaultTestTimeMinus30s := defaultTestTime.Add(-30 * time.Second)
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	testCases := map[string]struct {
 		pod            v1.Pod
 		wantFinishTime time.Time
@@ -351,6 +356,39 @@ func TestGetFinishedTime(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: defaultTestTime},
+				},
+			},
+			wantFinishTime: defaultTestTime,
+		},
+		// In this case, init container is stopped after the regular containers.
+		// This is because with the sidecar (restartable init) containers,
+		// sidecar containers will always finish later than regular containers.
+		"Pod with sidecar container and all containers terminated": {
+			pod: v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(defaultTestTime.Add(-1 * time.Second))},
+							},
+						},
+					},
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "sidecar",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(defaultTestTime)},
+							},
+						},
+					},
 				},
 			},
 			wantFinishTime: defaultTestTime,

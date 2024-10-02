@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// IBMCloudServiceEndpointApplyConfiguration represents an declarative configuration of the IBMCloudServiceEndpoint type for use
+// IBMCloudServiceEndpointApplyConfiguration represents a declarative configuration of the IBMCloudServiceEndpoint type for use
 // with apply.
 type IBMCloudServiceEndpointApplyConfiguration struct {
 	Name *v1.IBMCloudServiceName `json:"name,omitempty"`
 	URL  *string                 `json:"url,omitempty"`
 }
 
-// IBMCloudServiceEndpointApplyConfiguration constructs an declarative configuration of the IBMCloudServiceEndpoint type for use with
+// IBMCloudServiceEndpointApplyConfiguration constructs a declarative configuration of the IBMCloudServiceEndpoint type for use with
 // apply.
 func IBMCloudServiceEndpoint() *IBMCloudServiceEndpointApplyConfiguration {
 	return &IBMCloudServiceEndpointApplyConfiguration{}

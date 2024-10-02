@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// BareMetalPlatformSpecApplyConfiguration represents an declarative configuration of the BareMetalPlatformSpec type for use
+// BareMetalPlatformSpecApplyConfiguration represents a declarative configuration of the BareMetalPlatformSpec type for use
 // with apply.
 type BareMetalPlatformSpecApplyConfiguration struct {
 	APIServerInternalIPs []v1.IP   `json:"apiServerInternalIPs,omitempty"`
@@ -14,7 +14,7 @@ type BareMetalPlatformSpecApplyConfiguration struct {
 	MachineNetworks      []v1.CIDR `json:"machineNetworks,omitempty"`
 }
 
-// BareMetalPlatformSpecApplyConfiguration constructs an declarative configuration of the BareMetalPlatformSpec type for use with
+// BareMetalPlatformSpecApplyConfiguration constructs a declarative configuration of the BareMetalPlatformSpec type for use with
 // apply.
 func BareMetalPlatformSpec() *BareMetalPlatformSpecApplyConfiguration {
 	return &BareMetalPlatformSpecApplyConfiguration{}

@@ -586,6 +586,8 @@ func TestRetryWatcherToFinishWithUnreadEvents(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	watcher.Stop()
+	// Verify a second stop does not cause a panic
+	watcher.Stop()
 
 	maxTime := time.Second
 	select {

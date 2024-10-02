@@ -27,20 +27,22 @@ var ingressesKind = v1.SchemeGroupVersion.WithKind("Ingress")
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
 func (c *FakeIngresses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Ingress, err error) {
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(ingressesResource, name), &v1.Ingress{})
+		Invokes(testing.NewRootGetActionWithOptions(ingressesResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
 func (c *FakeIngresses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.IngressList, err error) {
+	emptyResult := &v1.IngressList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(ingressesResource, ingressesKind, opts), &v1.IngressList{})
+		Invokes(testing.NewRootListActionWithOptions(ingressesResource, ingressesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeIngresses) List(ctx context.Context, opts metav1.ListOptions) (resu
 // Watch returns a watch.Interface that watches the requested ingresses.
 func (c *FakeIngresses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(ingressesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(ingressesResource, opts))
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
 func (c *FakeIngresses) Create(ctx context.Context, ingress *v1.Ingress, opts metav1.CreateOptions) (result *v1.Ingress, err error) {
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(ingressesResource, ingress), &v1.Ingress{})
+		Invokes(testing.NewRootCreateActionWithOptions(ingressesResource, ingress, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
 func (c *FakeIngresses) Update(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) (result *v1.Ingress, err error) {
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(ingressesResource, ingress), &v1.Ingress{})
+		Invokes(testing.NewRootUpdateActionWithOptions(ingressesResource, ingress, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) (*v1.Ingress, error) {
+func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1.Ingress, opts metav1.UpdateOptions) (result *v1.Ingress, err error) {
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(ingressesResource, "status", ingress), &v1.Ingress{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(ingressesResource, "status", ingress, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
@@ -102,7 +107,7 @@ func (c *FakeIngresses) Delete(ctx context.Context, name string, opts metav1.Del
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeIngresses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(ingressesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(ingressesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.IngressList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeIngresses) DeleteCollection(ctx context.Context, opts metav1.Delete
 
 // Patch applies the patch and returns the patched ingress.
 func (c *FakeIngresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Ingress, err error) {
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressesResource, name, pt, data, subresources...), &v1.Ingress{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ingressesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
@@ -131,10 +137,11 @@ func (c *FakeIngresses) Apply(ctx context.Context, ingress *configv1.IngressAppl
 	if name == nil {
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressesResource, *name, types.ApplyPatchType, data), &v1.Ingress{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ingressesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }
@@ -153,10 +160,11 @@ func (c *FakeIngresses) ApplyStatus(ctx context.Context, ingress *configv1.Ingre
 	if name == nil {
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressesResource, *name, types.ApplyPatchType, data, "status"), &v1.Ingress{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ingressesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Ingress), err
 }

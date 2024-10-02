@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// APIServerEncryptionApplyConfiguration represents an declarative configuration of the APIServerEncryption type for use
+// APIServerEncryptionApplyConfiguration represents a declarative configuration of the APIServerEncryption type for use
 // with apply.
 type APIServerEncryptionApplyConfiguration struct {
 	Type *v1.EncryptionType `json:"type,omitempty"`
 }
 
-// APIServerEncryptionApplyConfiguration constructs an declarative configuration of the APIServerEncryption type for use with
+// APIServerEncryptionApplyConfiguration constructs a declarative configuration of the APIServerEncryption type for use with
 // apply.
 func APIServerEncryption() *APIServerEncryptionApplyConfiguration {
 	return &APIServerEncryptionApplyConfiguration{}

@@ -2,14 +2,14 @@
 
 package v1
 
-// ServiceAccountRestrictionApplyConfiguration represents an declarative configuration of the ServiceAccountRestriction type for use
+// ServiceAccountRestrictionApplyConfiguration represents a declarative configuration of the ServiceAccountRestriction type for use
 // with apply.
 type ServiceAccountRestrictionApplyConfiguration struct {
 	ServiceAccounts []ServiceAccountReferenceApplyConfiguration `json:"serviceaccounts,omitempty"`
 	Namespaces      []string                                    `json:"namespaces,omitempty"`
 }
 
-// ServiceAccountRestrictionApplyConfiguration constructs an declarative configuration of the ServiceAccountRestriction type for use with
+// ServiceAccountRestrictionApplyConfiguration constructs a declarative configuration of the ServiceAccountRestriction type for use with
 // apply.
 func ServiceAccountRestriction() *ServiceAccountRestrictionApplyConfiguration {
 	return &ServiceAccountRestrictionApplyConfiguration{}

@@ -2,14 +2,14 @@
 
 package v1
 
-// EgressNetworkPolicyPeerApplyConfiguration represents an declarative configuration of the EgressNetworkPolicyPeer type for use
+// EgressNetworkPolicyPeerApplyConfiguration represents a declarative configuration of the EgressNetworkPolicyPeer type for use
 // with apply.
 type EgressNetworkPolicyPeerApplyConfiguration struct {
 	CIDRSelector *string `json:"cidrSelector,omitempty"`
 	DNSName      *string `json:"dnsName,omitempty"`
 }
 
-// EgressNetworkPolicyPeerApplyConfiguration constructs an declarative configuration of the EgressNetworkPolicyPeer type for use with
+// EgressNetworkPolicyPeerApplyConfiguration constructs a declarative configuration of the EgressNetworkPolicyPeer type for use with
 // apply.
 func EgressNetworkPolicyPeer() *EgressNetworkPolicyPeerApplyConfiguration {
 	return &EgressNetworkPolicyPeerApplyConfiguration{}

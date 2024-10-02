@@ -24,8 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -280,13 +282,20 @@ func (f FieldsV1) MarshalJSON() ([]byte, error) {
 	if f.Raw == nil {
 		return []byte("null"), nil
 	}
+	if f.getContentType() == fieldsV1InvalidOrValidCBORObject {
+		var u map[string]interface{}
+		if err := cbor.Unmarshal(f.Raw, &u); err != nil {
+			return nil, fmt.Errorf("metav1.FieldsV1 cbor invalid: %w", err)
+		}
+		return utiljson.Marshal(u)
+	}
 	return f.Raw, nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler
 func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	if f == nil {
-		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
+		return errors.New("metav1.FieldsV1: UnmarshalJSON on nil pointer")
 	}
 	if !bytes.Equal(b, []byte("null")) {
 		f.Raw = append(f.Raw[0:0], b...)
@@ -296,3 +305,75 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 
 var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
+
+func (f FieldsV1) MarshalCBOR() ([]byte, error) {
+	if f.Raw == nil {
+		return cbor.Marshal(nil)
+	}
+	if f.getContentType() == fieldsV1InvalidOrValidJSONObject {
+		var u map[string]interface{}
+		if err := utiljson.Unmarshal(f.Raw, &u); err != nil {
+			return nil, fmt.Errorf("metav1.FieldsV1 json invalid: %w", err)
+		}
+		return cbor.Marshal(u)
+	}
+	return f.Raw, nil
+}
+
+var cborNull = []byte{0xf6}
+
+func (f *FieldsV1) UnmarshalCBOR(b []byte) error {
+	if f == nil {
+		return errors.New("metav1.FieldsV1: UnmarshalCBOR on nil pointer")
+	}
+	if !bytes.Equal(b, cborNull) {
+		f.Raw = append(f.Raw[0:0], b...)
+	}
+	return nil
+}
+
+const (
+	// fieldsV1InvalidOrEmpty indicates that a FieldsV1 either contains no raw bytes or its raw
+	// bytes don't represent an allowable value in any supported encoding.
+	fieldsV1InvalidOrEmpty = iota
+
+	// fieldsV1InvalidOrValidJSONObject indicates that a FieldV1 either contains raw bytes that
+	// are a valid JSON encoding of an allowable value or don't represent an allowable value in
+	// any supported encoding.
+	fieldsV1InvalidOrValidJSONObject
+
+	// fieldsV1InvalidOrValidCBORObject indicates that a FieldV1 either contains raw bytes that
+	// are a valid CBOR encoding of an allowable value or don't represent an allowable value in
+	// any supported encoding.
+	fieldsV1InvalidOrValidCBORObject
+)
+
+// getContentType returns one of fieldsV1InvalidOrEmpty, fieldsV1InvalidOrValidJSONObject,
+// fieldsV1InvalidOrValidCBORObject based on the value of Raw.
+//
+// Raw can be encoded in JSON or CBOR and is only valid if it is empty, null, or an object (map)
+// value. It is invalid if it contains a JSON string, number, boolean, or array. If Raw is nonempty
+// and represents an allowable value, then the initial byte unambiguously distinguishes a
+// JSON-encoded value from a CBOR-encoded value.
+//
+// A valid JSON-encoded value can begin with any of the four JSON whitespace characters, the first
+// character 'n' of null, or '{' (0x09, 0x0a, 0x0d, 0x20, 0x6e, or 0x7b, respectively). A valid
+// CBOR-encoded value can begin with the null simple value, an initial byte with major type "map",
+// or, if a tag-enclosed map, an initial byte with major type "tag" (0xf6, 0xa0...0xbf, or
+// 0xc6...0xdb). The two sets of valid initial bytes don't intersect.
+func (f FieldsV1) getContentType() int {
+	if len(f.Raw) > 0 {
+		p := f.Raw[0]
+		switch p {
+		case 'n', '{', '\t', '\r', '\n', ' ':
+			return fieldsV1InvalidOrValidJSONObject
+		case 0xf6: // null
+			return fieldsV1InvalidOrValidCBORObject
+		default:
+			if p >= 0xa0 && p <= 0xbf /* map */ || p >= 0xc6 && p <= 0xdb /* tag */ {
+				return fieldsV1InvalidOrValidCBORObject
+			}
+		}
+	}
+	return fieldsV1InvalidOrEmpty
+}

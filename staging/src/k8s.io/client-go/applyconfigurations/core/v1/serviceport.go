@@ -23,7 +23,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// ServicePortApplyConfiguration represents an declarative configuration of the ServicePort type for use
+// ServicePortApplyConfiguration represents a declarative configuration of the ServicePort type for use
 // with apply.
 type ServicePortApplyConfiguration struct {
 	Name        *string             `json:"name,omitempty"`
@@ -34,7 +34,7 @@ type ServicePortApplyConfiguration struct {
 	NodePort    *int32              `json:"nodePort,omitempty"`
 }
 
-// ServicePortApplyConfiguration constructs an declarative configuration of the ServicePort type for use with
+// ServicePortApplyConfiguration constructs a declarative configuration of the ServicePort type for use with
 // apply.
 func ServicePort() *ServicePortApplyConfiguration {
 	return &ServicePortApplyConfiguration{}

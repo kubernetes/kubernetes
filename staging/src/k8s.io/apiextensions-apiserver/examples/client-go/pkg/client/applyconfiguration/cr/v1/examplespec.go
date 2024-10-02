@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ExampleSpecApplyConfiguration represents an declarative configuration of the ExampleSpec type for use
+// ExampleSpecApplyConfiguration represents a declarative configuration of the ExampleSpec type for use
 // with apply.
 type ExampleSpecApplyConfiguration struct {
 	Foo *string `json:"foo,omitempty"`
 	Bar *bool   `json:"bar,omitempty"`
 }
 
-// ExampleSpecApplyConfiguration constructs an declarative configuration of the ExampleSpec type for use with
+// ExampleSpecApplyConfiguration constructs a declarative configuration of the ExampleSpec type for use with
 // apply.
 func ExampleSpec() *ExampleSpecApplyConfiguration {
 	return &ExampleSpecApplyConfiguration{}

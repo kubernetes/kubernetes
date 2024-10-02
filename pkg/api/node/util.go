@@ -26,11 +26,14 @@ import (
 )
 
 var deprecatedNodeLabels = map[string]string{
-	`beta.kubernetes.io/arch`:                  `deprecated since v1.14; use "kubernetes.io/arch" instead`,
-	`beta.kubernetes.io/os`:                    `deprecated since v1.14; use "kubernetes.io/os" instead`,
-	`failure-domain.beta.kubernetes.io/region`: `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
-	`failure-domain.beta.kubernetes.io/zone`:   `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
-	`beta.kubernetes.io/instance-type`:         `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
+	`beta.kubernetes.io/arch`:                       `deprecated since v1.14; use "kubernetes.io/arch" instead`,
+	`beta.kubernetes.io/os`:                         `deprecated since v1.14; use "kubernetes.io/os" instead`,
+	`failure-domain.beta.kubernetes.io/region`:      `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
+	`failure-domain.beta.kubernetes.io/zone`:        `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
+	`beta.kubernetes.io/instance-type`:              `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
+	`app.kubernetes.io/created-by`:                  `deprecated since v1.9`,
+	`scheduler.alpha.kubernetes.io/preferAvoidPods`: `deprecated since v1.22; use Taints and Tolerations instead`,
+	`node-role.kubernetes.io/master`:                `use "node-role.kubernetes.io/control-plane" instead`,
 }
 
 // GetNodeLabelDeprecatedMessage returns the message for the deprecated node label

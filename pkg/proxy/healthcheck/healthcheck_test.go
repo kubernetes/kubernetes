@@ -150,7 +150,7 @@ func (fake fakeProxierHealthChecker) IsHealthy() bool {
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{}, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
 	proxyChecker := &fakeProxierHealthChecker{true}
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
@@ -465,7 +465,7 @@ type serverTest struct {
 }
 
 func TestHealthzServer(t *testing.T) {
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -500,7 +500,7 @@ func TestHealthzServer(t *testing.T) {
 }
 
 func TestLivezServer(t *testing.T) {
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -664,7 +664,7 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
-	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"}, nil)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)

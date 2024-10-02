@@ -1,0 +1,46 @@
+# NOTE: Please do NOT add any to this list!!
+#
+# We are aiming to consolidate on: registry.k8s.io/e2e-test-images/agnhost
+# The sources for which are in test/images/agnhost.
+# If agnhost is missing functionality for your tests, please reach out to SIG Testing.
+gcr.io/authenticated-image-pulling/alpine
+gcr.io/authenticated-image-pulling/windows-nanoserver
+gcr.io/k8s-authenticated-test/agnhost
+invalid.registry.k8s.io/invalid/alpine
+registry.k8s.io/build-image/distroless-iptables
+registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver
+registry.k8s.io/e2e-test-images/agnhost
+registry.k8s.io/e2e-test-images/apparmor-loader
+registry.k8s.io/e2e-test-images/busybox
+registry.k8s.io/e2e-test-images/cuda-vector-add
+registry.k8s.io/e2e-test-images/httpd
+registry.k8s.io/e2e-test-images/ipc-utils
+registry.k8s.io/e2e-test-images/jessie-dnsutils
+registry.k8s.io/e2e-test-images/kitten
+registry.k8s.io/e2e-test-images/nautilus
+registry.k8s.io/e2e-test-images/nginx
+registry.k8s.io/e2e-test-images/node-perf/npb-ep
+registry.k8s.io/e2e-test-images/node-perf/npb-is
+registry.k8s.io/e2e-test-images/node-perf/tf-wide-deep
+registry.k8s.io/e2e-test-images/nonewprivs
+registry.k8s.io/e2e-test-images/nonroot
+registry.k8s.io/e2e-test-images/perl
+registry.k8s.io/e2e-test-images/redis
+registry.k8s.io/e2e-test-images/regression-issue-74839
+registry.k8s.io/e2e-test-images/resource-consumer
+registry.k8s.io/e2e-test-images/sample-apiserver
+registry.k8s.io/e2e-test-images/volume/iscsi
+registry.k8s.io/e2e-test-images/volume/nfs
+registry.k8s.io/etcd
+registry.k8s.io/pause
+registry.k8s.io/sig-storage/csi-attacher
+registry.k8s.io/sig-storage/csi-external-health-monitor-controller
+registry.k8s.io/sig-storage/csi-node-driver-registrar
+registry.k8s.io/sig-storage/csi-provisioner
+registry.k8s.io/sig-storage/csi-resizer
+registry.k8s.io/sig-storage/csi-snapshotter
+registry.k8s.io/sig-storage/hello-populator
+registry.k8s.io/sig-storage/hostpathplugin
+registry.k8s.io/sig-storage/livenessprobe
+registry.k8s.io/sig-storage/nfs-provisioner
+registry.k8s.io/sig-storage/volume-data-source-validator

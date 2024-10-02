@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// WeightedPodAffinityTermApplyConfiguration represents an declarative configuration of the WeightedPodAffinityTerm type for use
+// WeightedPodAffinityTermApplyConfiguration represents a declarative configuration of the WeightedPodAffinityTerm type for use
 // with apply.
 type WeightedPodAffinityTermApplyConfiguration struct {
 	Weight          *int32                             `json:"weight,omitempty"`
 	PodAffinityTerm *PodAffinityTermApplyConfiguration `json:"podAffinityTerm,omitempty"`
 }
 
-// WeightedPodAffinityTermApplyConfiguration constructs an declarative configuration of the WeightedPodAffinityTerm type for use with
+// WeightedPodAffinityTermApplyConfiguration constructs a declarative configuration of the WeightedPodAffinityTerm type for use with
 // apply.
 func WeightedPodAffinityTerm() *WeightedPodAffinityTermApplyConfiguration {
 	return &WeightedPodAffinityTermApplyConfiguration{}

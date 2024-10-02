@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1beta1
 
-// ForZoneApplyConfiguration represents an declarative configuration of the ForZone type for use
+// ForZoneApplyConfiguration represents a declarative configuration of the ForZone type for use
 // with apply.
 type ForZoneApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// ForZoneApplyConfiguration constructs an declarative configuration of the ForZone type for use with
+// ForZoneApplyConfiguration constructs a declarative configuration of the ForZone type for use with
 // apply.
 func ForZone() *ForZoneApplyConfiguration {
 	return &ForZoneApplyConfiguration{}

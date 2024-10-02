@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// CustomFeatureGatesApplyConfiguration represents an declarative configuration of the CustomFeatureGates type for use
+// CustomFeatureGatesApplyConfiguration represents a declarative configuration of the CustomFeatureGates type for use
 // with apply.
 type CustomFeatureGatesApplyConfiguration struct {
 	Enabled  []v1.FeatureGateName `json:"enabled,omitempty"`
 	Disabled []v1.FeatureGateName `json:"disabled,omitempty"`
 }
 
-// CustomFeatureGatesApplyConfiguration constructs an declarative configuration of the CustomFeatureGates type for use with
+// CustomFeatureGatesApplyConfiguration constructs a declarative configuration of the CustomFeatureGates type for use with
 // apply.
 func CustomFeatureGates() *CustomFeatureGatesApplyConfiguration {
 	return &CustomFeatureGatesApplyConfiguration{}

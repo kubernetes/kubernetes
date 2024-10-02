@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// FeatureGateApplyConfiguration represents an declarative configuration of the FeatureGate type for use
+// FeatureGateApplyConfiguration represents a declarative configuration of the FeatureGate type for use
 // with apply.
 type FeatureGateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type FeatureGateApplyConfiguration struct {
 	Status                           *FeatureGateStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// FeatureGate constructs an declarative configuration of the FeatureGate type for use with
+// FeatureGate constructs a declarative configuration of the FeatureGate type for use with
 // apply.
 func FeatureGate(name string) *FeatureGateApplyConfiguration {
 	b := &FeatureGateApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *FeatureGateApplyConfiguration) WithSpec(value *FeatureGateSpecApplyConf
 func (b *FeatureGateApplyConfiguration) WithStatus(value *FeatureGateStatusApplyConfiguration) *FeatureGateApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *FeatureGateApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

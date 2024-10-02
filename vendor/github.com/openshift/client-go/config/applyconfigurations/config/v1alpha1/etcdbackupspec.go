@@ -2,7 +2,7 @@
 
 package v1alpha1
 
-// EtcdBackupSpecApplyConfiguration represents an declarative configuration of the EtcdBackupSpec type for use
+// EtcdBackupSpecApplyConfiguration represents a declarative configuration of the EtcdBackupSpec type for use
 // with apply.
 type EtcdBackupSpecApplyConfiguration struct {
 	Schedule        *string                            `json:"schedule,omitempty"`
@@ -11,7 +11,7 @@ type EtcdBackupSpecApplyConfiguration struct {
 	PVCName         *string                            `json:"pvcName,omitempty"`
 }
 
-// EtcdBackupSpecApplyConfiguration constructs an declarative configuration of the EtcdBackupSpec type for use with
+// EtcdBackupSpecApplyConfiguration constructs a declarative configuration of the EtcdBackupSpec type for use with
 // apply.
 func EtcdBackupSpec() *EtcdBackupSpecApplyConfiguration {
 	return &EtcdBackupSpecApplyConfiguration{}

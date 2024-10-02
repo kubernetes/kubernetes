@@ -2,7 +2,7 @@
 
 package v1
 
-// ObjectReferenceApplyConfiguration represents an declarative configuration of the ObjectReference type for use
+// ObjectReferenceApplyConfiguration represents a declarative configuration of the ObjectReference type for use
 // with apply.
 type ObjectReferenceApplyConfiguration struct {
 	Group     *string `json:"group,omitempty"`
@@ -11,7 +11,7 @@ type ObjectReferenceApplyConfiguration struct {
 	Name      *string `json:"name,omitempty"`
 }
 
-// ObjectReferenceApplyConfiguration constructs an declarative configuration of the ObjectReference type for use with
+// ObjectReferenceApplyConfiguration constructs a declarative configuration of the ObjectReference type for use with
 // apply.
 func ObjectReference() *ObjectReferenceApplyConfiguration {
 	return &ObjectReferenceApplyConfiguration{}

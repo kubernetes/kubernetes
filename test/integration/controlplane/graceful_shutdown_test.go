@@ -30,7 +30,7 @@ import (
 )
 
 func TestGracefulShutdown(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	tearDownOnce := sync.Once{}
 	defer tearDownOnce.Do(server.TearDownFn)

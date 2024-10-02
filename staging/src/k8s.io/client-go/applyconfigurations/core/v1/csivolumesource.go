@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// CSIVolumeSourceApplyConfiguration represents an declarative configuration of the CSIVolumeSource type for use
+// CSIVolumeSourceApplyConfiguration represents a declarative configuration of the CSIVolumeSource type for use
 // with apply.
 type CSIVolumeSourceApplyConfiguration struct {
 	Driver               *string                                 `json:"driver,omitempty"`
@@ -28,7 +28,7 @@ type CSIVolumeSourceApplyConfiguration struct {
 	NodePublishSecretRef *LocalObjectReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty"`
 }
 
-// CSIVolumeSourceApplyConfiguration constructs an declarative configuration of the CSIVolumeSource type for use with
+// CSIVolumeSourceApplyConfiguration constructs a declarative configuration of the CSIVolumeSource type for use with
 // apply.
 func CSIVolumeSource() *CSIVolumeSourceApplyConfiguration {
 	return &CSIVolumeSourceApplyConfiguration{}

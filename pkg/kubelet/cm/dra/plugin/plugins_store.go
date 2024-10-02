@@ -17,15 +17,14 @@ limitations under the License.
 package plugin
 
 import (
+	"errors"
 	"sync"
-
-	"k8s.io/klog/v2"
 )
 
 // PluginsStore holds a list of DRA Plugins.
 type pluginsStore struct {
 	sync.RWMutex
-	store map[string]*plugin
+	store map[string]*Plugin
 }
 
 // draPlugins map keeps track of all registered DRA plugins on the node
@@ -34,7 +33,7 @@ var draPlugins = &pluginsStore{}
 
 // Get lets you retrieve a DRA Plugin by name.
 // This method is protected by a mutex.
-func (s *pluginsStore) get(pluginName string) *plugin {
+func (s *pluginsStore) get(pluginName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -43,26 +42,33 @@ func (s *pluginsStore) get(pluginName string) *plugin {
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
 // This method is protected by a mutex.
-func (s *pluginsStore) add(pluginName string, p *plugin) {
+func (s *pluginsStore) add(pluginName string, p *Plugin) (replaced bool) {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.store == nil {
-		s.store = make(map[string]*plugin)
+		s.store = make(map[string]*Plugin)
 	}
 
 	_, exists := s.store[pluginName]
-	if exists {
-		klog.V(1).InfoS(log("plugin: %s already registered, previous plugin will be overridden", pluginName))
-	}
 	s.store[pluginName] = p
+	return exists
 }
 
 // Delete lets you delete a DRA Plugin by name.
 // This method is protected by a mutex.
-func (s *pluginsStore) delete(pluginName string) {
+func (s *pluginsStore) delete(pluginName string) *Plugin {
 	s.Lock()
 	defer s.Unlock()
 
+	p, exists := s.store[pluginName]
+	if !exists {
+		return nil
+	}
+	if p.cancel != nil {
+		p.cancel(errors.New("plugin got removed"))
+	}
 	delete(s.store, pluginName)
+
+	return p
 }

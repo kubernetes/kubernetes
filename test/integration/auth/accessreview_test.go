@@ -62,9 +62,9 @@ func TestSubjectAccessReview(t *testing.T) {
 	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
 		},
 	})
 	defer tearDownFn()
@@ -172,9 +172,9 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(authenticatorFunc)
-			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(authenticatorFunc)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
 		},
 	})
 	defer tearDownFn()
@@ -256,9 +256,9 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
 		},
 	})
 	defer tearDownFn()

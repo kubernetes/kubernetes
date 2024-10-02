@@ -6,14 +6,14 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// ClusterImagePolicySpecApplyConfiguration represents an declarative configuration of the ClusterImagePolicySpec type for use
+// ClusterImagePolicySpecApplyConfiguration represents a declarative configuration of the ClusterImagePolicySpec type for use
 // with apply.
 type ClusterImagePolicySpecApplyConfiguration struct {
 	Scopes []v1alpha1.ImageScope     `json:"scopes,omitempty"`
 	Policy *PolicyApplyConfiguration `json:"policy,omitempty"`
 }
 
-// ClusterImagePolicySpecApplyConfiguration constructs an declarative configuration of the ClusterImagePolicySpec type for use with
+// ClusterImagePolicySpecApplyConfiguration constructs a declarative configuration of the ClusterImagePolicySpec type for use with
 // apply.
 func ClusterImagePolicySpec() *ClusterImagePolicySpecApplyConfiguration {
 	return &ClusterImagePolicySpecApplyConfiguration{}

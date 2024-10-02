@@ -2,7 +2,7 @@
 
 package v1
 
-// GCPPlatformStatusApplyConfiguration represents an declarative configuration of the GCPPlatformStatus type for use
+// GCPPlatformStatusApplyConfiguration represents a declarative configuration of the GCPPlatformStatus type for use
 // with apply.
 type GCPPlatformStatusApplyConfiguration struct {
 	ProjectID               *string                                    `json:"projectID,omitempty"`
@@ -12,7 +12,7 @@ type GCPPlatformStatusApplyConfiguration struct {
 	CloudLoadBalancerConfig *CloudLoadBalancerConfigApplyConfiguration `json:"cloudLoadBalancerConfig,omitempty"`
 }
 
-// GCPPlatformStatusApplyConfiguration constructs an declarative configuration of the GCPPlatformStatus type for use with
+// GCPPlatformStatusApplyConfiguration constructs a declarative configuration of the GCPPlatformStatus type for use with
 // apply.
 func GCPPlatformStatus() *GCPPlatformStatusApplyConfiguration {
 	return &GCPPlatformStatusApplyConfiguration{}

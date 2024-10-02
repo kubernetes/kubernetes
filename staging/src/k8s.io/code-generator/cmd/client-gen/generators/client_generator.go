@@ -405,7 +405,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		targetForScheme(args, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
 	if args.FakeClient {
 		targetList = append(targetList,
-			fake.TargetForClientset(args, clientsetDir, clientsetPkg, groupGoNames, boilerplate))
+			fake.TargetForClientset(args, clientsetDir, clientsetPkg, args.ApplyConfigurationPackage, groupGoNames, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.

@@ -97,6 +97,7 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewPreflightPhase())
 	nodeRunner.AppendPhase(phases.NewControlPlane())
+	nodeRunner.AppendPhase(phases.NewKubeconfigPhase())
 	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
 
 	// sets the data builder function, that will be used by the runner
@@ -180,11 +181,11 @@ func newNodeData(cmd *cobra.Command, args []string, nodeOptions *nodeOptions, ou
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(nodeOptions.ignorePreflightErrors, initCfg.NodeRegistration.IgnorePreflightErrors)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(nodeOptions.ignorePreflightErrors, upgradeCfg.Node.IgnorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}
-	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 	initCfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	var patchesDir string

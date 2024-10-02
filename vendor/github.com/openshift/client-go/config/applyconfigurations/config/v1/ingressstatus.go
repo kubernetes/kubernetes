@@ -6,14 +6,14 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// IngressStatusApplyConfiguration represents an declarative configuration of the IngressStatus type for use
+// IngressStatusApplyConfiguration represents a declarative configuration of the IngressStatus type for use
 // with apply.
 type IngressStatusApplyConfiguration struct {
 	ComponentRoutes  []ComponentRouteStatusApplyConfiguration `json:"componentRoutes,omitempty"`
 	DefaultPlacement *configv1.DefaultPlacement               `json:"defaultPlacement,omitempty"`
 }
 
-// IngressStatusApplyConfiguration constructs an declarative configuration of the IngressStatus type for use with
+// IngressStatusApplyConfiguration constructs a declarative configuration of the IngressStatus type for use with
 // apply.
 func IngressStatus() *IngressStatusApplyConfiguration {
 	return &IngressStatusApplyConfiguration{}

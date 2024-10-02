@@ -41,7 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	"k8s.io/apiserver/pkg/server/routine"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -285,7 +285,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			}
 
 			// Run watch serving in a separate goroutine to allow freeing current stack memory
-			t := genericfilters.TaskFrom(req.Context())
+			t := routine.TaskFrom(req.Context())
 			if t != nil {
 				t.Func = serve
 			} else {

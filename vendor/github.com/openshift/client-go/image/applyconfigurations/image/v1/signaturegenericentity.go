@@ -2,14 +2,14 @@
 
 package v1
 
-// SignatureGenericEntityApplyConfiguration represents an declarative configuration of the SignatureGenericEntity type for use
+// SignatureGenericEntityApplyConfiguration represents a declarative configuration of the SignatureGenericEntity type for use
 // with apply.
 type SignatureGenericEntityApplyConfiguration struct {
 	Organization *string `json:"organization,omitempty"`
 	CommonName   *string `json:"commonName,omitempty"`
 }
 
-// SignatureGenericEntityApplyConfiguration constructs an declarative configuration of the SignatureGenericEntity type for use with
+// SignatureGenericEntityApplyConfiguration constructs a declarative configuration of the SignatureGenericEntity type for use with
 // apply.
 func SignatureGenericEntity() *SignatureGenericEntityApplyConfiguration {
 	return &SignatureGenericEntityApplyConfiguration{}

@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha1
 
-// ServiceCIDRSpecApplyConfiguration represents an declarative configuration of the ServiceCIDRSpec type for use
+// ServiceCIDRSpecApplyConfiguration represents a declarative configuration of the ServiceCIDRSpec type for use
 // with apply.
 type ServiceCIDRSpecApplyConfiguration struct {
 	CIDRs []string `json:"cidrs,omitempty"`
 }
 
-// ServiceCIDRSpecApplyConfiguration constructs an declarative configuration of the ServiceCIDRSpec type for use with
+// ServiceCIDRSpecApplyConfiguration constructs a declarative configuration of the ServiceCIDRSpec type for use with
 // apply.
 func ServiceCIDRSpec() *ServiceCIDRSpecApplyConfiguration {
 	return &ServiceCIDRSpecApplyConfiguration{}

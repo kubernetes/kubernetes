@@ -297,8 +297,8 @@ type Controller struct {
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
 
-	nodeUpdateQueue workqueue.Interface
-	podUpdateQueue  workqueue.RateLimitingInterface
+	nodeUpdateQueue workqueue.TypedInterface[string]
+	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
 
 // NewNodeLifecycleController returns a new taint controller.
@@ -344,8 +344,13 @@ func NewNodeLifecycleController(
 		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
-		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
-		podUpdateQueue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_lifecycle_controller_pods"),
+		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
+		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
+			workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
+				Name: "node_lifecycle_controller_pods",
+			},
+		),
 	}
 
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
@@ -515,7 +520,7 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 		if shutdown {
 			return
 		}
-		nodeName := obj.(string)
+		nodeName := obj
 		if err := nc.doNoScheduleTaintingPass(ctx, nodeName); err != nil {
 			logger.Error(err, "Failed to taint NoSchedule on node, requeue it", "node", klog.KRef("", nodeName))
 			// TODO(k82cn): Add nodeName back to the queue
@@ -1096,7 +1101,7 @@ func (nc *Controller) doPodProcessingWorker(ctx context.Context) {
 			return
 		}
 
-		podItem := obj.(podUpdateItem)
+		podItem := obj
 		nc.processPod(ctx, podItem)
 	}
 }

@@ -2,7 +2,7 @@
 
 package v1
 
-// NetworkSpecApplyConfiguration represents an declarative configuration of the NetworkSpec type for use
+// NetworkSpecApplyConfiguration represents a declarative configuration of the NetworkSpec type for use
 // with apply.
 type NetworkSpecApplyConfiguration struct {
 	ClusterNetwork       []ClusterNetworkEntryApplyConfiguration `json:"clusterNetwork,omitempty"`
@@ -13,7 +13,7 @@ type NetworkSpecApplyConfiguration struct {
 	NetworkDiagnostics   *NetworkDiagnosticsApplyConfiguration   `json:"networkDiagnostics,omitempty"`
 }
 
-// NetworkSpecApplyConfiguration constructs an declarative configuration of the NetworkSpec type for use with
+// NetworkSpecApplyConfiguration constructs a declarative configuration of the NetworkSpec type for use with
 // apply.
 func NetworkSpec() *NetworkSpecApplyConfiguration {
 	return &NetworkSpecApplyConfiguration{}

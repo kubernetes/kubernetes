@@ -89,7 +89,7 @@ func TestPreScoreSkip(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))
@@ -576,7 +576,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(ctx, nil, nil,
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))

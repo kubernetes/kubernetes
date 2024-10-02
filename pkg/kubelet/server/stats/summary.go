@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -source=summary.go -destination=testing/mock_summary_provider.go -package=testing SummaryProvider
+//go:generate mockery
 package stats
 
 import (

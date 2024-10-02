@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -35,11 +35,11 @@ const (
 	defaultIPv6CIDR = "2001:db8::/64"
 )
 
-func newController(t *testing.T, objects []*networkingapiv1alpha1.ServiceCIDR) (*fake.Clientset, *Controller) {
+func newController(t *testing.T, objects []*networkingapiv1beta1.ServiceCIDR) (*fake.Clientset, *Controller) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	serviceCIDRInformer := informerFactory.Networking().V1alpha1().ServiceCIDRs()
+	serviceCIDRInformer := informerFactory.Networking().V1beta1().ServiceCIDRs()
 
 	store := serviceCIDRInformer.Informer().GetStore()
 	for _, obj := range objects {
@@ -64,7 +64,7 @@ func newController(t *testing.T, objects []*networkingapiv1alpha1.ServiceCIDR) (
 func TestControllerSync(t *testing.T) {
 	testCases := []struct {
 		name    string
-		cidrs   []*networkingapiv1alpha1.ServiceCIDR
+		cidrs   []*networkingapiv1beta1.ServiceCIDR
 		actions [][]string // verb and resource
 	}{
 		{
@@ -73,12 +73,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR update Ready condition",
-			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+			cidrs: []*networkingapiv1beta1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
+					Spec: networkingapiv1beta1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
@@ -87,12 +87,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR not matching cidrs",
-			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+			cidrs: []*networkingapiv1beta1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
+					Spec: networkingapiv1beta1.ServiceCIDRSpec{
 						CIDRs: []string{"fd00::/112"},
 					},
 				},
@@ -100,18 +100,18 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR not ready",
-			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+			cidrs: []*networkingapiv1beta1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: DefaultServiceCIDRName,
 					},
-					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
+					Spec: networkingapiv1beta1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
-					Status: networkingapiv1alpha1.ServiceCIDRStatus{
+					Status: networkingapiv1beta1.ServiceCIDRStatus{
 						Conditions: []metav1.Condition{
 							{
-								Type:   string(networkingapiv1alpha1.ServiceCIDRConditionReady),
+								Type:   string(networkingapiv1beta1.ServiceCIDRConditionReady),
 								Status: metav1.ConditionFalse,
 							},
 						},
@@ -121,13 +121,13 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing default service CIDR being deleted",
-			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+			cidrs: []*networkingapiv1beta1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              DefaultServiceCIDRName,
 						DeletionTimestamp: ptr.To(metav1.Now()),
 					},
-					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
+					Spec: networkingapiv1beta1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},
@@ -135,12 +135,12 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "existing service CIDRs but not default",
-			cidrs: []*networkingapiv1alpha1.ServiceCIDR{
+			cidrs: []*networkingapiv1beta1.ServiceCIDR{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "non-default-cidr",
 					},
-					Spec: networkingapiv1alpha1.ServiceCIDRSpec{
+					Spec: networkingapiv1beta1.ServiceCIDRSpec{
 						CIDRs: []string{defaultIPv4CIDR, defaultIPv6CIDR},
 					},
 				},

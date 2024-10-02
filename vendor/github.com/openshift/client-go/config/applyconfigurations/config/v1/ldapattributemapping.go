@@ -2,7 +2,7 @@
 
 package v1
 
-// LDAPAttributeMappingApplyConfiguration represents an declarative configuration of the LDAPAttributeMapping type for use
+// LDAPAttributeMappingApplyConfiguration represents a declarative configuration of the LDAPAttributeMapping type for use
 // with apply.
 type LDAPAttributeMappingApplyConfiguration struct {
 	ID                []string `json:"id,omitempty"`
@@ -11,7 +11,7 @@ type LDAPAttributeMappingApplyConfiguration struct {
 	Email             []string `json:"email,omitempty"`
 }
 
-// LDAPAttributeMappingApplyConfiguration constructs an declarative configuration of the LDAPAttributeMapping type for use with
+// LDAPAttributeMappingApplyConfiguration constructs a declarative configuration of the LDAPAttributeMapping type for use with
 // apply.
 func LDAPAttributeMapping() *LDAPAttributeMappingApplyConfiguration {
 	return &LDAPAttributeMappingApplyConfiguration{}

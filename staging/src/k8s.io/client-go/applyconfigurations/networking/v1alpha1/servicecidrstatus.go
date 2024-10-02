@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceCIDRStatusApplyConfiguration represents an declarative configuration of the ServiceCIDRStatus type for use
+// ServiceCIDRStatusApplyConfiguration represents a declarative configuration of the ServiceCIDRStatus type for use
 // with apply.
 type ServiceCIDRStatusApplyConfiguration struct {
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ServiceCIDRStatusApplyConfiguration constructs an declarative configuration of the ServiceCIDRStatus type for use with
+// ServiceCIDRStatusApplyConfiguration constructs a declarative configuration of the ServiceCIDRStatus type for use with
 // apply.
 func ServiceCIDRStatus() *ServiceCIDRStatusApplyConfiguration {
 	return &ServiceCIDRStatusApplyConfiguration{}

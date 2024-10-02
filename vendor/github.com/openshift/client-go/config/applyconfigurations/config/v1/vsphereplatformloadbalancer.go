@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// VSpherePlatformLoadBalancerApplyConfiguration represents an declarative configuration of the VSpherePlatformLoadBalancer type for use
+// VSpherePlatformLoadBalancerApplyConfiguration represents a declarative configuration of the VSpherePlatformLoadBalancer type for use
 // with apply.
 type VSpherePlatformLoadBalancerApplyConfiguration struct {
 	Type *v1.PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
-// VSpherePlatformLoadBalancerApplyConfiguration constructs an declarative configuration of the VSpherePlatformLoadBalancer type for use with
+// VSpherePlatformLoadBalancerApplyConfiguration constructs a declarative configuration of the VSpherePlatformLoadBalancer type for use with
 // apply.
 func VSpherePlatformLoadBalancer() *VSpherePlatformLoadBalancerApplyConfiguration {
 	return &VSpherePlatformLoadBalancerApplyConfiguration{}

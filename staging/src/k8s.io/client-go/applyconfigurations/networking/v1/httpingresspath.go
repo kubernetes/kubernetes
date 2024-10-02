@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/networking/v1"
 )
 
-// HTTPIngressPathApplyConfiguration represents an declarative configuration of the HTTPIngressPath type for use
+// HTTPIngressPathApplyConfiguration represents a declarative configuration of the HTTPIngressPath type for use
 // with apply.
 type HTTPIngressPathApplyConfiguration struct {
 	Path     *string                           `json:"path,omitempty"`
@@ -30,7 +30,7 @@ type HTTPIngressPathApplyConfiguration struct {
 	Backend  *IngressBackendApplyConfiguration `json:"backend,omitempty"`
 }
 
-// HTTPIngressPathApplyConfiguration constructs an declarative configuration of the HTTPIngressPath type for use with
+// HTTPIngressPathApplyConfiguration constructs a declarative configuration of the HTTPIngressPath type for use with
 // apply.
 func HTTPIngressPath() *HTTPIngressPathApplyConfiguration {
 	return &HTTPIngressPathApplyConfiguration{}

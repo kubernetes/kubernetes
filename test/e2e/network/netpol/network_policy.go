@@ -893,7 +893,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		f.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol", feature.NetworkPolicy, feature.UDP, func(ctx context.Context) {
+		f.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol", feature.NetworkPolicy, func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP, protocolUDP}
 			ports := []int32{80}
 			k8s = initializeResources(ctx, f, protocols, ports)

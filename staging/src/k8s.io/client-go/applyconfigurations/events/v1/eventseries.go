@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EventSeriesApplyConfiguration represents an declarative configuration of the EventSeries type for use
+// EventSeriesApplyConfiguration represents a declarative configuration of the EventSeries type for use
 // with apply.
 type EventSeriesApplyConfiguration struct {
 	Count            *int32        `json:"count,omitempty"`
 	LastObservedTime *v1.MicroTime `json:"lastObservedTime,omitempty"`
 }
 
-// EventSeriesApplyConfiguration constructs an declarative configuration of the EventSeries type for use with
+// EventSeriesApplyConfiguration constructs a declarative configuration of the EventSeries type for use with
 // apply.
 func EventSeries() *EventSeriesApplyConfiguration {
 	return &EventSeriesApplyConfiguration{}

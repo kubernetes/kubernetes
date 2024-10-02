@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 /*
 Package metric provides the OpenTelemetry API used to measure metrics about
@@ -67,6 +56,23 @@ asynchronous measurement, a Gauge ([Int64ObservableGauge] and
 
 See the [OpenTelemetry documentation] for more information about instruments
 and their intended use.
+
+# Instrument Name
+
+OpenTelemetry defines an [instrument name syntax] that restricts what
+instrument names are allowed.
+
+Instrument names should ...
+
+  - Not be empty.
+  - Have an alphabetic character as their first letter.
+  - Have any letter after the first be an alphanumeric character, ‘_’, ‘.’,
+    ‘-’, or ‘/’.
+  - Have a maximum length of 255 letters.
+
+To ensure compatibility with observability platforms, all instruments created
+need to conform to this syntax. Not all implementations of the API will validate
+these names, it is the callers responsibility to ensure compliance.
 
 # Measurements
 
@@ -149,7 +155,7 @@ of [go.opentelemetry.io/otel/metric].
 
 Finally, an author can embed another implementation in theirs. The embedded
 implementation will be used for methods not defined by the author. For example,
-an author who want to default to silently dropping the call can use
+an author who wants to default to silently dropping the call can use
 [go.opentelemetry.io/otel/metric/noop]:
 
 	import "go.opentelemetry.io/otel/metric/noop"
@@ -164,6 +170,7 @@ It is strongly recommended that authors only embed
 That implementation is the only one OpenTelemetry authors can guarantee will
 fully implement all the API interfaces when a user updates their API.
 
+[instrument name syntax]: https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument-name-syntax
 [OpenTelemetry documentation]: https://opentelemetry.io/docs/concepts/signals/metrics/
 [GetMeterProvider]: https://pkg.go.dev/go.opentelemetry.io/otel#GetMeterProvider
 */

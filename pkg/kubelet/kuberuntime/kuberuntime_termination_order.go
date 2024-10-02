@@ -56,7 +56,8 @@ func newTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *termin
 		to.terminated[c.Name] = channel
 		mainContainerChannels = append(mainContainerChannels, channel)
 
-		// if its not a running container, pre-close the channel so nothing waits on it
+		// if it's not a running container, pre-close the channel so nothing
+		// waits on it
 		if _, isRunning := runningContainers[c.Name]; !isRunning {
 			close(channel)
 		}
@@ -67,7 +68,14 @@ func newTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *termin
 		// get the init containers in reverse order
 		ic := pod.Spec.InitContainers[len(pod.Spec.InitContainers)-i-1]
 
-		to.terminated[ic.Name] = make(chan struct{})
+		channel := make(chan struct{})
+		to.terminated[ic.Name] = channel
+
+		// if it's not a running container, pre-close the channel so nothing
+		// waits on it
+		if _, isRunning := runningContainers[ic.Name]; !isRunning {
+			close(channel)
+		}
 
 		if types.IsRestartableInitContainer(&ic) {
 			// sidecars need to wait for all main containers to exit

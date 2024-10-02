@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// DeploymentStatusApplyConfiguration represents an declarative configuration of the DeploymentStatus type for use
+// DeploymentStatusApplyConfiguration represents a declarative configuration of the DeploymentStatus type for use
 // with apply.
 type DeploymentStatusApplyConfiguration struct {
 	ObservedGeneration  *int64                                  `json:"observedGeneration,omitempty"`
@@ -31,7 +31,7 @@ type DeploymentStatusApplyConfiguration struct {
 	CollisionCount      *int32                                  `json:"collisionCount,omitempty"`
 }
 
-// DeploymentStatusApplyConfiguration constructs an declarative configuration of the DeploymentStatus type for use with
+// DeploymentStatusApplyConfiguration constructs a declarative configuration of the DeploymentStatus type for use with
 // apply.
 func DeploymentStatus() *DeploymentStatusApplyConfiguration {
 	return &DeploymentStatusApplyConfiguration{}

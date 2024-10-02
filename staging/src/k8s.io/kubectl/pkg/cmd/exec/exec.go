@@ -147,7 +147,9 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		if err != nil {
 			return nil, err
 		}
-		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, httpstream.IsUpgradeFailure)
+		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -200,17 +202,8 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	}
 	if argsLenAtDash > -1 {
 		p.Command = argsIn[argsLenAtDash:]
-	} else if len(argsIn) > 1 {
-		if !p.Quiet {
-			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
-		}
-		p.Command = argsIn[1:]
-	} else if len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0 {
-		if !p.Quiet {
-			fmt.Fprint(p.ErrOut, "kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl exec [POD] -- [COMMAND] instead.\n")
-		}
-		p.Command = argsIn[0:]
-		p.ResourceName = ""
+	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
+		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
 	}
 
 	var err error

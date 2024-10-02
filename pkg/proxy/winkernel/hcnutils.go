@@ -20,7 +20,6 @@ limitations under the License.
 package winkernel
 
 import (
-	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	"k8s.io/klog/v2"
 )
@@ -41,6 +40,7 @@ type HcnService interface {
 	ListLoadBalancers() ([]hcn.HostComputeLoadBalancer, error)
 	GetLoadBalancerByID(loadBalancerId string) (*hcn.HostComputeLoadBalancer, error)
 	CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error)
+	UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer, hnsID string) (*hcn.HostComputeLoadBalancer, error)
 	DeleteLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) error
 	// Features functions
 	GetSupportedFeatures() hcn.SupportedFeatures
@@ -104,6 +104,10 @@ func (hcnObj hcnImpl) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalanc
 	return loadBalancer.Create()
 }
 
+func (hcnObj hcnImpl) UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer, hnsID string) (*hcn.HostComputeLoadBalancer, error) {
+	return loadBalancer.Update(hnsID)
+}
+
 func (hcnObj hcnImpl) DeleteLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) error {
 	return loadBalancer.Delete()
 }
@@ -121,15 +125,16 @@ func (hcnObj hcnImpl) DsrSupported() error {
 }
 
 func (hcnObj hcnImpl) DeleteAllHnsLoadBalancerPolicy() {
-	plists, err := hcsshim.HNSListPolicyListRequest()
+	lbs, err := hcnObj.ListLoadBalancers()
 	if err != nil {
+		klog.V(2).ErrorS(err, "Deleting all existing loadbalancers failed.")
 		return
 	}
-	for _, plist := range plists {
-		klog.V(3).InfoS("Remove policy", "policies", plist)
-		_, err = plist.Delete()
+	klog.V(3).InfoS("Deleting all existing loadbalancers", "lbCount", len(lbs))
+	for _, lb := range lbs {
+		err = lb.Delete()
 		if err != nil {
-			klog.ErrorS(err, "Failed to delete policy list")
+			klog.V(2).ErrorS(err, "Error deleting existing loadbalancer", "lb", lb)
 		}
 	}
 }

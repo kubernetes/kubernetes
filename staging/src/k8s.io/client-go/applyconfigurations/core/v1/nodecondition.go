@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NodeConditionApplyConfiguration represents an declarative configuration of the NodeCondition type for use
+// NodeConditionApplyConfiguration represents a declarative configuration of the NodeCondition type for use
 // with apply.
 type NodeConditionApplyConfiguration struct {
 	Type               *v1.NodeConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type NodeConditionApplyConfiguration struct {
 	Message            *string               `json:"message,omitempty"`
 }
 
-// NodeConditionApplyConfiguration constructs an declarative configuration of the NodeCondition type for use with
+// NodeConditionApplyConfiguration constructs a declarative configuration of the NodeCondition type for use with
 // apply.
 func NodeCondition() *NodeConditionApplyConfiguration {
 	return &NodeConditionApplyConfiguration{}

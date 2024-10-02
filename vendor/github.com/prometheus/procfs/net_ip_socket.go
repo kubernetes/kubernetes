@@ -50,10 +50,13 @@ type (
 		// UsedSockets shows the total number of parsed lines representing the
 		// number of used sockets.
 		UsedSockets uint64
+		// Drops shows the total number of dropped packets of all UPD sockets.
+		Drops *uint64
 	}
 
 	// netIPSocketLine represents the fields parsed from a single line
 	// in /proc/net/{t,u}dp{,6}. Fields which are not used by IPSocket are skipped.
+	// Drops is non-nil for udp{,6}, but nil for tcp{,6}.
 	// For the proc file format details, see https://linux.die.net/man/5/proc.
 	netIPSocketLine struct {
 		Sl        uint64
@@ -66,6 +69,7 @@ type (
 		RxQueue   uint64
 		UID       uint64
 		Inode     uint64
+		Drops     *uint64
 	}
 )
 
@@ -77,13 +81,14 @@ func newNetIPSocket(file string) (NetIPSocket, error) {
 	defer f.Close()
 
 	var netIPSocket NetIPSocket
+	isUDP := strings.Contains(file, "udp")
 
 	lr := io.LimitReader(f, readLimit)
 	s := bufio.NewScanner(lr)
 	s.Scan() // skip first line with headers
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
-		line, err := parseNetIPSocketLine(fields)
+		line, err := parseNetIPSocketLine(fields, isUDP)
 		if err != nil {
 			return nil, err
 		}
@@ -104,19 +109,25 @@ func newNetIPSocketSummary(file string) (*NetIPSocketSummary, error) {
 	defer f.Close()
 
 	var netIPSocketSummary NetIPSocketSummary
+	var udpPacketDrops uint64
+	isUDP := strings.Contains(file, "udp")
 
 	lr := io.LimitReader(f, readLimit)
 	s := bufio.NewScanner(lr)
 	s.Scan() // skip first line with headers
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
-		line, err := parseNetIPSocketLine(fields)
+		line, err := parseNetIPSocketLine(fields, isUDP)
 		if err != nil {
 			return nil, err
 		}
 		netIPSocketSummary.TxQueueLength += line.TxQueue
 		netIPSocketSummary.RxQueueLength += line.RxQueue
 		netIPSocketSummary.UsedSockets++
+		if isUDP {
+			udpPacketDrops += *line.Drops
+			netIPSocketSummary.Drops = &udpPacketDrops
+		}
 	}
 	if err := s.Err(); err != nil {
 		return nil, err
@@ -130,7 +141,7 @@ func parseIP(hexIP string) (net.IP, error) {
 	var byteIP []byte
 	byteIP, err := hex.DecodeString(hexIP)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse address field in socket line %q", hexIP)
+		return nil, fmt.Errorf("%w: Cannot parse socket field in %q: %w", ErrFileParse, hexIP, err)
 	}
 	switch len(byteIP) {
 	case 4:
@@ -144,16 +155,17 @@ func parseIP(hexIP string) (net.IP, error) {
 		}
 		return i, nil
 	default:
-		return nil, fmt.Errorf("Unable to parse IP %s", hexIP)
+		return nil, fmt.Errorf("%w: Unable to parse IP %s: %v", ErrFileParse, hexIP, nil)
 	}
 }
 
 // parseNetIPSocketLine parses a single line, represented by a list of fields.
-func parseNetIPSocketLine(fields []string) (*netIPSocketLine, error) {
+func parseNetIPSocketLine(fields []string, isUDP bool) (*netIPSocketLine, error) {
 	line := &netIPSocketLine{}
 	if len(fields) < 10 {
 		return nil, fmt.Errorf(
-			"cannot parse net socket line as it has less then 10 columns %q",
+			"%w: Less than 10 columns found %q",
+			ErrFileParse,
 			strings.Join(fields, " "),
 		)
 	}
@@ -162,64 +174,74 @@ func parseNetIPSocketLine(fields []string) (*netIPSocketLine, error) {
 	// sl
 	s := strings.Split(fields[0], ":")
 	if len(s) != 2 {
-		return nil, fmt.Errorf("cannot parse sl field in socket line %q", fields[0])
+		return nil, fmt.Errorf("%w: Unable to parse sl field in line %q", ErrFileParse, fields[0])
 	}
 
 	if line.Sl, err = strconv.ParseUint(s[0], 0, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse sl value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Unable to parse sl field in %q: %w", ErrFileParse, line.Sl, err)
 	}
 	// local_address
 	l := strings.Split(fields[1], ":")
 	if len(l) != 2 {
-		return nil, fmt.Errorf("cannot parse local_address field in socket line %q", fields[1])
+		return nil, fmt.Errorf("%w: Unable to parse local_address field in %q", ErrFileParse, fields[1])
 	}
 	if line.LocalAddr, err = parseIP(l[0]); err != nil {
 		return nil, err
 	}
 	if line.LocalPort, err = strconv.ParseUint(l[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse local_address port value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Unable to parse local_address port value line %q: %w", ErrFileParse, line.LocalPort, err)
 	}
 
 	// remote_address
 	r := strings.Split(fields[2], ":")
 	if len(r) != 2 {
-		return nil, fmt.Errorf("cannot parse rem_address field in socket line %q", fields[1])
+		return nil, fmt.Errorf("%w: Unable to parse rem_address field in %q", ErrFileParse, fields[1])
 	}
 	if line.RemAddr, err = parseIP(r[0]); err != nil {
 		return nil, err
 	}
 	if line.RemPort, err = strconv.ParseUint(r[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse rem_address port value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse rem_address port value in %q: %w", ErrFileParse, line.RemPort, err)
 	}
 
 	// st
 	if line.St, err = strconv.ParseUint(fields[3], 16, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse st value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse st value in %q: %w", ErrFileParse, line.St, err)
 	}
 
 	// tx_queue and rx_queue
 	q := strings.Split(fields[4], ":")
 	if len(q) != 2 {
 		return nil, fmt.Errorf(
-			"cannot parse tx/rx queues in socket line as it has a missing colon %q",
+			"%w: Missing colon for tx/rx queues in socket line %q",
+			ErrFileParse,
 			fields[4],
 		)
 	}
 	if line.TxQueue, err = strconv.ParseUint(q[0], 16, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse tx_queue value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse tx_queue value in %q: %w", ErrFileParse, line.TxQueue, err)
 	}
 	if line.RxQueue, err = strconv.ParseUint(q[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse rx_queue value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse trx_queue value in %q: %w", ErrFileParse, line.RxQueue, err)
 	}
 
 	// uid
 	if line.UID, err = strconv.ParseUint(fields[7], 0, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse uid value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse UID value in %q: %w", ErrFileParse, line.UID, err)
 	}
 
 	// inode
 	if line.Inode, err = strconv.ParseUint(fields[9], 0, 64); err != nil {
-		return nil, fmt.Errorf("cannot parse inode value in socket line: %w", err)
+		return nil, fmt.Errorf("%w: Cannot parse inode value in %q: %w", ErrFileParse, line.Inode, err)
+	}
+
+	// drops
+	if isUDP {
+		drops, err := strconv.ParseUint(fields[12], 0, 64)
+		if err != nil {
+			return nil, fmt.Errorf("%w: Cannot parse drops value in %q: %w", ErrFileParse, drops, err)
+		}
+		line.Drops = &drops
 	}
 
 	return line, nil

@@ -175,7 +175,7 @@ func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.Runt
 	}
 
 	// reject pod if Overhead is already set that differs from what is defined in RuntimeClass
-	if pod.Spec.Overhead != nil && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
+	if len(pod.Spec.Overhead) > 0 && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
 		return admission.NewForbidden(a, fmt.Errorf("pod rejected: Pod's Overhead doesn't match RuntimeClass's defined Overhead"))
 	}
 

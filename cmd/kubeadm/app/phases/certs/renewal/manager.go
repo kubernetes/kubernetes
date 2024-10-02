@@ -27,6 +27,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -248,6 +249,17 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	cfg := &pkiutil.CertConfig{
 		Config:              certConfig,
 		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
+	}
+
+	startTime := kubeadmutil.StartTimeUTC()
+
+	// Backdate certificate to allow small time jumps.
+	cfg.NotBefore = startTime.Add(-kubeadmconstants.CertificateBackdate)
+
+	// Use the validity periods defined in the ClusterConfiguration.
+	// Only use CertificateValidityPeriod as CA renewal is not supported.
+	if rm.cfg.CertificateValidityPeriod != nil {
+		cfg.NotAfter = startTime.Add(rm.cfg.CertificateValidityPeriod.Duration)
 	}
 
 	// reads the CA

@@ -2,13 +2,13 @@
 
 package v1
 
-// ImageDigestMirrorSetSpecApplyConfiguration represents an declarative configuration of the ImageDigestMirrorSetSpec type for use
+// ImageDigestMirrorSetSpecApplyConfiguration represents a declarative configuration of the ImageDigestMirrorSetSpec type for use
 // with apply.
 type ImageDigestMirrorSetSpecApplyConfiguration struct {
 	ImageDigestMirrors []ImageDigestMirrorsApplyConfiguration `json:"imageDigestMirrors,omitempty"`
 }
 
-// ImageDigestMirrorSetSpecApplyConfiguration constructs an declarative configuration of the ImageDigestMirrorSetSpec type for use with
+// ImageDigestMirrorSetSpecApplyConfiguration constructs a declarative configuration of the ImageDigestMirrorSetSpec type for use with
 // apply.
 func ImageDigestMirrorSetSpec() *ImageDigestMirrorSetSpecApplyConfiguration {
 	return &ImageDigestMirrorSetSpecApplyConfiguration{}

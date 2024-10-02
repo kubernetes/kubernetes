@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildVolumeSourceApplyConfiguration represents an declarative configuration of the BuildVolumeSource type for use
+// BuildVolumeSourceApplyConfiguration represents a declarative configuration of the BuildVolumeSource type for use
 // with apply.
 type BuildVolumeSourceApplyConfiguration struct {
 	Type      *v1.BuildVolumeSourceType     `json:"type,omitempty"`
@@ -16,7 +16,7 @@ type BuildVolumeSourceApplyConfiguration struct {
 	CSI       *corev1.CSIVolumeSource       `json:"csi,omitempty"`
 }
 
-// BuildVolumeSourceApplyConfiguration constructs an declarative configuration of the BuildVolumeSource type for use with
+// BuildVolumeSourceApplyConfiguration constructs a declarative configuration of the BuildVolumeSource type for use with
 // apply.
 func BuildVolumeSource() *BuildVolumeSourceApplyConfiguration {
 	return &BuildVolumeSourceApplyConfiguration{}

@@ -2,13 +2,13 @@
 
 package v1
 
-// EgressNetworkPolicySpecApplyConfiguration represents an declarative configuration of the EgressNetworkPolicySpec type for use
+// EgressNetworkPolicySpecApplyConfiguration represents a declarative configuration of the EgressNetworkPolicySpec type for use
 // with apply.
 type EgressNetworkPolicySpecApplyConfiguration struct {
 	Egress []EgressNetworkPolicyRuleApplyConfiguration `json:"egress,omitempty"`
 }
 
-// EgressNetworkPolicySpecApplyConfiguration constructs an declarative configuration of the EgressNetworkPolicySpec type for use with
+// EgressNetworkPolicySpecApplyConfiguration constructs a declarative configuration of the EgressNetworkPolicySpec type for use with
 // apply.
 func EgressNetworkPolicySpec() *EgressNetworkPolicySpecApplyConfiguration {
 	return &EgressNetworkPolicySpecApplyConfiguration{}

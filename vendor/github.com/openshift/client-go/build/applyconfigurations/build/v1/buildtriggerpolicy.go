@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/build/v1"
 )
 
-// BuildTriggerPolicyApplyConfiguration represents an declarative configuration of the BuildTriggerPolicy type for use
+// BuildTriggerPolicyApplyConfiguration represents a declarative configuration of the BuildTriggerPolicy type for use
 // with apply.
 type BuildTriggerPolicyApplyConfiguration struct {
 	Type             *v1.BuildTriggerType                  `json:"type,omitempty"`
@@ -17,7 +17,7 @@ type BuildTriggerPolicyApplyConfiguration struct {
 	BitbucketWebHook *WebHookTriggerApplyConfiguration     `json:"bitbucket,omitempty"`
 }
 
-// BuildTriggerPolicyApplyConfiguration constructs an declarative configuration of the BuildTriggerPolicy type for use with
+// BuildTriggerPolicyApplyConfiguration constructs a declarative configuration of the BuildTriggerPolicy type for use with
 // apply.
 func BuildTriggerPolicy() *BuildTriggerPolicyApplyConfiguration {
 	return &BuildTriggerPolicyApplyConfiguration{}

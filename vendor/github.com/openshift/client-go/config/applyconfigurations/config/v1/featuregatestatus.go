@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// FeatureGateStatusApplyConfiguration represents an declarative configuration of the FeatureGateStatus type for use
+// FeatureGateStatusApplyConfiguration represents a declarative configuration of the FeatureGateStatus type for use
 // with apply.
 type FeatureGateStatusApplyConfiguration struct {
 	Conditions   []v1.ConditionApplyConfiguration       `json:"conditions,omitempty"`
 	FeatureGates []FeatureGateDetailsApplyConfiguration `json:"featureGates,omitempty"`
 }
 
-// FeatureGateStatusApplyConfiguration constructs an declarative configuration of the FeatureGateStatus type for use with
+// FeatureGateStatusApplyConfiguration constructs a declarative configuration of the FeatureGateStatus type for use with
 // apply.
 func FeatureGateStatus() *FeatureGateStatusApplyConfiguration {
 	return &FeatureGateStatusApplyConfiguration{}

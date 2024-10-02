@@ -7,14 +7,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildSpecApplyConfiguration represents an declarative configuration of the BuildSpec type for use
+// BuildSpecApplyConfiguration represents a declarative configuration of the BuildSpec type for use
 // with apply.
 type BuildSpecApplyConfiguration struct {
 	CommonSpecApplyConfiguration `json:",inline"`
 	TriggeredBy                  []BuildTriggerCauseApplyConfiguration `json:"triggeredBy,omitempty"`
 }
 
-// BuildSpecApplyConfiguration constructs an declarative configuration of the BuildSpec type for use with
+// BuildSpecApplyConfiguration constructs a declarative configuration of the BuildSpec type for use with
 // apply.
 func BuildSpec() *BuildSpecApplyConfiguration {
 	return &BuildSpecApplyConfiguration{}

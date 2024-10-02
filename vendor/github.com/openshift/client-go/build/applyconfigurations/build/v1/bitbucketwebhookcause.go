@@ -2,13 +2,13 @@
 
 package v1
 
-// BitbucketWebHookCauseApplyConfiguration represents an declarative configuration of the BitbucketWebHookCause type for use
+// BitbucketWebHookCauseApplyConfiguration represents a declarative configuration of the BitbucketWebHookCause type for use
 // with apply.
 type BitbucketWebHookCauseApplyConfiguration struct {
 	CommonWebHookCauseApplyConfiguration `json:",inline"`
 }
 
-// BitbucketWebHookCauseApplyConfiguration constructs an declarative configuration of the BitbucketWebHookCause type for use with
+// BitbucketWebHookCauseApplyConfiguration constructs a declarative configuration of the BitbucketWebHookCause type for use with
 // apply.
 func BitbucketWebHookCause() *BitbucketWebHookCauseApplyConfiguration {
 	return &BitbucketWebHookCauseApplyConfiguration{}

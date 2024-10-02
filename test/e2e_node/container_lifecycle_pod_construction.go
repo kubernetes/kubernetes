@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -62,9 +61,9 @@ func ExecCommand(name string, c execCommand) []string {
 	// all outputs are in the format of:
 	// time-since-boot timestamp container-name message
 
-	// The busybox time command doesn't support sub-second display. uptime displays in hundredths of a second, so we
-	// include both and use time since boot for relative ordering of file entries
-	timeCmd := "`date +%s` `cat /proc/uptime | awk '{print $1}'`"
+	// The busybox time command doesn't support sub-second display.
+	// We have to use nmeter to get the milliseconds part.
+	timeCmd := "`date -u +%FT$(nmeter -d0 '%3t' | head -n1)Z`"
 	containerName := name
 	if c.ContainerName != "" {
 		containerName = c.ContainerName
@@ -106,9 +105,7 @@ func sleepCommand(seconds int) string {
 
 type containerOutput struct {
 	// time the message was seen to the nearest second
-	timestamp time.Time
-	// time the message was seen since the host booted, to the nearest hundredth of a second
-	timeSinceBoot float64
+	timestamp     time.Time
 	containerName string
 	command       string
 }
@@ -117,32 +114,49 @@ type containerOutputList []containerOutput
 func (o containerOutputList) String() string {
 	var b bytes.Buffer
 	for i, v := range o {
-		fmt.Fprintf(&b, "%d) %s %f %s %s\n", i, v.timestamp, v.timeSinceBoot, v.containerName, v.command)
+		fmt.Fprintf(&b, "%d) %s %s %s\n", i, v.timestamp, v.containerName, v.command)
 	}
 	return b.String()
 }
 
-// RunTogether returns an error the lhs and rhs run together
+// RunTogether returns an error if containers don't run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
+	if err := o.RunTogetherLhsFirst(lhs, rhs); err != nil {
+		if err := o.RunTogetherLhsFirst(rhs, lhs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunTogetherLhsFirst returns an error if containers don't run together or if rhs starts before lhs
+func (o containerOutputList) RunTogetherLhsFirst(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
-	rhsStart := o.findIndex(rhs, "Started", 0)
-
-	lhsFinish := o.findIndex(lhs, "Finishing", 0)
-	rhsFinish := o.findIndex(rhs, "Finishing", 0)
-
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
 	}
+
+	rhsStart := o.findIndex(rhs, "Started", lhsStart+1)
 	if rhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", rhs, o)
 	}
 
-	if lhsFinish != -1 && rhsStart > lhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", rhs, lhs, o)
+	lhsExit := o.findIndex(lhs, "Exiting", lhsStart+1)
+	if lhsExit == -1 {
+		return fmt.Errorf("couldn't find that %s ever exited, got\n%v", lhs, o)
 	}
 
-	if rhsFinish != -1 && lhsStart > rhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", lhs, rhs, o)
+	if rhsStart > lhsExit {
+		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", rhs, lhs, o)
+	}
+
+	rhsExit := o.findIndex(rhs, "Exiting", rhsStart+1)
+	if rhsExit == -1 {
+		return fmt.Errorf("couldn't find that %s ever exited, got\n%v", rhs, o)
+	}
+
+	if lhsStart > rhsExit {
+		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", lhs, rhs, o)
 	}
 
 	return nil
@@ -294,21 +308,22 @@ func (o containerOutputList) findLastIndex(name string, command string) int {
 	return found
 }
 
-// TimeOfStart returns the time since the node boot in floating point seconds that the specified container started.
-func (o containerOutputList) TimeOfStart(name string) (float64, error) {
+// TimeOfStart returns the UNIX time in milliseconds when the specified container started.
+func (o containerOutputList) TimeOfStart(name string) (int64, error) {
 	idx := o.findIndex(name, "Starting", 0)
 	if idx == -1 {
-		return 0.0, fmt.Errorf("couldn't find that %s ever started, got\n%v", name, o)
+		return 0, fmt.Errorf("couldn't find that %s ever started, got\n%v", name, o)
 	}
-	return o[idx].timeSinceBoot, nil
+	return o[idx].timestamp.UnixMilli(), nil
 }
 
-func (o containerOutputList) TimeOfLastLoop(name string) (float64, error) {
+// TimeOfLastLoop returns the UNIX time in milliseconds when the specified container last looped.
+func (o containerOutputList) TimeOfLastLoop(name string) (int64, error) {
 	idx := o.findLastIndex(name, "Looping")
 	if idx == -1 {
-		return 0.0, fmt.Errorf("couldn't find that %s ever looped, got\n%v", name, o)
+		return 0, fmt.Errorf("couldn't find that %s ever looped, got\n%v", name, o)
 	}
-	return o[idx].timeSinceBoot, nil
+	return o[idx].timestamp.UnixMilli(), nil
 }
 
 // parseOutput combines the container log from all of the init and regular
@@ -336,25 +351,23 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 	sc := bufio.NewScanner(&buf)
 	var res containerOutputList
 	for sc.Scan() {
+		log := sc.Text()
 		fields := strings.Fields(sc.Text())
-		if len(fields) < 4 {
+		if len(fields) < 3 {
 			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
 		}
-		timestamp, err := strconv.ParseInt(fields[0], 10, 64)
-		framework.ExpectNoError(err)
-		timeSinceBoot, err := strconv.ParseFloat(fields[1], 64)
-		framework.ExpectNoError(err)
+		timestamp, err := time.Parse(time.RFC3339, fields[0])
+		framework.ExpectNoError(err, "Failed to parse the timestamp, log: %q", log)
 		res = append(res, containerOutput{
-			timestamp:     time.Unix(timestamp, 0),
-			timeSinceBoot: timeSinceBoot,
-			containerName: fields[2],
-			command:       fields[3],
+			timestamp:     timestamp,
+			containerName: fields[1],
+			command:       fields[2],
 		})
 	}
 
 	// sort using the timeSinceBoot since it has more precision
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].timeSinceBoot < res[j].timeSinceBoot
+		return res[i].timestamp.Before(res[j].timestamp)
 	})
 	return res
 }
@@ -366,7 +379,7 @@ func preparePod(pod *v1.Pod) {
 			v1.ResourceMemory: resource.MustParse("15Mi"),
 		},
 		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("15Mi"),
+			v1.ResourceMemory: resource.MustParse("35Mi"),
 		},
 	}
 

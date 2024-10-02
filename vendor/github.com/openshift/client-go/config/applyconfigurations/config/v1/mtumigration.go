@@ -2,14 +2,14 @@
 
 package v1
 
-// MTUMigrationApplyConfiguration represents an declarative configuration of the MTUMigration type for use
+// MTUMigrationApplyConfiguration represents a declarative configuration of the MTUMigration type for use
 // with apply.
 type MTUMigrationApplyConfiguration struct {
 	Network *MTUMigrationValuesApplyConfiguration `json:"network,omitempty"`
 	Machine *MTUMigrationValuesApplyConfiguration `json:"machine,omitempty"`
 }
 
-// MTUMigrationApplyConfiguration constructs an declarative configuration of the MTUMigration type for use with
+// MTUMigrationApplyConfiguration constructs a declarative configuration of the MTUMigration type for use with
 // apply.
 func MTUMigration() *MTUMigrationApplyConfiguration {
 	return &MTUMigrationApplyConfiguration{}

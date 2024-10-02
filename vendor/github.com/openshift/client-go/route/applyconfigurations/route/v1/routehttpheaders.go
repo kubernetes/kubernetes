@@ -2,13 +2,13 @@
 
 package v1
 
-// RouteHTTPHeadersApplyConfiguration represents an declarative configuration of the RouteHTTPHeaders type for use
+// RouteHTTPHeadersApplyConfiguration represents a declarative configuration of the RouteHTTPHeaders type for use
 // with apply.
 type RouteHTTPHeadersApplyConfiguration struct {
 	Actions *RouteHTTPHeaderActionsApplyConfiguration `json:"actions,omitempty"`
 }
 
-// RouteHTTPHeadersApplyConfiguration constructs an declarative configuration of the RouteHTTPHeaders type for use with
+// RouteHTTPHeadersApplyConfiguration constructs a declarative configuration of the RouteHTTPHeaders type for use with
 // apply.
 func RouteHTTPHeaders() *RouteHTTPHeadersApplyConfiguration {
 	return &RouteHTTPHeadersApplyConfiguration{}

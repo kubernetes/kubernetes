@@ -136,6 +136,9 @@ type RouteSpec struct {
 	// Use the weight field in RouteTargetReference object to specify relative preference.
 	//
 	// +kubebuilder:validation:MaxItems=3
+	// +listType=map
+	// +listMapKey=name
+	// +listMapKey=kind
 	AlternateBackends []RouteTargetReference `json:"alternateBackends,omitempty" protobuf:"bytes,4,rep,name=alternateBackends"`
 
 	// If specified, the port to be used by the router. Most routers will use all
@@ -350,6 +353,7 @@ type RouteStatus struct {
 	// ingress describes the places where the route may be exposed. The list of
 	// ingress points may contain duplicate Host or RouterName values. Routes
 	// are considered live once they are `Ready`
+	// +listType=atomic
 	Ingress []RouteIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 
@@ -360,6 +364,8 @@ type RouteIngress struct {
 	// Name is a name chosen by the router to identify itself; this value is required
 	RouterName string `json:"routerName,omitempty" protobuf:"bytes,2,opt,name=routerName"`
 	// Conditions is the state of the route, may be empty.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []RouteIngressCondition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 	// Wildcard policy is the wildcard policy that was allowed where this route is exposed.
 	WildcardPolicy WildcardPolicyType `json:"wildcardPolicy,omitempty" protobuf:"bytes,4,opt,name=wildcardPolicy"`
@@ -415,7 +421,7 @@ type RouterShard struct {
 // TLSConfig defines config used to secure a route and provide termination
 //
 // +kubebuilder:validation:XValidation:rule="has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true", message="cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=ExternalRouteCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=RouteExternalCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
 type TLSConfig struct {
 	// termination indicates termination type.
 	//
@@ -464,7 +470,7 @@ type TLSConfig struct {
 	// be present in the same namespace as that of the Route.
 	// Forbidden when `certificate` is set.
 	//
-	// +openshift:enable:FeatureGate=ExternalRouteCertificate
+	// +openshift:enable:FeatureGate=RouteExternalCertificate
 	// +optional
 	ExternalCertificate *LocalObjectReference `json:"externalCertificate,omitempty" protobuf:"bytes,7,opt,name=externalCertificate"`
 }

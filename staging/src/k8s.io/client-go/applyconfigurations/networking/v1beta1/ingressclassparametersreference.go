@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// IngressClassParametersReferenceApplyConfiguration represents an declarative configuration of the IngressClassParametersReference type for use
+// IngressClassParametersReferenceApplyConfiguration represents a declarative configuration of the IngressClassParametersReference type for use
 // with apply.
 type IngressClassParametersReferenceApplyConfiguration struct {
 	APIGroup  *string `json:"apiGroup,omitempty"`
@@ -28,7 +28,7 @@ type IngressClassParametersReferenceApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// IngressClassParametersReferenceApplyConfiguration constructs an declarative configuration of the IngressClassParametersReference type for use with
+// IngressClassParametersReferenceApplyConfiguration constructs a declarative configuration of the IngressClassParametersReference type for use with
 // apply.
 func IngressClassParametersReference() *IngressClassParametersReferenceApplyConfiguration {
 	return &IngressClassParametersReferenceApplyConfiguration{}

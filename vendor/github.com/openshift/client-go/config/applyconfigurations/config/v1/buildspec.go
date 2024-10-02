@@ -2,7 +2,7 @@
 
 package v1
 
-// BuildSpecApplyConfiguration represents an declarative configuration of the BuildSpec type for use
+// BuildSpecApplyConfiguration represents a declarative configuration of the BuildSpec type for use
 // with apply.
 type BuildSpecApplyConfiguration struct {
 	AdditionalTrustedCA *ConfigMapNameReferenceApplyConfiguration `json:"additionalTrustedCA,omitempty"`
@@ -10,7 +10,7 @@ type BuildSpecApplyConfiguration struct {
 	BuildOverrides      *BuildOverridesApplyConfiguration         `json:"buildOverrides,omitempty"`
 }
 
-// BuildSpecApplyConfiguration constructs an declarative configuration of the BuildSpec type for use with
+// BuildSpecApplyConfiguration constructs a declarative configuration of the BuildSpec type for use with
 // apply.
 func BuildSpec() *BuildSpecApplyConfiguration {
 	return &BuildSpecApplyConfiguration{}

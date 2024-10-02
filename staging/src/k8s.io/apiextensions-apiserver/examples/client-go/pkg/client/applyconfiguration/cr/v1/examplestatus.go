@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 )
 
-// ExampleStatusApplyConfiguration represents an declarative configuration of the ExampleStatus type for use
+// ExampleStatusApplyConfiguration represents a declarative configuration of the ExampleStatus type for use
 // with apply.
 type ExampleStatusApplyConfiguration struct {
 	State   *v1.ExampleState `json:"state,omitempty"`
 	Message *string          `json:"message,omitempty"`
 }
 
-// ExampleStatusApplyConfiguration constructs an declarative configuration of the ExampleStatus type for use with
+// ExampleStatusApplyConfiguration constructs a declarative configuration of the ExampleStatus type for use with
 // apply.
 func ExampleStatus() *ExampleStatusApplyConfiguration {
 	return &ExampleStatusApplyConfiguration{}

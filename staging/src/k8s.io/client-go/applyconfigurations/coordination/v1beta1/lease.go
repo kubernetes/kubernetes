@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// LeaseApplyConfiguration represents an declarative configuration of the Lease type for use
+// LeaseApplyConfiguration represents a declarative configuration of the Lease type for use
 // with apply.
 type LeaseApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type LeaseApplyConfiguration struct {
 	Spec                             *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// Lease constructs an declarative configuration of the Lease type for use with
+// Lease constructs a declarative configuration of the Lease type for use with
 // apply.
 func Lease(name, namespace string) *LeaseApplyConfiguration {
 	b := &LeaseApplyConfiguration{}
@@ -246,4 +246,10 @@ func (b *LeaseApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 func (b *LeaseApplyConfiguration) WithSpec(value *LeaseSpecApplyConfiguration) *LeaseApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *LeaseApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

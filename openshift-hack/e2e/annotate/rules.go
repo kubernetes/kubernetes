@@ -19,10 +19,9 @@ var (
 			`\[FeatureGate:SELinuxMount\]`,
 			`\[Feature:RelaxedEnvironmentVariableValidation\]`,
 			`\[Feature:UserNamespacesPodSecurityStandards\]`,
-			`\[Feature:Traffic Distribution\]`,
-			`\[Feature:UserNamespacesSupport\]`,
+			`\[Feature:UserNamespacesSupport\]`, // disabled Beta
 			`\[Feature:DynamicResourceAllocation\]`,
-			`\[Feature:GPUUpgrade\]`,
+			`\[Feature:VolumeAttributesClass\]`, // disabled Beta
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -130,10 +129,6 @@ var (
 			`\[sig-network\] Networking Granular Checks: Services should function for service endpoints using hostNetwork`,
 			`\[sig-network\] Networking Granular Checks: Services should function for pod-Service\(hostNetwork\)`,
 
-			// https://issues.redhat.com/browse/OCPBUGS-7125
-			`\[sig-network\] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes`,
-			`\[sig-network\] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes`,
-
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1952460
 			`\[sig-network\] Firewall rule control plane should not expose well-known ports`,
 
@@ -155,6 +150,9 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-34594
 			`\[sig-node\] \[Feature:PodLifecycleSleepAction\] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-38839
+			`\[sig-network\] \[Feature:Traffic Distribution\] when Service has trafficDistribution=PreferClose should route traffic to an endpoint that is close to the client`,
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {
@@ -165,6 +163,10 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-38838
+			`\[sig-cli\] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from all pods based on default container`,
+			`\[sig-cli\] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from each pod and each container in Deployment`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -173,11 +175,7 @@ var (
 			`\[Driver: gluster\]`,       // OpenShift 4.x does not support Gluster
 			`Volumes GlusterFS`,         // OpenShift 4.x does not support Gluster
 			`GlusterDynamicProvisioner`, // OpenShift 4.x does not support Gluster
-			// OCP 4.16 and newer does not support PersistentVolumeLabel admission plugin and thus
-			// the test can's create in-tree PVs.
-			`Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs`,
-			`PersistentVolumes GCEPD`,
-			`\[Driver: azure-disk\] \[Testpattern: Pre-provisioned PV`,
+
 			// Skip vSphere-specific storage tests. The standard in-tree storage tests for vSphere
 			// (prefixed with `In-tree Volumes [Driver: vsphere]`) are enough for testing this plugin.
 			// https://bugzilla.redhat.com/show_bug.cgi?id=2019115
@@ -227,12 +225,28 @@ var (
 			// Internet access required
 			`\[sig-network\] Networking should provide Internet connection for containers`,
 		},
+		"[Skipped:alibabacloud]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:aws]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] .* UDP`,
+			`\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] .* session affinity`,
+		},
 		"[Skipped:azure]": {
 			"Networking should provide Internet connection for containers", // Azure does not allow ICMP traffic to internet.
 			// Azure CSI migration changed how we treat regions without zones.
 			// See https://bugzilla.redhat.com/bugzilla/show_bug.cgi?id=2066865
 			`\[sig-storage\] In-tree Volumes \[Driver: azure-disk\] \[Testpattern: Dynamic PV \(immediate binding\)\] topology should provision a volume and schedule a pod with AllowedTopologies`,
 			`\[sig-storage\] In-tree Volumes \[Driver: azure-disk\] \[Testpattern: Dynamic PV \(delayed binding\)\] topology should provision a volume and schedule a pod with AllowedTopologies`,
+		},
+		"[Skipped:baremetal]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
 		},
 		"[Skipped:gce]": {
 			// Requires creation of a different compute instance in a different zone and is not compatible with volumeBindingMode of WaitForFirstConsumer which we use in 4.x
@@ -263,6 +277,37 @@ var (
 			`\[HPA\] Horizontal pod autoscaling \(scale resource: Custom Metrics from Stackdriver\)`,
 			`\[Feature:CustomMetricsAutoscaling\]`,
 		},
+		"[Skipped:ibmcloud]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:kubevirt]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:nutanix]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:openstack]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:ovirt]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+		"[Skipped:vsphere]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-38840
+			`\[Feature:LoadBalancer\]`,
+		},
+
 		"[sig-node]": {
 			`\[NodeConformance\]`,
 			`NodeLease`,

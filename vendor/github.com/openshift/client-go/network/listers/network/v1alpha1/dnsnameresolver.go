@@ -4,8 +4,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "github.com/openshift/api/network/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -22,25 +22,17 @@ type DNSNameResolverLister interface {
 
 // dNSNameResolverLister implements the DNSNameResolverLister interface.
 type dNSNameResolverLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha1.DNSNameResolver]
 }
 
 // NewDNSNameResolverLister returns a new DNSNameResolverLister.
 func NewDNSNameResolverLister(indexer cache.Indexer) DNSNameResolverLister {
-	return &dNSNameResolverLister{indexer: indexer}
-}
-
-// List lists all DNSNameResolvers in the indexer.
-func (s *dNSNameResolverLister) List(selector labels.Selector) (ret []*v1alpha1.DNSNameResolver, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.DNSNameResolver))
-	})
-	return ret, err
+	return &dNSNameResolverLister{listers.New[*v1alpha1.DNSNameResolver](indexer, v1alpha1.Resource("dnsnameresolver"))}
 }
 
 // DNSNameResolvers returns an object that can list and get DNSNameResolvers.
 func (s *dNSNameResolverLister) DNSNameResolvers(namespace string) DNSNameResolverNamespaceLister {
-	return dNSNameResolverNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return dNSNameResolverNamespaceLister{listers.NewNamespaced[*v1alpha1.DNSNameResolver](s.ResourceIndexer, namespace)}
 }
 
 // DNSNameResolverNamespaceLister helps list and get DNSNameResolvers.
@@ -58,26 +50,5 @@ type DNSNameResolverNamespaceLister interface {
 // dNSNameResolverNamespaceLister implements the DNSNameResolverNamespaceLister
 // interface.
 type dNSNameResolverNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all DNSNameResolvers in the indexer for a given namespace.
-func (s dNSNameResolverNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.DNSNameResolver, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.DNSNameResolver))
-	})
-	return ret, err
-}
-
-// Get retrieves the DNSNameResolver from the indexer for a given namespace and name.
-func (s dNSNameResolverNamespaceLister) Get(name string) (*v1alpha1.DNSNameResolver, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("dnsnameresolver"), name)
-	}
-	return obj.(*v1alpha1.DNSNameResolver), nil
+	listers.ResourceIndexer[*v1alpha1.DNSNameResolver]
 }

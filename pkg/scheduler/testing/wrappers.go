@@ -21,7 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -882,21 +882,35 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// and injects into the pv.
+func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
+	if p.Spec.NodeAffinity == nil {
+		p.Spec.NodeAffinity = &v1.VolumeNodeAffinity{}
+	}
+	if p.Spec.NodeAffinity.Required == nil {
+		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
+	}
+	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
-type ResourceClaimWrapper struct{ resourcev1alpha2.ResourceClaim }
+type ResourceClaimWrapper struct{ resourceapi.ResourceClaim }
 
 // MakeResourceClaim creates a ResourceClaim wrapper.
-func MakeResourceClaim() *ResourceClaimWrapper {
-	return &ResourceClaimWrapper{resourcev1alpha2.ResourceClaim{}}
+func MakeResourceClaim(controller string) *ResourceClaimWrapper {
+	return &ResourceClaimWrapper{resourceapi.ResourceClaim{Spec: resourceapi.ResourceClaimSpec{Controller: controller}}}
 }
 
 // FromResourceClaim creates a ResourceClaim wrapper from some existing object.
-func FromResourceClaim(other *resourcev1alpha2.ResourceClaim) *ResourceClaimWrapper {
+func FromResourceClaim(other *resourceapi.ResourceClaim) *ResourceClaimWrapper {
 	return &ResourceClaimWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner ResourceClaim.
-func (wrapper *ResourceClaimWrapper) Obj() *resourcev1alpha2.ResourceClaim {
+func (wrapper *ResourceClaimWrapper) Obj() *resourceapi.ResourceClaim {
 	return &wrapper.ResourceClaim
 }
 
@@ -932,21 +946,35 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
-// AllocationMode sets the allocation mode of the inner object.
-func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha2.AllocationMode) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Spec.AllocationMode = a
-	return wrapper
-}
-
-// ResourceClassName sets the resource class name of the inner object.
-func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Spec.ResourceClassName = name
+// Request adds one device request for the given device class.
+func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
+			// Cannot rely on defaulting here, this is used in unit tests.
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			DeviceClassName: deviceClassName,
+		},
+	)
 	return wrapper
 }
 
 // Allocation sets the allocation of the inner object.
-func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourcev1alpha2.AllocationResult) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Status.Allocation = allocation
+	return wrapper
+}
+
+// Structured turns a "normal" claim into one which was allocated via structured parameters.
+// The only difference is that there is no controller name and the special finalizer
+// gets added.
+func (wrapper *ResourceClaimWrapper) Structured() *ResourceClaimWrapper {
+	wrapper.Spec.Controller = ""
+	if wrapper.ResourceClaim.Status.Allocation != nil {
+		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
+		wrapper.ResourceClaim.Status.Allocation.Controller = ""
+	}
 	return wrapper
 }
 
@@ -957,28 +985,33 @@ func (wrapper *ResourceClaimWrapper) DeallocationRequested(deallocationRequested
 }
 
 // ReservedFor sets that field of the inner object.
-func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha2.ResourceClaimConsumerReference) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourceapi.ResourceClaimConsumerReference) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Status.ReservedFor = consumers
 	return wrapper
 }
 
+// ReservedFor sets that field of the inner object given information about one pod.
+func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
+}
+
 // PodSchedulingWrapper wraps a PodSchedulingContext inside.
 type PodSchedulingWrapper struct {
-	resourcev1alpha2.PodSchedulingContext
+	resourceapi.PodSchedulingContext
 }
 
 // MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
 func MakePodSchedulingContexts() *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{resourcev1alpha2.PodSchedulingContext{}}
+	return &PodSchedulingWrapper{resourceapi.PodSchedulingContext{}}
 }
 
 // FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
-func FromPodSchedulingContexts(other *resourcev1alpha2.PodSchedulingContext) *PodSchedulingWrapper {
+func FromPodSchedulingContexts(other *resourceapi.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner object.
-func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha2.PodSchedulingContext {
+func (wrapper *PodSchedulingWrapper) Obj() *resourceapi.PodSchedulingContext {
 	return &wrapper.PodSchedulingContext
 }
 
@@ -1037,7 +1070,36 @@ func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedul
 }
 
 // ResourceClaims sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcev1alpha2.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
+func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourceapi.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
 	wrapper.Status.ResourceClaims = statuses
+	return wrapper
+}
+
+type ResourceSliceWrapper struct {
+	resourceapi.ResourceSlice
+}
+
+func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = nodeName + "-" + driverName
+	wrapper.Spec.NodeName = nodeName
+	wrapper.Spec.Pool.Name = nodeName
+	wrapper.Spec.Driver = driverName
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) Obj() *resourceapi.ResourceSlice {
+	return &wrapper.ResourceSlice
+}
+
+func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrapper {
+	for _, name := range names {
+		wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name})
+	}
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
+	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{Attributes: attrs}})
 	return wrapper
 }

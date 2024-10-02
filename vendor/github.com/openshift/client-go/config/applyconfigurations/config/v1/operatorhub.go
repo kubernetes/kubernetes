@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// OperatorHubApplyConfiguration represents an declarative configuration of the OperatorHub type for use
+// OperatorHubApplyConfiguration represents a declarative configuration of the OperatorHub type for use
 // with apply.
 type OperatorHubApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type OperatorHubApplyConfiguration struct {
 	Status                           *OperatorHubStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// OperatorHub constructs an declarative configuration of the OperatorHub type for use with
+// OperatorHub constructs a declarative configuration of the OperatorHub type for use with
 // apply.
 func OperatorHub(name string) *OperatorHubApplyConfiguration {
 	b := &OperatorHubApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *OperatorHubApplyConfiguration) WithSpec(value *OperatorHubSpecApplyConf
 func (b *OperatorHubApplyConfiguration) WithStatus(value *OperatorHubStatusApplyConfiguration) *OperatorHubApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *OperatorHubApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

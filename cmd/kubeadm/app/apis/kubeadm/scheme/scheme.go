@@ -44,7 +44,5 @@ func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(kubeadm.AddToScheme(scheme))
 	utilruntime.Must(v1beta3.AddToScheme(scheme))
 	utilruntime.Must(v1beta4.AddToScheme(scheme))
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2890
-	// make v1beta4 highest priority
-	utilruntime.Must(scheme.SetVersionPriority(v1beta3.SchemeGroupVersion, v1beta4.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1beta4.SchemeGroupVersion, v1beta3.SchemeGroupVersion))
 }

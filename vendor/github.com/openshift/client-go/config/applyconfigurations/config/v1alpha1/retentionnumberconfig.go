@@ -2,13 +2,13 @@
 
 package v1alpha1
 
-// RetentionNumberConfigApplyConfiguration represents an declarative configuration of the RetentionNumberConfig type for use
+// RetentionNumberConfigApplyConfiguration represents a declarative configuration of the RetentionNumberConfig type for use
 // with apply.
 type RetentionNumberConfigApplyConfiguration struct {
 	MaxNumberOfBackups *int `json:"maxNumberOfBackups,omitempty"`
 }
 
-// RetentionNumberConfigApplyConfiguration constructs an declarative configuration of the RetentionNumberConfig type for use with
+// RetentionNumberConfigApplyConfiguration constructs a declarative configuration of the RetentionNumberConfig type for use with
 // apply.
 func RetentionNumberConfig() *RetentionNumberConfigApplyConfiguration {
 	return &RetentionNumberConfigApplyConfiguration{}

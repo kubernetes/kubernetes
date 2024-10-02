@@ -25,7 +25,7 @@ import (
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 )
 
-// FlunderApplyConfiguration represents an declarative configuration of the Flunder type for use
+// FlunderApplyConfiguration represents a declarative configuration of the Flunder type for use
 // with apply.
 type FlunderApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -34,7 +34,7 @@ type FlunderApplyConfiguration struct {
 	Status                           *wardlev1alpha1.FlunderStatus  `json:"status,omitempty"`
 }
 
-// Flunder constructs an declarative configuration of the Flunder type for use with
+// Flunder constructs a declarative configuration of the Flunder type for use with
 // apply.
 func Flunder(name, namespace string) *FlunderApplyConfiguration {
 	b := &FlunderApplyConfiguration{}
@@ -217,4 +217,10 @@ func (b *FlunderApplyConfiguration) WithSpec(value *FlunderSpecApplyConfiguratio
 func (b *FlunderApplyConfiguration) WithStatus(value wardlev1alpha1.FlunderStatus) *FlunderApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *FlunderApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

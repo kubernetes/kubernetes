@@ -20,17 +20,14 @@ package v1beta2
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	flowcontrolv1beta2 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // PriorityLevelConfigurationsGetter has a method to return a PriorityLevelConfigurationInterface.
@@ -43,6 +40,7 @@ type PriorityLevelConfigurationsGetter interface {
 type PriorityLevelConfigurationInterface interface {
 	Create(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.CreateOptions) (*v1beta2.PriorityLevelConfiguration, error)
 	Update(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1beta2.PriorityLevelConfiguration, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (*v1beta2.PriorityLevelConfiguration, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
@@ -51,193 +49,25 @@ type PriorityLevelConfigurationInterface interface {
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.PriorityLevelConfiguration, err error)
 	Apply(ctx context.Context, priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.PriorityLevelConfiguration, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.PriorityLevelConfiguration, err error)
 	PriorityLevelConfigurationExpansion
 }
 
 // priorityLevelConfigurations implements PriorityLevelConfigurationInterface
 type priorityLevelConfigurations struct {
-	client rest.Interface
+	*gentype.ClientWithListAndApply[*v1beta2.PriorityLevelConfiguration, *v1beta2.PriorityLevelConfigurationList, *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration]
 }
 
 // newPriorityLevelConfigurations returns a PriorityLevelConfigurations
 func newPriorityLevelConfigurations(c *FlowcontrolV1beta2Client) *priorityLevelConfigurations {
 	return &priorityLevelConfigurations{
-		client: c.RESTClient(),
+		gentype.NewClientWithListAndApply[*v1beta2.PriorityLevelConfiguration, *v1beta2.PriorityLevelConfigurationList, *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration](
+			"prioritylevelconfigurations",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1beta2.PriorityLevelConfiguration { return &v1beta2.PriorityLevelConfiguration{} },
+			func() *v1beta2.PriorityLevelConfigurationList { return &v1beta2.PriorityLevelConfigurationList{} }),
 	}
-}
-
-// Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
-func (c *priorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Get().
-		Resource("prioritylevelconfigurations").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PriorityLevelConfigurations that match those selectors.
-func (c *priorityLevelConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.PriorityLevelConfigurationList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1beta2.PriorityLevelConfigurationList{}
-	err = c.client.Get().
-		Resource("prioritylevelconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested priorityLevelConfigurations.
-func (c *priorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("prioritylevelconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a priorityLevelConfiguration and creates it.  Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.CreateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Post().
-		Resource("prioritylevelconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(priorityLevelConfiguration).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a priorityLevelConfiguration and updates it. Returns the server's representation of the priorityLevelConfiguration, and an error, if there is any.
-func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Put().
-		Resource("prioritylevelconfigurations").
-		Name(priorityLevelConfiguration.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(priorityLevelConfiguration).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1beta2.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Put().
-		Resource("prioritylevelconfigurations").
-		Name(priorityLevelConfiguration.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(priorityLevelConfiguration).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the priorityLevelConfiguration and deletes it. Returns an error if one occurs.
-func (c *priorityLevelConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("prioritylevelconfigurations").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *priorityLevelConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("prioritylevelconfigurations").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched priorityLevelConfiguration.
-func (c *priorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Patch(pt).
-		Resource("prioritylevelconfigurations").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied priorityLevelConfiguration.
-func (c *priorityLevelConfigurations) Apply(ctx context.Context, priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	if priorityLevelConfiguration == nil {
-		return nil, fmt.Errorf("priorityLevelConfiguration provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(priorityLevelConfiguration)
-	if err != nil {
-		return nil, err
-	}
-	name := priorityLevelConfiguration.Name
-	if name == nil {
-		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
-	}
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("prioritylevelconfigurations").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *priorityLevelConfigurations) ApplyStatus(ctx context.Context, priorityLevelConfiguration *flowcontrolv1beta2.PriorityLevelConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.PriorityLevelConfiguration, err error) {
-	if priorityLevelConfiguration == nil {
-		return nil, fmt.Errorf("priorityLevelConfiguration provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(priorityLevelConfiguration)
-	if err != nil {
-		return nil, err
-	}
-
-	name := priorityLevelConfiguration.Name
-	if name == nil {
-		return nil, fmt.Errorf("priorityLevelConfiguration.Name must be provided to Apply")
-	}
-
-	result = &v1beta2.PriorityLevelConfiguration{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("prioritylevelconfigurations").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

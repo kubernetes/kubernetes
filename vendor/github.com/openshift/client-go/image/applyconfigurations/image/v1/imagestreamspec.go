@@ -2,7 +2,7 @@
 
 package v1
 
-// ImageStreamSpecApplyConfiguration represents an declarative configuration of the ImageStreamSpec type for use
+// ImageStreamSpecApplyConfiguration represents a declarative configuration of the ImageStreamSpec type for use
 // with apply.
 type ImageStreamSpecApplyConfiguration struct {
 	LookupPolicy          *ImageLookupPolicyApplyConfiguration `json:"lookupPolicy,omitempty"`
@@ -10,7 +10,7 @@ type ImageStreamSpecApplyConfiguration struct {
 	Tags                  []TagReferenceApplyConfiguration     `json:"tags,omitempty"`
 }
 
-// ImageStreamSpecApplyConfiguration constructs an declarative configuration of the ImageStreamSpec type for use with
+// ImageStreamSpecApplyConfiguration constructs a declarative configuration of the ImageStreamSpec type for use with
 // apply.
 func ImageStreamSpec() *ImageStreamSpecApplyConfiguration {
 	return &ImageStreamSpecApplyConfiguration{}

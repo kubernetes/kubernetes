@@ -21,10 +21,11 @@ var resourceaccessreviewsKind = v1.SchemeGroupVersion.WithKind("ResourceAccessRe
 
 // Create takes the representation of a resourceAccessReview and creates it.  Returns the server's representation of the resourceAccessReviewResponse, and an error, if there is any.
 func (c *FakeResourceAccessReviews) Create(ctx context.Context, resourceAccessReview *v1.ResourceAccessReview, opts metav1.CreateOptions) (result *v1.ResourceAccessReviewResponse, err error) {
+	emptyResult := &v1.ResourceAccessReviewResponse{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(resourceaccessreviewsResource, resourceAccessReview), &v1.ResourceAccessReviewResponse{})
+		Invokes(testing.NewRootCreateActionWithOptions(resourceaccessreviewsResource, resourceAccessReview, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceAccessReviewResponse), err
 }

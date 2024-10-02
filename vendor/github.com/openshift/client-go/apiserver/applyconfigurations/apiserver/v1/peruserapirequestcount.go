@@ -2,7 +2,7 @@
 
 package v1
 
-// PerUserAPIRequestCountApplyConfiguration represents an declarative configuration of the PerUserAPIRequestCount type for use
+// PerUserAPIRequestCountApplyConfiguration represents a declarative configuration of the PerUserAPIRequestCount type for use
 // with apply.
 type PerUserAPIRequestCountApplyConfiguration struct {
 	UserName     *string                                    `json:"username,omitempty"`
@@ -11,7 +11,7 @@ type PerUserAPIRequestCountApplyConfiguration struct {
 	ByVerb       []PerVerbAPIRequestCountApplyConfiguration `json:"byVerb,omitempty"`
 }
 
-// PerUserAPIRequestCountApplyConfiguration constructs an declarative configuration of the PerUserAPIRequestCount type for use with
+// PerUserAPIRequestCountApplyConfiguration constructs a declarative configuration of the PerUserAPIRequestCount type for use with
 // apply.
 func PerUserAPIRequestCount() *PerUserAPIRequestCountApplyConfiguration {
 	return &PerUserAPIRequestCountApplyConfiguration{}

@@ -2,7 +2,7 @@
 
 package v1
 
-// APIServerSpecApplyConfiguration represents an declarative configuration of the APIServerSpec type for use
+// APIServerSpecApplyConfiguration represents a declarative configuration of the APIServerSpec type for use
 // with apply.
 type APIServerSpecApplyConfiguration struct {
 	ServingCerts                 *APIServerServingCertsApplyConfiguration  `json:"servingCerts,omitempty"`
@@ -13,7 +13,7 @@ type APIServerSpecApplyConfiguration struct {
 	Audit                        *AuditApplyConfiguration                  `json:"audit,omitempty"`
 }
 
-// APIServerSpecApplyConfiguration constructs an declarative configuration of the APIServerSpec type for use with
+// APIServerSpecApplyConfiguration constructs a declarative configuration of the APIServerSpec type for use with
 // apply.
 func APIServerSpec() *APIServerSpecApplyConfiguration {
 	return &APIServerSpecApplyConfiguration{}

@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterTrustBundleApplyConfiguration represents an declarative configuration of the ClusterTrustBundle type for use
+// ClusterTrustBundleApplyConfiguration represents a declarative configuration of the ClusterTrustBundle type for use
 // with apply.
 type ClusterTrustBundleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type ClusterTrustBundleApplyConfiguration struct {
 	Spec                             *ClusterTrustBundleSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// ClusterTrustBundle constructs an declarative configuration of the ClusterTrustBundle type for use with
+// ClusterTrustBundle constructs a declarative configuration of the ClusterTrustBundle type for use with
 // apply.
 func ClusterTrustBundle(name string) *ClusterTrustBundleApplyConfiguration {
 	b := &ClusterTrustBundleApplyConfiguration{}
@@ -244,4 +244,10 @@ func (b *ClusterTrustBundleApplyConfiguration) ensureObjectMetaApplyConfiguratio
 func (b *ClusterTrustBundleApplyConfiguration) WithSpec(value *ClusterTrustBundleSpecApplyConfiguration) *ClusterTrustBundleApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterTrustBundleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

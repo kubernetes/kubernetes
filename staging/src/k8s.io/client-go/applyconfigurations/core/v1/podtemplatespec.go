@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodTemplateSpecApplyConfiguration represents an declarative configuration of the PodTemplateSpec type for use
+// PodTemplateSpecApplyConfiguration represents a declarative configuration of the PodTemplateSpec type for use
 // with apply.
 type PodTemplateSpecApplyConfiguration struct {
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PodSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// PodTemplateSpecApplyConfiguration constructs an declarative configuration of the PodTemplateSpec type for use with
+// PodTemplateSpecApplyConfiguration constructs a declarative configuration of the PodTemplateSpec type for use with
 // apply.
 func PodTemplateSpec() *PodTemplateSpecApplyConfiguration {
 	return &PodTemplateSpecApplyConfiguration{}
@@ -185,4 +185,10 @@ func (b *PodTemplateSpecApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 func (b *PodTemplateSpecApplyConfiguration) WithSpec(value *PodSpecApplyConfiguration) *PodTemplateSpecApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PodTemplateSpecApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

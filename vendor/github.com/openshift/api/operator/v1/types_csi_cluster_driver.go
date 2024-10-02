@@ -168,6 +168,65 @@ type AWSCSIDriverConfigSpec struct {
 	// +kubebuilder:validation:Pattern:=`^arn:(aws|aws-cn|aws-us-gov|aws-iso|aws-iso-b|aws-iso-e|aws-iso-f):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)\/.*$`
 	// +optional
 	KMSKeyARN string `json:"kmsKeyARN,omitempty"`
+
+	// efsVolumeMetrics sets the configuration for collecting metrics from EFS volumes used by the EFS CSI Driver.
+	// +openshift:enable:FeatureGate=AWSEFSDriverVolumeMetrics
+	// +optional
+	EFSVolumeMetrics *AWSEFSVolumeMetrics `json:"efsVolumeMetrics,omitempty"`
+}
+
+// AWSEFSVolumeMetricsState defines the modes for collecting volume metrics in the AWS EFS CSI Driver.
+// This can either enable recursive collection of volume metrics or disable metric collection entirely.
+// +kubebuilder:validation:Enum:="RecursiveWalk";"Disabled"
+type AWSEFSVolumeMetricsState string
+
+const (
+	// AWSEFSVolumeMetricsRecursiveWalk indicates that volume metrics collection in the AWS EFS CSI Driver
+	// is performed by recursively walking through the files in the volume.
+	AWSEFSVolumeMetricsRecursiveWalk AWSEFSVolumeMetricsState = "RecursiveWalk"
+
+	// AWSEFSVolumeMetricsDisabled indicates that volume metrics collection in the AWS EFS CSI Driver is disabled.
+	AWSEFSVolumeMetricsDisabled AWSEFSVolumeMetricsState = "Disabled"
+)
+
+// AWSEFSVolumeMetrics defines the configuration for volume metrics in the EFS CSI Driver.
+// +union
+type AWSEFSVolumeMetrics struct {
+	// state defines the state of metric collection in the AWS EFS CSI Driver.
+	// This field is required and must be set to one of the following values: Disabled or RecursiveWalk.
+	// Disabled means no metrics collection will be performed. This is the default value.
+	// RecursiveWalk means the AWS EFS CSI Driver will recursively scan volumes to collect metrics.
+	// This process may result in high CPU and memory usage, depending on the volume size.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Required
+	State AWSEFSVolumeMetricsState `json:"state"`
+
+	// recursiveWalk provides additional configuration for collecting volume metrics in the AWS EFS CSI Driver
+	// when the state is set to RecursiveWalk.
+	// +unionMember
+	// +optional
+	RecursiveWalk *AWSEFSVolumeMetricsRecursiveWalkConfig `json:"recursiveWalk,omitempty"`
+}
+
+// AWSEFSVolumeMetricsRecursiveWalkConfig defines options for volume metrics in the EFS CSI Driver.
+type AWSEFSVolumeMetricsRecursiveWalkConfig struct {
+	// refreshPeriodMinutes specifies the frequency, in minutes, at which volume metrics are refreshed.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable
+	// default, which is subject to change over time. The current default is 240.
+	// The valid range is from 1 to 43200 minutes (30 days).
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=43200
+	// +optional
+	RefreshPeriodMinutes int32 `json:"refreshPeriodMinutes,omitempty"`
+
+	// fsRateLimit defines the rate limit, in goroutines per file system, for processing volume metrics.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable
+	// default, which is subject to change over time. The current default is 5.
+	// The valid range is from 1 to 100 goroutines.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	FSRateLimit int32 `json:"fsRateLimit,omitempty"`
 }
 
 // AzureDiskEncryptionSet defines the configuration for a disk encryption set.

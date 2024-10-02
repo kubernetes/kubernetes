@@ -1,8 +1,16 @@
 ---
 linters:
   enable:
+  - errcheck
   - godot
+  - gosimple
+  - govet
+  - ineffassign
+  - misspell
   - revive
+  - staticcheck
+  - testifylint
+  - unused
 
 linter-settings:
   godot:
@@ -10,3 +18,5 @@ linter-settings:
     exclude:
     # Ignore "See: URL"
     - 'See:'
+  misspell:
+    locale: US

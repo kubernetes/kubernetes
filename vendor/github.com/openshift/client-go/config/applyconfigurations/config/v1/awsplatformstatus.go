@@ -2,7 +2,7 @@
 
 package v1
 
-// AWSPlatformStatusApplyConfiguration represents an declarative configuration of the AWSPlatformStatus type for use
+// AWSPlatformStatusApplyConfiguration represents a declarative configuration of the AWSPlatformStatus type for use
 // with apply.
 type AWSPlatformStatusApplyConfiguration struct {
 	Region           *string                                `json:"region,omitempty"`
@@ -10,7 +10,7 @@ type AWSPlatformStatusApplyConfiguration struct {
 	ResourceTags     []AWSResourceTagApplyConfiguration     `json:"resourceTags,omitempty"`
 }
 
-// AWSPlatformStatusApplyConfiguration constructs an declarative configuration of the AWSPlatformStatus type for use with
+// AWSPlatformStatusApplyConfiguration constructs a declarative configuration of the AWSPlatformStatus type for use with
 // apply.
 func AWSPlatformStatus() *AWSPlatformStatusApplyConfiguration {
 	return &AWSPlatformStatusApplyConfiguration{}

@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CustomResourceDefinitionApplyConfiguration represents an declarative configuration of the CustomResourceDefinition type for use
+// CustomResourceDefinitionApplyConfiguration represents a declarative configuration of the CustomResourceDefinition type for use
 // with apply.
 type CustomResourceDefinitionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type CustomResourceDefinitionApplyConfiguration struct {
 	Status                           *CustomResourceDefinitionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// CustomResourceDefinition constructs an declarative configuration of the CustomResourceDefinition type for use with
+// CustomResourceDefinition constructs a declarative configuration of the CustomResourceDefinition type for use with
 // apply.
 func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfiguration {
 	b := &CustomResourceDefinitionApplyConfiguration{}
@@ -215,4 +215,10 @@ func (b *CustomResourceDefinitionApplyConfiguration) WithSpec(value *CustomResou
 func (b *CustomResourceDefinitionApplyConfiguration) WithStatus(value *CustomResourceDefinitionStatusApplyConfiguration) *CustomResourceDefinitionApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *CustomResourceDefinitionApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

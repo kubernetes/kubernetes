@@ -2,7 +2,7 @@
 
 package v1
 
-// VSpherePlatformFailureDomainSpecApplyConfiguration represents an declarative configuration of the VSpherePlatformFailureDomainSpec type for use
+// VSpherePlatformFailureDomainSpecApplyConfiguration represents a declarative configuration of the VSpherePlatformFailureDomainSpec type for use
 // with apply.
 type VSpherePlatformFailureDomainSpecApplyConfiguration struct {
 	Name     *string                                    `json:"name,omitempty"`
@@ -12,7 +12,7 @@ type VSpherePlatformFailureDomainSpecApplyConfiguration struct {
 	Topology *VSpherePlatformTopologyApplyConfiguration `json:"topology,omitempty"`
 }
 
-// VSpherePlatformFailureDomainSpecApplyConfiguration constructs an declarative configuration of the VSpherePlatformFailureDomainSpec type for use with
+// VSpherePlatformFailureDomainSpecApplyConfiguration constructs a declarative configuration of the VSpherePlatformFailureDomainSpec type for use with
 // apply.
 func VSpherePlatformFailureDomainSpec() *VSpherePlatformFailureDomainSpecApplyConfiguration {
 	return &VSpherePlatformFailureDomainSpecApplyConfiguration{}

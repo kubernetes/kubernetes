@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// TokenClaimValidationRuleApplyConfiguration represents an declarative configuration of the TokenClaimValidationRule type for use
+// TokenClaimValidationRuleApplyConfiguration represents a declarative configuration of the TokenClaimValidationRule type for use
 // with apply.
 type TokenClaimValidationRuleApplyConfiguration struct {
 	Type          *v1.TokenValidationRuleType           `json:"type,omitempty"`
 	RequiredClaim *TokenRequiredClaimApplyConfiguration `json:"requiredClaim,omitempty"`
 }
 
-// TokenClaimValidationRuleApplyConfiguration constructs an declarative configuration of the TokenClaimValidationRule type for use with
+// TokenClaimValidationRuleApplyConfiguration constructs a declarative configuration of the TokenClaimValidationRule type for use with
 // apply.
 func TokenClaimValidationRule() *TokenClaimValidationRuleApplyConfiguration {
 	return &TokenClaimValidationRuleApplyConfiguration{}

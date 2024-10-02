@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImagePolicyApplyConfiguration represents an declarative configuration of the ImagePolicy type for use
+// ImagePolicyApplyConfiguration represents a declarative configuration of the ImagePolicy type for use
 // with apply.
 type ImagePolicyApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ImagePolicyApplyConfiguration struct {
 	Status                           *ImagePolicyStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ImagePolicy constructs an declarative configuration of the ImagePolicy type for use with
+// ImagePolicy constructs a declarative configuration of the ImagePolicy type for use with
 // apply.
 func ImagePolicy(name, namespace string) *ImagePolicyApplyConfiguration {
 	b := &ImagePolicyApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *ImagePolicyApplyConfiguration) WithSpec(value *ImagePolicySpecApplyConf
 func (b *ImagePolicyApplyConfiguration) WithStatus(value *ImagePolicyStatusApplyConfiguration) *ImagePolicyApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImagePolicyApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

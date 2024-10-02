@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// CustomBuildStrategyApplyConfiguration represents an declarative configuration of the CustomBuildStrategy type for use
+// CustomBuildStrategyApplyConfiguration represents a declarative configuration of the CustomBuildStrategy type for use
 // with apply.
 type CustomBuildStrategyApplyConfiguration struct {
 	From               *v1.ObjectReference            `json:"from,omitempty"`
@@ -18,7 +18,7 @@ type CustomBuildStrategyApplyConfiguration struct {
 	BuildAPIVersion    *string                        `json:"buildAPIVersion,omitempty"`
 }
 
-// CustomBuildStrategyApplyConfiguration constructs an declarative configuration of the CustomBuildStrategy type for use with
+// CustomBuildStrategyApplyConfiguration constructs a declarative configuration of the CustomBuildStrategy type for use with
 // apply.
 func CustomBuildStrategy() *CustomBuildStrategyApplyConfiguration {
 	return &CustomBuildStrategyApplyConfiguration{}

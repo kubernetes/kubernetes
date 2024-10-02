@@ -2,7 +2,7 @@
 
 package v1
 
-// OAuthTemplatesApplyConfiguration represents an declarative configuration of the OAuthTemplates type for use
+// OAuthTemplatesApplyConfiguration represents a declarative configuration of the OAuthTemplates type for use
 // with apply.
 type OAuthTemplatesApplyConfiguration struct {
 	Login             *SecretNameReferenceApplyConfiguration `json:"login,omitempty"`
@@ -10,7 +10,7 @@ type OAuthTemplatesApplyConfiguration struct {
 	Error             *SecretNameReferenceApplyConfiguration `json:"error,omitempty"`
 }
 
-// OAuthTemplatesApplyConfiguration constructs an declarative configuration of the OAuthTemplates type for use with
+// OAuthTemplatesApplyConfiguration constructs a declarative configuration of the OAuthTemplates type for use with
 // apply.
 func OAuthTemplates() *OAuthTemplatesApplyConfiguration {
 	return &OAuthTemplatesApplyConfiguration{}

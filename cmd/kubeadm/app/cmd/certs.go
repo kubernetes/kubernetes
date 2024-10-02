@@ -36,7 +36,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -516,7 +516,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
 			cert.Name,
 			cert.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(time.Duration(cert.ResidualTimeSeconds)*time.Second),
+			duration.HumanDuration(time.Duration(cert.ResidualTimeSeconds)*time.Second),
 			cert.CAName,
 			yesNo(cert.ExternallyManaged),
 		)
@@ -535,7 +535,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
 			ca.Name,
 			ca.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(time.Duration(ca.ResidualTimeSeconds)*time.Second),
+			duration.HumanDuration(time.Duration(ca.ResidualTimeSeconds)*time.Second),
 			yesNo(ca.ExternallyManaged),
 		)
 		fmt.Fprintln(tabw, s)

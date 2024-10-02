@@ -22,6 +22,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/api/coordination/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -109,6 +110,16 @@ func (in *LeaseSpec) DeepCopyInto(out *LeaseSpec) {
 	if in.LeaseTransitions != nil {
 		in, out := &in.LeaseTransitions, &out.LeaseTransitions
 		*out = new(int32)
+		**out = **in
+	}
+	if in.Strategy != nil {
+		in, out := &in.Strategy, &out.Strategy
+		*out = new(v1.CoordinatedLeaseStrategy)
+		**out = **in
+	}
+	if in.PreferredHolder != nil {
+		in, out := &in.PreferredHolder, &out.PreferredHolder
+		*out = new(string)
 		**out = **in
 	}
 	return

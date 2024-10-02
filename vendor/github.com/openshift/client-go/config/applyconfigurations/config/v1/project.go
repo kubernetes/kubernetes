@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ProjectApplyConfiguration represents an declarative configuration of the Project type for use
+// ProjectApplyConfiguration represents a declarative configuration of the Project type for use
 // with apply.
 type ProjectApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ProjectApplyConfiguration struct {
 	Status                           *apiconfigv1.ProjectStatus     `json:"status,omitempty"`
 }
 
-// Project constructs an declarative configuration of the Project type for use with
+// Project constructs a declarative configuration of the Project type for use with
 // apply.
 func Project(name string) *ProjectApplyConfiguration {
 	b := &ProjectApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ProjectApplyConfiguration) WithSpec(value *ProjectSpecApplyConfiguratio
 func (b *ProjectApplyConfiguration) WithStatus(value apiconfigv1.ProjectStatus) *ProjectApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ProjectApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

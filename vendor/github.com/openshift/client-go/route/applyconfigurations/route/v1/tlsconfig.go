@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/route/v1"
 )
 
-// TLSConfigApplyConfiguration represents an declarative configuration of the TLSConfig type for use
+// TLSConfigApplyConfiguration represents a declarative configuration of the TLSConfig type for use
 // with apply.
 type TLSConfigApplyConfiguration struct {
 	Termination                   *v1.TLSTerminationType                  `json:"termination,omitempty"`
@@ -18,7 +18,7 @@ type TLSConfigApplyConfiguration struct {
 	ExternalCertificate           *LocalObjectReferenceApplyConfiguration `json:"externalCertificate,omitempty"`
 }
 
-// TLSConfigApplyConfiguration constructs an declarative configuration of the TLSConfig type for use with
+// TLSConfigApplyConfiguration constructs a declarative configuration of the TLSConfig type for use with
 // apply.
 func TLSConfig() *TLSConfigApplyConfiguration {
 	return &TLSConfigApplyConfiguration{}

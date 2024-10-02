@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StepInfoApplyConfiguration represents an declarative configuration of the StepInfo type for use
+// StepInfoApplyConfiguration represents a declarative configuration of the StepInfo type for use
 // with apply.
 type StepInfoApplyConfiguration struct {
 	Name                 *v1.StepName `json:"name,omitempty"`
@@ -15,7 +15,7 @@ type StepInfoApplyConfiguration struct {
 	DurationMilliseconds *int64       `json:"durationMilliseconds,omitempty"`
 }
 
-// StepInfoApplyConfiguration constructs an declarative configuration of the StepInfo type for use with
+// StepInfoApplyConfiguration constructs a declarative configuration of the StepInfo type for use with
 // apply.
 func StepInfo() *StepInfoApplyConfiguration {
 	return &StepInfoApplyConfiguration{}

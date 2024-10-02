@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// UserRestrictionApplyConfiguration represents an declarative configuration of the UserRestriction type for use
+// UserRestrictionApplyConfiguration represents a declarative configuration of the UserRestriction type for use
 // with apply.
 type UserRestrictionApplyConfiguration struct {
 	Users     []string                             `json:"users,omitempty"`
@@ -14,7 +14,7 @@ type UserRestrictionApplyConfiguration struct {
 	Selectors []v1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
 }
 
-// UserRestrictionApplyConfiguration constructs an declarative configuration of the UserRestriction type for use with
+// UserRestrictionApplyConfiguration constructs a declarative configuration of the UserRestriction type for use with
 // apply.
 func UserRestriction() *UserRestrictionApplyConfiguration {
 	return &UserRestrictionApplyConfiguration{}

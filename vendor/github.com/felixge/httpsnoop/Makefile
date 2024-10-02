@@ -1,7 +1,7 @@
 .PHONY: ci generate clean
 
 ci: clean generate
-	go test -v ./...
+	go test -race -v ./...
 
 generate:
 	go generate .

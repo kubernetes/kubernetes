@@ -62,7 +62,7 @@ func indexOfCondition(svm *svmv1alpha1.StorageVersionMigration, conditionType sv
 func setStatusConditions(
 	toBeUpdatedSVM *svmv1alpha1.StorageVersionMigration,
 	conditionType svmv1alpha1.MigrationConditionType,
-	reason string,
+	reason, message string,
 ) *svmv1alpha1.StorageVersionMigration {
 	if !IsConditionTrue(toBeUpdatedSVM, conditionType) {
 		if conditionType == svmv1alpha1.MigrationSucceeded || conditionType == svmv1alpha1.MigrationFailed {
@@ -77,6 +77,7 @@ func setStatusConditions(
 			Status:         corev1.ConditionTrue,
 			LastUpdateTime: metav1.Now(),
 			Reason:         reason,
+			Message:        message,
 		})
 	}
 

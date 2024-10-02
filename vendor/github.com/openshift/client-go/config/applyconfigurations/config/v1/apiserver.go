@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// APIServerApplyConfiguration represents an declarative configuration of the APIServer type for use
+// APIServerApplyConfiguration represents a declarative configuration of the APIServer type for use
 // with apply.
 type APIServerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type APIServerApplyConfiguration struct {
 	Status                           *apiconfigv1.APIServerStatus     `json:"status,omitempty"`
 }
 
-// APIServer constructs an declarative configuration of the APIServer type for use with
+// APIServer constructs a declarative configuration of the APIServer type for use with
 // apply.
 func APIServer(name string) *APIServerApplyConfiguration {
 	b := &APIServerApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *APIServerApplyConfiguration) WithSpec(value *APIServerSpecApplyConfigur
 func (b *APIServerApplyConfiguration) WithStatus(value apiconfigv1.APIServerStatus) *APIServerApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *APIServerApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

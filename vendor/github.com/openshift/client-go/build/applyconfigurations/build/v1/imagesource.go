@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ImageSourceApplyConfiguration represents an declarative configuration of the ImageSource type for use
+// ImageSourceApplyConfiguration represents a declarative configuration of the ImageSource type for use
 // with apply.
 type ImageSourceApplyConfiguration struct {
 	From       *v1.ObjectReference                 `json:"from,omitempty"`
@@ -15,7 +15,7 @@ type ImageSourceApplyConfiguration struct {
 	PullSecret *v1.LocalObjectReference            `json:"pullSecret,omitempty"`
 }
 
-// ImageSourceApplyConfiguration constructs an declarative configuration of the ImageSource type for use with
+// ImageSourceApplyConfiguration constructs a declarative configuration of the ImageSource type for use with
 // apply.
 func ImageSource() *ImageSourceApplyConfiguration {
 	return &ImageSourceApplyConfiguration{}

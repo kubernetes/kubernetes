@@ -25,6 +25,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	corev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/core/v1"
 	examplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example/v1"
 	secondexamplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example2/v1"
 	thirdexamplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example3.io/v1"
@@ -32,6 +33,7 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
+	CoreV1() corev1.CoreV1Interface
 	ExampleV1() examplev1.ExampleV1Interface
 	SecondExampleV1() secondexamplev1.SecondExampleV1Interface
 	ThirdExampleV1() thirdexamplev1.ThirdExampleV1Interface
@@ -40,9 +42,15 @@ type Interface interface {
 // Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
+	coreV1          *corev1.CoreV1Client
 	exampleV1       *examplev1.ExampleV1Client
 	secondExampleV1 *secondexamplev1.SecondExampleV1Client
 	thirdExampleV1  *thirdexamplev1.ThirdExampleV1Client
+}
+
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1.CoreV1Interface {
+	return c.coreV1
 }
 
 // ExampleV1 retrieves the ExampleV1Client
@@ -104,6 +112,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 	var cs Clientset
 	var err error
+	cs.coreV1, err = corev1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.exampleV1, err = examplev1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -137,6 +149,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
+	cs.coreV1 = corev1.New(c)
 	cs.exampleV1 = examplev1.New(c)
 	cs.secondExampleV1 = secondexamplev1.New(c)
 	cs.thirdExampleV1 = thirdexamplev1.New(c)

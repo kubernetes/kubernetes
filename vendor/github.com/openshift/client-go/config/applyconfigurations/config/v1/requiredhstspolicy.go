@@ -7,7 +7,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RequiredHSTSPolicyApplyConfiguration represents an declarative configuration of the RequiredHSTSPolicy type for use
+// RequiredHSTSPolicyApplyConfiguration represents a declarative configuration of the RequiredHSTSPolicy type for use
 // with apply.
 type RequiredHSTSPolicyApplyConfiguration struct {
 	NamespaceSelector       *v1.LabelSelectorApplyConfiguration  `json:"namespaceSelector,omitempty"`
@@ -17,7 +17,7 @@ type RequiredHSTSPolicyApplyConfiguration struct {
 	IncludeSubDomainsPolicy *apiconfigv1.IncludeSubDomainsPolicy `json:"includeSubDomainsPolicy,omitempty"`
 }
 
-// RequiredHSTSPolicyApplyConfiguration constructs an declarative configuration of the RequiredHSTSPolicy type for use with
+// RequiredHSTSPolicyApplyConfiguration constructs a declarative configuration of the RequiredHSTSPolicy type for use with
 // apply.
 func RequiredHSTSPolicy() *RequiredHSTSPolicyApplyConfiguration {
 	return &RequiredHSTSPolicyApplyConfiguration{}

@@ -6,7 +6,7 @@ import (
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
-// PolicyRootOfTrustApplyConfiguration represents an declarative configuration of the PolicyRootOfTrust type for use
+// PolicyRootOfTrustApplyConfiguration represents a declarative configuration of the PolicyRootOfTrust type for use
 // with apply.
 type PolicyRootOfTrustApplyConfiguration struct {
 	PolicyType        *v1alpha1.PolicyType                 `json:"policyType,omitempty"`
@@ -14,7 +14,7 @@ type PolicyRootOfTrustApplyConfiguration struct {
 	FulcioCAWithRekor *FulcioCAWithRekorApplyConfiguration `json:"fulcioCAWithRekor,omitempty"`
 }
 
-// PolicyRootOfTrustApplyConfiguration constructs an declarative configuration of the PolicyRootOfTrust type for use with
+// PolicyRootOfTrustApplyConfiguration constructs a declarative configuration of the PolicyRootOfTrust type for use with
 // apply.
 func PolicyRootOfTrust() *PolicyRootOfTrustApplyConfiguration {
 	return &PolicyRootOfTrustApplyConfiguration{}

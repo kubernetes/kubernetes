@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// PlatformStatusApplyConfiguration represents an declarative configuration of the PlatformStatus type for use
+// PlatformStatusApplyConfiguration represents a declarative configuration of the PlatformStatus type for use
 // with apply.
 type PlatformStatusApplyConfiguration struct {
 	Type         *v1.PlatformType                              `json:"type,omitempty"`
@@ -26,7 +26,7 @@ type PlatformStatusApplyConfiguration struct {
 	External     *ExternalPlatformStatusApplyConfiguration     `json:"external,omitempty"`
 }
 
-// PlatformStatusApplyConfiguration constructs an declarative configuration of the PlatformStatus type for use with
+// PlatformStatusApplyConfiguration constructs a declarative configuration of the PlatformStatus type for use with
 // apply.
 func PlatformStatus() *PlatformStatusApplyConfiguration {
 	return &PlatformStatusApplyConfiguration{}

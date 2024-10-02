@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BuildStatusApplyConfiguration represents an declarative configuration of the BuildStatus type for use
+// BuildStatusApplyConfiguration represents a declarative configuration of the BuildStatus type for use
 // with apply.
 type BuildStatusApplyConfiguration struct {
 	Phase                      *v1.BuildPhase                       `json:"phase,omitempty"`
@@ -28,7 +28,7 @@ type BuildStatusApplyConfiguration struct {
 	Conditions                 []BuildConditionApplyConfiguration   `json:"conditions,omitempty"`
 }
 
-// BuildStatusApplyConfiguration constructs an declarative configuration of the BuildStatus type for use with
+// BuildStatusApplyConfiguration constructs a declarative configuration of the BuildStatus type for use with
 // apply.
 func BuildStatus() *BuildStatusApplyConfiguration {
 	return &BuildStatusApplyConfiguration{}

@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildSourceApplyConfiguration represents an declarative configuration of the BuildSource type for use
+// BuildSourceApplyConfiguration represents a declarative configuration of the BuildSource type for use
 // with apply.
 type BuildSourceApplyConfiguration struct {
 	Type         *v1.BuildSourceType                      `json:"type,omitempty"`
@@ -21,7 +21,7 @@ type BuildSourceApplyConfiguration struct {
 	ConfigMaps   []ConfigMapBuildSourceApplyConfiguration `json:"configMaps,omitempty"`
 }
 
-// BuildSourceApplyConfiguration constructs an declarative configuration of the BuildSource type for use with
+// BuildSourceApplyConfiguration constructs a declarative configuration of the BuildSource type for use with
 // apply.
 func BuildSource() *BuildSourceApplyConfiguration {
 	return &BuildSourceApplyConfiguration{}

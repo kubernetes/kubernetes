@@ -716,11 +716,11 @@ func TestAddReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done := dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(d1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
@@ -729,11 +729,11 @@ func TestAddReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done = dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(d2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -801,11 +801,11 @@ func TestUpdateReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done := dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(d1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
@@ -817,11 +817,11 @@ func TestUpdateReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done = dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(d2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -953,11 +953,11 @@ func TestDeleteReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done := dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(d1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
@@ -966,11 +966,11 @@ func TestDeleteReplicaSet(t *testing.T) {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 	key, done = dc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for rs %v", rs2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(d2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }

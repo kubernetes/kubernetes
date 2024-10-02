@@ -24,6 +24,7 @@ import (
 
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	netutils "k8s.io/utils/net"
 
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -49,7 +50,8 @@ func validateClusterIPFlags(options Extra) []error {
 	}
 
 	// Complete() expected to have set Primary* and Secondary
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
 		// primary CIDR validation
 		if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
 			errs = append(errs, err)
@@ -71,7 +73,8 @@ func validateClusterIPFlags(options Extra) []error {
 		if !dualstack {
 			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
-		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) ||
+			!utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
 			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
 				errs = append(errs, err)
 			}
@@ -137,6 +140,12 @@ func (s CompletedOptions) Validate() []error {
 
 	if s.MasterCount <= 0 {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
+	}
+
+	// TODO(#125980): remove in 1.32
+	effectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor(s.GenericServerRunOptions.ComponentName)
+	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
+		errs = append(errs, err)
 	}
 
 	return errs

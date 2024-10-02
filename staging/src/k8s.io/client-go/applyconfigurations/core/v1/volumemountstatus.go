@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// VolumeMountStatusApplyConfiguration represents an declarative configuration of the VolumeMountStatus type for use
+// VolumeMountStatusApplyConfiguration represents a declarative configuration of the VolumeMountStatus type for use
 // with apply.
 type VolumeMountStatusApplyConfiguration struct {
 	Name              *string                   `json:"name,omitempty"`
@@ -31,7 +31,7 @@ type VolumeMountStatusApplyConfiguration struct {
 	RecursiveReadOnly *v1.RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty"`
 }
 
-// VolumeMountStatusApplyConfiguration constructs an declarative configuration of the VolumeMountStatus type for use with
+// VolumeMountStatusApplyConfiguration constructs a declarative configuration of the VolumeMountStatus type for use with
 // apply.
 func VolumeMountStatus() *VolumeMountStatusApplyConfiguration {
 	return &VolumeMountStatusApplyConfiguration{}

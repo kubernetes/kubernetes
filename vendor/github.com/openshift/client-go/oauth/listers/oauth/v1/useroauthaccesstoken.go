@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/oauth/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type UserOAuthAccessTokenLister interface {
 
 // userOAuthAccessTokenLister implements the UserOAuthAccessTokenLister interface.
 type userOAuthAccessTokenLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.UserOAuthAccessToken]
 }
 
 // NewUserOAuthAccessTokenLister returns a new UserOAuthAccessTokenLister.
 func NewUserOAuthAccessTokenLister(indexer cache.Indexer) UserOAuthAccessTokenLister {
-	return &userOAuthAccessTokenLister{indexer: indexer}
-}
-
-// List lists all UserOAuthAccessTokens in the indexer.
-func (s *userOAuthAccessTokenLister) List(selector labels.Selector) (ret []*v1.UserOAuthAccessToken, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.UserOAuthAccessToken))
-	})
-	return ret, err
-}
-
-// Get retrieves the UserOAuthAccessToken from the index for a given name.
-func (s *userOAuthAccessTokenLister) Get(name string) (*v1.UserOAuthAccessToken, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("useroauthaccesstoken"), name)
-	}
-	return obj.(*v1.UserOAuthAccessToken), nil
+	return &userOAuthAccessTokenLister{listers.New[*v1.UserOAuthAccessToken](indexer, v1.Resource("useroauthaccesstoken"))}
 }

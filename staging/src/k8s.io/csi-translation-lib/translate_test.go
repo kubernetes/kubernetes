@@ -445,12 +445,6 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 				VolumeID: string(uuid.NewUUID()),
 			},
 		}, nil
-	case plugins.RBDDriverName:
-		return v1.VolumeSource{
-			RBD: &v1.RBDVolumeSource{
-				RBDImage: string(uuid.NewUUID()),
-			},
-		}, nil
 	default:
 		return v1.VolumeSource{}, fmt.Errorf("couldn't find logic for driver: %v", driverName)
 	}
@@ -471,11 +465,6 @@ func TestPluginNameMappings(t *testing.T) {
 			name:             "AWS EBS plugin name",
 			inTreePluginName: "kubernetes.io/aws-ebs",
 			csiPluginName:    "ebs.csi.aws.com",
-		},
-		{
-			name:             "RBD plugin name",
-			inTreePluginName: "kubernetes.io/rbd",
-			csiPluginName:    "rbd.csi.ceph.com",
 		},
 	}
 	for _, test := range testCases {

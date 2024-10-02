@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/klog/v2"
 )
 
@@ -92,6 +93,20 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	return json.Unmarshal(value, &intstr.IntVal)
 }
 
+func (intstr *IntOrString) UnmarshalCBOR(value []byte) error {
+	if err := cbor.Unmarshal(value, &intstr.StrVal); err == nil {
+		intstr.Type = String
+		return nil
+	}
+
+	if err := cbor.Unmarshal(value, &intstr.IntVal); err != nil {
+		return err
+	}
+
+	intstr.Type = Int
+	return nil
+}
+
 // String returns the string value, or the Itoa of the int value.
 func (intstr *IntOrString) String() string {
 	if intstr == nil {
@@ -123,6 +138,17 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return json.Marshal(intstr.StrVal)
 	default:
 		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+	}
+}
+
+func (intstr IntOrString) MarshalCBOR() ([]byte, error) {
+	switch intstr.Type {
+	case Int:
+		return cbor.Marshal(intstr.IntVal)
+	case String:
+		return cbor.Marshal(intstr.StrVal)
+	default:
+		return nil, fmt.Errorf("impossible IntOrString.Type")
 	}
 }
 

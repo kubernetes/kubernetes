@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RoleBindingApplyConfiguration represents an declarative configuration of the RoleBinding type for use
+// RoleBindingApplyConfiguration represents a declarative configuration of the RoleBinding type for use
 // with apply.
 type RoleBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -23,7 +23,7 @@ type RoleBindingApplyConfiguration struct {
 	RoleRef                          *corev1.ObjectReference        `json:"roleRef,omitempty"`
 }
 
-// RoleBinding constructs an declarative configuration of the RoleBinding type for use with
+// RoleBinding constructs a declarative configuration of the RoleBinding type for use with
 // apply.
 func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 	b := &RoleBindingApplyConfiguration{}
@@ -260,4 +260,10 @@ func (b *RoleBindingApplyConfiguration) WithSubjects(values ...corev1.ObjectRefe
 func (b *RoleBindingApplyConfiguration) WithRoleRef(value corev1.ObjectReference) *RoleBindingApplyConfiguration {
 	b.RoleRef = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RoleBindingApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

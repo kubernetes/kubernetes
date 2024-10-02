@@ -27,20 +27,22 @@ var operatorhubsKind = v1.SchemeGroupVersion.WithKind("OperatorHub")
 
 // Get takes name of the operatorHub, and returns the corresponding operatorHub object, and an error if there is any.
 func (c *FakeOperatorHubs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.OperatorHub, err error) {
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(operatorhubsResource, name), &v1.OperatorHub{})
+		Invokes(testing.NewRootGetActionWithOptions(operatorhubsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
 
 // List takes label and field selectors, and returns the list of OperatorHubs that match those selectors.
 func (c *FakeOperatorHubs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.OperatorHubList, err error) {
+	emptyResult := &v1.OperatorHubList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(operatorhubsResource, operatorhubsKind, opts), &v1.OperatorHubList{})
+		Invokes(testing.NewRootListActionWithOptions(operatorhubsResource, operatorhubsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeOperatorHubs) List(ctx context.Context, opts metav1.ListOptions) (r
 // Watch returns a watch.Interface that watches the requested operatorHubs.
 func (c *FakeOperatorHubs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(operatorhubsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(operatorhubsResource, opts))
 }
 
 // Create takes the representation of a operatorHub and creates it.  Returns the server's representation of the operatorHub, and an error, if there is any.
 func (c *FakeOperatorHubs) Create(ctx context.Context, operatorHub *v1.OperatorHub, opts metav1.CreateOptions) (result *v1.OperatorHub, err error) {
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(operatorhubsResource, operatorHub), &v1.OperatorHub{})
+		Invokes(testing.NewRootCreateActionWithOptions(operatorhubsResource, operatorHub, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
 
 // Update takes the representation of a operatorHub and updates it. Returns the server's representation of the operatorHub, and an error, if there is any.
 func (c *FakeOperatorHubs) Update(ctx context.Context, operatorHub *v1.OperatorHub, opts metav1.UpdateOptions) (result *v1.OperatorHub, err error) {
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(operatorhubsResource, operatorHub), &v1.OperatorHub{})
+		Invokes(testing.NewRootUpdateActionWithOptions(operatorhubsResource, operatorHub, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeOperatorHubs) UpdateStatus(ctx context.Context, operatorHub *v1.OperatorHub, opts metav1.UpdateOptions) (*v1.OperatorHub, error) {
+func (c *FakeOperatorHubs) UpdateStatus(ctx context.Context, operatorHub *v1.OperatorHub, opts metav1.UpdateOptions) (result *v1.OperatorHub, err error) {
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(operatorhubsResource, "status", operatorHub), &v1.OperatorHub{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(operatorhubsResource, "status", operatorHub, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
@@ -102,7 +107,7 @@ func (c *FakeOperatorHubs) Delete(ctx context.Context, name string, opts metav1.
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeOperatorHubs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(operatorhubsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(operatorhubsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.OperatorHubList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeOperatorHubs) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched operatorHub.
 func (c *FakeOperatorHubs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OperatorHub, err error) {
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(operatorhubsResource, name, pt, data, subresources...), &v1.OperatorHub{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(operatorhubsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
@@ -131,10 +137,11 @@ func (c *FakeOperatorHubs) Apply(ctx context.Context, operatorHub *configv1.Oper
 	if name == nil {
 		return nil, fmt.Errorf("operatorHub.Name must be provided to Apply")
 	}
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(operatorhubsResource, *name, types.ApplyPatchType, data), &v1.OperatorHub{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(operatorhubsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }
@@ -153,10 +160,11 @@ func (c *FakeOperatorHubs) ApplyStatus(ctx context.Context, operatorHub *configv
 	if name == nil {
 		return nil, fmt.Errorf("operatorHub.Name must be provided to Apply")
 	}
+	emptyResult := &v1.OperatorHub{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(operatorhubsResource, *name, types.ApplyPatchType, data, "status"), &v1.OperatorHub{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(operatorhubsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.OperatorHub), err
 }

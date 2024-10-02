@@ -71,7 +71,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   framework.BusyBoxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -126,7 +126,16 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		// ensure all job pods run on a single node and the volume
 		// will be mounted from a hostPath instead.
 		setupHostPathDirectory(job)
-		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; else touch /data/foo ; exit 1 ; fi"}
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [[ -r /data/foo ]]
+			then
+				exit 0
+			else
+				touch /data/foo
+				exit 1
+			fi
+		`}
 	case "notTerminateOnce":
 		// Do not terminate the 0-indexed pod in the first run and
 		// succeed the second time. Fail the non-0-indexed pods until
@@ -135,7 +144,19 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		// 0th indexed pod already created the marker file.
 		setupHostPathDirectory(job)
 		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
-		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; elif [[ $JOB_COMPLETION_INDEX -eq 0 ]] ; then touch /data/foo ; sleep 1000000 ; else exit 1 ; fi"}
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [[ -r /data/foo ]]
+			then
+				exit 0
+			elif [[ $JOB_COMPLETION_INDEX -eq 0 ]]
+			then
+				touch /data/foo
+				sleep 1000000
+			else
+				exit 1
+			fi
+		`}
 	}
 	return job
 }

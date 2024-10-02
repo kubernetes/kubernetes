@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 
-// FlunderSpecApplyConfiguration represents an declarative configuration of the FlunderSpec type for use
+// FlunderSpecApplyConfiguration represents a declarative configuration of the FlunderSpec type for use
 // with apply.
 type FlunderSpecApplyConfiguration struct {
 	FlunderReference *string                `json:"flunderReference,omitempty"`
@@ -30,7 +30,7 @@ type FlunderSpecApplyConfiguration struct {
 	ReferenceType    *v1beta1.ReferenceType `json:"referenceType,omitempty"`
 }
 
-// FlunderSpecApplyConfiguration constructs an declarative configuration of the FlunderSpec type for use with
+// FlunderSpecApplyConfiguration constructs a declarative configuration of the FlunderSpec type for use with
 // apply.
 func FlunderSpec() *FlunderSpecApplyConfiguration {
 	return &FlunderSpecApplyConfiguration{}

@@ -7,7 +7,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// DNSNameResolverResolvedNameApplyConfiguration represents an declarative configuration of the DNSNameResolverResolvedName type for use
+// DNSNameResolverResolvedNameApplyConfiguration represents a declarative configuration of the DNSNameResolverResolvedName type for use
 // with apply.
 type DNSNameResolverResolvedNameApplyConfiguration struct {
 	Conditions         []v1.ConditionApplyConfiguration                   `json:"conditions,omitempty"`
@@ -16,7 +16,7 @@ type DNSNameResolverResolvedNameApplyConfiguration struct {
 	ResolutionFailures *int32                                             `json:"resolutionFailures,omitempty"`
 }
 
-// DNSNameResolverResolvedNameApplyConfiguration constructs an declarative configuration of the DNSNameResolverResolvedName type for use with
+// DNSNameResolverResolvedNameApplyConfiguration constructs a declarative configuration of the DNSNameResolverResolvedName type for use with
 // apply.
 func DNSNameResolverResolvedName() *DNSNameResolverResolvedNameApplyConfiguration {
 	return &DNSNameResolverResolvedNameApplyConfiguration{}

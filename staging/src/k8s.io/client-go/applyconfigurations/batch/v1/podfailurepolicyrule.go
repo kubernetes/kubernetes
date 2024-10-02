@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/batch/v1"
 )
 
-// PodFailurePolicyRuleApplyConfiguration represents an declarative configuration of the PodFailurePolicyRule type for use
+// PodFailurePolicyRuleApplyConfiguration represents a declarative configuration of the PodFailurePolicyRule type for use
 // with apply.
 type PodFailurePolicyRuleApplyConfiguration struct {
 	Action          *v1.PodFailurePolicyAction                                 `json:"action,omitempty"`
@@ -30,7 +30,7 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 	OnPodConditions []PodFailurePolicyOnPodConditionsPatternApplyConfiguration `json:"onPodConditions,omitempty"`
 }
 
-// PodFailurePolicyRuleApplyConfiguration constructs an declarative configuration of the PodFailurePolicyRule type for use with
+// PodFailurePolicyRuleApplyConfiguration constructs a declarative configuration of the PodFailurePolicyRule type for use with
 // apply.
 func PodFailurePolicyRule() *PodFailurePolicyRuleApplyConfiguration {
 	return &PodFailurePolicyRuleApplyConfiguration{}

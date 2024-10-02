@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/image/v1"
 )
 
-// TagImportPolicyApplyConfiguration represents an declarative configuration of the TagImportPolicy type for use
+// TagImportPolicyApplyConfiguration represents a declarative configuration of the TagImportPolicy type for use
 // with apply.
 type TagImportPolicyApplyConfiguration struct {
 	Insecure   *bool              `json:"insecure,omitempty"`
@@ -14,7 +14,7 @@ type TagImportPolicyApplyConfiguration struct {
 	ImportMode *v1.ImportModeType `json:"importMode,omitempty"`
 }
 
-// TagImportPolicyApplyConfiguration constructs an declarative configuration of the TagImportPolicy type for use with
+// TagImportPolicyApplyConfiguration constructs a declarative configuration of the TagImportPolicy type for use with
 // apply.
 func TagImportPolicy() *TagImportPolicyApplyConfiguration {
 	return &TagImportPolicyApplyConfiguration{}

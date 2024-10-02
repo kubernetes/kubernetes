@@ -128,7 +128,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -138,6 +139,26 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
           }
         ]
       }
@@ -199,7 +220,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -209,6 +231,26 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
           }
         ]
       }
@@ -271,7 +313,8 @@
           },
           "claims": [
             {
-              "name": "nameValue"
+              "name": "nameValue",
+              "request": "requestValue"
             }
           ]
         },
@@ -281,6 +324,26 @@
             "mountPath": "mountPathValue",
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
           }
         ]
       }

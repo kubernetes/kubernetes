@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// UserOAuthAccessTokenApplyConfiguration represents an declarative configuration of the UserOAuthAccessToken type for use
+// UserOAuthAccessTokenApplyConfiguration represents a declarative configuration of the UserOAuthAccessToken type for use
 // with apply.
 type UserOAuthAccessTokenApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -27,7 +27,7 @@ type UserOAuthAccessTokenApplyConfiguration struct {
 	InactivityTimeoutSeconds         *int32   `json:"inactivityTimeoutSeconds,omitempty"`
 }
 
-// UserOAuthAccessToken constructs an declarative configuration of the UserOAuthAccessToken type for use with
+// UserOAuthAccessToken constructs a declarative configuration of the UserOAuthAccessToken type for use with
 // apply.
 func UserOAuthAccessToken(name string) *UserOAuthAccessTokenApplyConfiguration {
 	b := &UserOAuthAccessTokenApplyConfiguration{}
@@ -302,4 +302,10 @@ func (b *UserOAuthAccessTokenApplyConfiguration) WithRefreshToken(value string) 
 func (b *UserOAuthAccessTokenApplyConfiguration) WithInactivityTimeoutSeconds(value int32) *UserOAuthAccessTokenApplyConfiguration {
 	b.InactivityTimeoutSeconds = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *UserOAuthAccessTokenApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -813,7 +813,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Prepend an impersonation authorizer with specific opinions about alice and bob
-			config.GenericConfig.Authorization.Authorizer = unionauthz.New(impersonateAuthorizer{}, config.GenericConfig.Authorization.Authorizer)
+			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(impersonateAuthorizer{}, config.ControlPlane.Generic.Authorization.Authorizer)
 		},
 	})
 	defer tearDownFn()
@@ -1118,7 +1118,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, trackingAuthorizer)
+			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, trackingAuthorizer)
 		},
 	})
 	defer tearDownFn()
@@ -1458,9 +1458,9 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 			opts.Authorization.PolicyFile = "testdata/allowalice.jsonl"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
+			config.ControlPlane.Generic.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 			// Disable checking API audiences that is set by testserver by default.
-			config.GenericConfig.Authentication.APIAudiences = nil
+			config.ControlPlane.Generic.Authentication.APIAudiences = nil
 		},
 	})
 	defer tearDownFn()

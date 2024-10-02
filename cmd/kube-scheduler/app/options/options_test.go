@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2/ktesting"
@@ -321,7 +322,8 @@ profiles:
 					AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
-				Logs: logs.NewOptions(),
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -372,23 +374,26 @@ profiles:
 					}
 					return cfg
 				}(),
-				Logs: logs.NewOptions(),
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\"",
 		},
 		{
 			name: "unknown version kubescheduler.config.k8s.io/unknown",
 			options: &Options{
-				ConfigFile: unknownVersionConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               unknownVersionConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"kubescheduler.config.k8s.io/unknown\"",
 		},
 		{
 			name: "config file with no version",
 			options: &Options{
-				ConfigFile: noVersionConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               noVersionConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: "Object 'apiVersion' is missing",
 		},
@@ -424,7 +429,8 @@ profiles:
 					AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
-				Logs: logs.NewOptions(),
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -496,7 +502,8 @@ profiles:
 					AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 					AlwaysAllowGroups:            []string{"system:masters"},
 				},
-				Logs: logs.NewOptions(),
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				TypeMeta: metav1.TypeMeta{
@@ -539,8 +546,9 @@ profiles:
 		{
 			name: "plugin config",
 			options: &Options{
-				ConfigFile: pluginConfigFile,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               pluginConfigFile,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -659,8 +667,9 @@ profiles:
 		{
 			name: "multiple profiles",
 			options: &Options{
-				ConfigFile: multiProfilesConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               multiProfilesConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
@@ -774,15 +783,17 @@ profiles:
 		{
 			name: "no config",
 			options: &Options{
-				Logs: logs.NewOptions(),
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: "no configuration has been provided",
 		},
 		{
 			name: "unknown field",
 			options: &Options{
-				ConfigFile: unknownFieldConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               unknownFieldConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: `unknown field "foo"`,
 			checkErrFn:    runtime.IsStrictDecodingError,
@@ -790,8 +801,9 @@ profiles:
 		{
 			name: "duplicate fields",
 			options: &Options{
-				ConfigFile: duplicateFieldConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               duplicateFieldConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedError: `key "leaderElect" already set`,
 			checkErrFn:    runtime.IsStrictDecodingError,
@@ -799,8 +811,9 @@ profiles:
 		{
 			name: "high throughput profile",
 			options: &Options{
-				ConfigFile: highThroughputProfileConfig,
-				Logs:       logs.NewOptions(),
+				ConfigFile:               highThroughputProfileConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{

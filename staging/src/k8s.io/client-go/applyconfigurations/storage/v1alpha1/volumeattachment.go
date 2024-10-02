@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// VolumeAttachmentApplyConfiguration represents an declarative configuration of the VolumeAttachment type for use
+// VolumeAttachmentApplyConfiguration represents a declarative configuration of the VolumeAttachment type for use
 // with apply.
 type VolumeAttachmentApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type VolumeAttachmentApplyConfiguration struct {
 	Status                           *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// VolumeAttachment constructs an declarative configuration of the VolumeAttachment type for use with
+// VolumeAttachment constructs a declarative configuration of the VolumeAttachment type for use with
 // apply.
 func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 	b := &VolumeAttachmentApplyConfiguration{}
@@ -253,4 +253,10 @@ func (b *VolumeAttachmentApplyConfiguration) WithSpec(value *VolumeAttachmentSpe
 func (b *VolumeAttachmentApplyConfiguration) WithStatus(value *VolumeAttachmentStatusApplyConfiguration) *VolumeAttachmentApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *VolumeAttachmentApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

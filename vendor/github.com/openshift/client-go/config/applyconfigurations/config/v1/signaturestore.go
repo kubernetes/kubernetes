@@ -2,14 +2,14 @@
 
 package v1
 
-// SignatureStoreApplyConfiguration represents an declarative configuration of the SignatureStore type for use
+// SignatureStoreApplyConfiguration represents a declarative configuration of the SignatureStore type for use
 // with apply.
 type SignatureStoreApplyConfiguration struct {
 	URL *string                                   `json:"url,omitempty"`
 	CA  *ConfigMapNameReferenceApplyConfiguration `json:"ca,omitempty"`
 }
 
-// SignatureStoreApplyConfiguration constructs an declarative configuration of the SignatureStore type for use with
+// SignatureStoreApplyConfiguration constructs a declarative configuration of the SignatureStore type for use with
 // apply.
 func SignatureStore() *SignatureStoreApplyConfiguration {
 	return &SignatureStoreApplyConfiguration{}

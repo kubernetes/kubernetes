@@ -2,13 +2,13 @@
 
 package v1
 
-// RouteStatusApplyConfiguration represents an declarative configuration of the RouteStatus type for use
+// RouteStatusApplyConfiguration represents a declarative configuration of the RouteStatus type for use
 // with apply.
 type RouteStatusApplyConfiguration struct {
 	Ingress []RouteIngressApplyConfiguration `json:"ingress,omitempty"`
 }
 
-// RouteStatusApplyConfiguration constructs an declarative configuration of the RouteStatus type for use with
+// RouteStatusApplyConfiguration constructs a declarative configuration of the RouteStatus type for use with
 // apply.
 func RouteStatus() *RouteStatusApplyConfiguration {
 	return &RouteStatusApplyConfiguration{}

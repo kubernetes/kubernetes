@@ -63,6 +63,15 @@ kube::codegen::gen_client \
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
+    --output-dir "${SCRIPT_ROOT}/single" \
+    --output-pkg "${THIS_PKG}/single" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    --one-input-api "api" \
+    "${SCRIPT_ROOT}/single"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --with-applyconfig \
     --output-dir "${SCRIPT_ROOT}/MixedCase" \
     --output-pkg "${THIS_PKG}/MixedCase" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \

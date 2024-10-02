@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ContainerResourceMetricSourceApplyConfiguration represents an declarative configuration of the ContainerResourceMetricSource type for use
+// ContainerResourceMetricSourceApplyConfiguration represents a declarative configuration of the ContainerResourceMetricSource type for use
 // with apply.
 type ContainerResourceMetricSourceApplyConfiguration struct {
 	Name      *v1.ResourceName                `json:"name,omitempty"`
@@ -30,7 +30,7 @@ type ContainerResourceMetricSourceApplyConfiguration struct {
 	Container *string                         `json:"container,omitempty"`
 }
 
-// ContainerResourceMetricSourceApplyConfiguration constructs an declarative configuration of the ContainerResourceMetricSource type for use with
+// ContainerResourceMetricSourceApplyConfiguration constructs a declarative configuration of the ContainerResourceMetricSource type for use with
 // apply.
 func ContainerResourceMetricSource() *ContainerResourceMetricSourceApplyConfiguration {
 	return &ContainerResourceMetricSourceApplyConfiguration{}

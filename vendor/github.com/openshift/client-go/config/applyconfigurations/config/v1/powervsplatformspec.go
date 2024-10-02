@@ -2,13 +2,13 @@
 
 package v1
 
-// PowerVSPlatformSpecApplyConfiguration represents an declarative configuration of the PowerVSPlatformSpec type for use
+// PowerVSPlatformSpecApplyConfiguration represents a declarative configuration of the PowerVSPlatformSpec type for use
 // with apply.
 type PowerVSPlatformSpecApplyConfiguration struct {
 	ServiceEndpoints []PowerVSServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
 }
 
-// PowerVSPlatformSpecApplyConfiguration constructs an declarative configuration of the PowerVSPlatformSpec type for use with
+// PowerVSPlatformSpecApplyConfiguration constructs a declarative configuration of the PowerVSPlatformSpec type for use with
 // apply.
 func PowerVSPlatformSpec() *PowerVSPlatformSpecApplyConfiguration {
 	return &PowerVSPlatformSpecApplyConfiguration{}

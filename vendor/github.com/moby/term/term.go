@@ -1,100 +1,85 @@
-//go:build !windows
-// +build !windows
-
-// Package term provides structures and helper functions to work with
-// terminal (state, sizes).
 package term
 
-import (
-	"errors"
-	"io"
-	"os"
+import "io"
 
-	"golang.org/x/sys/unix"
-)
-
-// ErrInvalidState is returned if the state of the terminal is invalid.
-var ErrInvalidState = errors.New("Invalid terminal state")
-
-// State represents the state of the terminal.
-type State struct {
-	termios Termios
-}
+// State holds the platform-specific state / console mode for the terminal.
+type State terminalState
 
 // Winsize represents the size of the terminal window.
 type Winsize struct {
 	Height uint16
 	Width  uint16
-	x      uint16
-	y      uint16
+
+	// Only used on Unix
+	x uint16
+	y uint16
 }
 
 // StdStreams returns the standard streams (stdin, stdout, stderr).
+//
+// On Windows, it attempts to turn on VT handling on all std handles if
+// supported, or falls back to terminal emulation. On Unix, this returns
+// the standard [os.Stdin], [os.Stdout] and [os.Stderr].
 func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
-	return os.Stdin, os.Stdout, os.Stderr
+	return stdStreams()
 }
 
 // GetFdInfo returns the file descriptor for an os.File and indicates whether the file represents a terminal.
-func GetFdInfo(in interface{}) (uintptr, bool) {
-	var inFd uintptr
-	var isTerminalIn bool
-	if file, ok := in.(*os.File); ok {
-		inFd = file.Fd()
-		isTerminalIn = IsTerminal(inFd)
-	}
-	return inFd, isTerminalIn
+func GetFdInfo(in interface{}) (fd uintptr, isTerminal bool) {
+	return getFdInfo(in)
+}
+
+// GetWinsize returns the window size based on the specified file descriptor.
+func GetWinsize(fd uintptr) (*Winsize, error) {
+	return getWinsize(fd)
+}
+
+// SetWinsize tries to set the specified window size for the specified file
+// descriptor. It is only implemented on Unix, and returns an error on Windows.
+func SetWinsize(fd uintptr, ws *Winsize) error {
+	return setWinsize(fd, ws)
 }
 
 // IsTerminal returns true if the given file descriptor is a terminal.
 func IsTerminal(fd uintptr) bool {
-	_, err := tcget(fd)
-	return err == nil
+	return isTerminal(fd)
 }
 
 // RestoreTerminal restores the terminal connected to the given file descriptor
 // to a previous state.
 func RestoreTerminal(fd uintptr, state *State) error {
-	if state == nil {
-		return ErrInvalidState
-	}
-	return tcset(fd, &state.termios)
+	return restoreTerminal(fd, state)
 }
 
 // SaveState saves the state of the terminal connected to the given file descriptor.
 func SaveState(fd uintptr) (*State, error) {
-	termios, err := tcget(fd)
-	if err != nil {
-		return nil, err
-	}
-	return &State{termios: *termios}, nil
+	return saveState(fd)
 }
 
 // DisableEcho applies the specified state to the terminal connected to the file
 // descriptor, with echo disabled.
 func DisableEcho(fd uintptr, state *State) error {
-	newState := state.termios
-	newState.Lflag &^= unix.ECHO
-
-	if err := tcset(fd, &newState); err != nil {
-		return err
-	}
-	return nil
+	return disableEcho(fd, state)
 }
 
 // SetRawTerminal puts the terminal connected to the given file descriptor into
-// raw mode and returns the previous state. On UNIX, this puts both the input
-// and output into raw mode. On Windows, it only puts the input into raw mode.
-func SetRawTerminal(fd uintptr) (*State, error) {
-	oldState, err := MakeRaw(fd)
-	if err != nil {
-		return nil, err
-	}
-	return oldState, err
+// raw mode and returns the previous state. On UNIX, this is the equivalent of
+// [MakeRaw], and puts both the input and output into raw mode. On Windows, it
+// only puts the input into raw mode.
+func SetRawTerminal(fd uintptr) (previousState *State, err error) {
+	return setRawTerminal(fd)
 }
 
 // SetRawTerminalOutput puts the output of terminal connected to the given file
 // descriptor into raw mode. On UNIX, this does nothing and returns nil for the
 // state. On Windows, it disables LF -> CRLF translation.
-func SetRawTerminalOutput(fd uintptr) (*State, error) {
-	return nil, nil
+func SetRawTerminalOutput(fd uintptr) (previousState *State, err error) {
+	return setRawTerminalOutput(fd)
+}
+
+// MakeRaw puts the terminal (Windows Console) connected to the
+// given file descriptor into raw mode and returns the previous state of
+// the terminal so that it can be restored.
+func MakeRaw(fd uintptr) (previousState *State, err error) {
+	return makeRaw(fd)
 }

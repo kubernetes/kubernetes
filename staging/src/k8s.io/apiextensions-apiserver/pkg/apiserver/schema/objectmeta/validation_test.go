@@ -171,11 +171,9 @@ func TestValidate(t *testing.T) {
 						},
 					},
 					"additionalProperties": {
-						Generic: structuralschema.Generic{
-							AdditionalProperties: &structuralschema.StructuralOrBool{
-								Structural: &structuralschema.Structural{
-									Extensions: structuralschema.Extensions{XEmbeddedResource: true},
-								},
+						AdditionalProperties: &structuralschema.StructuralOrBool{
+							Structural: &structuralschema.Structural{
+								Extensions: structuralschema.Extensions{XEmbeddedResource: true},
 							},
 						},
 					},

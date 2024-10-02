@@ -2,13 +2,13 @@
 
 package v1
 
-// ExternalPlatformStatusApplyConfiguration represents an declarative configuration of the ExternalPlatformStatus type for use
+// ExternalPlatformStatusApplyConfiguration represents a declarative configuration of the ExternalPlatformStatus type for use
 // with apply.
 type ExternalPlatformStatusApplyConfiguration struct {
 	CloudControllerManager *CloudControllerManagerStatusApplyConfiguration `json:"cloudControllerManager,omitempty"`
 }
 
-// ExternalPlatformStatusApplyConfiguration constructs an declarative configuration of the ExternalPlatformStatus type for use with
+// ExternalPlatformStatusApplyConfiguration constructs a declarative configuration of the ExternalPlatformStatus type for use with
 // apply.
 func ExternalPlatformStatus() *ExternalPlatformStatusApplyConfiguration {
 	return &ExternalPlatformStatusApplyConfiguration{}

@@ -21,30 +21,33 @@ var useridentitymappingsKind = v1.SchemeGroupVersion.WithKind("UserIdentityMappi
 
 // Get takes name of the userIdentityMapping, and returns the corresponding userIdentityMapping object, and an error if there is any.
 func (c *FakeUserIdentityMappings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.UserIdentityMapping, err error) {
+	emptyResult := &v1.UserIdentityMapping{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(useridentitymappingsResource, name), &v1.UserIdentityMapping{})
+		Invokes(testing.NewRootGetActionWithOptions(useridentitymappingsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UserIdentityMapping), err
 }
 
 // Create takes the representation of a userIdentityMapping and creates it.  Returns the server's representation of the userIdentityMapping, and an error, if there is any.
 func (c *FakeUserIdentityMappings) Create(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.CreateOptions) (result *v1.UserIdentityMapping, err error) {
+	emptyResult := &v1.UserIdentityMapping{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(useridentitymappingsResource, userIdentityMapping), &v1.UserIdentityMapping{})
+		Invokes(testing.NewRootCreateActionWithOptions(useridentitymappingsResource, userIdentityMapping, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UserIdentityMapping), err
 }
 
 // Update takes the representation of a userIdentityMapping and updates it. Returns the server's representation of the userIdentityMapping, and an error, if there is any.
 func (c *FakeUserIdentityMappings) Update(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.UpdateOptions) (result *v1.UserIdentityMapping, err error) {
+	emptyResult := &v1.UserIdentityMapping{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(useridentitymappingsResource, userIdentityMapping), &v1.UserIdentityMapping{})
+		Invokes(testing.NewRootUpdateActionWithOptions(useridentitymappingsResource, userIdentityMapping, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.UserIdentityMapping), err
 }

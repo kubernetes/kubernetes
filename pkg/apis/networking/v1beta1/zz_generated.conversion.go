@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/networking/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -56,6 +57,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*v1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*v1beta1.HTTPIngressRuleValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IPAddress)(nil), (*networking.IPAddress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IPAddress_To_networking_IPAddress(a.(*v1beta1.IPAddress), b.(*networking.IPAddress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddress)(nil), (*v1beta1.IPAddress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddress_To_v1beta1_IPAddress(a.(*networking.IPAddress), b.(*v1beta1.IPAddress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IPAddressList)(nil), (*networking.IPAddressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IPAddressList_To_networking_IPAddressList(a.(*v1beta1.IPAddressList), b.(*networking.IPAddressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddressList)(nil), (*v1beta1.IPAddressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddressList_To_v1beta1_IPAddressList(a.(*networking.IPAddressList), b.(*v1beta1.IPAddressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IPAddressSpec)(nil), (*networking.IPAddressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(a.(*v1beta1.IPAddressSpec), b.(*networking.IPAddressSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddressSpec)(nil), (*v1beta1.IPAddressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(a.(*networking.IPAddressSpec), b.(*v1beta1.IPAddressSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -189,6 +220,56 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ParentReference)(nil), (*networking.ParentReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ParentReference_To_networking_ParentReference(a.(*v1beta1.ParentReference), b.(*networking.ParentReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ParentReference)(nil), (*v1beta1.ParentReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ParentReference_To_v1beta1_ParentReference(a.(*networking.ParentReference), b.(*v1beta1.ParentReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ServiceCIDR)(nil), (*networking.ServiceCIDR)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ServiceCIDR_To_networking_ServiceCIDR(a.(*v1beta1.ServiceCIDR), b.(*networking.ServiceCIDR), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDR)(nil), (*v1beta1.ServiceCIDR)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDR_To_v1beta1_ServiceCIDR(a.(*networking.ServiceCIDR), b.(*v1beta1.ServiceCIDR), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ServiceCIDRList)(nil), (*networking.ServiceCIDRList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ServiceCIDRList_To_networking_ServiceCIDRList(a.(*v1beta1.ServiceCIDRList), b.(*networking.ServiceCIDRList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRList)(nil), (*v1beta1.ServiceCIDRList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList(a.(*networking.ServiceCIDRList), b.(*v1beta1.ServiceCIDRList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ServiceCIDRSpec)(nil), (*networking.ServiceCIDRSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(a.(*v1beta1.ServiceCIDRSpec), b.(*networking.ServiceCIDRSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRSpec)(nil), (*v1beta1.ServiceCIDRSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(a.(*networking.ServiceCIDRSpec), b.(*v1beta1.ServiceCIDRSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ServiceCIDRStatus)(nil), (*networking.ServiceCIDRStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(a.(*v1beta1.ServiceCIDRStatus), b.(*networking.ServiceCIDRStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRStatus)(nil), (*v1beta1.ServiceCIDRStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(a.(*networking.ServiceCIDRStatus), b.(*v1beta1.ServiceCIDRStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*networking.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*v1beta1.IngressBackend), scope)
 	}); err != nil {
@@ -278,6 +359,74 @@ func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue
 // Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue is an autogenerated conversion function.
 func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in, out, s)
+}
+
+func autoConvert_v1beta1_IPAddress_To_networking_IPAddress(in *v1beta1.IPAddress, out *networking.IPAddress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_IPAddress_To_networking_IPAddress is an autogenerated conversion function.
+func Convert_v1beta1_IPAddress_To_networking_IPAddress(in *v1beta1.IPAddress, out *networking.IPAddress, s conversion.Scope) error {
+	return autoConvert_v1beta1_IPAddress_To_networking_IPAddress(in, out, s)
+}
+
+func autoConvert_networking_IPAddress_To_v1beta1_IPAddress(in *networking.IPAddress, out *v1beta1.IPAddress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_networking_IPAddress_To_v1beta1_IPAddress is an autogenerated conversion function.
+func Convert_networking_IPAddress_To_v1beta1_IPAddress(in *networking.IPAddress, out *v1beta1.IPAddress, s conversion.Scope) error {
+	return autoConvert_networking_IPAddress_To_v1beta1_IPAddress(in, out, s)
+}
+
+func autoConvert_v1beta1_IPAddressList_To_networking_IPAddressList(in *v1beta1.IPAddressList, out *networking.IPAddressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networking.IPAddress)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_IPAddressList_To_networking_IPAddressList is an autogenerated conversion function.
+func Convert_v1beta1_IPAddressList_To_networking_IPAddressList(in *v1beta1.IPAddressList, out *networking.IPAddressList, s conversion.Scope) error {
+	return autoConvert_v1beta1_IPAddressList_To_networking_IPAddressList(in, out, s)
+}
+
+func autoConvert_networking_IPAddressList_To_v1beta1_IPAddressList(in *networking.IPAddressList, out *v1beta1.IPAddressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1beta1.IPAddress)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_networking_IPAddressList_To_v1beta1_IPAddressList is an autogenerated conversion function.
+func Convert_networking_IPAddressList_To_v1beta1_IPAddressList(in *networking.IPAddressList, out *v1beta1.IPAddressList, s conversion.Scope) error {
+	return autoConvert_networking_IPAddressList_To_v1beta1_IPAddressList(in, out, s)
+}
+
+func autoConvert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(in *v1beta1.IPAddressSpec, out *networking.IPAddressSpec, s conversion.Scope) error {
+	out.ParentRef = (*networking.ParentReference)(unsafe.Pointer(in.ParentRef))
+	return nil
+}
+
+// Convert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec is an autogenerated conversion function.
+func Convert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(in *v1beta1.IPAddressSpec, out *networking.IPAddressSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_IPAddressSpec_To_networking_IPAddressSpec(in, out, s)
+}
+
+func autoConvert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(in *networking.IPAddressSpec, out *v1beta1.IPAddressSpec, s conversion.Scope) error {
+	out.ParentRef = (*v1beta1.ParentReference)(unsafe.Pointer(in.ParentRef))
+	return nil
+}
+
+// Convert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec is an autogenerated conversion function.
+func Convert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(in *networking.IPAddressSpec, out *v1beta1.IPAddressSpec, s conversion.Scope) error {
+	return autoConvert_networking_IPAddressSpec_To_v1beta1_IPAddressSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
@@ -675,4 +824,124 @@ func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.Ingr
 // Convert_networking_IngressTLS_To_v1beta1_IngressTLS is an autogenerated conversion function.
 func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *v1beta1.IngressTLS, s conversion.Scope) error {
 	return autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in, out, s)
+}
+
+func autoConvert_v1beta1_ParentReference_To_networking_ParentReference(in *v1beta1.ParentReference, out *networking.ParentReference, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1beta1_ParentReference_To_networking_ParentReference is an autogenerated conversion function.
+func Convert_v1beta1_ParentReference_To_networking_ParentReference(in *v1beta1.ParentReference, out *networking.ParentReference, s conversion.Scope) error {
+	return autoConvert_v1beta1_ParentReference_To_networking_ParentReference(in, out, s)
+}
+
+func autoConvert_networking_ParentReference_To_v1beta1_ParentReference(in *networking.ParentReference, out *v1beta1.ParentReference, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_networking_ParentReference_To_v1beta1_ParentReference is an autogenerated conversion function.
+func Convert_networking_ParentReference_To_v1beta1_ParentReference(in *networking.ParentReference, out *v1beta1.ParentReference, s conversion.Scope) error {
+	return autoConvert_networking_ParentReference_To_v1beta1_ParentReference(in, out, s)
+}
+
+func autoConvert_v1beta1_ServiceCIDR_To_networking_ServiceCIDR(in *v1beta1.ServiceCIDR, out *networking.ServiceCIDR, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_ServiceCIDR_To_networking_ServiceCIDR is an autogenerated conversion function.
+func Convert_v1beta1_ServiceCIDR_To_networking_ServiceCIDR(in *v1beta1.ServiceCIDR, out *networking.ServiceCIDR, s conversion.Scope) error {
+	return autoConvert_v1beta1_ServiceCIDR_To_networking_ServiceCIDR(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDR_To_v1beta1_ServiceCIDR(in *networking.ServiceCIDR, out *v1beta1.ServiceCIDR, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_networking_ServiceCIDR_To_v1beta1_ServiceCIDR is an autogenerated conversion function.
+func Convert_networking_ServiceCIDR_To_v1beta1_ServiceCIDR(in *networking.ServiceCIDR, out *v1beta1.ServiceCIDR, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDR_To_v1beta1_ServiceCIDR(in, out, s)
+}
+
+func autoConvert_v1beta1_ServiceCIDRList_To_networking_ServiceCIDRList(in *v1beta1.ServiceCIDRList, out *networking.ServiceCIDRList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networking.ServiceCIDR)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_ServiceCIDRList_To_networking_ServiceCIDRList is an autogenerated conversion function.
+func Convert_v1beta1_ServiceCIDRList_To_networking_ServiceCIDRList(in *v1beta1.ServiceCIDRList, out *networking.ServiceCIDRList, s conversion.Scope) error {
+	return autoConvert_v1beta1_ServiceCIDRList_To_networking_ServiceCIDRList(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList(in *networking.ServiceCIDRList, out *v1beta1.ServiceCIDRList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1beta1.ServiceCIDR)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList(in *networking.ServiceCIDRList, out *v1beta1.ServiceCIDRList, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRList_To_v1beta1_ServiceCIDRList(in, out, s)
+}
+
+func autoConvert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *v1beta1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	return nil
+}
+
+// Convert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec is an autogenerated conversion function.
+func Convert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *v1beta1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *v1beta1.ServiceCIDRSpec, s conversion.Scope) error {
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *v1beta1.ServiceCIDRSpec, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRSpec_To_v1beta1_ServiceCIDRSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *v1beta1.ServiceCIDRStatus, out *networking.ServiceCIDRStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+// Convert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus is an autogenerated conversion function.
+func Convert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *v1beta1.ServiceCIDRStatus, out *networking.ServiceCIDRStatus, s conversion.Scope) error {
+	return autoConvert_v1beta1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(in *networking.ServiceCIDRStatus, out *v1beta1.ServiceCIDRStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(in *networking.ServiceCIDRStatus, out *v1beta1.ServiceCIDRStatus, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRStatus_To_v1beta1_ServiceCIDRStatus(in, out, s)
 }

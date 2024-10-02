@@ -22,7 +22,7 @@ import (
 	v2beta2 "k8s.io/api/autoscaling/v2beta2"
 )
 
-// MetricStatusApplyConfiguration represents an declarative configuration of the MetricStatus type for use
+// MetricStatusApplyConfiguration represents a declarative configuration of the MetricStatus type for use
 // with apply.
 type MetricStatusApplyConfiguration struct {
 	Type              *v2beta2.MetricSourceType                        `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type MetricStatusApplyConfiguration struct {
 	External          *ExternalMetricStatusApplyConfiguration          `json:"external,omitempty"`
 }
 
-// MetricStatusApplyConfiguration constructs an declarative configuration of the MetricStatus type for use with
+// MetricStatusApplyConfiguration constructs a declarative configuration of the MetricStatus type for use with
 // apply.
 func MetricStatus() *MetricStatusApplyConfiguration {
 	return &MetricStatusApplyConfiguration{}

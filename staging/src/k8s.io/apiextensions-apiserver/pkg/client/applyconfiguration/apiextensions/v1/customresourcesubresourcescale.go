@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// CustomResourceSubresourceScaleApplyConfiguration represents an declarative configuration of the CustomResourceSubresourceScale type for use
+// CustomResourceSubresourceScaleApplyConfiguration represents a declarative configuration of the CustomResourceSubresourceScale type for use
 // with apply.
 type CustomResourceSubresourceScaleApplyConfiguration struct {
 	SpecReplicasPath   *string `json:"specReplicasPath,omitempty"`
@@ -26,7 +26,7 @@ type CustomResourceSubresourceScaleApplyConfiguration struct {
 	LabelSelectorPath  *string `json:"labelSelectorPath,omitempty"`
 }
 
-// CustomResourceSubresourceScaleApplyConfiguration constructs an declarative configuration of the CustomResourceSubresourceScale type for use with
+// CustomResourceSubresourceScaleApplyConfiguration constructs a declarative configuration of the CustomResourceSubresourceScale type for use with
 // apply.
 func CustomResourceSubresourceScale() *CustomResourceSubresourceScaleApplyConfiguration {
 	return &CustomResourceSubresourceScaleApplyConfiguration{}

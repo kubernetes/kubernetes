@@ -97,7 +97,7 @@ func (e *legacyEnumWrapper) Number() protoreflect.EnumNumber {
 func (e *legacyEnumWrapper) ProtoReflect() protoreflect.Enum {
 	return e
 }
-func (e *legacyEnumWrapper) protoUnwrap() interface{} {
+func (e *legacyEnumWrapper) protoUnwrap() any {
 	v := reflect.New(e.goTyp).Elem()
 	v.SetInt(int64(e.num))
 	return v.Interface()
@@ -167,6 +167,7 @@ func aberrantLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
 	ed := &filedesc.Enum{L2: new(filedesc.EnumL2)}
 	ed.L0.FullName = AberrantDeriveFullName(t) // e.g., github_com.user.repo.MyEnum
 	ed.L0.ParentFile = filedesc.SurrogateProto3
+	ed.L1.EditionFeatures = ed.L0.ParentFile.L1.EditionFeatures
 	ed.L2.Values.List = append(ed.L2.Values.List, filedesc.EnumValue{})
 
 	// TODO: Use the presence of a UnmarshalJSON method to determine proto2?

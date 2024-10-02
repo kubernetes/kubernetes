@@ -58,7 +58,7 @@ type Controller struct {
 	configMapInformer cache.SharedIndexInformer
 	configMapCache    cache.Indexer
 	configMapSynced   cache.InformerSynced
-	queue             workqueue.RateLimitingInterface
+	queue             workqueue.TypedRateLimitingInterface[string]
 
 	// rate limiter controls the rate limit of the creation of the configmap.
 	// this is useful in multi-apiserver cluster to prevent config existing in a
@@ -80,8 +80,11 @@ func newController(cs kubernetes.Interface, cl clock.Clock, limiter *rate.Limite
 	})
 
 	c := &Controller{
-		configMapClient:     cs.CoreV1(),
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "legacy_token_tracking_controller"),
+		configMapClient: cs.CoreV1(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "legacy_token_tracking_controller"},
+		),
 		configMapInformer:   informer,
 		configMapCache:      informer.GetIndexer(),
 		configMapSynced:     informer.HasSynced,

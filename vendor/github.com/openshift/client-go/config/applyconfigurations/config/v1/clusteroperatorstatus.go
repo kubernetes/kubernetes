@@ -6,7 +6,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// ClusterOperatorStatusApplyConfiguration represents an declarative configuration of the ClusterOperatorStatus type for use
+// ClusterOperatorStatusApplyConfiguration represents a declarative configuration of the ClusterOperatorStatus type for use
 // with apply.
 type ClusterOperatorStatusApplyConfiguration struct {
 	Conditions     []ClusterOperatorStatusConditionApplyConfiguration `json:"conditions,omitempty"`
@@ -15,7 +15,7 @@ type ClusterOperatorStatusApplyConfiguration struct {
 	Extension      *runtime.RawExtension                              `json:"extension,omitempty"`
 }
 
-// ClusterOperatorStatusApplyConfiguration constructs an declarative configuration of the ClusterOperatorStatus type for use with
+// ClusterOperatorStatusApplyConfiguration constructs a declarative configuration of the ClusterOperatorStatus type for use with
 // apply.
 func ClusterOperatorStatus() *ClusterOperatorStatusApplyConfiguration {
 	return &ClusterOperatorStatusApplyConfiguration{}

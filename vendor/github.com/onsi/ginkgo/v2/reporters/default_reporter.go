@@ -182,9 +182,30 @@ func (r *DefaultReporter) WillRun(report types.SpecReport) {
 	r.emitBlock(r.f(r.codeLocationBlock(report, "{{/}}", v.Is(types.VerbosityLevelVeryVerbose), false)))
 }
 
+func (r *DefaultReporter) wrapTextBlock(sectionName string, fn func()) {
+	r.emitBlock("\n")
+	if r.conf.GithubOutput {
+		r.emitBlock(r.fi(1, "::group::%s", sectionName))
+	} else {
+		r.emitBlock(r.fi(1, "{{gray}}%s >>{{/}}", sectionName))
+	}
+	fn()
+	if r.conf.GithubOutput {
+		r.emitBlock(r.fi(1, "::endgroup::"))
+	} else {
+		r.emitBlock(r.fi(1, "{{gray}}<< %s{{/}}", sectionName))
+	}
+
+}
+
 func (r *DefaultReporter) DidRun(report types.SpecReport) {
 	v := r.conf.Verbosity()
 	inParallel := report.RunningInParallel
+
+	//should we completely omit this spec?
+	if report.State.Is(types.SpecStateSkipped) && r.conf.SilenceSkips {
+		return
+	}
 
 	header := r.specDenoter
 	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
@@ -262,9 +283,12 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 		}
 	}
 
-	// If we have no content to show, jsut emit the header and return
+	// If we have no content to show, just emit the header and return
 	if !reportHasContent {
 		r.emit(r.f(highlightColor + header + "{{/}}"))
+		if r.conf.ForceNewlines {
+			r.emit("\n")
+		}
 		return
 	}
 
@@ -283,26 +307,23 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 
 	//Emit Stdout/Stderr Output
 	if showSeparateStdSection {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Captured StdOut/StdErr Output >>{{/}}"))
-		r.emitBlock(r.fi(1, "%s", report.CapturedStdOutErr))
-		r.emitBlock(r.fi(1, "{{gray}}<< Captured StdOut/StdErr Output{{/}}"))
+		r.wrapTextBlock("Captured StdOut/StdErr Output", func() {
+			r.emitBlock(r.fi(1, "%s", report.CapturedStdOutErr))
+		})
 	}
 
 	if showSeparateVisibilityAlwaysReportsSection {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Report Entries >>{{/}}"))
-		for _, entry := range report.ReportEntries.WithVisibility(types.ReportEntryVisibilityAlways) {
-			r.emitReportEntry(1, entry)
-		}
-		r.emitBlock(r.fi(1, "{{gray}}<< Report Entries{{/}}"))
+		r.wrapTextBlock("Report Entries", func() {
+			for _, entry := range report.ReportEntries.WithVisibility(types.ReportEntryVisibilityAlways) {
+				r.emitReportEntry(1, entry)
+			}
+		})
 	}
 
 	if showTimeline {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Timeline >>{{/}}"))
-		r.emitTimeline(1, report, timeline)
-		r.emitBlock(r.fi(1, "{{gray}}<< Timeline{{/}}"))
+		r.wrapTextBlock("Timeline", func() {
+			r.emitTimeline(1, report, timeline)
+		})
 	}
 
 	// Emit Failure Message
@@ -405,7 +426,15 @@ func (r *DefaultReporter) emitShortFailure(indent uint, state types.SpecState, f
 func (r *DefaultReporter) emitFailure(indent uint, state types.SpecState, failure types.Failure, includeAdditionalFailure bool) {
 	highlightColor := r.highlightColorForState(state)
 	r.emitBlock(r.fi(indent, highlightColor+"[%s] %s{{/}}", r.humanReadableState(state), failure.Message))
-	r.emitBlock(r.fi(indent, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}} {{gray}}@ %s{{/}}\n", failure.FailureNodeType, failure.Location, failure.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	if r.conf.GithubOutput {
+		level := "error"
+		if state.Is(types.SpecStateSkipped) {
+			level = "notice"
+		}
+		r.emitBlock(r.fi(indent, "::%s file=%s,line=%d::%s %s", level, failure.Location.FileName, failure.Location.LineNumber, failure.FailureNodeType, failure.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	} else {
+		r.emitBlock(r.fi(indent, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}} {{gray}}@ %s{{/}}\n", failure.FailureNodeType, failure.Location, failure.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	}
 	if failure.ForwardedPanic != "" {
 		r.emitBlock("\n")
 		r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.ForwardedPanic))

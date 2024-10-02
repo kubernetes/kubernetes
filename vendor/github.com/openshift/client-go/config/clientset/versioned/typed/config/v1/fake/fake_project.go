@@ -27,20 +27,22 @@ var projectsKind = v1.SchemeGroupVersion.WithKind("Project")
 
 // Get takes name of the project, and returns the corresponding project object, and an error if there is any.
 func (c *FakeProjects) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Project, err error) {
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(projectsResource, name), &v1.Project{})
+		Invokes(testing.NewRootGetActionWithOptions(projectsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
 
 // List takes label and field selectors, and returns the list of Projects that match those selectors.
 func (c *FakeProjects) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ProjectList, err error) {
+	emptyResult := &v1.ProjectList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(projectsResource, projectsKind, opts), &v1.ProjectList{})
+		Invokes(testing.NewRootListActionWithOptions(projectsResource, projectsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,36 +61,39 @@ func (c *FakeProjects) List(ctx context.Context, opts metav1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested projects.
 func (c *FakeProjects) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(projectsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(projectsResource, opts))
 }
 
 // Create takes the representation of a project and creates it.  Returns the server's representation of the project, and an error, if there is any.
 func (c *FakeProjects) Create(ctx context.Context, project *v1.Project, opts metav1.CreateOptions) (result *v1.Project, err error) {
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(projectsResource, project), &v1.Project{})
+		Invokes(testing.NewRootCreateActionWithOptions(projectsResource, project, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
 
 // Update takes the representation of a project and updates it. Returns the server's representation of the project, and an error, if there is any.
 func (c *FakeProjects) Update(ctx context.Context, project *v1.Project, opts metav1.UpdateOptions) (result *v1.Project, err error) {
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(projectsResource, project), &v1.Project{})
+		Invokes(testing.NewRootUpdateActionWithOptions(projectsResource, project, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeProjects) UpdateStatus(ctx context.Context, project *v1.Project, opts metav1.UpdateOptions) (*v1.Project, error) {
+func (c *FakeProjects) UpdateStatus(ctx context.Context, project *v1.Project, opts metav1.UpdateOptions) (result *v1.Project, err error) {
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(projectsResource, "status", project), &v1.Project{})
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(projectsResource, "status", project, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
@@ -102,7 +107,7 @@ func (c *FakeProjects) Delete(ctx context.Context, name string, opts metav1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeProjects) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(projectsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(projectsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ProjectList{})
 	return err
@@ -110,10 +115,11 @@ func (c *FakeProjects) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 
 // Patch applies the patch and returns the patched project.
 func (c *FakeProjects) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Project, err error) {
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, name, pt, data, subresources...), &v1.Project{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(projectsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
@@ -131,10 +137,11 @@ func (c *FakeProjects) Apply(ctx context.Context, project *configv1.ProjectApply
 	if name == nil {
 		return nil, fmt.Errorf("project.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, *name, types.ApplyPatchType, data), &v1.Project{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(projectsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }
@@ -153,10 +160,11 @@ func (c *FakeProjects) ApplyStatus(ctx context.Context, project *configv1.Projec
 	if name == nil {
 		return nil, fmt.Errorf("project.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Project{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, *name, types.ApplyPatchType, data, "status"), &v1.Project{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(projectsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Project), err
 }

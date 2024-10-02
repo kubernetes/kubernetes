@@ -2,7 +2,7 @@
 
 package v1
 
-// RegistrySourcesApplyConfiguration represents an declarative configuration of the RegistrySources type for use
+// RegistrySourcesApplyConfiguration represents a declarative configuration of the RegistrySources type for use
 // with apply.
 type RegistrySourcesApplyConfiguration struct {
 	InsecureRegistries               []string `json:"insecureRegistries,omitempty"`
@@ -11,7 +11,7 @@ type RegistrySourcesApplyConfiguration struct {
 	ContainerRuntimeSearchRegistries []string `json:"containerRuntimeSearchRegistries,omitempty"`
 }
 
-// RegistrySourcesApplyConfiguration constructs an declarative configuration of the RegistrySources type for use with
+// RegistrySourcesApplyConfiguration constructs a declarative configuration of the RegistrySources type for use with
 // apply.
 func RegistrySources() *RegistrySourcesApplyConfiguration {
 	return &RegistrySourcesApplyConfiguration{}

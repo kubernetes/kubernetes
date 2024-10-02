@@ -2,14 +2,14 @@
 
 package v1
 
-// VSpherePlatformNodeNetworkingApplyConfiguration represents an declarative configuration of the VSpherePlatformNodeNetworking type for use
+// VSpherePlatformNodeNetworkingApplyConfiguration represents a declarative configuration of the VSpherePlatformNodeNetworking type for use
 // with apply.
 type VSpherePlatformNodeNetworkingApplyConfiguration struct {
 	External *VSpherePlatformNodeNetworkingSpecApplyConfiguration `json:"external,omitempty"`
 	Internal *VSpherePlatformNodeNetworkingSpecApplyConfiguration `json:"internal,omitempty"`
 }
 
-// VSpherePlatformNodeNetworkingApplyConfiguration constructs an declarative configuration of the VSpherePlatformNodeNetworking type for use with
+// VSpherePlatformNodeNetworkingApplyConfiguration constructs a declarative configuration of the VSpherePlatformNodeNetworking type for use with
 // apply.
 func VSpherePlatformNodeNetworking() *VSpherePlatformNodeNetworkingApplyConfiguration {
 	return &VSpherePlatformNodeNetworkingApplyConfiguration{}

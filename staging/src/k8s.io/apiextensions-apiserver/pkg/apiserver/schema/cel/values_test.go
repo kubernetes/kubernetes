@@ -100,10 +100,10 @@ var (
 	mapSchema = schema.Structural{
 		Generic: schema.Generic{
 			Type: "object",
-			AdditionalProperties: &schema.StructuralOrBool{
-				Bool:       true,
-				Structural: &stringSchema,
-			},
+		},
+		AdditionalProperties: &schema.StructuralOrBool{
+			Bool:       true,
+			Structural: &stringSchema,
 		},
 	}
 )

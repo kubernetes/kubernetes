@@ -22,11 +22,12 @@ var localresourceaccessreviewsKind = v1.SchemeGroupVersion.WithKind("LocalResour
 
 // Create takes the representation of a localResourceAccessReview and creates it.  Returns the server's representation of the resourceAccessReviewResponse, and an error, if there is any.
 func (c *FakeLocalResourceAccessReviews) Create(ctx context.Context, localResourceAccessReview *v1.LocalResourceAccessReview, opts metav1.CreateOptions) (result *v1.ResourceAccessReviewResponse, err error) {
+	emptyResult := &v1.ResourceAccessReviewResponse{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(localresourceaccessreviewsResource, c.ns, localResourceAccessReview), &v1.ResourceAccessReviewResponse{})
+		Invokes(testing.NewCreateActionWithOptions(localresourceaccessreviewsResource, c.ns, localResourceAccessReview, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceAccessReviewResponse), err
 }

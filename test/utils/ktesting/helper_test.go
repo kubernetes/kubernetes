@@ -56,11 +56,11 @@ func (tc testcase) run(t *testing.T) {
 	}
 
 	duration := time.Since(start)
-	assert.InDelta(t, tc.expectDuration.Seconds(), duration.Seconds(), 0.1, fmt.Sprintf("callback invocation duration %s", duration))
+	assert.InDelta(t, tc.expectDuration.Seconds(), duration.Seconds(), 0.1, "callback invocation duration %s", duration)
 	assert.Equal(t, !tc.expectNoFail, tCtx.Failed(), "Failed()")
 	if tc.expectError == "" {
 		assert.NoError(t, err)
-	} else if assert.NotNil(t, err) {
+	} else if assert.Error(t, err) {
 		t.Logf("Result:\n%s", err.Error())
 		assert.Equal(t, tc.expectError, normalize(err.Error()))
 	}

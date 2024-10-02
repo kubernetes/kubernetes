@@ -2,14 +2,14 @@
 
 package v1
 
-// KeystoneIdentityProviderApplyConfiguration represents an declarative configuration of the KeystoneIdentityProvider type for use
+// KeystoneIdentityProviderApplyConfiguration represents a declarative configuration of the KeystoneIdentityProvider type for use
 // with apply.
 type KeystoneIdentityProviderApplyConfiguration struct {
 	OAuthRemoteConnectionInfoApplyConfiguration `json:",inline"`
 	DomainName                                  *string `json:"domainName,omitempty"`
 }
 
-// KeystoneIdentityProviderApplyConfiguration constructs an declarative configuration of the KeystoneIdentityProvider type for use with
+// KeystoneIdentityProviderApplyConfiguration constructs a declarative configuration of the KeystoneIdentityProvider type for use with
 // apply.
 func KeystoneIdentityProvider() *KeystoneIdentityProviderApplyConfiguration {
 	return &KeystoneIdentityProviderApplyConfiguration{}

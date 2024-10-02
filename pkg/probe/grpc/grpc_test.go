@@ -102,7 +102,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 			fmt.Fprint(w, "res")
 		}))
 		u := strings.Split(server.URL, ":")
-		assert.Equal(t, 3, len(u))
+		assert.Len(t, u, 3)
 
 		port, err := strconv.Atoi(u[2])
 		assert.Equal(t, nil, err)

@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/template/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -22,25 +22,17 @@ type TemplateLister interface {
 
 // templateLister implements the TemplateLister interface.
 type templateLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Template]
 }
 
 // NewTemplateLister returns a new TemplateLister.
 func NewTemplateLister(indexer cache.Indexer) TemplateLister {
-	return &templateLister{indexer: indexer}
-}
-
-// List lists all Templates in the indexer.
-func (s *templateLister) List(selector labels.Selector) (ret []*v1.Template, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Template))
-	})
-	return ret, err
+	return &templateLister{listers.New[*v1.Template](indexer, v1.Resource("template"))}
 }
 
 // Templates returns an object that can list and get Templates.
 func (s *templateLister) Templates(namespace string) TemplateNamespaceLister {
-	return templateNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return templateNamespaceLister{listers.NewNamespaced[*v1.Template](s.ResourceIndexer, namespace)}
 }
 
 // TemplateNamespaceLister helps list and get Templates.
@@ -58,26 +50,5 @@ type TemplateNamespaceLister interface {
 // templateNamespaceLister implements the TemplateNamespaceLister
 // interface.
 type templateNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Templates in the indexer for a given namespace.
-func (s templateNamespaceLister) List(selector labels.Selector) (ret []*v1.Template, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Template))
-	})
-	return ret, err
-}
-
-// Get retrieves the Template from the indexer for a given namespace and name.
-func (s templateNamespaceLister) Get(name string) (*v1.Template, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("template"), name)
-	}
-	return obj.(*v1.Template), nil
+	listers.ResourceIndexer[*v1.Template]
 }

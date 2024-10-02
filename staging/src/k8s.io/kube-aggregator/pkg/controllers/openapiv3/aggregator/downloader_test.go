@@ -71,7 +71,7 @@ func TestDownloadOpenAPISpec(t *testing.T) {
 		handlerTest{data: []byte(""), etag: ""})
 	assert.NoError(t, err)
 	if assert.NotNil(t, groups) {
-		assert.Equal(t, len(groups.Paths), 1)
+		assert.Len(t, groups.Paths, 1)
 		if assert.Contains(t, groups.Paths, "apis/group/version") {
 			assert.NotEmpty(t, groups.Paths["apis/group/version"].ServerRelativeURL)
 		}

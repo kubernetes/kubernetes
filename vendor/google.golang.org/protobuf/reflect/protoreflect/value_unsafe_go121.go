@@ -15,7 +15,7 @@ import (
 
 type (
 	ifaceHeader struct {
-		_    [0]interface{} // if interfaces have greater alignment than unsafe.Pointer, this will enforce it.
+		_    [0]any // if interfaces have greater alignment than unsafe.Pointer, this will enforce it.
 		Type unsafe.Pointer
 		Data unsafe.Pointer
 	}
@@ -37,7 +37,7 @@ var (
 
 // typeOf returns a pointer to the Go type information.
 // The pointer is comparable and equal if and only if the types are identical.
-func typeOf(t interface{}) unsafe.Pointer {
+func typeOf(t any) unsafe.Pointer {
 	return (*ifaceHeader)(unsafe.Pointer(&t)).Type
 }
 
@@ -70,7 +70,7 @@ func valueOfString(v string) Value {
 func valueOfBytes(v []byte) Value {
 	return Value{typ: bytesType, ptr: unsafe.Pointer(unsafe.SliceData(v)), num: uint64(len(v))}
 }
-func valueOfIface(v interface{}) Value {
+func valueOfIface(v any) Value {
 	p := (*ifaceHeader)(unsafe.Pointer(&v))
 	return Value{typ: p.Type, ptr: p.Data}
 }
@@ -81,7 +81,7 @@ func (v Value) getString() string {
 func (v Value) getBytes() []byte {
 	return unsafe.Slice((*byte)(v.ptr), v.num)
 }
-func (v Value) getIface() (x interface{}) {
+func (v Value) getIface() (x any) {
 	*(*ifaceHeader)(unsafe.Pointer(&x)) = ifaceHeader{Type: v.typ, Data: v.ptr}
 	return x
 }

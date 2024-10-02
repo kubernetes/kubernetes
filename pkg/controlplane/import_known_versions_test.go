@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apinamingtest "k8s.io/apimachinery/pkg/api/apitesting/naming"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -54,22 +55,25 @@ func TestGroupVersions(t *testing.T) {
 // but are also registered in internal versions (or referenced from internal types),
 // so we explicitly allow tags for them
 var typesAllowedTags = map[reflect.Type]bool{
-	reflect.TypeOf(intstr.IntOrString{}):          true,
-	reflect.TypeOf(metav1.Time{}):                 true,
-	reflect.TypeOf(metav1.MicroTime{}):            true,
-	reflect.TypeOf(metav1.Duration{}):             true,
-	reflect.TypeOf(metav1.TypeMeta{}):             true,
-	reflect.TypeOf(metav1.ListMeta{}):             true,
-	reflect.TypeOf(metav1.ObjectMeta{}):           true,
-	reflect.TypeOf(metav1.OwnerReference{}):       true,
-	reflect.TypeOf(metav1.LabelSelector{}):        true,
-	reflect.TypeOf(metav1.GetOptions{}):           true,
-	reflect.TypeOf(metav1.ListOptions{}):          true,
-	reflect.TypeOf(metav1.DeleteOptions{}):        true,
-	reflect.TypeOf(metav1.GroupVersionKind{}):     true,
-	reflect.TypeOf(metav1.GroupVersionResource{}): true,
-	reflect.TypeOf(metav1.Status{}):               true,
-	reflect.TypeOf(metav1.Condition{}):            true,
+	reflect.TypeOf(intstr.IntOrString{}):              true,
+	reflect.TypeOf(metav1.Time{}):                     true,
+	reflect.TypeOf(metav1.MicroTime{}):                true,
+	reflect.TypeOf(metav1.Duration{}):                 true,
+	reflect.TypeOf(metav1.TypeMeta{}):                 true,
+	reflect.TypeOf(metav1.ListMeta{}):                 true,
+	reflect.TypeOf(metav1.ObjectMeta{}):               true,
+	reflect.TypeOf(metav1.OwnerReference{}):           true,
+	reflect.TypeOf(metav1.LabelSelector{}):            true,
+	reflect.TypeOf(metav1.LabelSelectorRequirement{}): true,
+	reflect.TypeOf(metav1.FieldSelectorRequirement{}): true,
+	reflect.TypeOf(metav1.GetOptions{}):               true,
+	reflect.TypeOf(metav1.ListOptions{}):              true,
+	reflect.TypeOf(metav1.DeleteOptions{}):            true,
+	reflect.TypeOf(metav1.GroupVersionKind{}):         true,
+	reflect.TypeOf(metav1.GroupVersionResource{}):     true,
+	reflect.TypeOf(metav1.Status{}):                   true,
+	reflect.TypeOf(metav1.Condition{}):                true,
+	reflect.TypeOf(runtime.RawExtension{}):            true,
 }
 
 // These fields are limited exceptions to the standard JSON naming structure.

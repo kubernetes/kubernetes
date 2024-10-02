@@ -1,3 +1,7 @@
+# 3.10
+
+* Add support for the -v flag on Windows. It prints the version similarly to Linux. ([#125067](https://github.com/kubernetes/kubernetes/pull/125067), [@neolit123](https://github.com/neolit123))
+
 # 3.9
 
 * Unsupported Windows Semi-Annual Channel container images removed (OS Versions removed: 20H2). ([#112924](https://github.com/kubernetes/kubernetes/pull/112924), [@marosset](https://github.com/marosset))

@@ -56,11 +56,6 @@ func validNewClaim(name, ns string) *resource.ResourceClaim {
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: resource.ResourceClaimSpec{
-			ResourceClassName: "example",
-			AllocationMode:    resource.AllocationModeImmediate,
-		},
-		Status: resource.ResourceClaimStatus{},
 	}
 	return claim
 }
@@ -97,6 +92,12 @@ func TestUpdate(t *testing.T) {
 				object.Labels = map[string]string{}
 			}
 			object.Labels["foo"] = "bar"
+			return object
+		},
+		// invalid update
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*resource.ResourceClaim)
+			object.Name = "^%$#@#%"
 			return object
 		},
 	)
@@ -164,7 +165,6 @@ func TestUpdateStatus(t *testing.T) {
 	}
 
 	claim := claimStart.DeepCopy()
-	claim.Status.DriverName = "some-driver.example.com"
 	claim.Status.Allocation = &resource.AllocationResult{}
 	_, _, err = statusStorage.Update(ctx, claim.Name, rest.DefaultUpdatedObjectInfo(claim), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {

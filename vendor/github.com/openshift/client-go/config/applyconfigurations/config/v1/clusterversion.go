@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterVersionApplyConfiguration represents an declarative configuration of the ClusterVersion type for use
+// ClusterVersionApplyConfiguration represents a declarative configuration of the ClusterVersion type for use
 // with apply.
 type ClusterVersionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ClusterVersionApplyConfiguration struct {
 	Status                           *ClusterVersionStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ClusterVersion constructs an declarative configuration of the ClusterVersion type for use with
+// ClusterVersion constructs a declarative configuration of the ClusterVersion type for use with
 // apply.
 func ClusterVersion(name string) *ClusterVersionApplyConfiguration {
 	b := &ClusterVersionApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ClusterVersionApplyConfiguration) WithSpec(value *ClusterVersionSpecApp
 func (b *ClusterVersionApplyConfiguration) WithStatus(value *ClusterVersionStatusApplyConfiguration) *ClusterVersionApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterVersionApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

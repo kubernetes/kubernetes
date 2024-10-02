@@ -2,13 +2,13 @@
 
 package v1
 
-// AWSPlatformSpecApplyConfiguration represents an declarative configuration of the AWSPlatformSpec type for use
+// AWSPlatformSpecApplyConfiguration represents a declarative configuration of the AWSPlatformSpec type for use
 // with apply.
 type AWSPlatformSpecApplyConfiguration struct {
 	ServiceEndpoints []AWSServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
 }
 
-// AWSPlatformSpecApplyConfiguration constructs an declarative configuration of the AWSPlatformSpec type for use with
+// AWSPlatformSpecApplyConfiguration constructs a declarative configuration of the AWSPlatformSpec type for use with
 // apply.
 func AWSPlatformSpec() *AWSPlatformSpecApplyConfiguration {
 	return &AWSPlatformSpecApplyConfiguration{}

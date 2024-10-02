@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PersistentVolumeClaimStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimStatus type for use
+// PersistentVolumeClaimStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimStatus type for use
 // with apply.
 type PersistentVolumeClaimStatusApplyConfiguration struct {
 	Phase                            *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
@@ -35,7 +35,7 @@ type PersistentVolumeClaimStatusApplyConfiguration struct {
 	ModifyVolumeStatus               *ModifyVolumeStatusApplyConfiguration              `json:"modifyVolumeStatus,omitempty"`
 }
 
-// PersistentVolumeClaimStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimStatus type for use with
+// PersistentVolumeClaimStatusApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimStatus type for use with
 // apply.
 func PersistentVolumeClaimStatus() *PersistentVolumeClaimStatusApplyConfiguration {
 	return &PersistentVolumeClaimStatusApplyConfiguration{}

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
-// ClusterTrustBundleSpecApplyConfiguration represents an declarative configuration of the ClusterTrustBundleSpec type for use
+// ClusterTrustBundleSpecApplyConfiguration represents a declarative configuration of the ClusterTrustBundleSpec type for use
 // with apply.
 type ClusterTrustBundleSpecApplyConfiguration struct {
 	SignerName  *string `json:"signerName,omitempty"`
 	TrustBundle *string `json:"trustBundle,omitempty"`
 }
 
-// ClusterTrustBundleSpecApplyConfiguration constructs an declarative configuration of the ClusterTrustBundleSpec type for use with
+// ClusterTrustBundleSpecApplyConfiguration constructs a declarative configuration of the ClusterTrustBundleSpec type for use with
 // apply.
 func ClusterTrustBundleSpec() *ClusterTrustBundleSpecApplyConfiguration {
 	return &ClusterTrustBundleSpecApplyConfiguration{}

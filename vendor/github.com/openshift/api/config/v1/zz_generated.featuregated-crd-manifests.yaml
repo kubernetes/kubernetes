@@ -218,7 +218,8 @@ images.config.openshift.io:
   CRDName: images.config.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - ImageStreamImportMode
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -313,6 +314,7 @@ infrastructures.config.openshift.io:
   - GCPClusterHostedDNS
   - GCPLabelsTags
   - VSphereControlPlaneMachineSet
+  - VSphereMultiNetworks
   - VSphereMultiVCenters
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
@@ -359,7 +361,6 @@ networks.config.openshift.io:
   Category: ""
   FeatureGates:
   - NetworkDiagnosticsConfig
-  - NetworkLiveMigration
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"

@@ -28,6 +28,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -179,6 +180,13 @@ func (cm *containerManagerStub) UnprepareDynamicResources(*v1.Pod) error {
 
 func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *containerManagerStub) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+}
+
+func (cm *containerManagerStub) Updates() <-chan resourceupdates.Update {
+	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

@@ -2,14 +2,14 @@
 
 package v1
 
-// NetworkMigrationApplyConfiguration represents an declarative configuration of the NetworkMigration type for use
+// NetworkMigrationApplyConfiguration represents a declarative configuration of the NetworkMigration type for use
 // with apply.
 type NetworkMigrationApplyConfiguration struct {
 	NetworkType *string                         `json:"networkType,omitempty"`
 	MTU         *MTUMigrationApplyConfiguration `json:"mtu,omitempty"`
 }
 
-// NetworkMigrationApplyConfiguration constructs an declarative configuration of the NetworkMigration type for use with
+// NetworkMigrationApplyConfiguration constructs a declarative configuration of the NetworkMigration type for use with
 // apply.
 func NetworkMigration() *NetworkMigrationApplyConfiguration {
 	return &NetworkMigrationApplyConfiguration{}

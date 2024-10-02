@@ -33,11 +33,11 @@ func (sv SimpleValue) MarshalCBOR() ([]byte, error) {
 	// only has a single representation variant)."
 
 	switch {
-	case sv <= 23:
+	case sv <= maxSimpleValueInAdditionalInformation:
 		return []byte{byte(cborTypePrimitives) | byte(sv)}, nil
 
-	case sv >= 32:
-		return []byte{byte(cborTypePrimitives) | byte(24), byte(sv)}, nil
+	case sv >= minSimpleValueIn1ByteArgument:
+		return []byte{byte(cborTypePrimitives) | additionalInformationWith1ByteArgument, byte(sv)}, nil
 
 	default:
 		return nil, &UnsupportedValueError{msg: fmt.Sprintf("SimpleValue(%d)", sv)}
@@ -57,7 +57,7 @@ func (sv *SimpleValue) UnmarshalCBOR(data []byte) error {
 	if typ != cborTypePrimitives {
 		return &UnmarshalTypeError{CBORType: typ.String(), GoType: "SimpleValue"}
 	}
-	if ai > 24 {
+	if ai > additionalInformationWith1ByteArgument {
 		return &UnmarshalTypeError{CBORType: typ.String(), GoType: "SimpleValue", errorMsg: "not simple values"}
 	}
 

@@ -39,8 +39,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/service"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/klog/v2"
 )
@@ -205,7 +205,7 @@ func main() {
 						Containers: []v1.Container{
 							{
 								Name:  "serve-hostname",
-								Image: e2e.ServeHostnameImage,
+								Image: imageutils.GetE2EImage(imageutils.Agnhost),
 								Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},

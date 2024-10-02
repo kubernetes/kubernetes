@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// IdentityApplyConfiguration represents an declarative configuration of the Identity type for use
+// IdentityApplyConfiguration represents a declarative configuration of the Identity type for use
 // with apply.
 type IdentityApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -23,7 +23,7 @@ type IdentityApplyConfiguration struct {
 	Extra                            map[string]string       `json:"extra,omitempty"`
 }
 
-// Identity constructs an declarative configuration of the Identity type for use with
+// Identity constructs a declarative configuration of the Identity type for use with
 // apply.
 func Identity(name string) *IdentityApplyConfiguration {
 	b := &IdentityApplyConfiguration{}
@@ -262,4 +262,10 @@ func (b *IdentityApplyConfiguration) WithExtra(entries map[string]string) *Ident
 		b.Extra[k] = v
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *IdentityApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

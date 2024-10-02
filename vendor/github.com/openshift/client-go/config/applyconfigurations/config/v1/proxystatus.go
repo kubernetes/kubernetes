@@ -2,7 +2,7 @@
 
 package v1
 
-// ProxyStatusApplyConfiguration represents an declarative configuration of the ProxyStatus type for use
+// ProxyStatusApplyConfiguration represents a declarative configuration of the ProxyStatus type for use
 // with apply.
 type ProxyStatusApplyConfiguration struct {
 	HTTPProxy  *string `json:"httpProxy,omitempty"`
@@ -10,7 +10,7 @@ type ProxyStatusApplyConfiguration struct {
 	NoProxy    *string `json:"noProxy,omitempty"`
 }
 
-// ProxyStatusApplyConfiguration constructs an declarative configuration of the ProxyStatus type for use with
+// ProxyStatusApplyConfiguration constructs a declarative configuration of the ProxyStatus type for use with
 // apply.
 func ProxyStatus() *ProxyStatusApplyConfiguration {
 	return &ProxyStatusApplyConfiguration{}

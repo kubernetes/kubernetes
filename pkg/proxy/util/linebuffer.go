@@ -19,6 +19,9 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
+	"github.com/go-logr/logr"
 )
 
 // LineBuffer is an interface for writing lines of input to a bytes.Buffer
@@ -45,6 +48,8 @@ type LineBuffer interface {
 	// you never wrote any newlines to the buffer yourself.
 	Lines() int
 }
+
+var _ logr.Marshaler = &realLineBuffer{}
 
 type realLineBuffer struct {
 	b     bytes.Buffer
@@ -106,6 +111,11 @@ func (buf *realLineBuffer) String() string {
 // Lines is part of LineBuffer
 func (buf *realLineBuffer) Lines() int {
 	return buf.lines
+}
+
+// Implements the logs.Marshaler interface
+func (buf *realLineBuffer) MarshalLog() any {
+	return strings.Split(buf.b.String(), "\n")
 }
 
 type discardLineBuffer struct {

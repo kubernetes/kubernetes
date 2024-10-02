@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// CustomDeploymentStrategyParamsApplyConfiguration represents an declarative configuration of the CustomDeploymentStrategyParams type for use
+// CustomDeploymentStrategyParamsApplyConfiguration represents a declarative configuration of the CustomDeploymentStrategyParams type for use
 // with apply.
 type CustomDeploymentStrategyParamsApplyConfiguration struct {
 	Image       *string     `json:"image,omitempty"`
@@ -14,7 +14,7 @@ type CustomDeploymentStrategyParamsApplyConfiguration struct {
 	Command     []string    `json:"command,omitempty"`
 }
 
-// CustomDeploymentStrategyParamsApplyConfiguration constructs an declarative configuration of the CustomDeploymentStrategyParams type for use with
+// CustomDeploymentStrategyParamsApplyConfiguration constructs a declarative configuration of the CustomDeploymentStrategyParams type for use with
 // apply.
 func CustomDeploymentStrategyParams() *CustomDeploymentStrategyParamsApplyConfiguration {
 	return &CustomDeploymentStrategyParamsApplyConfiguration{}

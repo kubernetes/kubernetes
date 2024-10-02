@@ -61,7 +61,7 @@ type quotaEvaluator struct {
 	// The technique is valuable for rollup activities to avoid fanout and reduce resource contention.
 	// We could move this into a library if another component needed it.
 	// queue is indexed by namespace, so that we bundle up on a per-namespace basis
-	queue      *workqueue.Type
+	queue      *workqueue.Typed[string]
 	workLock   sync.Mutex
 	work       map[string][]*admissionWaiter
 	dirtyWork  map[string][]*admissionWaiter
@@ -122,7 +122,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		ignoredResources: ignoredResources,
 		registry:         quotaRegistry,
 
-		queue:      workqueue.NewNamed("admission_quota_controller"),
+		queue:      workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "admission_quota_controller"}),
 		work:       map[string][]*admissionWaiter{},
 		dirtyWork:  map[string][]*admissionWaiter{},
 		inProgress: sets.String{},
@@ -666,11 +666,10 @@ func (e *quotaEvaluator) completeWork(ns string) {
 // returned namespace (regardless of whether the work item list is
 // empty).
 func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
-	uncastNS, shutdown := e.queue.Get()
+	ns, shutdown := e.queue.Get()
 	if shutdown {
 		return "", []*admissionWaiter{}, shutdown
 	}
-	ns := uncastNS.(string)
 
 	e.workLock.Lock()
 	defer e.workLock.Unlock()

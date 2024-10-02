@@ -316,7 +316,7 @@ if [[ -n "${NODE_ACCELERATORS}" ]]; then
 fi
 
 # List of the set of feature gates recognized by the GCP CCM
-export CCM_FEATURE_GATES="APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,CustomResourceValidationExpressions,KMSv2,OpenAPIEnums,OpenAPIV3,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
+export CCM_FEATURE_GATES="APIPriorityAndFairness,APIResponseCompression,APIServerIdentity,APIServerTracing,AllAlpha,AllBeta,KMSv2,OpenAPIEnums,OpenAPIV3,ServerSideFieldValidation,StorageVersionAPI,StorageVersionHash"
 
 # Optional: Install cluster DNS.
 # Set CLUSTER_DNS_CORE_DNS to 'false' to install kube-dns instead of CoreDNS.
@@ -532,7 +532,7 @@ KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
 # as an addon daemonset.
 KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
-# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs, nftables].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
 # Will be passed into the kube-proxy via `--detect-local-mode`

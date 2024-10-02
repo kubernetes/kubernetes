@@ -2,7 +2,7 @@
 
 package v1
 
-// RouteTargetReferenceApplyConfiguration represents an declarative configuration of the RouteTargetReference type for use
+// RouteTargetReferenceApplyConfiguration represents a declarative configuration of the RouteTargetReference type for use
 // with apply.
 type RouteTargetReferenceApplyConfiguration struct {
 	Kind   *string `json:"kind,omitempty"`
@@ -10,7 +10,7 @@ type RouteTargetReferenceApplyConfiguration struct {
 	Weight *int32  `json:"weight,omitempty"`
 }
 
-// RouteTargetReferenceApplyConfiguration constructs an declarative configuration of the RouteTargetReference type for use with
+// RouteTargetReferenceApplyConfiguration constructs a declarative configuration of the RouteTargetReference type for use with
 // apply.
 func RouteTargetReference() *RouteTargetReferenceApplyConfiguration {
 	return &RouteTargetReferenceApplyConfiguration{}

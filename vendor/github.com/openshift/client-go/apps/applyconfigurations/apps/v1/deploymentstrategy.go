@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// DeploymentStrategyApplyConfiguration represents an declarative configuration of the DeploymentStrategy type for use
+// DeploymentStrategyApplyConfiguration represents a declarative configuration of the DeploymentStrategy type for use
 // with apply.
 type DeploymentStrategyApplyConfiguration struct {
 	Type                  *v1.DeploymentStrategyType                          `json:"type,omitempty"`
@@ -20,7 +20,7 @@ type DeploymentStrategyApplyConfiguration struct {
 	ActiveDeadlineSeconds *int64                                              `json:"activeDeadlineSeconds,omitempty"`
 }
 
-// DeploymentStrategyApplyConfiguration constructs an declarative configuration of the DeploymentStrategy type for use with
+// DeploymentStrategyApplyConfiguration constructs a declarative configuration of the DeploymentStrategy type for use with
 // apply.
 func DeploymentStrategy() *DeploymentStrategyApplyConfiguration {
 	return &DeploymentStrategyApplyConfiguration{}

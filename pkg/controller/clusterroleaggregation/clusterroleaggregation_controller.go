@@ -48,7 +48,7 @@ type ClusterRoleAggregationController struct {
 	clusterRolesSynced cache.InformerSynced
 
 	syncHandler func(ctx context.Context, key string) error
-	queue       workqueue.RateLimitingInterface
+	queue       workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewClusterRoleAggregation creates a new controller
@@ -58,7 +58,12 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 		clusterRoleLister:  clusterRoleInformer.Lister(),
 		clusterRolesSynced: clusterRoleInformer.Informer().HasSynced,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ClusterRoleAggregator"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "ClusterRoleAggregator",
+			},
+		),
 	}
 	c.syncHandler = c.syncClusterRole
 
@@ -212,7 +217,7 @@ func (c *ClusterRoleAggregationController) processNextWorkItem(ctx context.Conte
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.syncHandler(ctx, dsKey.(string))
+	err := c.syncHandler(ctx, dsKey)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true

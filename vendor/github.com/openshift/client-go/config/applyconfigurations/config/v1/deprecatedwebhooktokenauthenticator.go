@@ -2,13 +2,13 @@
 
 package v1
 
-// DeprecatedWebhookTokenAuthenticatorApplyConfiguration represents an declarative configuration of the DeprecatedWebhookTokenAuthenticator type for use
+// DeprecatedWebhookTokenAuthenticatorApplyConfiguration represents a declarative configuration of the DeprecatedWebhookTokenAuthenticator type for use
 // with apply.
 type DeprecatedWebhookTokenAuthenticatorApplyConfiguration struct {
 	KubeConfig *SecretNameReferenceApplyConfiguration `json:"kubeConfig,omitempty"`
 }
 
-// DeprecatedWebhookTokenAuthenticatorApplyConfiguration constructs an declarative configuration of the DeprecatedWebhookTokenAuthenticator type for use with
+// DeprecatedWebhookTokenAuthenticatorApplyConfiguration constructs a declarative configuration of the DeprecatedWebhookTokenAuthenticator type for use with
 // apply.
 func DeprecatedWebhookTokenAuthenticator() *DeprecatedWebhookTokenAuthenticatorApplyConfiguration {
 	return &DeprecatedWebhookTokenAuthenticatorApplyConfiguration{}

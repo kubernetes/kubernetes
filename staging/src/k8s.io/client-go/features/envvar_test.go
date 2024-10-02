@@ -23,21 +23,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEnvVarFeatureGates(t *testing.T) {
-	defaultTestFeatures := map[Feature]FeatureSpec{
-		"TestAlpha": {
-			Default:       false,
-			LockToDefault: false,
-			PreRelease:    "Alpha",
-		},
-		"TestBeta": {
-			Default:       true,
-			LockToDefault: false,
-			PreRelease:    "Beta",
-		},
-	}
-	expectedDefaultFeaturesState := map[Feature]bool{"TestAlpha": false, "TestBeta": true}
+var defaultTestFeatures = map[Feature]FeatureSpec{
+	"TestAlpha": {
+		Default:       false,
+		LockToDefault: false,
+		PreRelease:    "Alpha",
+	},
+	"TestBeta": {
+		Default:       true,
+		LockToDefault: false,
+		PreRelease:    "Beta",
+	},
+}
 
+func TestEnvVarFeatureGates(t *testing.T) {
+	expectedDefaultFeaturesState := map[Feature]bool{"TestAlpha": false, "TestBeta": true}
 	copyExpectedStateMap := func(toCopy map[Feature]bool) map[Feature]bool {
 		m := map[Feature]bool{}
 		for k, v := range toCopy {
@@ -47,11 +47,14 @@ func TestEnvVarFeatureGates(t *testing.T) {
 	}
 
 	scenarios := []struct {
-		name                                string
-		features                            map[Feature]FeatureSpec
-		envVariables                        map[string]string
-		expectedFeaturesState               map[Feature]bool
-		expectedInternalEnabledFeatureState map[Feature]bool
+		name              string
+		features          map[Feature]FeatureSpec
+		envVariables      map[string]string
+		setMethodFeatures map[Feature]bool
+
+		expectedFeaturesState                           map[Feature]bool
+		expectedInternalEnabledViaEnvVarFeatureState    map[Feature]bool
+		expectedInternalEnabledViaSetMethodFeatureState map[Feature]bool
 	}{
 		{
 			name: "can add empty features",
@@ -76,7 +79,7 @@ func TestEnvVarFeatureGates(t *testing.T) {
 				expectedDefaultFeaturesStateCopy["TestAlpha"] = true
 				return expectedDefaultFeaturesStateCopy
 			}(),
-			expectedInternalEnabledFeatureState: map[Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledViaEnvVarFeatureState: map[Feature]bool{"TestAlpha": true},
 		},
 		{
 			name:                  "incorrect env var value gets ignored",
@@ -111,9 +114,25 @@ func TestEnvVarFeatureGates(t *testing.T) {
 					PreRelease:    "Alpha",
 				},
 			},
-			envVariables:                        map[string]string{"KUBE_FEATURE_TestAlpha": "True"},
-			expectedFeaturesState:               map[Feature]bool{"TestAlpha": true},
-			expectedInternalEnabledFeatureState: map[Feature]bool{"TestAlpha": true},
+			envVariables:          map[string]string{"KUBE_FEATURE_TestAlpha": "True"},
+			expectedFeaturesState: map[Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledViaEnvVarFeatureState: map[Feature]bool{"TestAlpha": true},
+		},
+		{
+			name:                  "setting a feature via the Set method works",
+			features:              defaultTestFeatures,
+			setMethodFeatures:     map[Feature]bool{"TestAlpha": true},
+			expectedFeaturesState: map[Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledViaSetMethodFeatureState: map[Feature]bool{"TestAlpha": true},
+		},
+		{
+			name:                  "setting a feature via the Set method wins",
+			features:              defaultTestFeatures,
+			setMethodFeatures:     map[Feature]bool{"TestAlpha": false},
+			envVariables:          map[string]string{"KUBE_FEATURE_TestAlpha": "True"},
+			expectedFeaturesState: map[Feature]bool{"TestAlpha": false},
+			expectedInternalEnabledViaEnvVarFeatureState:    map[Feature]bool{"TestAlpha": true},
+			expectedInternalEnabledViaSetMethodFeatureState: map[Feature]bool{"TestAlpha": false},
 		},
 	}
 	for _, scenario := range scenarios {
@@ -123,20 +142,33 @@ func TestEnvVarFeatureGates(t *testing.T) {
 			}
 			target := newEnvVarFeatureGates(scenario.features)
 
+			for k, v := range scenario.setMethodFeatures {
+				err := target.Set(k, v)
+				require.NoError(t, err)
+			}
 			for expectedFeature, expectedValue := range scenario.expectedFeaturesState {
 				actualValue := target.Enabled(expectedFeature)
 				require.Equal(t, actualValue, expectedValue, "expected feature=%v, to be=%v, not=%v", expectedFeature, expectedValue, actualValue)
 			}
 
-			enabledInternalMap := target.enabled.Load().(map[Feature]bool)
-			require.Len(t, enabledInternalMap, len(scenario.expectedInternalEnabledFeatureState))
+			enabledViaEnvVarInternalMap := target.enabledViaEnvVar.Load().(map[Feature]bool)
+			require.Len(t, enabledViaEnvVarInternalMap, len(scenario.expectedInternalEnabledViaEnvVarFeatureState))
+			for expectedFeatureName, expectedFeatureValue := range scenario.expectedInternalEnabledViaEnvVarFeatureState {
+				actualFeatureValue, wasExpectedFeatureFound := enabledViaEnvVarInternalMap[expectedFeatureName]
+				if !wasExpectedFeatureFound {
+					t.Errorf("feature %v has not been found in enabledViaEnvVarInternalMap", expectedFeatureName)
+				}
+				require.Equal(t, expectedFeatureValue, actualFeatureValue, "feature %v has incorrect value = %v, expected = %v", expectedFeatureName, actualFeatureValue, expectedFeatureValue)
+			}
 
-			for expectedFeature, expectedInternalPresence := range scenario.expectedInternalEnabledFeatureState {
-				featureInternalValue, featureSet := enabledInternalMap[expectedFeature]
-				require.Equal(t, expectedInternalPresence, featureSet, "feature %v present = %v, expected = %v", expectedFeature, featureSet, expectedInternalPresence)
-
-				expectedFeatureInternalValue := scenario.expectedFeaturesState[expectedFeature]
-				require.Equal(t, expectedFeatureInternalValue, featureInternalValue)
+			enabledViaSetMethodInternalMap := target.enabledViaSetMethod
+			require.Len(t, enabledViaSetMethodInternalMap, len(scenario.expectedInternalEnabledViaSetMethodFeatureState))
+			for expectedFeatureName, expectedFeatureValue := range scenario.expectedInternalEnabledViaSetMethodFeatureState {
+				actualFeatureValue, wasExpectedFeatureFound := enabledViaSetMethodInternalMap[expectedFeatureName]
+				if !wasExpectedFeatureFound {
+					t.Errorf("feature %v has not been found in enabledViaSetMethod", expectedFeatureName)
+				}
+				require.Equal(t, expectedFeatureValue, actualFeatureValue, "feature %v has incorrect value = %v, expected = %v", expectedFeatureName, actualFeatureValue, expectedFeatureValue)
 			}
 		})
 	}
@@ -153,4 +185,49 @@ func TestHasAlreadyReadEnvVar(t *testing.T) {
 
 	_ = target.getEnabledMapFromEnvVar()
 	require.True(t, target.hasAlreadyReadEnvVar())
+}
+
+func TestEnvVarFeatureGatesSetNegative(t *testing.T) {
+	scenarios := []struct {
+		name         string
+		features     map[Feature]FeatureSpec
+		featureName  Feature
+		featureValue bool
+
+		expectedErr func(string) error
+	}{
+		{
+			name:     "empty feature name returns an error",
+			features: defaultTestFeatures,
+			expectedErr: func(callSiteName string) error {
+				return fmt.Errorf("feature %q is not registered in FeatureGates %q", "", callSiteName)
+			},
+		},
+		{
+			name:        "setting unknown feature returns an error",
+			features:    defaultTestFeatures,
+			featureName: "Unknown",
+			expectedErr: func(callSiteName string) error {
+				return fmt.Errorf("feature %q is not registered in FeatureGates %q", "Unknown", callSiteName)
+			},
+		},
+		{
+			name:         "setting locked feature returns an error",
+			features:     map[Feature]FeatureSpec{"LockedFeature": {LockToDefault: true, Default: true}},
+			featureName:  "LockedFeature",
+			featureValue: false,
+			expectedErr: func(_ string) error {
+				return fmt.Errorf("cannot set feature gate %q to %v, feature is locked to %v", "LockedFeature", false, true)
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			target := newEnvVarFeatureGates(scenario.features)
+
+			err := target.Set(scenario.featureName, scenario.featureValue)
+			require.Equal(t, scenario.expectedErr(target.callSiteName), err)
+		})
+	}
 }

@@ -2,14 +2,14 @@
 
 package v1
 
-// TokenRequiredClaimApplyConfiguration represents an declarative configuration of the TokenRequiredClaim type for use
+// TokenRequiredClaimApplyConfiguration represents a declarative configuration of the TokenRequiredClaim type for use
 // with apply.
 type TokenRequiredClaimApplyConfiguration struct {
 	Claim         *string `json:"claim,omitempty"`
 	RequiredValue *string `json:"requiredValue,omitempty"`
 }
 
-// TokenRequiredClaimApplyConfiguration constructs an declarative configuration of the TokenRequiredClaim type for use with
+// TokenRequiredClaimApplyConfiguration constructs a declarative configuration of the TokenRequiredClaim type for use with
 // apply.
 func TokenRequiredClaim() *TokenRequiredClaimApplyConfiguration {
 	return &TokenRequiredClaimApplyConfiguration{}

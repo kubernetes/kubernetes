@@ -17,7 +17,7 @@ var Error = errors.New("protobuf error")
 
 // New formats a string according to the format specifier and arguments and
 // returns an error that has a "proto" prefix.
-func New(f string, x ...interface{}) error {
+func New(f string, x ...any) error {
 	return &prefixError{s: format(f, x...)}
 }
 
@@ -43,7 +43,7 @@ func (e *prefixError) Unwrap() error {
 
 // Wrap returns an error that has a "proto" prefix, the formatted string described
 // by the format specifier and arguments, and a suffix of err. The error wraps err.
-func Wrap(err error, f string, x ...interface{}) error {
+func Wrap(err error, f string, x ...any) error {
 	return &wrapError{
 		s:   format(f, x...),
 		err: err,
@@ -67,7 +67,7 @@ func (e *wrapError) Is(target error) bool {
 	return target == Error
 }
 
-func format(f string, x ...interface{}) string {
+func format(f string, x ...any) string {
 	// avoid "proto: " prefix when chaining
 	for i := 0; i < len(x); i++ {
 		switch e := x[i].(type) {
@@ -86,4 +86,19 @@ func InvalidUTF8(name string) error {
 
 func RequiredNotSet(name string) error {
 	return New("required field %v not set", name)
+}
+
+type SizeMismatchError struct {
+	Calculated, Measured int
+}
+
+func (e *SizeMismatchError) Error() string {
+	return fmt.Sprintf("size mismatch (see https://github.com/golang/protobuf/issues/1609): calculated=%d, measured=%d", e.Calculated, e.Measured)
+}
+
+func MismatchedSizeCalculation(calculated, measured int) error {
+	return &SizeMismatchError{
+		Calculated: calculated,
+		Measured:   measured,
+	}
 }

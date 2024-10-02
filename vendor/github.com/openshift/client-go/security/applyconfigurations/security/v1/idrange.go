@@ -2,14 +2,14 @@
 
 package v1
 
-// IDRangeApplyConfiguration represents an declarative configuration of the IDRange type for use
+// IDRangeApplyConfiguration represents a declarative configuration of the IDRange type for use
 // with apply.
 type IDRangeApplyConfiguration struct {
 	Min *int64 `json:"min,omitempty"`
 	Max *int64 `json:"max,omitempty"`
 }
 
-// IDRangeApplyConfiguration constructs an declarative configuration of the IDRange type for use with
+// IDRangeApplyConfiguration constructs a declarative configuration of the IDRange type for use with
 // apply.
 func IDRange() *IDRangeApplyConfiguration {
 	return &IDRangeApplyConfiguration{}

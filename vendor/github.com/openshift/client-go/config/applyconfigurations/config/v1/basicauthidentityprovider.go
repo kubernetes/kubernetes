@@ -2,13 +2,13 @@
 
 package v1
 
-// BasicAuthIdentityProviderApplyConfiguration represents an declarative configuration of the BasicAuthIdentityProvider type for use
+// BasicAuthIdentityProviderApplyConfiguration represents a declarative configuration of the BasicAuthIdentityProvider type for use
 // with apply.
 type BasicAuthIdentityProviderApplyConfiguration struct {
 	OAuthRemoteConnectionInfoApplyConfiguration `json:",inline"`
 }
 
-// BasicAuthIdentityProviderApplyConfiguration constructs an declarative configuration of the BasicAuthIdentityProvider type for use with
+// BasicAuthIdentityProviderApplyConfiguration constructs a declarative configuration of the BasicAuthIdentityProvider type for use with
 // apply.
 func BasicAuthIdentityProvider() *BasicAuthIdentityProviderApplyConfiguration {
 	return &BasicAuthIdentityProviderApplyConfiguration{}

@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type ClusterVersionLister interface {
 
 // clusterVersionLister implements the ClusterVersionLister interface.
 type clusterVersionLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ClusterVersion]
 }
 
 // NewClusterVersionLister returns a new ClusterVersionLister.
 func NewClusterVersionLister(indexer cache.Indexer) ClusterVersionLister {
-	return &clusterVersionLister{indexer: indexer}
-}
-
-// List lists all ClusterVersions in the indexer.
-func (s *clusterVersionLister) List(selector labels.Selector) (ret []*v1.ClusterVersion, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ClusterVersion))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterVersion from the index for a given name.
-func (s *clusterVersionLister) Get(name string) (*v1.ClusterVersion, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("clusterversion"), name)
-	}
-	return obj.(*v1.ClusterVersion), nil
+	return &clusterVersionLister{listers.New[*v1.ClusterVersion](indexer, v1.Resource("clusterversion"))}
 }

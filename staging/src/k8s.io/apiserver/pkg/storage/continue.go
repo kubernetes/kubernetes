@@ -91,3 +91,30 @@ func EncodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 	}
 	return base64.RawURLEncoding.EncodeToString(out), nil
 }
+
+// PrepareContinueToken prepares optional
+// parameters for retrieving additional results for a paginated request.
+//
+// This function sets up parameters that a client can use to fetch the remaining results
+// from the server if they are available.
+func PrepareContinueToken(keyLastItem, keyPrefix string, resourceVersion int64, itemsCount int64, hasMoreItems bool, opts ListOptions) (string, *int64, error) {
+	var remainingItemCount *int64
+	var continueValue string
+	var err error
+
+	if hasMoreItems {
+		// Instruct the client to begin querying from immediately after the last key.
+		continueValue, err = EncodeContinue(keyLastItem+"\x00", keyPrefix, resourceVersion)
+		if err != nil {
+			return "", remainingItemCount, err
+		}
+		// Etcd response counts in objects that do not match the pred.
+		// Instead of returning inaccurate count for non-empty selectors, we return nil.
+		// We only set remainingItemCount if the predicate is empty.
+		if opts.Predicate.Empty() {
+			remainingItems := itemsCount - opts.Predicate.Limit
+			remainingItemCount = &remainingItems
+		}
+	}
+	return continueValue, remainingItemCount, err
+}

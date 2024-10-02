@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// FCVolumeSourceApplyConfiguration represents an declarative configuration of the FCVolumeSource type for use
+// FCVolumeSourceApplyConfiguration represents a declarative configuration of the FCVolumeSource type for use
 // with apply.
 type FCVolumeSourceApplyConfiguration struct {
 	TargetWWNs []string `json:"targetWWNs,omitempty"`
@@ -28,7 +28,7 @@ type FCVolumeSourceApplyConfiguration struct {
 	WWIDs      []string `json:"wwids,omitempty"`
 }
 
-// FCVolumeSourceApplyConfiguration constructs an declarative configuration of the FCVolumeSource type for use with
+// FCVolumeSourceApplyConfiguration constructs a declarative configuration of the FCVolumeSource type for use with
 // apply.
 func FCVolumeSource() *FCVolumeSourceApplyConfiguration {
 	return &FCVolumeSourceApplyConfiguration{}

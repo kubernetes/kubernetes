@@ -7,9 +7,11 @@ specifically focuses on supporting Kubernetes components which are
 using nftables in the way that nftables is supposed to be used (as
 opposed to using nftables in a naively-translated-from-iptables way,
 or using nftables to do totally valid things that aren't the sorts of
-things Kubernetes components are likely to need to do).
+things Kubernetes components are likely to need to do; see the
+"[iptables porting](./docs/iptables-porting.md)" doc for more thoughts
+on porting old iptables-based components to nftables.)
 
-It is still under development and is not yet API stable. (See the
+knftables is still under development and is not yet API stable. (See the
 section on "Possible future changes" below.)
 
 The library is implemented as a wrapper around the `nft` CLI, because
@@ -21,12 +23,21 @@ that is quite different from all documented examples of nftables usage
 because there is no easy way to convert the "standard" representation
 of nftables rules into the netlink form.
 
-(Actually, that's not quite true: the `nft` CLI is just a thin wrapper
-around `libnftables`, and it would be possible for knftables to use
-cgo to invoke that library instead of using an external binary.
-However, this would be harder to build and ship, so I'm not bothering
-with that for now. But this could be done in the future without
-needing to change knftables's API.)
+(Actually, it's not quite true that there's no other usable API: the
+`nft` CLI is just a thin wrapper around `libnftables`, and it would be
+possible for knftables to use cgo to invoke that library instead of
+using an external binary. However, this would be harder to build and
+ship, so I'm not bothering with that for now. But this could be done
+in the future without needing to change knftables's API.)
+
+knftables requires nft version 1.0.1 or later, because earlier
+versions would download and process the entire ruleset regardless of
+what you were doing, which, besides being pointlessly inefficient,
+means that in some cases, other people using new features in _their_
+tables could prevent you from modifying _your_ table. (In particular,
+a change in how some rules are generated starting in nft 1.0.3
+triggers a crash in nft 0.9.9 and earlier, _even if you aren't looking
+at the table containing that rule_.)
 
 ## Usage
 

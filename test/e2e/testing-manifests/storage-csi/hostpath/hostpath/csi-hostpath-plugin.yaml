@@ -219,7 +219,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.13.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.14.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -262,7 +262,7 @@ spec:
               name: dev-dir
 
         - name: csi-external-health-monitor-controller
-          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.11.0
+          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.12.1
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -276,7 +276,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.1
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -310,7 +310,7 @@ spec:
           - --health-port=9898
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.5.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.6.1
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -324,7 +324,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.0.1
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -340,7 +340,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.10.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.11.1
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
@@ -354,7 +354,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v7.0.1
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.0.1
           args:
             - -v=5
             - --csi-address=/csi/csi.sock

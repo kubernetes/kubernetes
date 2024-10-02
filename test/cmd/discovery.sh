@@ -407,3 +407,73 @@ __EOF__
   set +o nounset
   set +o errexit
 }
+
+run_explain_crd_with_additional_properties_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing explain with custom CRD that uses additionalProperties as non boolean field"
+
+  kubectl create -f - << __EOF__
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mock-resources.test.com
+spec:
+  group: test.com
+  scope: Namespaced
+  names:
+    plural: mock-resources
+    singular: mock-resource
+    kind: MockResource
+    listKind: MockResources
+  versions:
+    - name: v1
+      storage: true
+      served: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                test:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+              additionalProperties: true
+__EOF__
+
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"mock-resources.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'mock-resources.test.com:'
+
+  retries=0
+  max_retries=5
+
+  # First try would get non zero exit code so we disable immediate exit here
+  set +o errexit
+
+  # Loop until `kubectl explain` returns a zero exit code or maximum retries reached
+  until output_message=$(kubectl explain mock-resource) > /dev/null || [ $retries -eq $max_retries ]; do
+    kube::log::status "Retrying kubectl explain..."
+    ((retries++))
+    sleep 1
+  done
+
+  set -o errexit
+
+  output_message=$(kubectl explain mock-resource)
+  kube::test::if_has_string "${output_message}" 'FIELDS:'
+
+  output_message=$(kubectl explain mock-resource --recursive)
+  kube::test::if_has_string "${output_message}" 'FIELDS:'
+
+  # Cleanup
+  kubectl delete crd mock-resources.test.com
+
+  set +o nounset
+  set +o errexit
+}

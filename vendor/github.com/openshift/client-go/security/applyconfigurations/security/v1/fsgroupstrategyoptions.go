@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/security/v1"
 )
 
-// FSGroupStrategyOptionsApplyConfiguration represents an declarative configuration of the FSGroupStrategyOptions type for use
+// FSGroupStrategyOptionsApplyConfiguration represents a declarative configuration of the FSGroupStrategyOptions type for use
 // with apply.
 type FSGroupStrategyOptionsApplyConfiguration struct {
 	Type   *v1.FSGroupStrategyType     `json:"type,omitempty"`
 	Ranges []IDRangeApplyConfiguration `json:"ranges,omitempty"`
 }
 
-// FSGroupStrategyOptionsApplyConfiguration constructs an declarative configuration of the FSGroupStrategyOptions type for use with
+// FSGroupStrategyOptionsApplyConfiguration constructs a declarative configuration of the FSGroupStrategyOptions type for use with
 // apply.
 func FSGroupStrategyOptions() *FSGroupStrategyOptionsApplyConfiguration {
 	return &FSGroupStrategyOptionsApplyConfiguration{}

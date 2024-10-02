@@ -2,7 +2,7 @@
 
 package v1
 
-// AlibabaCloudPlatformStatusApplyConfiguration represents an declarative configuration of the AlibabaCloudPlatformStatus type for use
+// AlibabaCloudPlatformStatusApplyConfiguration represents a declarative configuration of the AlibabaCloudPlatformStatus type for use
 // with apply.
 type AlibabaCloudPlatformStatusApplyConfiguration struct {
 	Region          *string                                     `json:"region,omitempty"`
@@ -10,7 +10,7 @@ type AlibabaCloudPlatformStatusApplyConfiguration struct {
 	ResourceTags    []AlibabaCloudResourceTagApplyConfiguration `json:"resourceTags,omitempty"`
 }
 
-// AlibabaCloudPlatformStatusApplyConfiguration constructs an declarative configuration of the AlibabaCloudPlatformStatus type for use with
+// AlibabaCloudPlatformStatusApplyConfiguration constructs a declarative configuration of the AlibabaCloudPlatformStatus type for use with
 // apply.
 func AlibabaCloudPlatformStatus() *AlibabaCloudPlatformStatusApplyConfiguration {
 	return &AlibabaCloudPlatformStatusApplyConfiguration{}

@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageStreamMappingApplyConfiguration represents an declarative configuration of the ImageStreamMapping type for use
+// ImageStreamMappingApplyConfiguration represents a declarative configuration of the ImageStreamMapping type for use
 // with apply.
 type ImageStreamMappingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ImageStreamMappingApplyConfiguration struct {
 	Tag                              *string                  `json:"tag,omitempty"`
 }
 
-// ImageStreamMapping constructs an declarative configuration of the ImageStreamMapping type for use with
+// ImageStreamMapping constructs a declarative configuration of the ImageStreamMapping type for use with
 // apply.
 func ImageStreamMapping(name, namespace string) *ImageStreamMappingApplyConfiguration {
 	b := &ImageStreamMappingApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *ImageStreamMappingApplyConfiguration) WithImage(value *ImageApplyConfig
 func (b *ImageStreamMappingApplyConfiguration) WithTag(value string) *ImageStreamMappingApplyConfiguration {
 	b.Tag = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ImageStreamMappingApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -25,7 +25,6 @@ import (
 	"golang.org/x/tools/internal/event"
 	"golang.org/x/tools/internal/event/keys"
 	"golang.org/x/tools/internal/event/label"
-	"golang.org/x/tools/internal/event/tag"
 )
 
 // An Runner will run go command invocations and serialize
@@ -55,11 +54,14 @@ func (runner *Runner) initialize() {
 // 1.14: go: updating go.mod: existing contents have changed since last read
 var modConcurrencyError = regexp.MustCompile(`go:.*go.mod.*contents have changed`)
 
-// verb is an event label for the go command verb.
-var verb = keys.NewString("verb", "go command verb")
+// event keys for go command invocations
+var (
+	verb      = keys.NewString("verb", "go command verb")
+	directory = keys.NewString("directory", "")
+)
 
 func invLabels(inv Invocation) []label.Label {
-	return []label.Label{verb.Of(inv.Verb), tag.Directory.Of(inv.WorkingDir)}
+	return []label.Label{verb.Of(inv.Verb), directory.Of(inv.WorkingDir)}
 }
 
 // Run is a convenience wrapper around RunRaw.
@@ -158,12 +160,15 @@ type Invocation struct {
 	BuildFlags []string
 
 	// If ModFlag is set, the go command is invoked with -mod=ModFlag.
+	// TODO(rfindley): remove, in favor of Args.
 	ModFlag string
 
 	// If ModFile is set, the go command is invoked with -modfile=ModFile.
+	// TODO(rfindley): remove, in favor of Args.
 	ModFile string
 
 	// If Overlay is set, the go command is invoked with -overlay=Overlay.
+	// TODO(rfindley): remove, in favor of Args.
 	Overlay string
 
 	// If CleanEnv is set, the invocation will run only with the environment

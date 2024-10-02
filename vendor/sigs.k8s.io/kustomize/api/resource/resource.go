@@ -287,12 +287,25 @@ func (r *Resource) getCsvAnnotation(name string) []string {
 	return strings.Split(annotations[name], ",")
 }
 
-// PrefixesSuffixesEquals is conceptually doing the same task
-// as OutermostPrefixSuffix but performs a deeper comparison
-// of the suffix and prefix slices.
-func (r *Resource) PrefixesSuffixesEquals(o ResCtx) bool {
-	return utils.SameEndingSubSlice(r.GetNamePrefixes(), o.GetNamePrefixes()) &&
-		utils.SameEndingSubSlice(r.GetNameSuffixes(), o.GetNameSuffixes())
+// PrefixesSuffixesEquals is conceptually doing the same task as
+// OutermostPrefixSuffix but performs a deeper comparison of the suffix and
+// prefix slices.
+// The allowEmpty flag determines whether an empty prefix/suffix
+// should be considered a match on anything.
+// This is used when filtering, starting with a coarser pass allowing empty
+// matches, before requiring exact matches if there are multiple
+// remaining candidates.
+func (r *Resource) PrefixesSuffixesEquals(o ResCtx, allowEmpty bool) bool {
+	if allowEmpty {
+		eitherPrefixEmpty := len(r.GetNamePrefixes()) == 0 || len(o.GetNamePrefixes()) == 0
+		eitherSuffixEmpty := len(r.GetNameSuffixes()) == 0 || len(o.GetNameSuffixes()) == 0
+
+		return (eitherPrefixEmpty || utils.SameEndingSubSlice(r.GetNamePrefixes(), o.GetNamePrefixes())) &&
+			(eitherSuffixEmpty || utils.SameEndingSubSlice(r.GetNameSuffixes(), o.GetNameSuffixes()))
+	} else {
+		return utils.SameEndingSubSlice(r.GetNamePrefixes(), o.GetNamePrefixes()) &&
+			utils.SameEndingSubSlice(r.GetNameSuffixes(), o.GetNameSuffixes())
+	}
 }
 
 // RemoveBuildAnnotations removes annotations created by the build process.

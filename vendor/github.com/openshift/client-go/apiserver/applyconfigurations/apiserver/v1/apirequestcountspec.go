@@ -2,13 +2,13 @@
 
 package v1
 
-// APIRequestCountSpecApplyConfiguration represents an declarative configuration of the APIRequestCountSpec type for use
+// APIRequestCountSpecApplyConfiguration represents a declarative configuration of the APIRequestCountSpec type for use
 // with apply.
 type APIRequestCountSpecApplyConfiguration struct {
 	NumberOfUsersToReport *int64 `json:"numberOfUsersToReport,omitempty"`
 }
 
-// APIRequestCountSpecApplyConfiguration constructs an declarative configuration of the APIRequestCountSpec type for use with
+// APIRequestCountSpecApplyConfiguration constructs a declarative configuration of the APIRequestCountSpec type for use with
 // apply.
 func APIRequestCountSpec() *APIRequestCountSpecApplyConfiguration {
 	return &APIRequestCountSpecApplyConfiguration{}

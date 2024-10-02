@@ -35,7 +35,7 @@ ipvs:
   minSyncPeriod: 0s
   scheduler: ""
   strictARP: false
-  syncPeriod: 30s
+  syncPeriod: 0s
   tcpFinTimeout: 0s
   tcpTimeout: 0s
   udpTimeout: 0s
@@ -54,8 +54,8 @@ mode: ""
 nftables:
   masqueradeAll: false
   masqueradeBit: 14
-  minSyncPeriod: 1s
-  syncPeriod: 30s
+  minSyncPeriod: 0s
+  syncPeriod: 0s
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""

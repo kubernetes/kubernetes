@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ContainerResizePolicyApplyConfiguration represents an declarative configuration of the ContainerResizePolicy type for use
+// ContainerResizePolicyApplyConfiguration represents a declarative configuration of the ContainerResizePolicy type for use
 // with apply.
 type ContainerResizePolicyApplyConfiguration struct {
 	ResourceName  *v1.ResourceName                `json:"resourceName,omitempty"`
 	RestartPolicy *v1.ResourceResizeRestartPolicy `json:"restartPolicy,omitempty"`
 }
 
-// ContainerResizePolicyApplyConfiguration constructs an declarative configuration of the ContainerResizePolicy type for use with
+// ContainerResizePolicyApplyConfiguration constructs a declarative configuration of the ContainerResizePolicy type for use with
 // apply.
 func ContainerResizePolicy() *ContainerResizePolicyApplyConfiguration {
 	return &ContainerResizePolicyApplyConfiguration{}

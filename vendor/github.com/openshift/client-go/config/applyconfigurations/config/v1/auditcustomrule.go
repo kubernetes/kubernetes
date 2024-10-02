@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// AuditCustomRuleApplyConfiguration represents an declarative configuration of the AuditCustomRule type for use
+// AuditCustomRuleApplyConfiguration represents a declarative configuration of the AuditCustomRule type for use
 // with apply.
 type AuditCustomRuleApplyConfiguration struct {
 	Group   *string              `json:"group,omitempty"`
 	Profile *v1.AuditProfileType `json:"profile,omitempty"`
 }
 
-// AuditCustomRuleApplyConfiguration constructs an declarative configuration of the AuditCustomRule type for use with
+// AuditCustomRuleApplyConfiguration constructs a declarative configuration of the AuditCustomRule type for use with
 // apply.
 func AuditCustomRule() *AuditCustomRuleApplyConfiguration {
 	return &AuditCustomRuleApplyConfiguration{}

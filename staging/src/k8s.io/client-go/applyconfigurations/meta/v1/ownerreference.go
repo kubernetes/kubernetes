@@ -22,7 +22,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-// OwnerReferenceApplyConfiguration represents an declarative configuration of the OwnerReference type for use
+// OwnerReferenceApplyConfiguration represents a declarative configuration of the OwnerReference type for use
 // with apply.
 type OwnerReferenceApplyConfiguration struct {
 	APIVersion         *string    `json:"apiVersion,omitempty"`
@@ -33,7 +33,7 @@ type OwnerReferenceApplyConfiguration struct {
 	BlockOwnerDeletion *bool      `json:"blockOwnerDeletion,omitempty"`
 }
 
-// OwnerReferenceApplyConfiguration constructs an declarative configuration of the OwnerReference type for use with
+// OwnerReferenceApplyConfiguration constructs a declarative configuration of the OwnerReference type for use with
 // apply.
 func OwnerReference() *OwnerReferenceApplyConfiguration {
 	return &OwnerReferenceApplyConfiguration{}

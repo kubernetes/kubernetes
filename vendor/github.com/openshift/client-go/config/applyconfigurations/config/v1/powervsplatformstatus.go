@@ -2,7 +2,7 @@
 
 package v1
 
-// PowerVSPlatformStatusApplyConfiguration represents an declarative configuration of the PowerVSPlatformStatus type for use
+// PowerVSPlatformStatusApplyConfiguration represents a declarative configuration of the PowerVSPlatformStatus type for use
 // with apply.
 type PowerVSPlatformStatusApplyConfiguration struct {
 	Region           *string                                    `json:"region,omitempty"`
@@ -13,7 +13,7 @@ type PowerVSPlatformStatusApplyConfiguration struct {
 	DNSInstanceCRN   *string                                    `json:"dnsInstanceCRN,omitempty"`
 }
 
-// PowerVSPlatformStatusApplyConfiguration constructs an declarative configuration of the PowerVSPlatformStatus type for use with
+// PowerVSPlatformStatusApplyConfiguration constructs a declarative configuration of the PowerVSPlatformStatus type for use with
 // apply.
 func PowerVSPlatformStatus() *PowerVSPlatformStatusApplyConfiguration {
 	return &PowerVSPlatformStatusApplyConfiguration{}

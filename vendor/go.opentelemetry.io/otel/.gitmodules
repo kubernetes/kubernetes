@@ -1,3 +1,0 @@
-[submodule "opentelemetry-proto"]
-	path = exporters/otlp/internal/opentelemetry-proto
-	url = https://github.com/open-telemetry/opentelemetry-proto

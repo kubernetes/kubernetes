@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// AzurePlatformStatusApplyConfiguration represents an declarative configuration of the AzurePlatformStatus type for use
+// AzurePlatformStatusApplyConfiguration represents a declarative configuration of the AzurePlatformStatus type for use
 // with apply.
 type AzurePlatformStatusApplyConfiguration struct {
 	ResourceGroupName        *string                              `json:"resourceGroupName,omitempty"`
@@ -16,7 +16,7 @@ type AzurePlatformStatusApplyConfiguration struct {
 	ResourceTags             []AzureResourceTagApplyConfiguration `json:"resourceTags,omitempty"`
 }
 
-// AzurePlatformStatusApplyConfiguration constructs an declarative configuration of the AzurePlatformStatus type for use with
+// AzurePlatformStatusApplyConfiguration constructs a declarative configuration of the AzurePlatformStatus type for use with
 // apply.
 func AzurePlatformStatus() *AzurePlatformStatusApplyConfiguration {
 	return &AzurePlatformStatusApplyConfiguration{}

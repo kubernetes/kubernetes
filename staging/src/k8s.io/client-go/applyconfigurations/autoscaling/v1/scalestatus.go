@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ScaleStatusApplyConfiguration represents an declarative configuration of the ScaleStatus type for use
+// ScaleStatusApplyConfiguration represents a declarative configuration of the ScaleStatus type for use
 // with apply.
 type ScaleStatusApplyConfiguration struct {
 	Replicas *int32  `json:"replicas,omitempty"`
 	Selector *string `json:"selector,omitempty"`
 }
 
-// ScaleStatusApplyConfiguration constructs an declarative configuration of the ScaleStatus type for use with
+// ScaleStatusApplyConfiguration constructs a declarative configuration of the ScaleStatus type for use with
 // apply.
 func ScaleStatus() *ScaleStatusApplyConfiguration {
 	return &ScaleStatusApplyConfiguration{}

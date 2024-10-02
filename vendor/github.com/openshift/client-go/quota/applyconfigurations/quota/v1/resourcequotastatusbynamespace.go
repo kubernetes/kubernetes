@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ResourceQuotaStatusByNamespaceApplyConfiguration represents an declarative configuration of the ResourceQuotaStatusByNamespace type for use
+// ResourceQuotaStatusByNamespaceApplyConfiguration represents a declarative configuration of the ResourceQuotaStatusByNamespace type for use
 // with apply.
 type ResourceQuotaStatusByNamespaceApplyConfiguration struct {
 	Namespace *string                 `json:"namespace,omitempty"`
 	Status    *v1.ResourceQuotaStatus `json:"status,omitempty"`
 }
 
-// ResourceQuotaStatusByNamespaceApplyConfiguration constructs an declarative configuration of the ResourceQuotaStatusByNamespace type for use with
+// ResourceQuotaStatusByNamespaceApplyConfiguration constructs a declarative configuration of the ResourceQuotaStatusByNamespace type for use with
 // apply.
 func ResourceQuotaStatusByNamespace() *ResourceQuotaStatusByNamespaceApplyConfiguration {
 	return &ResourceQuotaStatusByNamespaceApplyConfiguration{}

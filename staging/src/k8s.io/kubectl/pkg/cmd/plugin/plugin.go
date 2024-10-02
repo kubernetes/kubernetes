@@ -40,15 +40,19 @@ var (
 		Plugins provide extended functionality that is not part of the major command-line distribution.
 		Please refer to the documentation and examples for more information about how write your own plugins.
 
-		The easiest way to discover and install plugins is via the kubernetes sub-project krew.
-		To install krew, visit [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)`))
+		The easiest way to discover and install plugins is via the kubernetes sub-project krew: [krew.sigs.k8s.io].
+		To install krew, visit https://krew.sigs.k8s.io/docs/user-guide/setup/install`))
 
 	pluginExample = templates.Examples(i18n.T(`
 		# List all available plugins
-		kubectl plugin list`))
+		kubectl plugin list
+		
+		# List only binary names of available plugins without paths
+		kubectl plugin list --name-only`))
 
 	pluginListLong = templates.LongDesc(i18n.T(`
 		List all available plugin files on a user's PATH.
+		To see plugins binary names without the full path use --name-only flag.
 
 		Available plugin files are those that are:
 		- executable
@@ -65,6 +69,7 @@ func NewCmdPlugin(streams genericiooptions.IOStreams) *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Provides utilities for interacting with plugins"),
 		Long:                  pluginLong,
+		Example:               pluginExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 		},

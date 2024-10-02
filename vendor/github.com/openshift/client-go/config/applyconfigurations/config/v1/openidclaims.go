@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// OpenIDClaimsApplyConfiguration represents an declarative configuration of the OpenIDClaims type for use
+// OpenIDClaimsApplyConfiguration represents a declarative configuration of the OpenIDClaims type for use
 // with apply.
 type OpenIDClaimsApplyConfiguration struct {
 	PreferredUsername []string         `json:"preferredUsername,omitempty"`
@@ -15,7 +15,7 @@ type OpenIDClaimsApplyConfiguration struct {
 	Groups            []v1.OpenIDClaim `json:"groups,omitempty"`
 }
 
-// OpenIDClaimsApplyConfiguration constructs an declarative configuration of the OpenIDClaims type for use with
+// OpenIDClaimsApplyConfiguration constructs a declarative configuration of the OpenIDClaims type for use with
 // apply.
 func OpenIDClaims() *OpenIDClaimsApplyConfiguration {
 	return &OpenIDClaimsApplyConfiguration{}

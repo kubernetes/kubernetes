@@ -8,7 +8,7 @@
       "name": "endpointslices",
       "namespaced": true,
       "singularName": "endpointslice",
-      "storageVersionHash": "Nx3SIv6I0mE=",
+      "storageVersionHash": "qgS0xkrxYAI=",
       "verbs": [
         "create",
         "delete",

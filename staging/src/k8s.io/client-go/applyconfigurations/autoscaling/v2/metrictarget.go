@@ -23,7 +23,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
-// MetricTargetApplyConfiguration represents an declarative configuration of the MetricTarget type for use
+// MetricTargetApplyConfiguration represents a declarative configuration of the MetricTarget type for use
 // with apply.
 type MetricTargetApplyConfiguration struct {
 	Type               *v2.MetricTargetType `json:"type,omitempty"`
@@ -32,7 +32,7 @@ type MetricTargetApplyConfiguration struct {
 	AverageUtilization *int32               `json:"averageUtilization,omitempty"`
 }
 
-// MetricTargetApplyConfiguration constructs an declarative configuration of the MetricTarget type for use with
+// MetricTargetApplyConfiguration constructs a declarative configuration of the MetricTarget type for use with
 // apply.
 func MetricTarget() *MetricTargetApplyConfiguration {
 	return &MetricTargetApplyConfiguration{}

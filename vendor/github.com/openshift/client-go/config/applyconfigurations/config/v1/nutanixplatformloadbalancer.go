@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// NutanixPlatformLoadBalancerApplyConfiguration represents an declarative configuration of the NutanixPlatformLoadBalancer type for use
+// NutanixPlatformLoadBalancerApplyConfiguration represents a declarative configuration of the NutanixPlatformLoadBalancer type for use
 // with apply.
 type NutanixPlatformLoadBalancerApplyConfiguration struct {
 	Type *v1.PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
-// NutanixPlatformLoadBalancerApplyConfiguration constructs an declarative configuration of the NutanixPlatformLoadBalancer type for use with
+// NutanixPlatformLoadBalancerApplyConfiguration constructs a declarative configuration of the NutanixPlatformLoadBalancer type for use with
 // apply.
 func NutanixPlatformLoadBalancer() *NutanixPlatformLoadBalancerApplyConfiguration {
 	return &NutanixPlatformLoadBalancerApplyConfiguration{}

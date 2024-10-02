@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// IngressApplyConfiguration represents an declarative configuration of the Ingress type for use
+// IngressApplyConfiguration represents a declarative configuration of the Ingress type for use
 // with apply.
 type IngressApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type IngressApplyConfiguration struct {
 	Status                           *IngressStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Ingress constructs an declarative configuration of the Ingress type for use with
+// Ingress constructs a declarative configuration of the Ingress type for use with
 // apply.
 func Ingress(name, namespace string) *IngressApplyConfiguration {
 	b := &IngressApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *IngressApplyConfiguration) WithSpec(value *IngressSpecApplyConfiguratio
 func (b *IngressApplyConfiguration) WithStatus(value *IngressStatusApplyConfiguration) *IngressApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *IngressApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

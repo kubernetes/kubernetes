@@ -128,7 +128,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: registry.k8s.io/pause:3.9
+    image: registry.k8s.io/pause:3.10
 ---
 apiVersion: v1
 kind: Pod
@@ -140,7 +140,7 @@ metadata:
 spec:
   containers:
     - name: kubernetes-pause
-      image: registry.k8s.io/pause:3.9
+      image: registry.k8s.io/pause:3.10
 ---
 apiVersion: v1
 kind: Pod
@@ -152,7 +152,7 @@ metadata:
 spec:
   containers:
     - name: kubernetes-pause
-      image: registry.k8s.io/pause:3.9
+      image: registry.k8s.io/pause:3.10
 EOF
     kube::test::get_object_assert 'pods a -n nsbprune' "{{${id_field:?}}}" 'a'
     kube::test::get_object_assert 'pods b -n nsbprune' "{{${id_field:?}}}" 'b'
@@ -169,7 +169,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: registry.k8s.io/pause:3.9
+    image: registry.k8s.io/pause:3.10
 ---
 apiVersion: v1
 kind: Pod
@@ -181,7 +181,7 @@ metadata:
 spec:
   containers:
     - name: kubernetes-pause
-      image: registry.k8s.io/pause:3.9
+      image: registry.k8s.io/pause:3.10
 EOF
 )
     output_message=$(echo "${PRUNE}" | kubectl diff -l prune-group=true -f -)

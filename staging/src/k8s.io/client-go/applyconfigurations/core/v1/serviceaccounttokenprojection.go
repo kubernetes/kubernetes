@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ServiceAccountTokenProjectionApplyConfiguration represents an declarative configuration of the ServiceAccountTokenProjection type for use
+// ServiceAccountTokenProjectionApplyConfiguration represents a declarative configuration of the ServiceAccountTokenProjection type for use
 // with apply.
 type ServiceAccountTokenProjectionApplyConfiguration struct {
 	Audience          *string `json:"audience,omitempty"`
@@ -26,7 +26,7 @@ type ServiceAccountTokenProjectionApplyConfiguration struct {
 	Path              *string `json:"path,omitempty"`
 }
 
-// ServiceAccountTokenProjectionApplyConfiguration constructs an declarative configuration of the ServiceAccountTokenProjection type for use with
+// ServiceAccountTokenProjectionApplyConfiguration constructs a declarative configuration of the ServiceAccountTokenProjection type for use with
 // apply.
 func ServiceAccountTokenProjection() *ServiceAccountTokenProjectionApplyConfiguration {
 	return &ServiceAccountTokenProjectionApplyConfiguration{}

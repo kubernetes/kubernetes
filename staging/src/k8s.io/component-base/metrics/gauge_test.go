@@ -87,7 +87,7 @@ func TestGauge(t *testing.T) {
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
@@ -175,7 +175,7 @@ func TestGaugeVec(t *testing.T) {
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Set(1.0)
 			ms, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -188,7 +188,7 @@ func TestGaugeVec(t *testing.T) {
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
 			}
 		})
 	}

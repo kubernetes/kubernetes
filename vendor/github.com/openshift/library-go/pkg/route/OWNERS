@@ -2,15 +2,13 @@ approvers:
   - frobware
   - knobunc
   - Miciah
-  - sgreene570
-  - smarterclayton
   - candita
 reviewers:
-  - danehans
   - frobware
   - knobunc
   - Miciah
-  - sgreene570
-  - smarterclayton
   - candita
+  - alebedev87
+emeritus_approvers:
+  - smarterclayton
 component: Routing

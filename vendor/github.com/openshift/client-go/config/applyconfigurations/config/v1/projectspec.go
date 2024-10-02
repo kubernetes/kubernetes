@@ -2,14 +2,14 @@
 
 package v1
 
-// ProjectSpecApplyConfiguration represents an declarative configuration of the ProjectSpec type for use
+// ProjectSpecApplyConfiguration represents a declarative configuration of the ProjectSpec type for use
 // with apply.
 type ProjectSpecApplyConfiguration struct {
 	ProjectRequestMessage  *string                              `json:"projectRequestMessage,omitempty"`
 	ProjectRequestTemplate *TemplateReferenceApplyConfiguration `json:"projectRequestTemplate,omitempty"`
 }
 
-// ProjectSpecApplyConfiguration constructs an declarative configuration of the ProjectSpec type for use with
+// ProjectSpecApplyConfiguration constructs a declarative configuration of the ProjectSpec type for use with
 // apply.
 func ProjectSpec() *ProjectSpecApplyConfiguration {
 	return &ProjectSpecApplyConfiguration{}

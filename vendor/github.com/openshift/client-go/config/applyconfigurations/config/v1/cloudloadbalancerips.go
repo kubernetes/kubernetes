@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// CloudLoadBalancerIPsApplyConfiguration represents an declarative configuration of the CloudLoadBalancerIPs type for use
+// CloudLoadBalancerIPsApplyConfiguration represents a declarative configuration of the CloudLoadBalancerIPs type for use
 // with apply.
 type CloudLoadBalancerIPsApplyConfiguration struct {
 	APIIntLoadBalancerIPs  []v1.IP `json:"apiIntLoadBalancerIPs,omitempty"`
@@ -14,7 +14,7 @@ type CloudLoadBalancerIPsApplyConfiguration struct {
 	IngressLoadBalancerIPs []v1.IP `json:"ingressLoadBalancerIPs,omitempty"`
 }
 
-// CloudLoadBalancerIPsApplyConfiguration constructs an declarative configuration of the CloudLoadBalancerIPs type for use with
+// CloudLoadBalancerIPsApplyConfiguration constructs a declarative configuration of the CloudLoadBalancerIPs type for use with
 // apply.
 func CloudLoadBalancerIPs() *CloudLoadBalancerIPsApplyConfiguration {
 	return &CloudLoadBalancerIPsApplyConfiguration{}

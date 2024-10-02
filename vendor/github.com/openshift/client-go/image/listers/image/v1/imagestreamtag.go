@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/image/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -22,25 +22,17 @@ type ImageStreamTagLister interface {
 
 // imageStreamTagLister implements the ImageStreamTagLister interface.
 type imageStreamTagLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.ImageStreamTag]
 }
 
 // NewImageStreamTagLister returns a new ImageStreamTagLister.
 func NewImageStreamTagLister(indexer cache.Indexer) ImageStreamTagLister {
-	return &imageStreamTagLister{indexer: indexer}
-}
-
-// List lists all ImageStreamTags in the indexer.
-func (s *imageStreamTagLister) List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ImageStreamTag))
-	})
-	return ret, err
+	return &imageStreamTagLister{listers.New[*v1.ImageStreamTag](indexer, v1.Resource("imagestreamtag"))}
 }
 
 // ImageStreamTags returns an object that can list and get ImageStreamTags.
 func (s *imageStreamTagLister) ImageStreamTags(namespace string) ImageStreamTagNamespaceLister {
-	return imageStreamTagNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return imageStreamTagNamespaceLister{listers.NewNamespaced[*v1.ImageStreamTag](s.ResourceIndexer, namespace)}
 }
 
 // ImageStreamTagNamespaceLister helps list and get ImageStreamTags.
@@ -58,26 +50,5 @@ type ImageStreamTagNamespaceLister interface {
 // imageStreamTagNamespaceLister implements the ImageStreamTagNamespaceLister
 // interface.
 type imageStreamTagNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ImageStreamTags in the indexer for a given namespace.
-func (s imageStreamTagNamespaceLister) List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ImageStreamTag))
-	})
-	return ret, err
-}
-
-// Get retrieves the ImageStreamTag from the indexer for a given namespace and name.
-func (s imageStreamTagNamespaceLister) Get(name string) (*v1.ImageStreamTag, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("imagestreamtag"), name)
-	}
-	return obj.(*v1.ImageStreamTag), nil
+	listers.ResourceIndexer[*v1.ImageStreamTag]
 }

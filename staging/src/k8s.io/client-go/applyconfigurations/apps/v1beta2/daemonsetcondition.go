@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DaemonSetConditionApplyConfiguration represents an declarative configuration of the DaemonSetCondition type for use
+// DaemonSetConditionApplyConfiguration represents a declarative configuration of the DaemonSetCondition type for use
 // with apply.
 type DaemonSetConditionApplyConfiguration struct {
 	Type               *v1beta2.DaemonSetConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type DaemonSetConditionApplyConfiguration struct {
 	Message            *string                         `json:"message,omitempty"`
 }
 
-// DaemonSetConditionApplyConfiguration constructs an declarative configuration of the DaemonSetCondition type for use with
+// DaemonSetConditionApplyConfiguration constructs a declarative configuration of the DaemonSetCondition type for use with
 // apply.
 func DaemonSetCondition() *DaemonSetConditionApplyConfiguration {
 	return &DaemonSetConditionApplyConfiguration{}

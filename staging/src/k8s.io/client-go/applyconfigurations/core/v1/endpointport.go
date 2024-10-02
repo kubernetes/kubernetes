@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// EndpointPortApplyConfiguration represents an declarative configuration of the EndpointPort type for use
+// EndpointPortApplyConfiguration represents a declarative configuration of the EndpointPort type for use
 // with apply.
 type EndpointPortApplyConfiguration struct {
 	Name        *string      `json:"name,omitempty"`
@@ -31,7 +31,7 @@ type EndpointPortApplyConfiguration struct {
 	AppProtocol *string      `json:"appProtocol,omitempty"`
 }
 
-// EndpointPortApplyConfiguration constructs an declarative configuration of the EndpointPort type for use with
+// EndpointPortApplyConfiguration constructs a declarative configuration of the EndpointPort type for use with
 // apply.
 func EndpointPort() *EndpointPortApplyConfiguration {
 	return &EndpointPortApplyConfiguration{}

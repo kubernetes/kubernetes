@@ -102,15 +102,14 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
-		ID:                   kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
-		Name:                 c.GetMetadata().GetName(),
-		ImageID:              imageID,
-		ImageRef:             c.ImageRef,
-		ImageRuntimeHandler:  c.Image.RuntimeHandler,
-		Image:                c.Image.Image,
-		Hash:                 annotatedInfo.Hash,
-		HashWithoutResources: annotatedInfo.HashWithoutResources,
-		State:                toKubeContainerState(c.State),
+		ID:                  kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
+		Name:                c.GetMetadata().GetName(),
+		ImageID:             imageID,
+		ImageRef:            c.ImageRef,
+		ImageRuntimeHandler: c.Image.RuntimeHandler,
+		Image:               c.Image.Image,
+		Hash:                annotatedInfo.Hash,
+		State:               toKubeContainerState(c.State),
 	}, nil
 }
 
@@ -209,7 +208,7 @@ func parsePodUIDFromLogsDirectory(name string) types.UID {
 }
 
 // toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.
-func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeapi.RuntimeHandler) *kubecontainer.RuntimeStatus {
+func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeapi.RuntimeHandler, features *runtimeapi.RuntimeFeatures) *kubecontainer.RuntimeStatus {
 	conditions := []kubecontainer.RuntimeCondition{}
 	for _, c := range status.GetConditions() {
 		conditions = append(conditions, kubecontainer.RuntimeCondition{
@@ -233,7 +232,13 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			SupportsUserNamespaces:          supportsUserns,
 		}
 	}
-	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers}
+	var retFeatures *kubecontainer.RuntimeFeatures
+	if features != nil {
+		retFeatures = &kubecontainer.RuntimeFeatures{
+			SupplementalGroupsPolicy: features.SupplementalGroupsPolicy,
+		}
+	}
+	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}
 }
 
 func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) (*runtimeapi.SecurityProfile, error) {

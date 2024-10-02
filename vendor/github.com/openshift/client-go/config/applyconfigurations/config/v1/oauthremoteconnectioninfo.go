@@ -2,7 +2,7 @@
 
 package v1
 
-// OAuthRemoteConnectionInfoApplyConfiguration represents an declarative configuration of the OAuthRemoteConnectionInfo type for use
+// OAuthRemoteConnectionInfoApplyConfiguration represents a declarative configuration of the OAuthRemoteConnectionInfo type for use
 // with apply.
 type OAuthRemoteConnectionInfoApplyConfiguration struct {
 	URL           *string                                   `json:"url,omitempty"`
@@ -11,7 +11,7 @@ type OAuthRemoteConnectionInfoApplyConfiguration struct {
 	TLSClientKey  *SecretNameReferenceApplyConfiguration    `json:"tlsClientKey,omitempty"`
 }
 
-// OAuthRemoteConnectionInfoApplyConfiguration constructs an declarative configuration of the OAuthRemoteConnectionInfo type for use with
+// OAuthRemoteConnectionInfoApplyConfiguration constructs a declarative configuration of the OAuthRemoteConnectionInfo type for use with
 // apply.
 func OAuthRemoteConnectionInfo() *OAuthRemoteConnectionInfoApplyConfiguration {
 	return &OAuthRemoteConnectionInfoApplyConfiguration{}

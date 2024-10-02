@@ -6,7 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// BuildDefaultsApplyConfiguration represents an declarative configuration of the BuildDefaults type for use
+// BuildDefaultsApplyConfiguration represents a declarative configuration of the BuildDefaults type for use
 // with apply.
 type BuildDefaultsApplyConfiguration struct {
 	DefaultProxy *ProxySpecApplyConfiguration   `json:"defaultProxy,omitempty"`
@@ -16,7 +16,7 @@ type BuildDefaultsApplyConfiguration struct {
 	Resources    *corev1.ResourceRequirements   `json:"resources,omitempty"`
 }
 
-// BuildDefaultsApplyConfiguration constructs an declarative configuration of the BuildDefaults type for use with
+// BuildDefaultsApplyConfiguration constructs a declarative configuration of the BuildDefaults type for use with
 // apply.
 func BuildDefaults() *BuildDefaultsApplyConfiguration {
 	return &BuildDefaultsApplyConfiguration{}

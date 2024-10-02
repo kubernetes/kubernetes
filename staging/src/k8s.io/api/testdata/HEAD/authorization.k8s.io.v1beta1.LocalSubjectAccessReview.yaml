@@ -42,7 +42,21 @@ spec:
     path: pathValue
     verb: verbValue
   resourceAttributes:
+    fieldSelector:
+      rawSelector: rawSelectorValue
+      requirements:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
     group: groupValue
+    labelSelector:
+      rawSelector: rawSelectorValue
+      requirements:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
     name: nameValue
     namespace: namespaceValue
     resource: resourceValue

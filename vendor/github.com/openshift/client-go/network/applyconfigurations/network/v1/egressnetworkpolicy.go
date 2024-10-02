@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EgressNetworkPolicyApplyConfiguration represents an declarative configuration of the EgressNetworkPolicy type for use
+// EgressNetworkPolicyApplyConfiguration represents a declarative configuration of the EgressNetworkPolicy type for use
 // with apply.
 type EgressNetworkPolicyApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -19,7 +19,7 @@ type EgressNetworkPolicyApplyConfiguration struct {
 	Spec                             *EgressNetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// EgressNetworkPolicy constructs an declarative configuration of the EgressNetworkPolicy type for use with
+// EgressNetworkPolicy constructs a declarative configuration of the EgressNetworkPolicy type for use with
 // apply.
 func EgressNetworkPolicy(name, namespace string) *EgressNetworkPolicyApplyConfiguration {
 	b := &EgressNetworkPolicyApplyConfiguration{}
@@ -230,4 +230,10 @@ func (b *EgressNetworkPolicyApplyConfiguration) ensureObjectMetaApplyConfigurati
 func (b *EgressNetworkPolicyApplyConfiguration) WithSpec(value *EgressNetworkPolicySpecApplyConfiguration) *EgressNetworkPolicyApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EgressNetworkPolicyApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

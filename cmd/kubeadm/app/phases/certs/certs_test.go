@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	certutil "k8s.io/client-go/util/cert"
@@ -634,38 +633,6 @@ func TestValidateMethods(t *testing.T) {
 			t.Errorf("expected success, error executing validateFunc: %v, %v", test.name, err)
 		} else if !test.expectedSuccess && err == nil {
 			t.Errorf("expected failure, no error executing validateFunc: %v", test.name)
-		}
-	}
-}
-
-func TestNewCSR(t *testing.T) {
-	kubeadmCert := KubeadmCertAPIServer()
-	cfg := testutil.GetDefaultInternalConfig(t)
-
-	certConfig, err := kubeadmCert.GetConfig(cfg)
-	if err != nil {
-		t.Fatalf("couldn't get cert config: %v", err)
-	}
-
-	csr, _, err := NewCSR(kubeadmCert, cfg)
-
-	if err != nil {
-		t.Errorf("invalid signature on CSR: %v", err)
-	}
-
-	assert.ElementsMatch(t, certConfig.Organization, csr.Subject.Organization, "organizations not equal")
-
-	if csr.Subject.CommonName != certConfig.CommonName {
-		t.Errorf("expected common name %q, got %q", certConfig.CommonName, csr.Subject.CommonName)
-	}
-
-	assert.ElementsMatch(t, certConfig.AltNames.DNSNames, csr.DNSNames, "dns names not equal")
-
-	assert.Len(t, csr.IPAddresses, len(certConfig.AltNames.IPs))
-
-	for i, ip := range csr.IPAddresses {
-		if !ip.Equal(certConfig.AltNames.IPs[i]) {
-			t.Errorf("[%d]: %v != %v", i, ip, certConfig.AltNames.IPs[i])
 		}
 	}
 }

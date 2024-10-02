@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterResourceQuotaApplyConfiguration represents an declarative configuration of the ClusterResourceQuota type for use
+// ClusterResourceQuotaApplyConfiguration represents a declarative configuration of the ClusterResourceQuota type for use
 // with apply.
 type ClusterResourceQuotaApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type ClusterResourceQuotaApplyConfiguration struct {
 	Status                           *ClusterResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ClusterResourceQuota constructs an declarative configuration of the ClusterResourceQuota type for use with
+// ClusterResourceQuota constructs a declarative configuration of the ClusterResourceQuota type for use with
 // apply.
 func ClusterResourceQuota(name string) *ClusterResourceQuotaApplyConfiguration {
 	b := &ClusterResourceQuotaApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *ClusterResourceQuotaApplyConfiguration) WithSpec(value *ClusterResource
 func (b *ClusterResourceQuotaApplyConfiguration) WithStatus(value *ClusterResourceQuotaStatusApplyConfiguration) *ClusterResourceQuotaApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterResourceQuotaApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

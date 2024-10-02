@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// IdentityProviderConfigApplyConfiguration represents an declarative configuration of the IdentityProviderConfig type for use
+// IdentityProviderConfigApplyConfiguration represents a declarative configuration of the IdentityProviderConfig type for use
 // with apply.
 type IdentityProviderConfigApplyConfiguration struct {
 	Type          *v1.IdentityProviderType                         `json:"type,omitempty"`
@@ -21,7 +21,7 @@ type IdentityProviderConfigApplyConfiguration struct {
 	RequestHeader *RequestHeaderIdentityProviderApplyConfiguration `json:"requestHeader,omitempty"`
 }
 
-// IdentityProviderConfigApplyConfiguration constructs an declarative configuration of the IdentityProviderConfig type for use with
+// IdentityProviderConfigApplyConfiguration constructs a declarative configuration of the IdentityProviderConfig type for use with
 // apply.
 func IdentityProviderConfig() *IdentityProviderConfigApplyConfiguration {
 	return &IdentityProviderConfigApplyConfiguration{}

@@ -2,7 +2,7 @@
 
 package v1
 
-// OvirtPlatformStatusApplyConfiguration represents an declarative configuration of the OvirtPlatformStatus type for use
+// OvirtPlatformStatusApplyConfiguration represents a declarative configuration of the OvirtPlatformStatus type for use
 // with apply.
 type OvirtPlatformStatusApplyConfiguration struct {
 	APIServerInternalIP  *string                                      `json:"apiServerInternalIP,omitempty"`
@@ -13,7 +13,7 @@ type OvirtPlatformStatusApplyConfiguration struct {
 	LoadBalancer         *OvirtPlatformLoadBalancerApplyConfiguration `json:"loadBalancer,omitempty"`
 }
 
-// OvirtPlatformStatusApplyConfiguration constructs an declarative configuration of the OvirtPlatformStatus type for use with
+// OvirtPlatformStatusApplyConfiguration constructs a declarative configuration of the OvirtPlatformStatus type for use with
 // apply.
 func OvirtPlatformStatus() *OvirtPlatformStatusApplyConfiguration {
 	return &OvirtPlatformStatusApplyConfiguration{}

@@ -54,7 +54,11 @@ func startSVMController(
 		return nil, true, fmt.Errorf("storage version migrator requires garbage collector")
 	}
 
+	// svm controller can make a lot of requests during migration, keep it fast
 	config := controllerContext.ClientBuilder.ConfigOrDie(controllerName)
+	config.QPS *= 20
+	config.Burst *= 100
+
 	client := controllerContext.ClientBuilder.ClientOrDie(controllerName)
 	informer := controllerContext.InformerFactory.Storagemigration().V1alpha1().StorageVersionMigrations()
 

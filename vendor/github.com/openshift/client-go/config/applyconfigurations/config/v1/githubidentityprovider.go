@@ -2,7 +2,7 @@
 
 package v1
 
-// GitHubIdentityProviderApplyConfiguration represents an declarative configuration of the GitHubIdentityProvider type for use
+// GitHubIdentityProviderApplyConfiguration represents a declarative configuration of the GitHubIdentityProvider type for use
 // with apply.
 type GitHubIdentityProviderApplyConfiguration struct {
 	ClientID      *string                                   `json:"clientID,omitempty"`
@@ -13,7 +13,7 @@ type GitHubIdentityProviderApplyConfiguration struct {
 	CA            *ConfigMapNameReferenceApplyConfiguration `json:"ca,omitempty"`
 }
 
-// GitHubIdentityProviderApplyConfiguration constructs an declarative configuration of the GitHubIdentityProvider type for use with
+// GitHubIdentityProviderApplyConfiguration constructs a declarative configuration of the GitHubIdentityProvider type for use with
 // apply.
 func GitHubIdentityProvider() *GitHubIdentityProviderApplyConfiguration {
 	return &GitHubIdentityProviderApplyConfiguration{}

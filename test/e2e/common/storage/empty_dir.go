@@ -259,7 +259,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 						Name:    busyBoxMainContainerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh"},
-						Args:    []string{"-c", "sleep 100000"},
+						Args:    []string{"-c", e2epod.InfiniteSleepCommand},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -330,7 +330,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 						Name:    busyBoxMainContainerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh"},
-						Args:    []string{"-c", "sleep 100000"},
+						Args:    []string{"-c", e2epod.InfiniteSleepCommand},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,

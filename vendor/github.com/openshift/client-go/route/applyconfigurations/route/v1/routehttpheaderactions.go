@@ -2,14 +2,14 @@
 
 package v1
 
-// RouteHTTPHeaderActionsApplyConfiguration represents an declarative configuration of the RouteHTTPHeaderActions type for use
+// RouteHTTPHeaderActionsApplyConfiguration represents a declarative configuration of the RouteHTTPHeaderActions type for use
 // with apply.
 type RouteHTTPHeaderActionsApplyConfiguration struct {
 	Response []RouteHTTPHeaderApplyConfiguration `json:"response,omitempty"`
 	Request  []RouteHTTPHeaderApplyConfiguration `json:"request,omitempty"`
 }
 
-// RouteHTTPHeaderActionsApplyConfiguration constructs an declarative configuration of the RouteHTTPHeaderActions type for use with
+// RouteHTTPHeaderActionsApplyConfiguration constructs a declarative configuration of the RouteHTTPHeaderActions type for use with
 // apply.
 func RouteHTTPHeaderActions() *RouteHTTPHeaderActionsApplyConfiguration {
 	return &RouteHTTPHeaderActionsApplyConfiguration{}

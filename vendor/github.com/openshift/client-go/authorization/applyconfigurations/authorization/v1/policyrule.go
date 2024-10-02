@@ -6,7 +6,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// PolicyRuleApplyConfiguration represents an declarative configuration of the PolicyRule type for use
+// PolicyRuleApplyConfiguration represents a declarative configuration of the PolicyRule type for use
 // with apply.
 type PolicyRuleApplyConfiguration struct {
 	Verbs                 []string              `json:"verbs,omitempty"`
@@ -17,7 +17,7 @@ type PolicyRuleApplyConfiguration struct {
 	NonResourceURLsSlice  []string              `json:"nonResourceURLs,omitempty"`
 }
 
-// PolicyRuleApplyConfiguration constructs an declarative configuration of the PolicyRule type for use with
+// PolicyRuleApplyConfiguration constructs a declarative configuration of the PolicyRule type for use with
 // apply.
 func PolicyRule() *PolicyRuleApplyConfiguration {
 	return &PolicyRuleApplyConfiguration{}

@@ -2,14 +2,14 @@
 
 package v1
 
-// PowerVSServiceEndpointApplyConfiguration represents an declarative configuration of the PowerVSServiceEndpoint type for use
+// PowerVSServiceEndpointApplyConfiguration represents a declarative configuration of the PowerVSServiceEndpoint type for use
 // with apply.
 type PowerVSServiceEndpointApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	URL  *string `json:"url,omitempty"`
 }
 
-// PowerVSServiceEndpointApplyConfiguration constructs an declarative configuration of the PowerVSServiceEndpoint type for use with
+// PowerVSServiceEndpointApplyConfiguration constructs a declarative configuration of the PowerVSServiceEndpoint type for use with
 // apply.
 func PowerVSServiceEndpoint() *PowerVSServiceEndpointApplyConfiguration {
 	return &PowerVSServiceEndpointApplyConfiguration{}

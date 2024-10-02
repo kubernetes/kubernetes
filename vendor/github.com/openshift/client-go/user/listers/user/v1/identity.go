@@ -4,8 +4,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/user/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -23,30 +23,10 @@ type IdentityLister interface {
 
 // identityLister implements the IdentityLister interface.
 type identityLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Identity]
 }
 
 // NewIdentityLister returns a new IdentityLister.
 func NewIdentityLister(indexer cache.Indexer) IdentityLister {
-	return &identityLister{indexer: indexer}
-}
-
-// List lists all Identities in the indexer.
-func (s *identityLister) List(selector labels.Selector) (ret []*v1.Identity, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Identity))
-	})
-	return ret, err
-}
-
-// Get retrieves the Identity from the index for a given name.
-func (s *identityLister) Get(name string) (*v1.Identity, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("identity"), name)
-	}
-	return obj.(*v1.Identity), nil
+	return &identityLister{listers.New[*v1.Identity](indexer, v1.Resource("identity"))}
 }

@@ -2,7 +2,7 @@
 
 package v1
 
-// ImageStreamStatusApplyConfiguration represents an declarative configuration of the ImageStreamStatus type for use
+// ImageStreamStatusApplyConfiguration represents a declarative configuration of the ImageStreamStatus type for use
 // with apply.
 type ImageStreamStatusApplyConfiguration struct {
 	DockerImageRepository       *string                               `json:"dockerImageRepository,omitempty"`
@@ -10,7 +10,7 @@ type ImageStreamStatusApplyConfiguration struct {
 	Tags                        []NamedTagEventListApplyConfiguration `json:"tags,omitempty"`
 }
 
-// ImageStreamStatusApplyConfiguration constructs an declarative configuration of the ImageStreamStatus type for use with
+// ImageStreamStatusApplyConfiguration constructs a declarative configuration of the ImageStreamStatus type for use with
 // apply.
 func ImageStreamStatus() *ImageStreamStatusApplyConfiguration {
 	return &ImageStreamStatusApplyConfiguration{}

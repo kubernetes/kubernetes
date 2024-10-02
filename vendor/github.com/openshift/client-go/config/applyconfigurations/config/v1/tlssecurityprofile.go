@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// TLSSecurityProfileApplyConfiguration represents an declarative configuration of the TLSSecurityProfile type for use
+// TLSSecurityProfileApplyConfiguration represents a declarative configuration of the TLSSecurityProfile type for use
 // with apply.
 type TLSSecurityProfileApplyConfiguration struct {
 	Type         *v1.TLSProfileType                  `json:"type,omitempty"`
@@ -16,7 +16,7 @@ type TLSSecurityProfileApplyConfiguration struct {
 	Custom       *CustomTLSProfileApplyConfiguration `json:"custom,omitempty"`
 }
 
-// TLSSecurityProfileApplyConfiguration constructs an declarative configuration of the TLSSecurityProfile type for use with
+// TLSSecurityProfileApplyConfiguration constructs a declarative configuration of the TLSSecurityProfile type for use with
 // apply.
 func TLSSecurityProfile() *TLSSecurityProfileApplyConfiguration {
 	return &TLSSecurityProfileApplyConfiguration{}

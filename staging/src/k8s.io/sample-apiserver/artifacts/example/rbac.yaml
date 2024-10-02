@@ -7,7 +7,7 @@ rules:
   resources: ["namespaces"]
   verbs: ["get", "watch", "list"]
 - apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations", "validatingadmissionpolicies", "validatingadmissionpolicybindings"]
   verbs: ["get", "watch", "list"]
 - apiGroups: ["flowcontrol.apiserver.k8s.io"]
   resources: ['prioritylevelconfigurations', 'flowschemas']

@@ -8,7 +8,7 @@ import (
 	v1 "github.com/openshift/api/authorization/v1"
 	scheme "github.com/openshift/client-go/authorization/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // SubjectRulesReviewsGetter has a method to return a SubjectRulesReviewInterface.
@@ -25,27 +25,17 @@ type SubjectRulesReviewInterface interface {
 
 // subjectRulesReviews implements SubjectRulesReviewInterface
 type subjectRulesReviews struct {
-	client rest.Interface
-	ns     string
+	*gentype.Client[*v1.SubjectRulesReview]
 }
 
 // newSubjectRulesReviews returns a SubjectRulesReviews
 func newSubjectRulesReviews(c *AuthorizationV1Client, namespace string) *subjectRulesReviews {
 	return &subjectRulesReviews{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClient[*v1.SubjectRulesReview](
+			"subjectrulesreviews",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.SubjectRulesReview { return &v1.SubjectRulesReview{} }),
 	}
-}
-
-// Create takes the representation of a subjectRulesReview and creates it.  Returns the server's representation of the subjectRulesReview, and an error, if there is any.
-func (c *subjectRulesReviews) Create(ctx context.Context, subjectRulesReview *v1.SubjectRulesReview, opts metav1.CreateOptions) (result *v1.SubjectRulesReview, err error) {
-	result = &v1.SubjectRulesReview{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("subjectrulesreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(subjectRulesReview).
-		Do(ctx).
-		Into(result)
-	return
 }

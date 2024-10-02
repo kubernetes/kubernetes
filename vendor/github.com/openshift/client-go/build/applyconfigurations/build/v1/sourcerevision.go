@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/build/v1"
 )
 
-// SourceRevisionApplyConfiguration represents an declarative configuration of the SourceRevision type for use
+// SourceRevisionApplyConfiguration represents a declarative configuration of the SourceRevision type for use
 // with apply.
 type SourceRevisionApplyConfiguration struct {
 	Type *v1.BuildSourceType                  `json:"type,omitempty"`
 	Git  *GitSourceRevisionApplyConfiguration `json:"git,omitempty"`
 }
 
-// SourceRevisionApplyConfiguration constructs an declarative configuration of the SourceRevision type for use with
+// SourceRevisionApplyConfiguration constructs a declarative configuration of the SourceRevision type for use with
 // apply.
 func SourceRevision() *SourceRevisionApplyConfiguration {
 	return &SourceRevisionApplyConfiguration{}

@@ -104,7 +104,7 @@ type HorizontalController struct {
 	podListerSynced cache.InformerSynced
 
 	// Controllers that need to be synced
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// Latest unstabilized recommendations for each autoscaler.
 	recommendations     map[string][]timestampedRecommendation
@@ -148,15 +148,20 @@ func NewHorizontalController(
 		hpaNamespacer:                hpaNamespacer,
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
 		monitor:                      monitor.New(),
-		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper:                       mapper,
-		recommendations:              map[string][]timestampedRecommendation{},
-		recommendationsLock:          sync.Mutex{},
-		scaleUpEvents:                map[string][]timestampedScaleEvent{},
-		scaleUpEventsLock:            sync.RWMutex{},
-		scaleDownEvents:              map[string][]timestampedScaleEvent{},
-		scaleDownEventsLock:          sync.RWMutex{},
-		hpaSelectors:                 selectors.NewBiMultimap(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			NewDefaultHPARateLimiter(resyncPeriod),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "horizontalpodautoscaler",
+			},
+		),
+		mapper:              mapper,
+		recommendations:     map[string][]timestampedRecommendation{},
+		recommendationsLock: sync.Mutex{},
+		scaleUpEvents:       map[string][]timestampedScaleEvent{},
+		scaleUpEventsLock:   sync.RWMutex{},
+		scaleDownEvents:     map[string][]timestampedScaleEvent{},
+		scaleDownEventsLock: sync.RWMutex{},
+		hpaSelectors:        selectors.NewBiMultimap(),
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -265,7 +270,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer a.queue.Done(key)
 
-	deleted, err := a.reconcileKey(ctx, key.(string))
+	deleted, err := a.reconcileKey(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(err)
 	}

@@ -7,104 +7,123 @@ import (
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"sigs.k8s.io/kustomize/api/filters/patchjson6902"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/yaml"
 )
 
 type PatchTransformerPlugin struct {
-	loadedPatch  *resource.Resource
-	decodedPatch jsonpatch.Patch
-	Path         string          `json:"path,omitempty" yaml:"path,omitempty"`
-	Patch        string          `json:"patch,omitempty" yaml:"patch,omitempty"`
-	Target       *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
-	Options      map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
+	smPatches   []*resource.Resource // strategic-merge patches
+	jsonPatches jsonpatch.Patch      // json6902 patch
+	// patchText is pure patch text created by Path or Patch
+	patchText string
+	// patchSource is patch source message
+	patchSource string
+	Path        string          `json:"path,omitempty"    yaml:"path,omitempty"`
+	Patch       string          `json:"patch,omitempty"   yaml:"patch,omitempty"`
+	Target      *types.Selector `json:"target,omitempty"  yaml:"target,omitempty"`
+	Options     map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
-func (p *PatchTransformerPlugin) Config(
-	h *resmap.PluginHelpers, c []byte) error {
-	err := yaml.Unmarshal(c, p)
-	if err != nil {
+func (p *PatchTransformerPlugin) Config(h *resmap.PluginHelpers, c []byte) error {
+	if err := yaml.Unmarshal(c, p); err != nil {
 		return err
 	}
+
 	p.Patch = strings.TrimSpace(p.Patch)
-	if p.Patch == "" && p.Path == "" {
-		return fmt.Errorf(
-			"must specify one of patch and path in\n%s", string(c))
-	}
-	if p.Patch != "" && p.Path != "" {
-		return fmt.Errorf(
-			"patch and path can't be set at the same time\n%s", string(c))
-	}
-	if p.Path != "" {
-		loaded, loadErr := h.Loader().Load(p.Path)
-		if loadErr != nil {
-			return loadErr
+	switch {
+	case p.Patch == "" && p.Path == "":
+		return fmt.Errorf("must specify one of patch and path in\n%s", string(c))
+	case p.Patch != "" && p.Path != "":
+		return fmt.Errorf("patch and path can't be set at the same time\n%s", string(c))
+	case p.Patch != "":
+		p.patchText = p.Patch
+		p.patchSource = fmt.Sprintf("[patch: %q]", p.patchText)
+	case p.Path != "":
+		loaded, err := h.Loader().Load(p.Path)
+		if err != nil {
+			return fmt.Errorf("failed to get the patch file from path(%s): %w", p.Path, err)
 		}
-		p.Patch = string(loaded)
+		p.patchText = string(loaded)
+		p.patchSource = fmt.Sprintf("[path: %q]", p.Path)
 	}
 
-	patchSM, errSM := h.ResmapFactory().RF().FromBytes([]byte(p.Patch))
-	patchJson, errJson := jsonPatchFromBytes([]byte(p.Patch))
+	patchesSM, errSM := h.ResmapFactory().RF().SliceFromBytes([]byte(p.patchText))
+	patchesJson, errJson := jsonPatchFromBytes([]byte(p.patchText))
+
 	if (errSM == nil && errJson == nil) ||
-		(patchSM != nil && patchJson != nil) {
+		(patchesSM != nil && patchesJson != nil) {
 		return fmt.Errorf(
-			"illegally qualifies as both an SM and JSON patch: [%v]",
-			p.Patch)
+			"illegally qualifies as both an SM and JSON patch: %s",
+			p.patchSource)
 	}
 	if errSM != nil && errJson != nil {
 		return fmt.Errorf(
-			"unable to parse SM or JSON patch from [%v]", p.Patch)
+			"unable to parse SM or JSON patch from %s", p.patchSource)
 	}
 	if errSM == nil {
-		p.loadedPatch = patchSM
-		if p.Options["allowNameChange"] {
-			p.loadedPatch.AllowNameChange()
-		}
-		if p.Options["allowKindChange"] {
-			p.loadedPatch.AllowKindChange()
+		p.smPatches = patchesSM
+		for _, loadedPatch := range p.smPatches {
+			if p.Options["allowNameChange"] {
+				loadedPatch.AllowNameChange()
+			}
+			if p.Options["allowKindChange"] {
+				loadedPatch.AllowKindChange()
+			}
 		}
 	} else {
-		p.decodedPatch = patchJson
+		p.jsonPatches = patchesJson
 	}
 	return nil
 }
 
 func (p *PatchTransformerPlugin) Transform(m resmap.ResMap) error {
-	if p.loadedPatch == nil {
-		return p.transformJson6902(m, p.decodedPatch)
+	if p.smPatches != nil {
+		return p.transformStrategicMerge(m)
 	}
-	// The patch was a strategic merge patch
-	return p.transformStrategicMerge(m, p.loadedPatch)
+	return p.transformJson6902(m)
 }
 
-// transformStrategicMerge applies the provided strategic merge patch
-// to all the resources in the ResMap that match either the Target or
-// the identifier of the patch.
-func (p *PatchTransformerPlugin) transformStrategicMerge(m resmap.ResMap, patch *resource.Resource) error {
-	if p.Target == nil {
+// transformStrategicMerge applies each loaded strategic merge patch
+// to the resource in the ResMap that matches the identifier of the patch.
+// If only one patch is specified, the Target can be used instead.
+func (p *PatchTransformerPlugin) transformStrategicMerge(m resmap.ResMap) error {
+	if p.Target != nil {
+		if len(p.smPatches) > 1 {
+			// detail: https://github.com/kubernetes-sigs/kustomize/issues/5049#issuecomment-1440604403
+			return fmt.Errorf("Multiple Strategic-Merge Patches in one `patches` entry is not allowed to set `patches.target` field: %s", p.patchSource)
+		}
+
+		// single patch
+		patch := p.smPatches[0]
+		selected, err := m.Select(*p.Target)
+		if err != nil {
+			return fmt.Errorf("unable to find patch target %q in `resources`: %w", p.Target, err)
+		}
+		return errors.Wrap(m.ApplySmPatch(resource.MakeIdSet(selected), patch))
+	}
+
+	for _, patch := range p.smPatches {
 		target, err := m.GetById(patch.OrgId())
 		if err != nil {
-			return err
+			return fmt.Errorf("no resource matches strategic merge patch %q: %w", patch.OrgId(), err)
 		}
-		return target.ApplySmPatch(patch)
+		if err := target.ApplySmPatch(patch); err != nil {
+			return errors.Wrap(err)
+		}
 	}
-	selected, err := m.Select(*p.Target)
-	if err != nil {
-		return err
-	}
-	return m.ApplySmPatch(resource.MakeIdSet(selected), patch)
+	return nil
 }
 
-// transformJson6902 applies the provided json6902 patch
-// to all the resources in the ResMap that match the Target.
-func (p *PatchTransformerPlugin) transformJson6902(m resmap.ResMap, patch jsonpatch.Patch) error {
+// transformJson6902 applies json6902 Patch to all the resources in the ResMap that match Target.
+func (p *PatchTransformerPlugin) transformJson6902(m resmap.ResMap) error {
 	if p.Target == nil {
-		return fmt.Errorf("must specify a target for patch %s", p.Patch)
+		return fmt.Errorf("must specify a target for JSON patch %s", p.patchSource)
 	}
 	resources, err := m.Select(*p.Target)
 	if err != nil {
@@ -114,7 +133,7 @@ func (p *PatchTransformerPlugin) transformJson6902(m resmap.ResMap, patch jsonpa
 		res.StorePreviousId()
 		internalAnnotations := kioutil.GetInternalAnnotations(&res.RNode)
 		err = res.ApplyFilter(patchjson6902.Filter{
-			Patch: p.Patch,
+			Patch: p.patchText,
 		})
 		if err != nil {
 			return err
@@ -129,16 +148,17 @@ func (p *PatchTransformerPlugin) transformJson6902(m resmap.ResMap, patch jsonpa
 	return nil
 }
 
-// jsonPatchFromBytes loads a Json 6902 patch from
-// a bytes input
-func jsonPatchFromBytes(
-	in []byte) (jsonpatch.Patch, error) {
+// jsonPatchFromBytes loads a Json 6902 patch from a bytes input
+func jsonPatchFromBytes(in []byte) (jsonpatch.Patch, error) {
 	ops := string(in)
 	if ops == "" {
 		return nil, fmt.Errorf("empty json patch operations")
 	}
 
 	if ops[0] != '[' {
+		// TODO(5049):
+		//   In the case of multiple yaml documents, return error instead of ignoring all but first.
+		//   Details: https://github.com/kubernetes-sigs/kustomize/pull/5194#discussion_r1256686728
 		jsonOps, err := yaml.YAMLToJSON(in)
 		if err != nil {
 			return nil, err

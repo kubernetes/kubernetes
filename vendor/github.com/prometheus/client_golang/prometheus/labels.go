@@ -32,19 +32,15 @@ import (
 // create a Desc.
 type Labels map[string]string
 
+// LabelConstraint normalizes label values.
+type LabelConstraint func(string) string
+
 // ConstrainedLabels represents a label name and its constrain function
 // to normalize label values. This type is commonly used when constructing
 // metric vector Collectors.
 type ConstrainedLabel struct {
 	Name       string
-	Constraint func(string) string
-}
-
-func (cl ConstrainedLabel) Constrain(v string) string {
-	if cl.Constraint == nil {
-		return v
-	}
-	return cl.Constraint(v)
+	Constraint LabelConstraint
 }
 
 // ConstrainableLabels is an interface that allows creating of labels that can
@@ -58,7 +54,7 @@ func (cl ConstrainedLabel) Constrain(v string) string {
 //	  },
 //	})
 type ConstrainableLabels interface {
-	constrainedLabels() ConstrainedLabels
+	compile() *compiledLabels
 	labelNames() []string
 }
 
@@ -67,8 +63,20 @@ type ConstrainableLabels interface {
 // metric vector Collectors.
 type ConstrainedLabels []ConstrainedLabel
 
-func (cls ConstrainedLabels) constrainedLabels() ConstrainedLabels {
-	return cls
+func (cls ConstrainedLabels) compile() *compiledLabels {
+	compiled := &compiledLabels{
+		names:            make([]string, len(cls)),
+		labelConstraints: map[string]LabelConstraint{},
+	}
+
+	for i, label := range cls {
+		compiled.names[i] = label.Name
+		if label.Constraint != nil {
+			compiled.labelConstraints[label.Name] = label.Constraint
+		}
+	}
+
+	return compiled
 }
 
 func (cls ConstrainedLabels) labelNames() []string {
@@ -92,16 +100,34 @@ func (cls ConstrainedLabels) labelNames() []string {
 //	}
 type UnconstrainedLabels []string
 
-func (uls UnconstrainedLabels) constrainedLabels() ConstrainedLabels {
-	constrainedLabels := make([]ConstrainedLabel, len(uls))
-	for i, l := range uls {
-		constrainedLabels[i] = ConstrainedLabel{Name: l}
+func (uls UnconstrainedLabels) compile() *compiledLabels {
+	return &compiledLabels{
+		names: uls,
 	}
-	return constrainedLabels
 }
 
 func (uls UnconstrainedLabels) labelNames() []string {
 	return uls
+}
+
+type compiledLabels struct {
+	names            []string
+	labelConstraints map[string]LabelConstraint
+}
+
+func (cls *compiledLabels) compile() *compiledLabels {
+	return cls
+}
+
+func (cls *compiledLabels) labelNames() []string {
+	return cls.names
+}
+
+func (cls *compiledLabels) constrain(labelName, value string) string {
+	if fn, ok := cls.labelConstraints[labelName]; ok && fn != nil {
+		return fn(value)
+	}
+	return value
 }
 
 // reservedLabelPrefix is a prefix which is not legal in user-supplied
@@ -139,6 +165,8 @@ func validateValuesInLabels(labels Labels, expectedNumberOfValues int) error {
 
 func validateLabelValues(vals []string, expectedNumberOfValues int) error {
 	if len(vals) != expectedNumberOfValues {
+		// The call below makes vals escape, copy them to avoid that.
+		vals := append([]string(nil), vals...)
 		return fmt.Errorf(
 			"%w: expected %d label values but got %d in %#v",
 			errInconsistentCardinality, expectedNumberOfValues,

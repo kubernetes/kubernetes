@@ -37,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	compute "google.golang.org/api/compute/v1"
 	netutils "k8s.io/utils/net"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -776,7 +775,7 @@ func (j *TestJig) WaitForIngress(ctx context.Context, waitForNodePort bool) {
 
 // WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
 func (j *TestJig) WaitForIngressToStable(ctx context.Context) {
-	if err := wait.PollWithContext(ctx, 10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client), func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, 10*time.Second, e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, j.Client), false, func(ctx context.Context) (bool, error) {
 		_, err := j.GetDistinctResponseFromIngress(ctx)
 		if err != nil {
 			return false, nil
@@ -940,23 +939,6 @@ func (j *TestJig) GetServicePorts(ctx context.Context, includeDefaultBackend boo
 		svcPorts[svcName] = svc.Spec.Ports[0]
 	}
 	return svcPorts
-}
-
-// ConstructFirewallForIngress returns the expected GCE firewall rule for the ingress resource
-func (j *TestJig) ConstructFirewallForIngress(ctx context.Context, firewallRuleName string, nodeTags []string) *compute.Firewall {
-	nodePorts := j.GetIngressNodePorts(ctx, true)
-
-	fw := compute.Firewall{}
-	fw.Name = firewallRuleName
-	fw.SourceRanges = framework.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
-	fw.TargetTags = nodeTags
-	fw.Allowed = []*compute.FirewallAllowed{
-		{
-			IPProtocol: "tcp",
-			Ports:      nodePorts,
-		},
-	}
-	return &fw
 }
 
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.

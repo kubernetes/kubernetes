@@ -6,13 +6,13 @@ import (
 	v1alpha1 "github.com/openshift/api/network/v1alpha1"
 )
 
-// DNSNameResolverSpecApplyConfiguration represents an declarative configuration of the DNSNameResolverSpec type for use
+// DNSNameResolverSpecApplyConfiguration represents a declarative configuration of the DNSNameResolverSpec type for use
 // with apply.
 type DNSNameResolverSpecApplyConfiguration struct {
 	Name *v1alpha1.DNSName `json:"name,omitempty"`
 }
 
-// DNSNameResolverSpecApplyConfiguration constructs an declarative configuration of the DNSNameResolverSpec type for use with
+// DNSNameResolverSpecApplyConfiguration constructs a declarative configuration of the DNSNameResolverSpec type for use with
 // apply.
 func DNSNameResolverSpec() *DNSNameResolverSpecApplyConfiguration {
 	return &DNSNameResolverSpecApplyConfiguration{}

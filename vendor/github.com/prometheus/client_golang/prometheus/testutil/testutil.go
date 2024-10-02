@@ -47,6 +47,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/internal"
@@ -230,6 +231,20 @@ func convertReaderToMetricFamily(reader io.Reader) ([]*dto.MetricFamily, error) 
 		return nil, fmt.Errorf("converting reader to metric families failed: %w", err)
 	}
 
+	// The text protocol handles empty help fields inconsistently. When
+	// encoding, any non-nil value, include the empty string, produces a
+	// "# HELP" line. But when decoding, the help field is only set to a
+	// non-nil value if the "# HELP" line contains a non-empty value.
+	//
+	// Because metrics in a registry always have non-nil help fields, populate
+	// any nil help fields in the parsed metrics with the empty string so that
+	// when we compare text encodings, the results are consistent.
+	for _, metric := range notNormalized {
+		if metric.Help == nil {
+			metric.Help = proto.String("")
+		}
+	}
+
 	return internal.NormalizeMetricFamilies(notNormalized), nil
 }
 
@@ -250,13 +265,13 @@ func compareMetricFamilies(got, expected []*dto.MetricFamily, metricNames ...str
 // result.
 func compare(got, want []*dto.MetricFamily) error {
 	var gotBuf, wantBuf bytes.Buffer
-	enc := expfmt.NewEncoder(&gotBuf, expfmt.FmtText)
+	enc := expfmt.NewEncoder(&gotBuf, expfmt.NewFormat(expfmt.TypeTextPlain))
 	for _, mf := range got {
 		if err := enc.Encode(mf); err != nil {
 			return fmt.Errorf("encoding gathered metrics failed: %w", err)
 		}
 	}
-	enc = expfmt.NewEncoder(&wantBuf, expfmt.FmtText)
+	enc = expfmt.NewEncoder(&wantBuf, expfmt.NewFormat(expfmt.TypeTextPlain))
 	for _, mf := range want {
 		if err := enc.Encode(mf); err != nil {
 			return fmt.Errorf("encoding expected metrics failed: %w", err)

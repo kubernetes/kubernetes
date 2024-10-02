@@ -2,7 +2,7 @@
 
 package v1
 
-// ImageLayerApplyConfiguration represents an declarative configuration of the ImageLayer type for use
+// ImageLayerApplyConfiguration represents a declarative configuration of the ImageLayer type for use
 // with apply.
 type ImageLayerApplyConfiguration struct {
 	Name      *string `json:"name,omitempty"`
@@ -10,7 +10,7 @@ type ImageLayerApplyConfiguration struct {
 	MediaType *string `json:"mediaType,omitempty"`
 }
 
-// ImageLayerApplyConfiguration constructs an declarative configuration of the ImageLayer type for use with
+// ImageLayerApplyConfiguration constructs a declarative configuration of the ImageLayer type for use with
 // apply.
 func ImageLayer() *ImageLayerApplyConfiguration {
 	return &ImageLayerApplyConfiguration{}

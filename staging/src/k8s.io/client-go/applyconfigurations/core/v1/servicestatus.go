@@ -22,14 +22,14 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceStatusApplyConfiguration represents an declarative configuration of the ServiceStatus type for use
+// ServiceStatusApplyConfiguration represents a declarative configuration of the ServiceStatus type for use
 // with apply.
 type ServiceStatusApplyConfiguration struct {
 	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
 	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty"`
 }
 
-// ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with
+// ServiceStatusApplyConfiguration constructs a declarative configuration of the ServiceStatus type for use with
 // apply.
 func ServiceStatus() *ServiceStatusApplyConfiguration {
 	return &ServiceStatusApplyConfiguration{}

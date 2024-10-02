@@ -2,14 +2,14 @@
 
 package v1
 
-// AzureResourceTagApplyConfiguration represents an declarative configuration of the AzureResourceTag type for use
+// AzureResourceTagApplyConfiguration represents a declarative configuration of the AzureResourceTag type for use
 // with apply.
 type AzureResourceTagApplyConfiguration struct {
 	Key   *string `json:"key,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// AzureResourceTagApplyConfiguration constructs an declarative configuration of the AzureResourceTag type for use with
+// AzureResourceTagApplyConfiguration constructs a declarative configuration of the AzureResourceTag type for use with
 // apply.
 func AzureResourceTag() *AzureResourceTagApplyConfiguration {
 	return &AzureResourceTagApplyConfiguration{}

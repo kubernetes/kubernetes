@@ -6,13 +6,13 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// OvirtPlatformLoadBalancerApplyConfiguration represents an declarative configuration of the OvirtPlatformLoadBalancer type for use
+// OvirtPlatformLoadBalancerApplyConfiguration represents a declarative configuration of the OvirtPlatformLoadBalancer type for use
 // with apply.
 type OvirtPlatformLoadBalancerApplyConfiguration struct {
 	Type *v1.PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
-// OvirtPlatformLoadBalancerApplyConfiguration constructs an declarative configuration of the OvirtPlatformLoadBalancer type for use with
+// OvirtPlatformLoadBalancerApplyConfiguration constructs a declarative configuration of the OvirtPlatformLoadBalancer type for use with
 // apply.
 func OvirtPlatformLoadBalancer() *OvirtPlatformLoadBalancerApplyConfiguration {
 	return &OvirtPlatformLoadBalancerApplyConfiguration{}

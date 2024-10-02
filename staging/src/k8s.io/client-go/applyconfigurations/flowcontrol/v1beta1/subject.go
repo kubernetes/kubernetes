@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/flowcontrol/v1beta1"
 )
 
-// SubjectApplyConfiguration represents an declarative configuration of the Subject type for use
+// SubjectApplyConfiguration represents a declarative configuration of the Subject type for use
 // with apply.
 type SubjectApplyConfiguration struct {
 	Kind           *v1beta1.SubjectKind                     `json:"kind,omitempty"`
@@ -31,7 +31,7 @@ type SubjectApplyConfiguration struct {
 	ServiceAccount *ServiceAccountSubjectApplyConfiguration `json:"serviceAccount,omitempty"`
 }
 
-// SubjectApplyConfiguration constructs an declarative configuration of the Subject type for use with
+// SubjectApplyConfiguration constructs a declarative configuration of the Subject type for use with
 // apply.
 func Subject() *SubjectApplyConfiguration {
 	return &SubjectApplyConfiguration{}

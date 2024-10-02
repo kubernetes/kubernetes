@@ -44,6 +44,8 @@ type SecureServingOptions struct {
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
+	// DisableHTTP2Serving indicates that http2 serving should not be enabled.
+	DisableHTTP2Serving bool
 	// Required set to true means that BindPort cannot be zero.
 	Required bool
 	// ExternalAddress is the address advertised, even if BindAddress is a loopback. By default this
@@ -163,6 +165,9 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, desc)
 
+	fs.BoolVar(&s.DisableHTTP2Serving, "disable-http2-serving", s.DisableHTTP2Serving,
+		"If true, HTTP2 serving will be disabled [default=false]")
+
 	fs.StringVar(&s.ServerCert.CertDirectory, "cert-dir", s.ServerCert.CertDirectory, ""+
 		"The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
@@ -256,6 +261,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	*config = &server.SecureServingInfo{
 		Listener:                     s.Listener,
 		HTTP2MaxStreamsPerConnection: s.HTTP2MaxStreamsPerConnection,
+		DisableHTTP2:                 s.DisableHTTP2Serving,
 	}
 	c := *config
 

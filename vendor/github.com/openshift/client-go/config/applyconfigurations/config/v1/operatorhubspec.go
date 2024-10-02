@@ -2,14 +2,14 @@
 
 package v1
 
-// OperatorHubSpecApplyConfiguration represents an declarative configuration of the OperatorHubSpec type for use
+// OperatorHubSpecApplyConfiguration represents a declarative configuration of the OperatorHubSpec type for use
 // with apply.
 type OperatorHubSpecApplyConfiguration struct {
 	DisableAllDefaultSources *bool                         `json:"disableAllDefaultSources,omitempty"`
 	Sources                  []HubSourceApplyConfiguration `json:"sources,omitempty"`
 }
 
-// OperatorHubSpecApplyConfiguration constructs an declarative configuration of the OperatorHubSpec type for use with
+// OperatorHubSpecApplyConfiguration constructs a declarative configuration of the OperatorHubSpec type for use with
 // apply.
 func OperatorHubSpec() *OperatorHubSpecApplyConfiguration {
 	return &OperatorHubSpecApplyConfiguration{}

@@ -2,7 +2,7 @@
 
 package v1
 
-// VSpherePlatformTopologyApplyConfiguration represents an declarative configuration of the VSpherePlatformTopology type for use
+// VSpherePlatformTopologyApplyConfiguration represents a declarative configuration of the VSpherePlatformTopology type for use
 // with apply.
 type VSpherePlatformTopologyApplyConfiguration struct {
 	Datacenter     *string  `json:"datacenter,omitempty"`
@@ -14,7 +14,7 @@ type VSpherePlatformTopologyApplyConfiguration struct {
 	Template       *string  `json:"template,omitempty"`
 }
 
-// VSpherePlatformTopologyApplyConfiguration constructs an declarative configuration of the VSpherePlatformTopology type for use with
+// VSpherePlatformTopologyApplyConfiguration constructs a declarative configuration of the VSpherePlatformTopology type for use with
 // apply.
 func VSpherePlatformTopology() *VSpherePlatformTopologyApplyConfiguration {
 	return &VSpherePlatformTopologyApplyConfiguration{}

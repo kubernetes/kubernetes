@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// DaemonSetApplyConfiguration represents an declarative configuration of the DaemonSet type for use
+// DaemonSetApplyConfiguration represents a declarative configuration of the DaemonSet type for use
 // with apply.
 type DaemonSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type DaemonSetApplyConfiguration struct {
 	Status                           *DaemonSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// DaemonSet constructs an declarative configuration of the DaemonSet type for use with
+// DaemonSet constructs a declarative configuration of the DaemonSet type for use with
 // apply.
 func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 	b := &DaemonSetApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *DaemonSetApplyConfiguration) WithSpec(value *DaemonSetSpecApplyConfigur
 func (b *DaemonSetApplyConfiguration) WithStatus(value *DaemonSetStatusApplyConfiguration) *DaemonSetApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *DaemonSetApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

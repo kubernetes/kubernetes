@@ -2,7 +2,7 @@
 
 package v1
 
-// ConditionalUpdateRiskApplyConfiguration represents an declarative configuration of the ConditionalUpdateRisk type for use
+// ConditionalUpdateRiskApplyConfiguration represents a declarative configuration of the ConditionalUpdateRisk type for use
 // with apply.
 type ConditionalUpdateRiskApplyConfiguration struct {
 	URL           *string                              `json:"url,omitempty"`
@@ -11,7 +11,7 @@ type ConditionalUpdateRiskApplyConfiguration struct {
 	MatchingRules []ClusterConditionApplyConfiguration `json:"matchingRules,omitempty"`
 }
 
-// ConditionalUpdateRiskApplyConfiguration constructs an declarative configuration of the ConditionalUpdateRisk type for use with
+// ConditionalUpdateRiskApplyConfiguration constructs a declarative configuration of the ConditionalUpdateRisk type for use with
 // apply.
 func ConditionalUpdateRisk() *ConditionalUpdateRiskApplyConfiguration {
 	return &ConditionalUpdateRiskApplyConfiguration{}

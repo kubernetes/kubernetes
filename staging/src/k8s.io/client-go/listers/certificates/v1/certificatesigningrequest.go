@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/certificates/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type CertificateSigningRequestLister interface {
 
 // certificateSigningRequestLister implements the CertificateSigningRequestLister interface.
 type certificateSigningRequestLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.CertificateSigningRequest]
 }
 
 // NewCertificateSigningRequestLister returns a new CertificateSigningRequestLister.
 func NewCertificateSigningRequestLister(indexer cache.Indexer) CertificateSigningRequestLister {
-	return &certificateSigningRequestLister{indexer: indexer}
-}
-
-// List lists all CertificateSigningRequests in the indexer.
-func (s *certificateSigningRequestLister) List(selector labels.Selector) (ret []*v1.CertificateSigningRequest, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.CertificateSigningRequest))
-	})
-	return ret, err
-}
-
-// Get retrieves the CertificateSigningRequest from the index for a given name.
-func (s *certificateSigningRequestLister) Get(name string) (*v1.CertificateSigningRequest, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("certificatesigningrequest"), name)
-	}
-	return obj.(*v1.CertificateSigningRequest), nil
+	return &certificateSigningRequestLister{listers.New[*v1.CertificateSigningRequest](indexer, v1.Resource("certificatesigningrequest"))}
 }

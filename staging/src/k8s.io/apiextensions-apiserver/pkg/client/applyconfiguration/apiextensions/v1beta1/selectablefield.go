@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1beta1
 
-// SelectableFieldApplyConfiguration represents an declarative configuration of the SelectableField type for use
+// SelectableFieldApplyConfiguration represents a declarative configuration of the SelectableField type for use
 // with apply.
 type SelectableFieldApplyConfiguration struct {
 	JSONPath *string `json:"jsonPath,omitempty"`
 }
 
-// SelectableFieldApplyConfiguration constructs an declarative configuration of the SelectableField type for use with
+// SelectableFieldApplyConfiguration constructs a declarative configuration of the SelectableField type for use with
 // apply.
 func SelectableField() *SelectableFieldApplyConfiguration {
 	return &SelectableFieldApplyConfiguration{}

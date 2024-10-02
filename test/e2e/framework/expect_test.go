@@ -44,7 +44,7 @@ func TestNewGomega(t *testing.T) {
 		t.Errorf("unexpected failure: %s", err.Error())
 	}
 	err := Gomega().Expect("hello").ToNot(gomega.Equal("hello"))
-	require.NotNil(t, err)
+	require.Error(t, err)
 	assert.Equal(t, `Expected
     <string>: hello
 not to equal

@@ -235,7 +235,7 @@ func TestShowHiddenMetric(t *testing.T) {
 
 	ms, err := registry.Gather()
 	assert.Nil(t, err, "Gather failed %v", err)
-	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 
 	showHidden.Store(true)
 	defer showHidden.Store(false)
@@ -253,7 +253,7 @@ func TestShowHiddenMetric(t *testing.T) {
 
 	ms, err = registry.Gather()
 	assert.Nil(t, err, "Gather failed %v", err)
-	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+	assert.Lenf(t, ms, expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 }
 
 func TestValidateShowHiddenMetricsVersion(t *testing.T) {

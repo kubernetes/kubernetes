@@ -18,4 +18,5 @@ package internal
 
 type InitConfig struct {
 	PerTestOutput bool
+	BufferLogs    bool
 }

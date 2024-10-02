@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterResourceQuotaSelectorApplyConfiguration represents an declarative configuration of the ClusterResourceQuotaSelector type for use
+// ClusterResourceQuotaSelectorApplyConfiguration represents a declarative configuration of the ClusterResourceQuotaSelector type for use
 // with apply.
 type ClusterResourceQuotaSelectorApplyConfiguration struct {
 	LabelSelector      *v1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
 	AnnotationSelector map[string]string                   `json:"annotations,omitempty"`
 }
 
-// ClusterResourceQuotaSelectorApplyConfiguration constructs an declarative configuration of the ClusterResourceQuotaSelector type for use with
+// ClusterResourceQuotaSelectorApplyConfiguration constructs a declarative configuration of the ClusterResourceQuotaSelector type for use with
 // apply.
 func ClusterResourceQuotaSelector() *ClusterResourceQuotaSelectorApplyConfiguration {
 	return &ClusterResourceQuotaSelectorApplyConfiguration{}

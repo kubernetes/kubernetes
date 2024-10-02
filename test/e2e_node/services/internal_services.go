@@ -24,8 +24,8 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"k8s.io/klog/v2"
 )
@@ -58,17 +58,17 @@ func (es *e2eServices) run(t *testing.T) error {
 
 // start starts the tests embedded services or returns an error.
 func (es *e2eServices) start(t *testing.T) error {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	klog.Info("Starting e2e services...")
 	err := es.startEtcd(t)
 	if err != nil {
 		return err
 	}
-	err = es.startAPIServer(es.etcdStorage)
+	err = es.startAPIServer(tCtx, es.etcdStorage)
 	if err != nil {
 		return err
 	}
-	err = es.startNamespaceController(ctx)
+	err = es.startNamespaceController(tCtx)
 	if err != nil {
 		return nil
 	}
@@ -121,10 +121,10 @@ func (es *e2eServices) startEtcd(t *testing.T) error {
 }
 
 // startAPIServer starts the embedded API server or returns an error.
-func (es *e2eServices) startAPIServer(etcdStorage *storagebackend.Config) error {
+func (es *e2eServices) startAPIServer(ctx context.Context, etcdStorage *storagebackend.Config) error {
 	klog.Info("Starting API server")
 	es.apiServer = NewAPIServer(*etcdStorage)
-	return es.apiServer.Start()
+	return es.apiServer.Start(ctx)
 }
 
 // startNamespaceController starts the embedded namespace controller or returns an error.

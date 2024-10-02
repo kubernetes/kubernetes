@@ -27,20 +27,22 @@ var buildsKind = v1.SchemeGroupVersion.WithKind("Build")
 
 // Get takes name of the build, and returns the corresponding build object, and an error if there is any.
 func (c *FakeBuilds) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Build, err error) {
+	emptyResult := &v1.Build{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(buildsResource, name), &v1.Build{})
+		Invokes(testing.NewRootGetActionWithOptions(buildsResource, name, options), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Build), err
 }
 
 // List takes label and field selectors, and returns the list of Builds that match those selectors.
 func (c *FakeBuilds) List(ctx context.Context, opts metav1.ListOptions) (result *v1.BuildList, err error) {
+	emptyResult := &v1.BuildList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(buildsResource, buildsKind, opts), &v1.BuildList{})
+		Invokes(testing.NewRootListActionWithOptions(buildsResource, buildsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -59,25 +61,27 @@ func (c *FakeBuilds) List(ctx context.Context, opts metav1.ListOptions) (result 
 // Watch returns a watch.Interface that watches the requested builds.
 func (c *FakeBuilds) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(buildsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(buildsResource, opts))
 }
 
 // Create takes the representation of a build and creates it.  Returns the server's representation of the build, and an error, if there is any.
 func (c *FakeBuilds) Create(ctx context.Context, build *v1.Build, opts metav1.CreateOptions) (result *v1.Build, err error) {
+	emptyResult := &v1.Build{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(buildsResource, build), &v1.Build{})
+		Invokes(testing.NewRootCreateActionWithOptions(buildsResource, build, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Build), err
 }
 
 // Update takes the representation of a build and updates it. Returns the server's representation of the build, and an error, if there is any.
 func (c *FakeBuilds) Update(ctx context.Context, build *v1.Build, opts metav1.UpdateOptions) (result *v1.Build, err error) {
+	emptyResult := &v1.Build{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(buildsResource, build), &v1.Build{})
+		Invokes(testing.NewRootUpdateActionWithOptions(buildsResource, build, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Build), err
 }
@@ -91,7 +95,7 @@ func (c *FakeBuilds) Delete(ctx context.Context, name string, opts metav1.Delete
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeBuilds) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(buildsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(buildsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.BuildList{})
 	return err
@@ -99,10 +103,11 @@ func (c *FakeBuilds) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 
 // Patch applies the patch and returns the patched build.
 func (c *FakeBuilds) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Build, err error) {
+	emptyResult := &v1.Build{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(buildsResource, name, pt, data, subresources...), &v1.Build{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(buildsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Build), err
 }
@@ -120,10 +125,11 @@ func (c *FakeBuilds) Apply(ctx context.Context, build *configv1.BuildApplyConfig
 	if name == nil {
 		return nil, fmt.Errorf("build.Name must be provided to Apply")
 	}
+	emptyResult := &v1.Build{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(buildsResource, *name, types.ApplyPatchType, data), &v1.Build{})
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(buildsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.Build), err
 }

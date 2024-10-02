@@ -69,6 +69,7 @@ func TestGetControllerOf(t *testing.T) {
 		},
 	}
 	controllerRef := NewControllerRef(obj1, gvk)
+	controllerRef.BlockOwnerDeletion = nil
 	var falseRef = false
 	obj2 := &metaObj{
 		ObjectMeta: ObjectMeta{
@@ -94,6 +95,12 @@ func TestGetControllerOf(t *testing.T) {
 	c := GetControllerOf(obj2)
 	if c.Name != controllerRef.Name || c.UID != controllerRef.UID {
 		t.Errorf("Incorrect result of GetControllerOf: %v", c)
+	}
+
+	// test that all pointers are also deep copied
+	if (c.Controller == controllerRef.Controller) ||
+		(c.BlockOwnerDeletion != nil && c.BlockOwnerDeletion == controllerRef.BlockOwnerDeletion) {
+		t.Errorf("GetControllerOf did not return deep copy: %v", c)
 	}
 }
 

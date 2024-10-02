@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type resourceUtilizationRatioTestCase struct {
@@ -38,12 +39,12 @@ func (tc *resourceUtilizationRatioTestCase) runTest(t *testing.T) {
 	actualUtilizationRatio, actualCurrentUtilization, actualRawAverageValue, actualErr := GetResourceUtilizationRatio(tc.metrics, tc.requests, tc.targetUtilization)
 
 	if tc.expectedErr != nil {
-		assert.Error(t, actualErr, "there should be an error getting the utilization ratio")
+		require.Error(t, actualErr, "there should be an error getting the utilization ratio")
 		assert.Contains(t, fmt.Sprintf("%v", actualErr), fmt.Sprintf("%v", tc.expectedErr), "the error message should be as expected")
 		return
 	}
 
-	assert.NoError(t, actualErr, "there should be no error retrieving the utilization ratio")
+	require.NoError(t, actualErr, "there should be no error retrieving the utilization ratio")
 	assert.Equal(t, tc.expectedUtilizationRatio, actualUtilizationRatio, "the utilization ratios should be as expected")
 	assert.Equal(t, tc.expectedCurrentUtilization, actualCurrentUtilization, "the current utilization should be as expected")
 	assert.Equal(t, tc.expectedRawAverageValue, actualRawAverageValue, "the raw average value should be as expected")

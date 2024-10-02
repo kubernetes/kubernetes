@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// ComponentRouteSpecApplyConfiguration represents an declarative configuration of the ComponentRouteSpec type for use
+// ComponentRouteSpecApplyConfiguration represents a declarative configuration of the ComponentRouteSpec type for use
 // with apply.
 type ComponentRouteSpecApplyConfiguration struct {
 	Namespace                *string                                `json:"namespace,omitempty"`
@@ -15,7 +15,7 @@ type ComponentRouteSpecApplyConfiguration struct {
 	ServingCertKeyPairSecret *SecretNameReferenceApplyConfiguration `json:"servingCertKeyPairSecret,omitempty"`
 }
 
-// ComponentRouteSpecApplyConfiguration constructs an declarative configuration of the ComponentRouteSpec type for use with
+// ComponentRouteSpecApplyConfiguration constructs a declarative configuration of the ComponentRouteSpec type for use with
 // apply.
 func ComponentRouteSpec() *ComponentRouteSpecApplyConfiguration {
 	return &ComponentRouteSpecApplyConfiguration{}

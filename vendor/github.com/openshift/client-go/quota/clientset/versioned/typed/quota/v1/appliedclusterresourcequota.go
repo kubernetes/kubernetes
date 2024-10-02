@@ -4,12 +4,11 @@ package v1
 
 import (
 	"context"
-	"time"
 
 	quotav1 "github.com/openshift/api/quota/v1"
 	scheme "github.com/openshift/client-go/quota/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // AppliedClusterResourceQuotasGetter has a method to return a AppliedClusterResourceQuotaInterface.
@@ -27,44 +26,18 @@ type AppliedClusterResourceQuotaInterface interface {
 
 // appliedClusterResourceQuotas implements AppliedClusterResourceQuotaInterface
 type appliedClusterResourceQuotas struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*quotav1.AppliedClusterResourceQuota, *quotav1.AppliedClusterResourceQuotaList]
 }
 
 // newAppliedClusterResourceQuotas returns a AppliedClusterResourceQuotas
 func newAppliedClusterResourceQuotas(c *QuotaV1Client, namespace string) *appliedClusterResourceQuotas {
 	return &appliedClusterResourceQuotas{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*quotav1.AppliedClusterResourceQuota, *quotav1.AppliedClusterResourceQuotaList](
+			"appliedclusterresourcequotas",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *quotav1.AppliedClusterResourceQuota { return &quotav1.AppliedClusterResourceQuota{} },
+			func() *quotav1.AppliedClusterResourceQuotaList { return &quotav1.AppliedClusterResourceQuotaList{} }),
 	}
-}
-
-// Get takes name of the appliedClusterResourceQuota, and returns the corresponding appliedClusterResourceQuota object, and an error if there is any.
-func (c *appliedClusterResourceQuotas) Get(ctx context.Context, name string, options v1.GetOptions) (result *quotav1.AppliedClusterResourceQuota, err error) {
-	result = &quotav1.AppliedClusterResourceQuota{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("appliedclusterresourcequotas").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of AppliedClusterResourceQuotas that match those selectors.
-func (c *appliedClusterResourceQuotas) List(ctx context.Context, opts v1.ListOptions) (result *quotav1.AppliedClusterResourceQuotaList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &quotav1.AppliedClusterResourceQuotaList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("appliedclusterresourcequotas").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
 }

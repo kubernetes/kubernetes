@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-provisioner/raw/v4.0.0/deploy/kubernetes//rbac.yaml
-# for csi-driver-host-path release-1.13
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-provisioner/raw/v5.0.1/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path release-1.14
 # by ./update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external
@@ -32,7 +32,7 @@ rules:
   #   verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "delete"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update"]

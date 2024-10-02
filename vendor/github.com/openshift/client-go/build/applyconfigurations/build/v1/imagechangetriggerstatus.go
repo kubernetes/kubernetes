@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ImageChangeTriggerStatusApplyConfiguration represents an declarative configuration of the ImageChangeTriggerStatus type for use
+// ImageChangeTriggerStatusApplyConfiguration represents a declarative configuration of the ImageChangeTriggerStatus type for use
 // with apply.
 type ImageChangeTriggerStatusApplyConfiguration struct {
 	LastTriggeredImageID *string                                    `json:"lastTriggeredImageID,omitempty"`
@@ -14,7 +14,7 @@ type ImageChangeTriggerStatusApplyConfiguration struct {
 	LastTriggerTime      *metav1.Time                               `json:"lastTriggerTime,omitempty"`
 }
 
-// ImageChangeTriggerStatusApplyConfiguration constructs an declarative configuration of the ImageChangeTriggerStatus type for use with
+// ImageChangeTriggerStatusApplyConfiguration constructs a declarative configuration of the ImageChangeTriggerStatus type for use with
 // apply.
 func ImageChangeTriggerStatus() *ImageChangeTriggerStatusApplyConfiguration {
 	return &ImageChangeTriggerStatusApplyConfiguration{}

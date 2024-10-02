@@ -22,9 +22,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -38,21 +39,51 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_VolumeAttachment(in *v1alpha1.VolumeAttachment) {
 	if in.Spec.Source.InlineVolumeSpec != nil {
-		v1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
+		corev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath != nil {
-			v1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
+			corev1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD != nil {
-			v1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool = "rbd"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser = "admin"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
-			v1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 	}
 }

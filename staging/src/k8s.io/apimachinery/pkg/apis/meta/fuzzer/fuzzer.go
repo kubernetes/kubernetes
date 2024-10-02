@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -249,8 +250,9 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 
 			if j.MatchExpressions != nil {
-				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
-				// so we need to make sure ours are sorted as well here to preserve round-trip comparison.
+				// NB: the label selector parser code sorts match expressions by key, and
+				// sorts and deduplicates the values, so we need to make sure ours are
+				// sorted and deduplicated as well here to preserve round-trip comparison.
 				// In practice, not sorting doesn't hurt anything...
 
 				for i := range j.MatchExpressions {
@@ -266,7 +268,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 						for i := range req.Values {
 							req.Values[i] = randomLabelPart(c, true)
 						}
-						sort.Strings(req.Values)
+						req.Values = sets.List(sets.New(req.Values...))
 					} else {
 						req.Values = nil
 					}

@@ -44,7 +44,7 @@ message Action {
 
   // Content is the actual content of the request for create and update
   // +kubebuilder:pruning:PreserveUnknownFields
-  optional k8s.io.apimachinery.pkg.runtime.RawExtension content = 7;
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension content = 7;
 }
 
 // ClusterRole is a logical grouping of PolicyRules that can be referenced as a unit by ClusterRoleBindings.
@@ -54,7 +54,7 @@ message Action {
 message ClusterRole {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
   repeated PolicyRule rules = 2;
@@ -62,7 +62,7 @@ message ClusterRole {
   // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
   // If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
   // stomped by the controller.
-  optional k8s.io.api.rbac.v1.AggregationRule aggregationRule = 3;
+  optional .k8s.io.api.rbac.v1.AggregationRule aggregationRule = 3;
 }
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference any ClusterRole in the same namespace or in the global namespace.
@@ -74,7 +74,7 @@ message ClusterRole {
 message ClusterRoleBinding {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // UserNames holds all the usernames directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
@@ -95,12 +95,12 @@ message ClusterRoleBinding {
   // Thus newer clients that do not need to support backwards compatibility should send
   // only fully qualified Subjects and should omit the UserNames and GroupNames fields.
   // Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.
-  repeated k8s.io.api.core.v1.ObjectReference subjects = 4;
+  repeated .k8s.io.api.core.v1.ObjectReference subjects = 4;
 
   // RoleRef can only reference the current namespace and the global namespace.
   // If the ClusterRoleRef cannot be resolved, the Authorizer must return an error.
   // Since Policy is a singleton, this is sufficient knowledge to locate a role.
-  optional k8s.io.api.core.v1.ObjectReference roleRef = 5;
+  optional .k8s.io.api.core.v1.ObjectReference roleRef = 5;
 }
 
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
@@ -110,7 +110,7 @@ message ClusterRoleBinding {
 message ClusterRoleBindingList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoleBindings
   repeated ClusterRoleBinding items = 2;
@@ -123,7 +123,7 @@ message ClusterRoleBindingList {
 message ClusterRoleList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoles
   repeated ClusterRole items = 2;
@@ -140,7 +140,7 @@ message GroupRestriction {
 
   // Selectors specifies a list of label selectors over group labels.
   // +nullable
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labels = 2;
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labels = 2;
 }
 
 // IsPersonalSubjectAccessReview is a marker for PolicyRule.AttributeRestrictions that denotes that subjectaccessreviews on self should be allowed
@@ -155,7 +155,11 @@ message IsPersonalSubjectAccessReview {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message LocalResourceAccessReview {
-  // Action describes the action being tested.  The Namespace element is FORCED to the current namespace.
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 2;
+
+  // Action describes the action being tested. The Namespace element is FORCED to the current namespace.
   optional Action Action = 1;
 }
 
@@ -164,6 +168,10 @@ message LocalResourceAccessReview {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message LocalSubjectAccessReview {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 5;
+
   // Action describes the action being tested.  The Namespace element is FORCED to the current namespace.
   optional Action Action = 1;
 
@@ -244,7 +252,7 @@ message PolicyRule {
   // AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
   // If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
   // +kubebuilder:pruning:PreserveUnknownFields
-  optional k8s.io.apimachinery.pkg.runtime.RawExtension attributeRestrictions = 2;
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension attributeRestrictions = 2;
 
   // APIGroups is the name of the APIGroup that contains the resources.  If this field is empty, then both kubernetes and origin API groups are assumed.
   // That means that if an action is requested against one of the enumerated resources in either the kubernetes or the origin API group, the request
@@ -270,6 +278,10 @@ message PolicyRule {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message ResourceAccessReview {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 2;
+
   // Action describes the action being tested.
   optional Action Action = 1;
 }
@@ -303,7 +315,7 @@ message ResourceAccessReviewResponse {
 message Role {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
   repeated PolicyRule rules = 2;
@@ -318,7 +330,7 @@ message Role {
 message RoleBinding {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // UserNames holds all the usernames directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
@@ -339,12 +351,12 @@ message RoleBinding {
   // Thus newer clients that do not need to support backwards compatibility should send
   // only fully qualified Subjects and should omit the UserNames and GroupNames fields.
   // Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.
-  repeated k8s.io.api.core.v1.ObjectReference subjects = 4;
+  repeated .k8s.io.api.core.v1.ObjectReference subjects = 4;
 
   // RoleRef can only reference the current namespace and the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
   // Since Policy is a singleton, this is sufficient knowledge to locate a role.
-  optional k8s.io.api.core.v1.ObjectReference roleRef = 5;
+  optional .k8s.io.api.core.v1.ObjectReference roleRef = 5;
 }
 
 // RoleBindingList is a collection of RoleBindings
@@ -354,7 +366,7 @@ message RoleBinding {
 message RoleBindingList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of RoleBindings
   repeated RoleBinding items = 2;
@@ -376,7 +388,7 @@ message RoleBindingList {
 message RoleBindingRestriction {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the matcher.
   optional RoleBindingRestrictionSpec spec = 2;
@@ -389,7 +401,7 @@ message RoleBindingRestriction {
 message RoleBindingRestrictionList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of RoleBindingRestriction objects.
   repeated RoleBindingRestriction items = 2;
@@ -418,7 +430,7 @@ message RoleBindingRestrictionSpec {
 message RoleList {
   // metadata is the standard list's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of Roles
   repeated Role items = 2;
@@ -429,6 +441,10 @@ message RoleList {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message SelfSubjectRulesReview {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 3;
+
   // Spec adds information about how to conduct the check
   optional SelfSubjectRulesReviewSpec spec = 1;
 
@@ -473,6 +489,10 @@ message ServiceAccountRestriction {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message SubjectAccessReview {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 5;
+
   // Action describes the action being tested.
   optional Action Action = 1;
 
@@ -515,6 +535,10 @@ message SubjectAccessReviewResponse {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message SubjectRulesReview {
+  // metadata is the standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 3;
+
   // Spec adds information about how to conduct the check
   optional SubjectRulesReviewSpec spec = 1;
 
@@ -557,6 +581,6 @@ message UserRestriction {
 
   // Selectors specifies a list of label selectors over user labels.
   // +nullable
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labels = 3;
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labels = 3;
 }
 

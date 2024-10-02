@@ -2382,14 +2382,14 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 	reconciler.volumesNeedUpdateFromNodeStatus = append(reconciler.volumesNeedUpdateFromNodeStatus, volumeName1, volumeName2)
 	// Act - run reconcile loop just once.
 	// "volumesNeedUpdateFromNodeStatus" is not empty, so no unmount will be triggered.
-	reconciler.reconcileNew()
+	reconciler.reconcile()
 
 	// Assert
 	assert.True(t, reconciler.StatesHasBeenSynced())
 	assert.Empty(t, reconciler.volumesNeedUpdateFromNodeStatus)
 
 	attachedVolumes := asw.GetAttachedVolumes()
-	assert.Equalf(t, len(attachedVolumes), 2, "two volumes in ASW expected")
+	assert.Lenf(t, attachedVolumes, 2, "two volumes in ASW expected")
 	for _, vol := range attachedVolumes {
 		if vol.VolumeName == volumeName1 {
 			// devicePath + attachability must have been updated from node.status

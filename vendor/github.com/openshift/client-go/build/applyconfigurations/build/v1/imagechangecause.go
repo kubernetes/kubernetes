@@ -6,14 +6,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ImageChangeCauseApplyConfiguration represents an declarative configuration of the ImageChangeCause type for use
+// ImageChangeCauseApplyConfiguration represents a declarative configuration of the ImageChangeCause type for use
 // with apply.
 type ImageChangeCauseApplyConfiguration struct {
 	ImageID *string             `json:"imageID,omitempty"`
 	FromRef *v1.ObjectReference `json:"fromRef,omitempty"`
 }
 
-// ImageChangeCauseApplyConfiguration constructs an declarative configuration of the ImageChangeCause type for use with
+// ImageChangeCauseApplyConfiguration constructs a declarative configuration of the ImageChangeCause type for use with
 // apply.
 func ImageChangeCause() *ImageChangeCauseApplyConfiguration {
 	return &ImageChangeCauseApplyConfiguration{}

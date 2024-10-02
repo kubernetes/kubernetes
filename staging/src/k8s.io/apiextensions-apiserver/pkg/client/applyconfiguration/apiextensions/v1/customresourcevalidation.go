@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// CustomResourceValidationApplyConfiguration represents an declarative configuration of the CustomResourceValidation type for use
+// CustomResourceValidationApplyConfiguration represents a declarative configuration of the CustomResourceValidation type for use
 // with apply.
 type CustomResourceValidationApplyConfiguration struct {
 	OpenAPIV3Schema *JSONSchemaPropsApplyConfiguration `json:"openAPIV3Schema,omitempty"`
 }
 
-// CustomResourceValidationApplyConfiguration constructs an declarative configuration of the CustomResourceValidation type for use with
+// CustomResourceValidationApplyConfiguration constructs a declarative configuration of the CustomResourceValidation type for use with
 // apply.
 func CustomResourceValidation() *CustomResourceValidationApplyConfiguration {
 	return &CustomResourceValidationApplyConfiguration{}

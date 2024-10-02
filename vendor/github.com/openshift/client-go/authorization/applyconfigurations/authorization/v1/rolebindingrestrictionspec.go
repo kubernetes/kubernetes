@@ -2,7 +2,7 @@
 
 package v1
 
-// RoleBindingRestrictionSpecApplyConfiguration represents an declarative configuration of the RoleBindingRestrictionSpec type for use
+// RoleBindingRestrictionSpecApplyConfiguration represents a declarative configuration of the RoleBindingRestrictionSpec type for use
 // with apply.
 type RoleBindingRestrictionSpecApplyConfiguration struct {
 	UserRestriction           *UserRestrictionApplyConfiguration           `json:"userrestriction,omitempty"`
@@ -10,7 +10,7 @@ type RoleBindingRestrictionSpecApplyConfiguration struct {
 	ServiceAccountRestriction *ServiceAccountRestrictionApplyConfiguration `json:"serviceaccountrestriction,omitempty"`
 }
 
-// RoleBindingRestrictionSpecApplyConfiguration constructs an declarative configuration of the RoleBindingRestrictionSpec type for use with
+// RoleBindingRestrictionSpecApplyConfiguration constructs a declarative configuration of the RoleBindingRestrictionSpec type for use with
 // apply.
 func RoleBindingRestrictionSpec() *RoleBindingRestrictionSpecApplyConfiguration {
 	return &RoleBindingRestrictionSpecApplyConfiguration{}

@@ -59,6 +59,12 @@ type Config struct {
 	// FullResyncPeriod is the period at which ShouldResync is considered.
 	FullResyncPeriod time.Duration
 
+	// MinWatchTimeout, if set, will define the minimum timeout for watch requests send
+	// to kube-apiserver. However, values lower than 5m will not be honored to avoid
+	// negative performance impact on controlplane.
+	// Optional - if unset a default value of 5m will be used.
+	MinWatchTimeout time.Duration
+
 	// ShouldResync is periodically used by the reflector to determine
 	// whether to Resync the Queue. If ShouldResync is `nil` or
 	// returns true, it means the reflector should proceed with the
@@ -138,6 +144,7 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 		c.config.Queue,
 		ReflectorOptions{
 			ResyncPeriod:    c.config.FullResyncPeriod,
+			MinWatchTimeout: c.config.MinWatchTimeout,
 			TypeDescription: c.config.ObjectDescription,
 			Clock:           c.clock,
 		},
@@ -346,6 +353,58 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 	return ObjectToName(obj)
 }
 
+// InformerOptions configure a Reflector.
+type InformerOptions struct {
+	// ListerWatcher implements List and Watch functions for the source of the resource
+	// the informer will be informing about.
+	ListerWatcher ListerWatcher
+
+	// ObjectType is an object of the type that informer is expected to receive.
+	ObjectType runtime.Object
+
+	// Handler defines functions that should called on object mutations.
+	Handler ResourceEventHandler
+
+	// ResyncPeriod is the underlying Reflector's resync period. If non-zero, the store
+	// is re-synced with that frequency - Modify events are delivered even if objects
+	// didn't change.
+	// This is useful for synchronizing objects that configure external resources
+	// (e.g. configure cloud provider functionalities).
+	// Optional - if unset, store resyncing is not happening periodically.
+	ResyncPeriod time.Duration
+
+	// MinWatchTimeout, if set, will define the minimum timeout for watch requests send
+	// to kube-apiserver. However, values lower than 5m will not be honored to avoid
+	// negative performance impact on controlplane.
+	// Optional - if unset a default value of 5m will be used.
+	MinWatchTimeout time.Duration
+
+	// Indexers, if set, are the indexers for the received objects to optimize
+	// certain queries.
+	// Optional - if unset no indexes are maintained.
+	Indexers Indexers
+
+	// Transform function, if set, will be called on all objects before they will be
+	// put into the Store and corresponding Add/Modify/Delete handlers will be invoked
+	// for them.
+	// Optional - if unset no additional transforming is happening.
+	Transform TransformFunc
+}
+
+// NewInformerWithOptions returns a Store and a controller for populating the store
+// while also providing event notifications. You should only used the returned
+// Store for Get/List operations; Add/Modify/Deletes will cause the event
+// notifications to be faulty.
+func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
+	var clientState Store
+	if options.Indexers == nil {
+		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	} else {
+		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
+	}
+	return clientState, newInformer(clientState, options)
+}
+
 // NewInformer returns a Store and a controller for populating the store
 // while also providing event notifications. You should only used the returned
 // Store for Get/List operations; Add/Modify/Deletes will cause the event
@@ -360,6 +419,8 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 //     long as possible (until the upstream source closes the watch or times out,
 //     or you stop the controller).
 //   - h is the object you want notifications sent to.
+//
+// Deprecated: Use NewInformerWithOptions instead.
 func NewInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -369,7 +430,13 @@ func NewInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, nil)
+	options := InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    objType,
+		Handler:       h,
+		ResyncPeriod:  resyncPeriod,
+	}
+	return clientState, newInformer(clientState, options)
 }
 
 // NewIndexerInformer returns an Indexer and a Controller for populating the index
@@ -387,6 +454,8 @@ func NewInformer(
 //     or you stop the controller).
 //   - h is the object you want notifications sent to.
 //   - indexers is the indexer for the received object type.
+//
+// Deprecated: Use NewInformerWithOptions instead.
 func NewIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -397,7 +466,14 @@ func NewIndexerInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, nil)
+	options := InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    objType,
+		Handler:       h,
+		ResyncPeriod:  resyncPeriod,
+		Indexers:      indexers,
+	}
+	return clientState, newInformer(clientState, options)
 }
 
 // NewTransformingInformer returns a Store and a controller for populating
@@ -407,6 +483,8 @@ func NewIndexerInformer(
 // The given transform function will be called on all objects before they will
 // put into the Store and corresponding Add/Modify/Delete handlers will
 // be invoked for them.
+//
+// Deprecated: Use NewInformerWithOptions instead.
 func NewTransformingInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -417,7 +495,14 @@ func NewTransformingInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
+	options := InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    objType,
+		Handler:       h,
+		ResyncPeriod:  resyncPeriod,
+		Transform:     transformer,
+	}
+	return clientState, newInformer(clientState, options)
 }
 
 // NewTransformingIndexerInformer returns an Indexer and a controller for
@@ -427,6 +512,8 @@ func NewTransformingInformer(
 // The given transform function will be called on all objects before they will
 // be put into the Index and corresponding Add/Modify/Delete handlers will
 // be invoked for them.
+//
+// Deprecated: Use NewInformerWithOptions instead.
 func NewTransformingIndexerInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -438,7 +525,15 @@ func NewTransformingIndexerInformer(
 	// This will hold the client state, as we know it.
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
-	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
+	options := InformerOptions{
+		ListerWatcher: lw,
+		ObjectType:    objType,
+		Handler:       h,
+		ResyncPeriod:  resyncPeriod,
+		Indexers:      indexers,
+		Transform:     transformer,
+	}
+	return clientState, newInformer(clientState, options)
 }
 
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
@@ -481,42 +576,29 @@ func processDeltas(
 // providing event notifications.
 //
 // Parameters
-//   - lw is list and watch functions for the source of the resource you want to
-//     be informed of.
-//   - objType is an object of the type that you expect to receive.
-//   - resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
-//     calls, even if nothing changed). Otherwise, re-list will be delayed as
-//     long as possible (until the upstream source closes the watch or times out,
-//     or you stop the controller).
-//   - h is the object you want notifications sent to.
 //   - clientState is the store you want to populate
-func newInformer(
-	lw ListerWatcher,
-	objType runtime.Object,
-	resyncPeriod time.Duration,
-	h ResourceEventHandler,
-	clientState Store,
-	transformer TransformFunc,
-) Controller {
+//   - options contain the options to configure the controller
+func newInformer(clientState Store, options InformerOptions) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          clientState,
 		EmitDeltaTypeReplaced: true,
-		Transformer:           transformer,
+		Transformer:           options.Transform,
 	})
 
 	cfg := &Config{
 		Queue:            fifo,
-		ListerWatcher:    lw,
-		ObjectType:       objType,
-		FullResyncPeriod: resyncPeriod,
+		ListerWatcher:    options.ListerWatcher,
+		ObjectType:       options.ObjectType,
+		FullResyncPeriod: options.ResyncPeriod,
+		MinWatchTimeout:  options.MinWatchTimeout,
 		RetryOnError:     false,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(h, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},

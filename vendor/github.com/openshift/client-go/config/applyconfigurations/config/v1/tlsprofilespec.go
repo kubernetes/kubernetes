@@ -6,14 +6,14 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// TLSProfileSpecApplyConfiguration represents an declarative configuration of the TLSProfileSpec type for use
+// TLSProfileSpecApplyConfiguration represents a declarative configuration of the TLSProfileSpec type for use
 // with apply.
 type TLSProfileSpecApplyConfiguration struct {
 	Ciphers       []string               `json:"ciphers,omitempty"`
 	MinTLSVersion *v1.TLSProtocolVersion `json:"minTLSVersion,omitempty"`
 }
 
-// TLSProfileSpecApplyConfiguration constructs an declarative configuration of the TLSProfileSpec type for use with
+// TLSProfileSpecApplyConfiguration constructs a declarative configuration of the TLSProfileSpec type for use with
 // apply.
 func TLSProfileSpec() *TLSProfileSpecApplyConfiguration {
 	return &TLSProfileSpecApplyConfiguration{}

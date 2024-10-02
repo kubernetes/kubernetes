@@ -6,13 +6,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// FeatureGateSpecApplyConfiguration represents an declarative configuration of the FeatureGateSpec type for use
+// FeatureGateSpecApplyConfiguration represents a declarative configuration of the FeatureGateSpec type for use
 // with apply.
 type FeatureGateSpecApplyConfiguration struct {
 	FeatureGateSelectionApplyConfiguration `json:",inline"`
 }
 
-// FeatureGateSpecApplyConfiguration constructs an declarative configuration of the FeatureGateSpec type for use with
+// FeatureGateSpecApplyConfiguration constructs a declarative configuration of the FeatureGateSpec type for use with
 // apply.
 func FeatureGateSpec() *FeatureGateSpecApplyConfiguration {
 	return &FeatureGateSpecApplyConfiguration{}

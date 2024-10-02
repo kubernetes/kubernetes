@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// ExecActionApplyConfiguration represents an declarative configuration of the ExecAction type for use
+// ExecActionApplyConfiguration represents a declarative configuration of the ExecAction type for use
 // with apply.
 type ExecActionApplyConfiguration struct {
 	Command []string `json:"command,omitempty"`
 }
 
-// ExecActionApplyConfiguration constructs an declarative configuration of the ExecAction type for use with
+// ExecActionApplyConfiguration constructs a declarative configuration of the ExecAction type for use with
 // apply.
 func ExecAction() *ExecActionApplyConfiguration {
 	return &ExecActionApplyConfiguration{}

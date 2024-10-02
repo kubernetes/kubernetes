@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// DNSApplyConfiguration represents an declarative configuration of the DNS type for use
+// DNSApplyConfiguration represents a declarative configuration of the DNS type for use
 // with apply.
 type DNSApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type DNSApplyConfiguration struct {
 	Status                           *apiconfigv1.DNSStatus     `json:"status,omitempty"`
 }
 
-// DNS constructs an declarative configuration of the DNS type for use with
+// DNS constructs a declarative configuration of the DNS type for use with
 // apply.
 func DNS(name string) *DNSApplyConfiguration {
 	b := &DNSApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *DNSApplyConfiguration) WithSpec(value *DNSSpecApplyConfiguration) *DNSA
 func (b *DNSApplyConfiguration) WithStatus(value apiconfigv1.DNSStatus) *DNSApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *DNSApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -23,6 +23,8 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common"
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/ext"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
@@ -628,6 +630,18 @@ func TestAuthzLibrary(t *testing.T) {
 			expectRuntimeCost:   6,
 		},
 		{
+			name:                "fieldSelector",
+			expr:                "authorizer.group('').resource('pods').fieldSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com')",
+			expectEstimatedCost: checker.CostEstimate{Min: 1821, Max: 1821},
+			expectRuntimeCost:   1821, // authorizer(1) + group(1) + resource(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
+			name:                "labelSelector",
+			expr:                "authorizer.group('').resource('pods').labelSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com')",
+			expectEstimatedCost: checker.CostEstimate{Min: 1821, Max: 1821},
+			expectRuntimeCost:   1821, // authorizer(1) + group(1) + resource(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
 			name:                "path check allowed",
 			expr:                "authorizer.path('/healthz').check('get').allowed()",
 			expectEstimatedCost: checker.CostEstimate{Min: 350003, Max: 350003},
@@ -774,6 +788,42 @@ func TestQuantityCost(t *testing.T) {
 			expr:                `quantity("50.703k").asApproximateFloat() > 0.0`,
 			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
 			expectRuntimeCost:   3,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
+func TestNameFormatCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "format.named",
+			expr:                `format.named("dns1123subdomain")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name: "format.dns1123Subdomain.validate",
+			expr: `format.named("dns1123Subdomain").value().validate("my-name")`,
+			// Estimated cost doesnt know value at runtime so it is
+			// using an estimated maximum regex length
+			expectEstimatedCost: checker.CostEstimate{Min: 34, Max: 34},
+			expectRuntimeCost:   17,
+		},
+		{
+			name:                "format.dns1123label.validate",
+			expr:                `format.named("dns1123Label").value().validate("my-name")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 34, Max: 34},
+			expectRuntimeCost:   10,
 		},
 	}
 
@@ -1015,6 +1065,10 @@ func TestSetsCost(t *testing.T) {
 }
 
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
 		ext.Strings(ext.StringsVersion(2)),
@@ -1022,10 +1076,13 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		Regex(),
 		Lists(),
 		Authz(),
+		AuthzSelectors(),
 		Quantity(),
 		ext.Sets(),
 		IP(),
 		CIDR(),
+		Format(),
+		cel.OptionalTypes(),
 		// cel-go v0.17.7 introduced CostEstimatorOptions.
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
@@ -1039,7 +1096,11 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 	}
 	compiled, issues := env.Compile(expr)
 	if len(issues.Errors()) > 0 {
-		t.Fatalf("%v", issues.Errors())
+		var errList []string
+		for _, issue := range issues.Errors() {
+			errList = append(errList, issue.ToDisplayString(common.NewTextSource(expr)))
+		}
+		t.Fatalf("%v", errList)
 	}
 	estCost, err := env.EstimateCost(compiled, est)
 	if err != nil {
@@ -1124,6 +1185,11 @@ func TestSize(t *testing.T) {
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
 		},
 	}
+
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1147,6 +1213,8 @@ type testSizeNode struct {
 	size checker.SizeEstimate
 }
 
+var _ checker.AstNode = (*testSizeNode)(nil)
+
 func (t testSizeNode) Path() []string {
 	return nil // not needed
 }
@@ -1155,7 +1223,7 @@ func (t testSizeNode) Type() *types.Type {
 	return nil // not needed
 }
 
-func (t testSizeNode) Expr() *exprpb.Expr {
+func (t testSizeNode) Expr() ast.Expr {
 	return nil // not needed
 }
 

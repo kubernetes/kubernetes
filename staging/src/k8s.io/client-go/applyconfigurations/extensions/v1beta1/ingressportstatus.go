@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// IngressPortStatusApplyConfiguration represents an declarative configuration of the IngressPortStatus type for use
+// IngressPortStatusApplyConfiguration represents a declarative configuration of the IngressPortStatus type for use
 // with apply.
 type IngressPortStatusApplyConfiguration struct {
 	Port     *int32       `json:"port,omitempty"`
@@ -30,7 +30,7 @@ type IngressPortStatusApplyConfiguration struct {
 	Error    *string      `json:"error,omitempty"`
 }
 
-// IngressPortStatusApplyConfiguration constructs an declarative configuration of the IngressPortStatus type for use with
+// IngressPortStatusApplyConfiguration constructs a declarative configuration of the IngressPortStatus type for use with
 // apply.
 func IngressPortStatus() *IngressPortStatusApplyConfiguration {
 	return &IngressPortStatusApplyConfiguration{}

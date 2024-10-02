@@ -22,10 +22,8 @@ import (
 // when calculating their combined hash value (aka signature aka fingerprint).
 const SeparatorByte byte = 255
 
-var (
-	// cache the signature of an empty label set.
-	emptyLabelSignature = hashNew()
-)
+// cache the signature of an empty label set.
+var emptyLabelSignature = hashNew()
 
 // LabelsToSignature returns a quasi-unique signature (i.e., fingerprint) for a
 // given label set. (Collisions are possible but unlikely if the number of label

@@ -2,14 +2,14 @@
 
 package v1
 
-// DeploymentDetailsApplyConfiguration represents an declarative configuration of the DeploymentDetails type for use
+// DeploymentDetailsApplyConfiguration represents a declarative configuration of the DeploymentDetails type for use
 // with apply.
 type DeploymentDetailsApplyConfiguration struct {
 	Message *string                             `json:"message,omitempty"`
 	Causes  []DeploymentCauseApplyConfiguration `json:"causes,omitempty"`
 }
 
-// DeploymentDetailsApplyConfiguration constructs an declarative configuration of the DeploymentDetails type for use with
+// DeploymentDetailsApplyConfiguration constructs a declarative configuration of the DeploymentDetails type for use with
 // apply.
 func DeploymentDetails() *DeploymentDetailsApplyConfiguration {
 	return &DeploymentDetailsApplyConfiguration{}

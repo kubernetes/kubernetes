@@ -2,7 +2,7 @@
 
 package v1
 
-// ClusterRoleScopeRestrictionApplyConfiguration represents an declarative configuration of the ClusterRoleScopeRestriction type for use
+// ClusterRoleScopeRestrictionApplyConfiguration represents a declarative configuration of the ClusterRoleScopeRestriction type for use
 // with apply.
 type ClusterRoleScopeRestrictionApplyConfiguration struct {
 	RoleNames       []string `json:"roleNames,omitempty"`
@@ -10,7 +10,7 @@ type ClusterRoleScopeRestrictionApplyConfiguration struct {
 	AllowEscalation *bool    `json:"allowEscalation,omitempty"`
 }
 
-// ClusterRoleScopeRestrictionApplyConfiguration constructs an declarative configuration of the ClusterRoleScopeRestriction type for use with
+// ClusterRoleScopeRestrictionApplyConfiguration constructs a declarative configuration of the ClusterRoleScopeRestriction type for use with
 // apply.
 func ClusterRoleScopeRestriction() *ClusterRoleScopeRestrictionApplyConfiguration {
 	return &ClusterRoleScopeRestrictionApplyConfiguration{}

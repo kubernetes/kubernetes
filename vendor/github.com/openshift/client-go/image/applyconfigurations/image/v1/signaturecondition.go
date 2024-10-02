@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SignatureConditionApplyConfiguration represents an declarative configuration of the SignatureCondition type for use
+// SignatureConditionApplyConfiguration represents a declarative configuration of the SignatureCondition type for use
 // with apply.
 type SignatureConditionApplyConfiguration struct {
 	Type               *v1.SignatureConditionType `json:"type,omitempty"`
@@ -19,7 +19,7 @@ type SignatureConditionApplyConfiguration struct {
 	Message            *string                    `json:"message,omitempty"`
 }
 
-// SignatureConditionApplyConfiguration constructs an declarative configuration of the SignatureCondition type for use with
+// SignatureConditionApplyConfiguration constructs a declarative configuration of the SignatureCondition type for use with
 // apply.
 func SignatureCondition() *SignatureConditionApplyConfiguration {
 	return &SignatureConditionApplyConfiguration{}

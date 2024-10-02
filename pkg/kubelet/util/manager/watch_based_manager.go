@@ -224,12 +224,16 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		return c.watchObject(namespace, options)
 	}
 	store := c.newStore()
-	reflector := cache.NewNamedReflector(
-		fmt.Sprintf("object-%q/%q", namespace, name),
+	reflector := cache.NewReflectorWithOptions(
 		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
 		c.newObject(),
 		store,
-		0,
+		cache.ReflectorOptions{
+			Name: fmt.Sprintf("object-%q/%q", namespace, name),
+			// Bump default 5m MinWatchTimeout to avoid recreating
+			// watches too often.
+			MinWatchTimeout: 30 * time.Minute,
+		},
 	)
 	item := &objectCacheItem{
 		refMap:    make(map[types.UID]int),
@@ -383,7 +387,7 @@ func NewWatchBasedManager(
 	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	resyncInterval time.Duration,
-	getReferencedObjects func(*v1.Pod) sets.String) Manager {
+	getReferencedObjects func(*v1.Pod) sets.Set[string]) Manager {
 
 	// If a configmap/secret is used as a volume, the volumeManager will visit the objectCacheItem every resyncInterval cycle,
 	// We just want to stop the objectCacheItem referenced by environment variables,

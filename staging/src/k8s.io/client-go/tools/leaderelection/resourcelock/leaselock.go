@@ -122,6 +122,12 @@ func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElec
 	if spec.RenewTime != nil {
 		r.RenewTime = metav1.Time{Time: spec.RenewTime.Time}
 	}
+	if spec.PreferredHolder != nil {
+		r.PreferredHolder = *spec.PreferredHolder
+	}
+	if spec.Strategy != nil {
+		r.Strategy = *spec.Strategy
+	}
 	return &r
 
 }
@@ -129,11 +135,18 @@ func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElec
 func LeaderElectionRecordToLeaseSpec(ler *LeaderElectionRecord) coordinationv1.LeaseSpec {
 	leaseDurationSeconds := int32(ler.LeaseDurationSeconds)
 	leaseTransitions := int32(ler.LeaderTransitions)
-	return coordinationv1.LeaseSpec{
+	spec := coordinationv1.LeaseSpec{
 		HolderIdentity:       &ler.HolderIdentity,
 		LeaseDurationSeconds: &leaseDurationSeconds,
 		AcquireTime:          &metav1.MicroTime{Time: ler.AcquireTime.Time},
 		RenewTime:            &metav1.MicroTime{Time: ler.RenewTime.Time},
 		LeaseTransitions:     &leaseTransitions,
 	}
+	if ler.PreferredHolder != "" {
+		spec.PreferredHolder = &ler.PreferredHolder
+	}
+	if ler.Strategy != "" {
+		spec.Strategy = &ler.Strategy
+	}
+	return spec
 }

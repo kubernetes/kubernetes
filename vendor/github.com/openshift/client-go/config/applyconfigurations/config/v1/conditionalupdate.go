@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ConditionalUpdateApplyConfiguration represents an declarative configuration of the ConditionalUpdate type for use
+// ConditionalUpdateApplyConfiguration represents a declarative configuration of the ConditionalUpdate type for use
 // with apply.
 type ConditionalUpdateApplyConfiguration struct {
 	Release    *ReleaseApplyConfiguration                `json:"release,omitempty"`
@@ -14,7 +14,7 @@ type ConditionalUpdateApplyConfiguration struct {
 	Conditions []metav1.ConditionApplyConfiguration      `json:"conditions,omitempty"`
 }
 
-// ConditionalUpdateApplyConfiguration constructs an declarative configuration of the ConditionalUpdate type for use with
+// ConditionalUpdateApplyConfiguration constructs a declarative configuration of the ConditionalUpdate type for use with
 // apply.
 func ConditionalUpdate() *ConditionalUpdateApplyConfiguration {
 	return &ConditionalUpdateApplyConfiguration{}

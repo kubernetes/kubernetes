@@ -6,7 +6,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-// OpenStackPlatformStatusApplyConfiguration represents an declarative configuration of the OpenStackPlatformStatus type for use
+// OpenStackPlatformStatusApplyConfiguration represents a declarative configuration of the OpenStackPlatformStatus type for use
 // with apply.
 type OpenStackPlatformStatusApplyConfiguration struct {
 	APIServerInternalIP  *string                                          `json:"apiServerInternalIP,omitempty"`
@@ -19,7 +19,7 @@ type OpenStackPlatformStatusApplyConfiguration struct {
 	MachineNetworks      []configv1.CIDR                                  `json:"machineNetworks,omitempty"`
 }
 
-// OpenStackPlatformStatusApplyConfiguration constructs an declarative configuration of the OpenStackPlatformStatus type for use with
+// OpenStackPlatformStatusApplyConfiguration constructs a declarative configuration of the OpenStackPlatformStatus type for use with
 // apply.
 func OpenStackPlatformStatus() *OpenStackPlatformStatusApplyConfiguration {
 	return &OpenStackPlatformStatusApplyConfiguration{}

@@ -2,7 +2,7 @@
 # the kube-apiserver layered on top of the cluster-native Linux installer image.
 # The resulting image is used to build the openshift-install binary.
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS macbuilder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS macbuilder
 ARG TAGS=""
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
@@ -10,7 +10,7 @@ ENV KUBE_BUILD_PLATFORMS=darwin/amd64
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS macarmbuilder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS macarmbuilder
 ARG TAGS=""
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
@@ -18,7 +18,7 @@ ENV KUBE_BUILD_PLATFORMS=darwin/arm64
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS linuxbuilder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS linuxbuilder
 ARG TAGS=""
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
@@ -27,7 +27,7 @@ ENV KUBE_BUILD_PLATFORMS=linux/amd64
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS linuxarmbuilder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS linuxarmbuilder
 ARG TAGS=""
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
@@ -36,7 +36,7 @@ ENV KUBE_BUILD_PLATFORMS=linux/arm64
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18 AS builder
 ARG TAGS=""
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
@@ -44,7 +44,7 @@ ENV GO_COMPLIANCE_EXCLUDE=".*"
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.18:base-rhel9
 COPY --from=macbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/amd64/kube-apiserver /usr/share/openshift/darwin/amd64/kube-apiserver
 COPY --from=macarmbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/arm64/kube-apiserver /usr/share/openshift/darwin/arm64/kube-apiserver
 COPY --from=linuxbuilder /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/kube-apiserver /usr/share/openshift/linux/amd64/kube-apiserver

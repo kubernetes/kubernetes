@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// RoleRefApplyConfiguration represents an declarative configuration of the RoleRef type for use
+// RoleRefApplyConfiguration represents a declarative configuration of the RoleRef type for use
 // with apply.
 type RoleRefApplyConfiguration struct {
 	APIGroup *string `json:"apiGroup,omitempty"`
@@ -26,7 +26,7 @@ type RoleRefApplyConfiguration struct {
 	Name     *string `json:"name,omitempty"`
 }
 
-// RoleRefApplyConfiguration constructs an declarative configuration of the RoleRef type for use with
+// RoleRefApplyConfiguration constructs a declarative configuration of the RoleRef type for use with
 // apply.
 func RoleRef() *RoleRefApplyConfiguration {
 	return &RoleRefApplyConfiguration{}

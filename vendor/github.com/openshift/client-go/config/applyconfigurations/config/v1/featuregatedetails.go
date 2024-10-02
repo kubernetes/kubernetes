@@ -2,7 +2,7 @@
 
 package v1
 
-// FeatureGateDetailsApplyConfiguration represents an declarative configuration of the FeatureGateDetails type for use
+// FeatureGateDetailsApplyConfiguration represents a declarative configuration of the FeatureGateDetails type for use
 // with apply.
 type FeatureGateDetailsApplyConfiguration struct {
 	Version  *string                                   `json:"version,omitempty"`
@@ -10,7 +10,7 @@ type FeatureGateDetailsApplyConfiguration struct {
 	Disabled []FeatureGateAttributesApplyConfiguration `json:"disabled,omitempty"`
 }
 
-// FeatureGateDetailsApplyConfiguration constructs an declarative configuration of the FeatureGateDetails type for use with
+// FeatureGateDetailsApplyConfiguration constructs a declarative configuration of the FeatureGateDetails type for use with
 // apply.
 func FeatureGateDetails() *FeatureGateDetailsApplyConfiguration {
 	return &FeatureGateDetailsApplyConfiguration{}

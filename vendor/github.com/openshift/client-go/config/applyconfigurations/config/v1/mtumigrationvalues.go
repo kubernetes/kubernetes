@@ -2,14 +2,14 @@
 
 package v1
 
-// MTUMigrationValuesApplyConfiguration represents an declarative configuration of the MTUMigrationValues type for use
+// MTUMigrationValuesApplyConfiguration represents a declarative configuration of the MTUMigrationValues type for use
 // with apply.
 type MTUMigrationValuesApplyConfiguration struct {
 	To   *uint32 `json:"to,omitempty"`
 	From *uint32 `json:"from,omitempty"`
 }
 
-// MTUMigrationValuesApplyConfiguration constructs an declarative configuration of the MTUMigrationValues type for use with
+// MTUMigrationValuesApplyConfiguration constructs a declarative configuration of the MTUMigrationValues type for use with
 // apply.
 func MTUMigrationValues() *MTUMigrationValuesApplyConfiguration {
 	return &MTUMigrationValuesApplyConfiguration{}

@@ -37,7 +37,7 @@ import (
 func TestDeleteSync(t *testing.T) {
 	const gceDriver = "pd.csi.storage.gke.io"
 	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{

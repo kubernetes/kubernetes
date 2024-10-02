@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// APIRequestCountApplyConfiguration represents an declarative configuration of the APIRequestCount type for use
+// APIRequestCountApplyConfiguration represents a declarative configuration of the APIRequestCount type for use
 // with apply.
 type APIRequestCountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type APIRequestCountApplyConfiguration struct {
 	Status                           *APIRequestCountStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// APIRequestCount constructs an declarative configuration of the APIRequestCount type for use with
+// APIRequestCount constructs a declarative configuration of the APIRequestCount type for use with
 // apply.
 func APIRequestCount(name string) *APIRequestCountApplyConfiguration {
 	b := &APIRequestCountApplyConfiguration{}
@@ -237,4 +237,10 @@ func (b *APIRequestCountApplyConfiguration) WithSpec(value *APIRequestCountSpecA
 func (b *APIRequestCountApplyConfiguration) WithStatus(value *APIRequestCountStatusApplyConfiguration) *APIRequestCountApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *APIRequestCountApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

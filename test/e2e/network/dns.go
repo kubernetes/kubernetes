@@ -26,7 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -640,6 +642,53 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		pod.Spec.HostNetwork = true
 		pod.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
 		validateDNSResults(ctx, f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
+	// https://issues.k8s.io/67019
+	ginkgo.It("spec.Hostname field is not silently ignored and is used for hostname for a Pod", func(ctx context.Context) {
+		ginkgo.By("Creating a pod by setting a hostname")
+
+		testAgnhostPod := e2epod.NewAgnhostPod(f.Namespace.Name, "test-dns-hostname", nil, nil, nil)
+		testAgnhostPod.Spec.Hostname = dnsTestPodHostName
+		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to created pod: %s", testAgnhostPod.Name)
+
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
+		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
+
+		stdout, err := e2eoutput.RunHostCmd(testAgnhostPod.Namespace, testAgnhostPod.Name, "hostname")
+		framework.ExpectNoError(err, "failed to run command hostname: %s", stdout)
+		hostname := strings.TrimSpace(stdout)
+		if testAgnhostPod.Spec.Hostname != hostname {
+			framework.Failf("expected hostname: %s, got: %s", testAgnhostPod.Spec.Hostname, hostname)
+		}
+	})
+
+	// https://issues.k8s.io/67019
+	ginkgo.It("spec.Hostname field is silently ignored and the node hostname is used when hostNetwork is set to true for a Pod", func(ctx context.Context) {
+		ginkgo.By("Creating a pod by setting a hostNetwork to true")
+
+		testAgnhostPod := e2epod.NewAgnhostPod(f.Namespace.Name, "test-dns-hostnetwork", nil, nil, nil)
+		testAgnhostPod.Spec.Hostname = dnsTestPodHostName
+		testAgnhostPod.Spec.HostNetwork = true
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		nodeSelection := e2epod.NodeSelection{}
+		e2epod.SetAffinity(&nodeSelection, node.Name)
+		e2epod.SetNodeSelection(&testAgnhostPod.Spec, nodeSelection)
+
+		testAgnhostPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testAgnhostPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to created pod: %s", testAgnhostPod.Name)
+
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, testAgnhostPod.Name, f.Namespace.Name, framework.PodStartTimeout)
+		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
+
+		stdout, err := e2eoutput.RunHostCmd(testAgnhostPod.Namespace, testAgnhostPod.Name, "hostname")
+		framework.ExpectNoError(err, "failed to run command hostname: %s", stdout)
+		hostname := strings.TrimSpace(stdout)
+		if dnsTestPodHostName == hostname {
+			framework.Failf("https://issues.k8s.io/67019 expected spec.Hostname %s to be ignored", hostname)
+		}
 	})
 
 })

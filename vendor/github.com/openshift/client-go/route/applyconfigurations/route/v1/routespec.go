@@ -6,7 +6,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-// RouteSpecApplyConfiguration represents an declarative configuration of the RouteSpec type for use
+// RouteSpecApplyConfiguration represents a declarative configuration of the RouteSpec type for use
 // with apply.
 type RouteSpecApplyConfiguration struct {
 	Host              *string                                  `json:"host,omitempty"`
@@ -20,7 +20,7 @@ type RouteSpecApplyConfiguration struct {
 	HTTPHeaders       *RouteHTTPHeadersApplyConfiguration      `json:"httpHeaders,omitempty"`
 }
 
-// RouteSpecApplyConfiguration constructs an declarative configuration of the RouteSpec type for use with
+// RouteSpecApplyConfiguration constructs a declarative configuration of the RouteSpec type for use with
 // apply.
 func RouteSpec() *RouteSpecApplyConfiguration {
 	return &RouteSpecApplyConfiguration{}

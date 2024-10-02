@@ -373,6 +373,23 @@ func (t *Type) TypeName() string {
 	return t.runtimeTypeName
 }
 
+// WithTraits creates a copy of the current Type and sets the trait mask to the traits parameter.
+//
+// This method should be used with Opaque types where the type acts like a container, e.g. vector.
+func (t *Type) WithTraits(traits int) *Type {
+	if t == nil {
+		return nil
+	}
+	return &Type{
+		kind:                    t.kind,
+		parameters:              t.parameters,
+		runtimeTypeName:         t.runtimeTypeName,
+		isAssignableType:        t.isAssignableType,
+		isAssignableRuntimeType: t.isAssignableRuntimeType,
+		traitMask:               traits,
+	}
+}
+
 // String returns a human-readable definition of the type name.
 func (t *Type) String() string {
 	if len(t.Parameters()) == 0 {
@@ -496,7 +513,7 @@ func NewNullableType(wrapped *Type) *Type {
 
 // NewOptionalType creates an abstract parameterized type instance corresponding to CEL's notion of optional.
 func NewOptionalType(param *Type) *Type {
-	return NewOpaqueType("optional", param)
+	return NewOpaqueType("optional_type", param)
 }
 
 // NewOpaqueType creates an abstract parameterized type with a given name.

@@ -2,7 +2,7 @@
 
 package v1
 
-// OIDCProviderApplyConfiguration represents an declarative configuration of the OIDCProvider type for use
+// OIDCProviderApplyConfiguration represents a declarative configuration of the OIDCProvider type for use
 // with apply.
 type OIDCProviderApplyConfiguration struct {
 	Name                 *string                                      `json:"name,omitempty"`
@@ -12,7 +12,7 @@ type OIDCProviderApplyConfiguration struct {
 	ClaimValidationRules []TokenClaimValidationRuleApplyConfiguration `json:"claimValidationRules,omitempty"`
 }
 
-// OIDCProviderApplyConfiguration constructs an declarative configuration of the OIDCProvider type for use with
+// OIDCProviderApplyConfiguration constructs a declarative configuration of the OIDCProvider type for use with
 // apply.
 func OIDCProvider() *OIDCProviderApplyConfiguration {
 	return &OIDCProviderApplyConfiguration{}

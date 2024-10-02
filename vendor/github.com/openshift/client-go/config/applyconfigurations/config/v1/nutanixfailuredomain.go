@@ -2,7 +2,7 @@
 
 package v1
 
-// NutanixFailureDomainApplyConfiguration represents an declarative configuration of the NutanixFailureDomain type for use
+// NutanixFailureDomainApplyConfiguration represents a declarative configuration of the NutanixFailureDomain type for use
 // with apply.
 type NutanixFailureDomainApplyConfiguration struct {
 	Name    *string                                       `json:"name,omitempty"`
@@ -10,7 +10,7 @@ type NutanixFailureDomainApplyConfiguration struct {
 	Subnets []NutanixResourceIdentifierApplyConfiguration `json:"subnets,omitempty"`
 }
 
-// NutanixFailureDomainApplyConfiguration constructs an declarative configuration of the NutanixFailureDomain type for use with
+// NutanixFailureDomainApplyConfiguration constructs a declarative configuration of the NutanixFailureDomain type for use with
 // apply.
 func NutanixFailureDomain() *NutanixFailureDomainApplyConfiguration {
 	return &NutanixFailureDomainApplyConfiguration{}

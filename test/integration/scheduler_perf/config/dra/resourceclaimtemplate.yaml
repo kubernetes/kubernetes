@@ -1,7 +1,11 @@
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1alpha3
 kind: ResourceClaimTemplate
 metadata:
   name: test-claim-template
 spec:
   spec:
-    resourceClassName: test-class
+    controller: test-driver.cdi.k8s.io
+    devices:
+      requests:
+      - name: req-0
+        deviceClassName: test-class

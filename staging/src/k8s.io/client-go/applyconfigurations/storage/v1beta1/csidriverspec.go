@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 )
 
-// CSIDriverSpecApplyConfiguration represents an declarative configuration of the CSIDriverSpec type for use
+// CSIDriverSpecApplyConfiguration represents a declarative configuration of the CSIDriverSpec type for use
 // with apply.
 type CSIDriverSpecApplyConfiguration struct {
 	AttachRequired       *bool                            `json:"attachRequired,omitempty"`
@@ -35,7 +35,7 @@ type CSIDriverSpecApplyConfiguration struct {
 	SELinuxMount         *bool                            `json:"seLinuxMount,omitempty"`
 }
 
-// CSIDriverSpecApplyConfiguration constructs an declarative configuration of the CSIDriverSpec type for use with
+// CSIDriverSpecApplyConfiguration constructs a declarative configuration of the CSIDriverSpec type for use with
 // apply.
 func CSIDriverSpec() *CSIDriverSpecApplyConfiguration {
 	return &CSIDriverSpecApplyConfiguration{}

@@ -25,17 +25,17 @@ import (
 
 func TestRateLimitingQueue(t *testing.T) {
 	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
-	queue := NewRateLimitingQueue(limiter).(*rateLimitingType)
+	queue := NewRateLimitingQueue(limiter).(*rateLimitingType[any])
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	delayingQueue := &delayingType{
-		Interface:       New(),
+	delayingQueue := &delayingType[any]{
+		TypedInterface:  New(),
 		clock:           fakeClock,
 		heartbeat:       fakeClock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan *waitFor, 1000),
 		metrics:         newRetryMetrics("", nil),
 	}
-	queue.DelayingInterface = delayingQueue
+	queue.TypedDelayingInterface = delayingQueue
 
 	queue.AddRateLimited("one")
 	waitEntry := <-delayingQueue.waitingForAddCh

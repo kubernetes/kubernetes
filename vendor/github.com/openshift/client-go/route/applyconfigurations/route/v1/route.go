@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RouteApplyConfiguration represents an declarative configuration of the Route type for use
+// RouteApplyConfiguration represents a declarative configuration of the Route type for use
 // with apply.
 type RouteApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type RouteApplyConfiguration struct {
 	Status                           *RouteStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Route constructs an declarative configuration of the Route type for use with
+// Route constructs a declarative configuration of the Route type for use with
 // apply.
 func Route(name, namespace string) *RouteApplyConfiguration {
 	b := &RouteApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *RouteApplyConfiguration) WithSpec(value *RouteSpecApplyConfiguration) *
 func (b *RouteApplyConfiguration) WithStatus(value *RouteStatusApplyConfiguration) *RouteApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RouteApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

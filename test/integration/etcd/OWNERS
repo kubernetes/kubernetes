@@ -6,3 +6,5 @@ reviewers:
   - deads2k
   - liggitt
   - enj
+labels:
+  - sig/etcd

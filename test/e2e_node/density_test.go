@@ -354,10 +354,13 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, rc *Resour
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
+	ginkgo.DeferCleanup(rc.Stop)
 
 	ginkgo.By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps
 	createTimes := createBatchPodWithRateControl(ctx, f, pods, testArg.interval)
+	ginkgo.DeferCleanup(deletePodsSync, f, pods)
+	ginkgo.DeferCleanup(deletePodsSync, f, []*v1.Pod{getCadvisorPod()})
 
 	ginkgo.By("Waiting for all Pods to be observed by the watch...")
 
@@ -400,17 +403,12 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, rc *Resour
 	sort.Sort(e2emetrics.LatencySlice(e2eLags))
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
-	rc.Stop()
-	deletePodsSync(ctx, f, pods)
-
 	// Log time series data.
 	if isLogTimeSeries {
 		logDensityTimeSeries(rc, createTimes, watchTimes, testInfo)
 	}
 	// Log throughput data.
 	logPodCreateThroughput(batchLag, e2eLags, testArg.podsNr, testInfo)
-
-	deletePodsSync(ctx, f, []*v1.Pod{getCadvisorPod()})
 
 	return batchLag, e2eLags
 }
@@ -428,21 +426,20 @@ func runDensitySeqTest(ctx context.Context, f *framework.Framework, rc *Resource
 
 	// CreatBatch is synchronized, all pods are running when it returns
 	e2epod.NewPodClient(f).CreateBatch(ctx, bgPods)
+	ginkgo.DeferCleanup(deletePodsSync, f, bgPods)
+	ginkgo.DeferCleanup(deletePodsSync, f, []*v1.Pod{getCadvisorPod()})
 
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
+	ginkgo.DeferCleanup(rc.Stop)
 
 	// Create pods sequentially (back-to-back). e2eLags have been sorted.
 	batchlag, e2eLags := createBatchPodSequential(ctx, f, testPods, podType)
-
-	rc.Stop()
-	deletePodsSync(ctx, f, append(bgPods, testPods...))
+	ginkgo.DeferCleanup(deletePodsSync, f, testPods)
 
 	// Log throughput data.
 	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr, testInfo)
-
-	deletePodsSync(ctx, f, []*v1.Pod{getCadvisorPod()})
 
 	return batchlag, e2eLags
 }

@@ -44,22 +44,24 @@ var resourcequotasKind = v1.SchemeGroupVersion.WithKind("ResourceQuota")
 
 // Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
 func (c *FakeResourceQuotas) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ResourceQuota, err error) {
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(resourcequotasResource, c.ns, name), &v1.ResourceQuota{})
+		Invokes(testing.NewGetActionWithOptions(resourcequotasResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
 
 // List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
 func (c *FakeResourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+	emptyResult := &v1.ResourceQuotaList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(resourcequotasResource, resourcequotasKind, c.ns, opts), &v1.ResourceQuotaList{})
+		Invokes(testing.NewListActionWithOptions(resourcequotasResource, resourcequotasKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -78,40 +80,43 @@ func (c *FakeResourceQuotas) List(ctx context.Context, opts metav1.ListOptions) 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
 func (c *FakeResourceQuotas) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(resourcequotasResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.CreateOptions) (result *v1.ResourceQuota, err error) {
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewCreateActionWithOptions(resourcequotasResource, c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
 
 // Update takes the representation of a resourceQuota and updates it. Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewUpdateActionWithOptions(resourcequotasResource, c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeResourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (*v1.ResourceQuota, error) {
+func (c *FakeResourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), &v1.ResourceQuota{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(resourcequotasResource, "status", c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
@@ -126,7 +131,7 @@ func (c *FakeResourceQuotas) Delete(ctx context.Context, name string, opts metav
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeResourceQuotas) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(resourcequotasResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})
 	return err
@@ -134,11 +139,12 @@ func (c *FakeResourceQuotas) DeleteCollection(ctx context.Context, opts metav1.D
 
 // Patch applies the patch and returns the patched resourceQuota.
 func (c *FakeResourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error) {
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, pt, data, subresources...), &v1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
@@ -156,11 +162,12 @@ func (c *FakeResourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.Re
 	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data), &v1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }
@@ -179,11 +186,12 @@ func (c *FakeResourceQuotas) ApplyStatus(ctx context.Context, resourceQuota *cor
 	if name == nil {
 		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
 	}
+	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ResourceQuota{})
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.ResourceQuota), err
 }

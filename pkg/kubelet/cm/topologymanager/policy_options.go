@@ -22,17 +22,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
 	PreferClosestNUMANodes string = "prefer-closest-numa-nodes"
+	MaxAllowableNUMANodes  string = "max-allowable-numa-nodes"
 )
 
 var (
 	alphaOptions = sets.New[string]()
 	betaOptions  = sets.New[string](
 		PreferClosestNUMANodes,
+		MaxAllowableNUMANodes,
 	)
 	stableOptions = sets.New[string]()
 )
@@ -54,11 +57,17 @@ func CheckPolicyOptionAvailable(option string) error {
 }
 
 type PolicyOptions struct {
-	PreferClosestNUMA bool
+	PreferClosestNUMA     bool
+	MaxAllowableNUMANodes int
 }
 
 func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
-	opts := PolicyOptions{}
+	opts := PolicyOptions{
+		// Set MaxAllowableNUMANodes to the default. This will be overwritten
+		// if the user has specified a policy option for MaxAllowableNUMANodes.
+		MaxAllowableNUMANodes: defaultMaxAllowableNUMANodes,
+	}
+
 	for name, value := range policyOptions {
 		if err := CheckPolicyOptionAvailable(name); err != nil {
 			return opts, err
@@ -71,6 +80,20 @@ func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.PreferClosestNUMA = optValue
+		case MaxAllowableNUMANodes:
+			optValue, err := strconv.Atoi(value)
+			if err != nil {
+				return opts, fmt.Errorf("unable to convert policy option to integer %q: %w", name, err)
+			}
+
+			if optValue < defaultMaxAllowableNUMANodes {
+				return opts, fmt.Errorf("the minimum value of %q should not be less than %v", name, defaultMaxAllowableNUMANodes)
+			}
+
+			if optValue > defaultMaxAllowableNUMANodes {
+				klog.InfoS("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
+			}
+			opts.MaxAllowableNUMANodes = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.

@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RangeAllocationApplyConfiguration represents an declarative configuration of the RangeAllocation type for use
+// RangeAllocationApplyConfiguration represents a declarative configuration of the RangeAllocation type for use
 // with apply.
 type RangeAllocationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -20,7 +20,7 @@ type RangeAllocationApplyConfiguration struct {
 	Data                             []byte  `json:"data,omitempty"`
 }
 
-// RangeAllocation constructs an declarative configuration of the RangeAllocation type for use with
+// RangeAllocation constructs a declarative configuration of the RangeAllocation type for use with
 // apply.
 func RangeAllocation(name string) *RangeAllocationApplyConfiguration {
 	b := &RangeAllocationApplyConfiguration{}
@@ -239,4 +239,10 @@ func (b *RangeAllocationApplyConfiguration) WithData(values ...byte) *RangeAlloc
 		b.Data = append(b.Data, values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RangeAllocationApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

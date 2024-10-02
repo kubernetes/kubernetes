@@ -11,7 +11,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// OAuthClientAuthorizationApplyConfiguration represents an declarative configuration of the OAuthClientAuthorization type for use
+// OAuthClientAuthorizationApplyConfiguration represents a declarative configuration of the OAuthClientAuthorization type for use
 // with apply.
 type OAuthClientAuthorizationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -22,7 +22,7 @@ type OAuthClientAuthorizationApplyConfiguration struct {
 	Scopes                           []string `json:"scopes,omitempty"`
 }
 
-// OAuthClientAuthorization constructs an declarative configuration of the OAuthClientAuthorization type for use with
+// OAuthClientAuthorization constructs a declarative configuration of the OAuthClientAuthorization type for use with
 // apply.
 func OAuthClientAuthorization(name string) *OAuthClientAuthorizationApplyConfiguration {
 	b := &OAuthClientAuthorizationApplyConfiguration{}
@@ -257,4 +257,10 @@ func (b *OAuthClientAuthorizationApplyConfiguration) WithScopes(values ...string
 		b.Scopes = append(b.Scopes, values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *OAuthClientAuthorizationApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

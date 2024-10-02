@@ -92,6 +92,8 @@ status:
   daemonEndpoints:
     kubeletEndpoint:
       Port: 1
+  features:
+    supplementalGroupsPolicy: true
   images:
   - names:
     - namesValue
@@ -111,6 +113,7 @@ status:
   runtimeHandlers:
   - features:
       recursiveReadOnlyMounts: true
+      userNamespaces: true
     name: nameValue
   volumesAttached:
   - devicePath: devicePathValue

@@ -22,14 +22,14 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
-// DaemonSetUpdateStrategyApplyConfiguration represents an declarative configuration of the DaemonSetUpdateStrategy type for use
+// DaemonSetUpdateStrategyApplyConfiguration represents a declarative configuration of the DaemonSetUpdateStrategy type for use
 // with apply.
 type DaemonSetUpdateStrategyApplyConfiguration struct {
 	Type          *v1beta1.DaemonSetUpdateStrategyType      `json:"type,omitempty"`
 	RollingUpdate *RollingUpdateDaemonSetApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// DaemonSetUpdateStrategyApplyConfiguration constructs an declarative configuration of the DaemonSetUpdateStrategy type for use with
+// DaemonSetUpdateStrategyApplyConfiguration constructs a declarative configuration of the DaemonSetUpdateStrategy type for use with
 // apply.
 func DaemonSetUpdateStrategy() *DaemonSetUpdateStrategyApplyConfiguration {
 	return &DaemonSetUpdateStrategyApplyConfiguration{}

@@ -18,16 +18,11 @@ var HTTPClient ContextKey
 // because nobody else can create a ContextKey, being unexported.
 type ContextKey struct{}
 
-var appengineClientHook func(context.Context) *http.Client
-
 func ContextClient(ctx context.Context) *http.Client {
 	if ctx != nil {
 		if hc, ok := ctx.Value(HTTPClient).(*http.Client); ok {
 			return hc
 		}
-	}
-	if appengineClientHook != nil {
-		return appengineClientHook(ctx)
 	}
 	return http.DefaultClient
 }

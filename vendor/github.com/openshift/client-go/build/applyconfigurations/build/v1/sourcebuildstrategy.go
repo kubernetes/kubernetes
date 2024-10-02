@@ -6,7 +6,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// SourceBuildStrategyApplyConfiguration represents an declarative configuration of the SourceBuildStrategy type for use
+// SourceBuildStrategyApplyConfiguration represents a declarative configuration of the SourceBuildStrategy type for use
 // with apply.
 type SourceBuildStrategyApplyConfiguration struct {
 	From        *v1.ObjectReference             `json:"from,omitempty"`
@@ -18,7 +18,7 @@ type SourceBuildStrategyApplyConfiguration struct {
 	Volumes     []BuildVolumeApplyConfiguration `json:"volumes,omitempty"`
 }
 
-// SourceBuildStrategyApplyConfiguration constructs an declarative configuration of the SourceBuildStrategy type for use with
+// SourceBuildStrategyApplyConfiguration constructs a declarative configuration of the SourceBuildStrategy type for use with
 // apply.
 func SourceBuildStrategy() *SourceBuildStrategyApplyConfiguration {
 	return &SourceBuildStrategyApplyConfiguration{}

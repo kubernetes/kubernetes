@@ -49,6 +49,9 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
+// podKind contains the schema.GroupVersionKind for pods.
+var podKind = v1.SchemeGroupVersion.WithKind("Pod")
+
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
 	// client interface
@@ -71,7 +74,7 @@ type StatefulSetController struct {
 	// revListerSynced returns true if the rev shared informer has synced at least once
 	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// eventBroadcaster is the core of event processing pipeline.
 	eventBroadcaster record.EventBroadcaster
 }
@@ -101,8 +104,11 @@ func NewStatefulSetController(
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		revListerSynced: revInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
-		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "statefulset"},
+		),
+		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
 		eventBroadcaster: eventBroadcaster,
 	}
@@ -428,8 +434,8 @@ func (ssc *StatefulSetController) processNextWorkItem(ctx context.Context) bool 
 		return false
 	}
 	defer ssc.queue.Done(key)
-	if err := ssc.sync(ctx, key.(string)); err != nil {
-		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %v", key.(string), err))
+	if err := ssc.sync(ctx, key); err != nil {
+		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %w", key, err))
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)

@@ -6,7 +6,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 )
 
-// AuthenticationSpecApplyConfiguration represents an declarative configuration of the AuthenticationSpec type for use
+// AuthenticationSpecApplyConfiguration represents a declarative configuration of the AuthenticationSpec type for use
 // with apply.
 type AuthenticationSpecApplyConfiguration struct {
 	Type                       *v1.AuthenticationType                                  `json:"type,omitempty"`
@@ -17,7 +17,7 @@ type AuthenticationSpecApplyConfiguration struct {
 	OIDCProviders              []OIDCProviderApplyConfiguration                        `json:"oidcProviders,omitempty"`
 }
 
-// AuthenticationSpecApplyConfiguration constructs an declarative configuration of the AuthenticationSpec type for use with
+// AuthenticationSpecApplyConfiguration constructs a declarative configuration of the AuthenticationSpec type for use with
 // apply.
 func AuthenticationSpec() *AuthenticationSpecApplyConfiguration {
 	return &AuthenticationSpecApplyConfiguration{}

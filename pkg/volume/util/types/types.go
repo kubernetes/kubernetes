@@ -102,6 +102,27 @@ func IsFailedPreconditionError(err error) bool {
 	return errors.As(err, &failedPreconditionError)
 }
 
+// InfeasibleError errors are a subset of OperationFinished or final error
+// codes. In terms of CSI - this usually means that, the operation is not possible
+// in current state with given arguments.
+type InfeasibleError struct {
+	msg string
+}
+
+func (err *InfeasibleError) Error() string {
+	return err.msg
+}
+
+// NewInfeasibleError returns a new instance of InfeasibleError
+func NewInfeasibleError(msg string) *InfeasibleError {
+	return &InfeasibleError{msg: msg}
+}
+
+func IsInfeasibleError(err error) bool {
+	var infeasibleError *InfeasibleError
+	return errors.As(err, &infeasibleError)
+}
+
 type OperationNotSupported struct {
 	msg string
 }

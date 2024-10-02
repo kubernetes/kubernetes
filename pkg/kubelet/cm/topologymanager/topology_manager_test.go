@@ -105,7 +105,7 @@ func TestNewManager(t *testing.T) {
 			description:    "more than 8 NUMA nodes",
 			policyName:     "best-effort",
 			expectedPolicy: "best-effort",
-			expectedError:  fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes),
+			expectedError:  fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", defaultMaxAllowableNUMANodes),
 			topology: []cadvisorapi.Node{
 				{
 					Id: 0,

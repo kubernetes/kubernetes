@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// FlowSchemaSpecApplyConfiguration represents an declarative configuration of the FlowSchemaSpec type for use
+// FlowSchemaSpecApplyConfiguration represents a declarative configuration of the FlowSchemaSpec type for use
 // with apply.
 type FlowSchemaSpecApplyConfiguration struct {
 	PriorityLevelConfiguration *PriorityLevelConfigurationReferenceApplyConfiguration `json:"priorityLevelConfiguration,omitempty"`
@@ -27,7 +27,7 @@ type FlowSchemaSpecApplyConfiguration struct {
 	Rules                      []PolicyRulesWithSubjectsApplyConfiguration            `json:"rules,omitempty"`
 }
 
-// FlowSchemaSpecApplyConfiguration constructs an declarative configuration of the FlowSchemaSpec type for use with
+// FlowSchemaSpecApplyConfiguration constructs a declarative configuration of the FlowSchemaSpec type for use with
 // apply.
 func FlowSchemaSpec() *FlowSchemaSpecApplyConfiguration {
 	return &FlowSchemaSpecApplyConfiguration{}

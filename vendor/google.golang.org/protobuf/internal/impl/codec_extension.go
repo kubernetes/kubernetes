@@ -99,6 +99,28 @@ func (f *ExtensionField) canLazy(xt protoreflect.ExtensionType) bool {
 	return false
 }
 
+// isUnexpandedLazy returns true if the ExensionField is lazy and not
+// yet expanded, which means it's present and already checked for
+// initialized required fields.
+func (f *ExtensionField) isUnexpandedLazy() bool {
+	return f.lazy != nil && atomic.LoadUint32(&f.lazy.atomicOnce) == 0
+}
+
+// lazyBuffer retrieves the buffer for a lazy extension if it's not yet expanded.
+//
+// The returned buffer has to be kept over whatever operation we're planning,
+// as re-retrieving it will fail after the message is lazily decoded.
+func (f *ExtensionField) lazyBuffer() []byte {
+	// This function might be in the critical path, so check the atomic without
+	// taking a look first, then only take the lock if needed.
+	if !f.isUnexpandedLazy() {
+		return nil
+	}
+	f.lazy.mu.Lock()
+	defer f.lazy.mu.Unlock()
+	return f.lazy.b
+}
+
 func (f *ExtensionField) lazyInit() {
 	f.lazy.mu.Lock()
 	defer f.lazy.mu.Unlock()

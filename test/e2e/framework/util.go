@@ -53,7 +53,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
 
@@ -132,14 +131,8 @@ const (
 )
 
 var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
 	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
-
-	// ServeHostnameImage is a serve hostname image name.
-	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 // RunID is a unique identifier of the e2e run.
@@ -245,7 +238,7 @@ func WaitForNamespacesDeleted(ctx context.Context, c clientset.Interface, namesp
 		nsMap[ns] = true
 	}
 	//Now POLL until all namespaces have been eradicated.
-	return wait.PollWithContext(ctx, 2*time.Second, timeout,
+	return wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, false,
 		func(ctx context.Context) (bool, error) {
 			nsList, err := c.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 			if err != nil {
@@ -423,7 +416,7 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 // WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 // Some components use EndpointSlices other Endpoints, we must verify that both objects meet the requirements.
 func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
-	return wait.PollWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
 		endpoint, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
@@ -622,8 +615,10 @@ func CoreDump(dir string) {
 		Logf("Dumping logs locally to: %s", dir)
 		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
-	cmd.Env = append(os.Environ(), fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
+	env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_JOURNAL=%v", TestContext.DumpSystemdJournal))
+	cmd.Env = env
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

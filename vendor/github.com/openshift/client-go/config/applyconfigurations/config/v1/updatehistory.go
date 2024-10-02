@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// UpdateHistoryApplyConfiguration represents an declarative configuration of the UpdateHistory type for use
+// UpdateHistoryApplyConfiguration represents a declarative configuration of the UpdateHistory type for use
 // with apply.
 type UpdateHistoryApplyConfiguration struct {
 	State          *v1.UpdateState `json:"state,omitempty"`
@@ -19,7 +19,7 @@ type UpdateHistoryApplyConfiguration struct {
 	AcceptedRisks  *string         `json:"acceptedRisks,omitempty"`
 }
 
-// UpdateHistoryApplyConfiguration constructs an declarative configuration of the UpdateHistory type for use with
+// UpdateHistoryApplyConfiguration constructs a declarative configuration of the UpdateHistory type for use with
 // apply.
 func UpdateHistory() *UpdateHistoryApplyConfiguration {
 	return &UpdateHistoryApplyConfiguration{}

@@ -2,13 +2,13 @@
 
 package v1
 
-// ConsoleAuthenticationApplyConfiguration represents an declarative configuration of the ConsoleAuthentication type for use
+// ConsoleAuthenticationApplyConfiguration represents a declarative configuration of the ConsoleAuthentication type for use
 // with apply.
 type ConsoleAuthenticationApplyConfiguration struct {
 	LogoutRedirect *string `json:"logoutRedirect,omitempty"`
 }
 
-// ConsoleAuthenticationApplyConfiguration constructs an declarative configuration of the ConsoleAuthentication type for use with
+// ConsoleAuthenticationApplyConfiguration constructs a declarative configuration of the ConsoleAuthentication type for use with
 // apply.
 func ConsoleAuthentication() *ConsoleAuthenticationApplyConfiguration {
 	return &ConsoleAuthenticationApplyConfiguration{}

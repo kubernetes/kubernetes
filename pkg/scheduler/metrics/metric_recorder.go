@@ -119,9 +119,19 @@ func NewMetricsAsyncRecorder(bufferSize int, interval time.Duration, stopCh <-ch
 // ObservePluginDurationAsync observes the plugin_execution_duration_seconds metric.
 // The metric will be flushed to Prometheus asynchronously.
 func (r *MetricAsyncRecorder) ObservePluginDurationAsync(extensionPoint, pluginName, status string, value float64) {
+	r.observeMetricAsync(PluginExecutionDuration, value, pluginName, extensionPoint, status)
+}
+
+// ObserveQueueingHintDurationAsync observes the queueing_hint_execution_duration_seconds metric.
+// The metric will be flushed to Prometheus asynchronously.
+func (r *MetricAsyncRecorder) ObserveQueueingHintDurationAsync(pluginName, event, hint string, value float64) {
+	r.observeMetricAsync(queueingHintExecutionDuration, value, pluginName, event, hint)
+}
+
+func (r *MetricAsyncRecorder) observeMetricAsync(m *metrics.HistogramVec, value float64, labelsValues ...string) {
 	newMetric := &metric{
-		metric:      PluginExecutionDuration,
-		labelValues: []string{pluginName, extensionPoint, status},
+		metric:      m,
+		labelValues: labelsValues,
 		value:       value,
 	}
 	select {
