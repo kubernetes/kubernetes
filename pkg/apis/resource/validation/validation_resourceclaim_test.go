@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -597,6 +598,8 @@ func TestValidateClaimUpdate(t *testing.T) {
 }
 
 func TestValidateClaimStatusUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, true)
+
 	validAllocatedClaim := validClaim.DeepCopy()
 	validAllocatedClaim.Status = resource.ResourceClaimStatus{
 		Allocation: &resource.AllocationResult{
@@ -980,6 +983,118 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			}(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				// No change -> remains valid.
+				return claim
+			},
+		},
+		"valid-network-device-status": {
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Conditions: []metav1.Condition{
+							{
+								Type:   "test",
+								Status: metav1.ConditionTrue,
+							},
+						},
+						Data: &runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName: ptr.To("net-1"),
+							Addresses: []string{
+								"10.9.8.0/24",
+								"2001:db8::/64",
+							},
+							HWAddress: ptr.To("ea:9f:cb:40:b1:7b"),
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-device-status-duplicate": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.DeviceID{Driver: goodName, Pool: goodName, Device: goodName}),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+					},
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-network-device-status": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "addresses").Index(0), "300.9.8.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							Addresses: []string{
+								"300.9.8.0/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-data-device-status": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("data"), "<value omitted>", "error parsing data: invalid character 'o' in literal false (expecting 'a')"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data: &runtime.RawExtension{
+							Raw: []byte(`foo`),
+						},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-device-status-no-device": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.DeviceID{Driver: "b", Pool: "a", Device: "r"}, "must be an allocated device in the claim"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: "b",
+						Pool:   "a",
+						Device: "r",
+					},
+				}
 				return claim
 			},
 		},

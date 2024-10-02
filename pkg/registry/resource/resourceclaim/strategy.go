@@ -181,6 +181,7 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
+	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -230,4 +231,10 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	}
 
 	return false
+}
+
+func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		newClaim.Status.Devices = nil
+	}
 }

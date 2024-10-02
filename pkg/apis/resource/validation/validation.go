@@ -25,15 +25,20 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -121,6 +126,15 @@ func gatherRequestNames(deviceClaim *resource.DeviceClaim) sets.Set[string] {
 		requestNames.Insert(request.Name)
 	}
 	return requestNames
+}
+
+func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.DeviceID] {
+	allocatedDevices := sets.New[structured.DeviceID]()
+	for _, result := range allocationResult.Results {
+		deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+		allocatedDevices.Insert(deviceID)
+	}
+	return allocatedDevices
 }
 
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
@@ -270,6 +284,21 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
 		fldPath.Child("reservedFor"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		var allocatedDevices sets.Set[structured.DeviceID]
+		if status.Allocation != nil {
+			allocatedDevices = gatherAllocatedDevices(&status.Allocation.Devices)
+		}
+		allErrs = append(allErrs, validateSet(status.Devices, -1,
+			func(device resource.AllocatedDeviceStatus, fldPath *field.Path) field.ErrorList {
+				return validateDeviceStatus(device, fldPath, allocatedDevices)
+			},
+			func(device resource.AllocatedDeviceStatus) (structured.DeviceID, string) {
+				return structured.DeviceID{Driver: device.Driver, Pool: device.Pool, Device: device.Device}, "deviceID"
+			},
+			fldPath.Child("devices"))...)
+	}
 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(status.ReservedFor) > 0 {
@@ -728,4 +757,48 @@ func truncateIfTooLong(str string, maxLen int) string {
 	ellipsis := "..."
 	remaining := maxLen - len(ellipsis)
 	return str[0:(remaining+1)/2] + ellipsis + str[len(str)-remaining/2:]
+}
+
+func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.DeviceID]) field.ErrorList {
+	var allErrs field.ErrorList
+	deviceID := structured.DeviceID{Driver: device.Driver, Pool: device.Pool, Device: device.Device}
+	if !allocatedDevices.Has(deviceID) {
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
+	}
+	allErrs = append(allErrs, validateSlice(device.Conditions, -1,
+		func(condition metav1.Condition, fldPath *field.Path) field.ErrorList {
+			var allErrs field.ErrorList
+			return allErrs
+		}, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"))...)
+	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
+	return allErrs
+}
+
+func validateRawExtension(rawExtension *runtime.RawExtension, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if rawExtension == nil {
+		return allErrs
+	}
+	var v any
+	if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+	} else if _, isObject := v.(map[string]any); !isObject {
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "parameters must be a valid JSON object"))
+	}
+	return allErrs
+}
+
+func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if networkDeviceData == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateSlice(networkDeviceData.Addresses, -1,
+		func(address string, fldPath *field.Path) field.ErrorList {
+			var allErrs field.ErrorList
+			allErrs = append(allErrs, validation.IsValidCIDR(fldPath, address)...)
+			return allErrs
+		}, fldPath.Child("addresses"))...)
+	return allErrs
 }
