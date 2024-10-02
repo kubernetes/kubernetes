@@ -74,14 +74,10 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
-	if len(config.HealthzBindAddresses) > 0 {
-		allErrs = append(allErrs, validateDualStackCIDRStrings(config.HealthzBindAddresses, newPath.Child("HealthzBindAddresses"))...)
+	if config.HealthzBindAddress != "" {
+		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
 	}
-	if config.HealthzBindPort > 0 {
-		allErrs = append(allErrs, validatePort(config.HealthzBindPort, newPath.Child("HealthzBindPort"))...)
-	}
-	allErrs = append(allErrs, validateDualStackCIDRStrings(config.MetricsBindAddresses, newPath.Child("MetricsBindAddresses"))...)
-	allErrs = append(allErrs, validatePort(config.MetricsBindPort, newPath.Child("MetricsBindPort"))...)
+	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
@@ -348,14 +344,6 @@ func validateDetectLocalConfiguration(mode kubeproxyconfig.LocalMode, config kub
 		if len(config.ClusterCIDRs) > 0 {
 			allErrs = append(allErrs, validateDualStackCIDRStrings(config.ClusterCIDRs, fldPath.Child("ClusterCIDRs"))...)
 		}
-	}
-	return allErrs
-}
-
-func validatePort(port int32, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if port < 1 || port > 65535 {
-		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	}
 	return allErrs
 }
