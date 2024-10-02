@@ -1418,7 +1418,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test2",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: ptr.To(true),
+					StorageCapacity: ptr.To(false),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -1426,7 +1426,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test2",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: ptr.To(false),
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			err:    false,
