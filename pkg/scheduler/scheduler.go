@@ -547,8 +547,8 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.GVK]framework.ActionType {
-	gvkMap := make(map[framework.GVK]framework.ActionType)
+func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.EventResource]framework.ActionType {
+	gvkMap := make(map[framework.EventResource]framework.ActionType)
 	for _, queueingHints := range queueingHintsPerProfile {
 		for evt := range queueingHints {
 			if _, ok := gvkMap[evt.Resource]; ok {
