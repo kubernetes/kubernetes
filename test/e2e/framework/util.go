@@ -585,7 +585,9 @@ func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	if err != nil {
 		return
 	}
-	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
+	// cmd.Args contains command itself as 0th argument, so it's sufficient to
+	// print 1st and latter arguments
+	Logf("Asynchronously running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " "))
 	err = cmd.Start()
 	return
 }
