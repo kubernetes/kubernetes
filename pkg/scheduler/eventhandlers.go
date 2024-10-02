@@ -46,27 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
-func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
-	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.StorageClassAdd.Label).Observe(metrics.SinceInSeconds(start))
-	logger := sched.logger
-	sc, ok := obj.(*storagev1.StorageClass)
-	if !ok {
-		logger.Error(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
-		return
-	}
-
-	// CheckVolumeBindingPred fails if pod has unbound immediate PVCs. If these
-	// PVCs have specified StorageClass name, creating StorageClass objects
-	// with late binding will cause predicates to pass, so we need to move pods
-	// to active queue.
-	// We don't need to invalidate cached results because results will not be
-	// cached for pod that has unbound immediate PVCs.
-	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.StorageClassAdd, nil, sc, nil)
-	}
-}
-
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	start := time.Now()
 	defer metrics.EventHandlingLatency.WithLabelValues(framework.NodeAdd.Label).Observe(metrics.SinceInSeconds(start))
@@ -437,8 +416,25 @@ func addAllEventHandlers(
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Add, Label: label}
 			funcs.AddFunc = func(obj interface{}) {
 				start := time.Now()
+				defer metrics.EventHandlingLatency.WithLabelValues(label).Observe(metrics.SinceInSeconds(start))
+				if gvk == framework.StorageClass && !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+					sc, ok := obj.(*storagev1.StorageClass)
+					if !ok {
+						logger.Error(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
+						return
+					}
+
+					// CheckVolumeBindingPred fails if pod has unbound immediate PVCs. If these
+					// PVCs have specified StorageClass name, creating StorageClass objects
+					// with late binding will cause predicates to pass, so we need to move pods
+					// to active queue.
+					// We don't need to invalidate cached results because results will not be
+					// cached for pod that has unbound immediate PVCs.
+					if sc.VolumeBindingMode == nil || *sc.VolumeBindingMode != storagev1.VolumeBindingWaitForFirstConsumer {
+						return
+					}
+				}
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, obj, nil)
-				metrics.EventHandlingLatency.WithLabelValues(label).Observe(metrics.SinceInSeconds(start))
 			}
 		}
 		if at&framework.Update != 0 {
@@ -550,30 +546,12 @@ func addAllEventHandlers(
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.StorageClass:
-			if at&framework.Add != 0 {
-				if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
-					cache.ResourceEventHandlerFuncs{
-						AddFunc: sched.onStorageClassAdd,
-					},
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.StorageClass, "StorageClass"),
+			); err != nil {
+				return err
 			}
-			if at&framework.Update != 0 {
-				if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
-					cache.ResourceEventHandlerFuncs{
-						UpdateFunc: func(old, obj interface{}) {
-							start := time.Now()
-							defer metrics.EventHandlingLatency.WithLabelValues(framework.StorageClassUpdate.Label).Observe(metrics.SinceInSeconds(start))
-							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.StorageClassUpdate, old, obj, nil)
-						},
-					},
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
+			handlers = append(handlers, handlerRegistration)
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {
