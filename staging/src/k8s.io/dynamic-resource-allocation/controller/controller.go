@@ -328,7 +328,7 @@ func (ctrl *controller) Run(workers int) {
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(ctrl.sync, 0, stopCh)
+		go wait.Until(func() { ctrl.sync(ctrl.queue) }, 0, stopCh)
 	}
 
 	<-stopCh
@@ -344,12 +344,12 @@ var errRequeue = errors.New("requeue")
 var errPeriodic = errors.New("periodic")
 
 // sync is the main worker.
-func (ctrl *controller) sync() {
-	key, quit := ctrl.queue.Get()
+func (ctrl *controller) sync(queue workqueue.TypedRateLimitingInterface[string]) {
+	key, quit := queue.Get()
 	if quit {
 		return
 	}
-	defer ctrl.queue.Done(key)
+	defer queue.Done(key)
 
 	logger := klog.LoggerWithValues(ctrl.logger, "key", key)
 	ctx := klog.NewContext(ctrl.ctx, logger)
@@ -358,20 +358,20 @@ func (ctrl *controller) sync() {
 	switch err {
 	case nil:
 		logger.V(5).Info("completed")
-		ctrl.queue.Forget(key)
+		queue.Forget(key)
 	case errRequeue:
 		logger.V(5).Info("requeue")
-		ctrl.queue.AddRateLimited(key)
+		queue.AddRateLimited(key)
 	case errPeriodic:
 		logger.V(5).Info("recheck periodically")
-		ctrl.queue.AddAfter(key, recheckDelay)
+		queue.AddAfter(key, recheckDelay)
 	default:
 		logger.Error(err, "processing failed")
 		if obj != nil {
 			// TODO: We don't know here *what* failed. Determine based on error?
 			ctrl.eventRecorder.Event(obj, v1.EventTypeWarning, "Failed", err.Error())
 		}
-		ctrl.queue.AddRateLimited(key)
+		queue.AddRateLimited(key)
 	}
 }
 
