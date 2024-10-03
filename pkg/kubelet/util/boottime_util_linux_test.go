@@ -35,3 +35,18 @@ func TestGetBootTime(t *testing.T) {
 		t.Errorf("Invalid system uptime")
 	}
 }
+
+func TestVariationBetweenGetBootTimeMethods(t *testing.T) {
+	boottime1, err := getBootTimeWithProcStat()
+	if err != nil {
+		t.Errorf("Unable to get boot time from /proc/uptime")
+	}
+	boottime2, err := getBootTimeWithSysinfo()
+	if err != nil {
+		t.Errorf("Unable to get boot time from unix.Sysinfo")
+	}
+	diff := boottime1.Sub(boottime2)
+	if diff > time.Second || diff < -time.Second {
+		t.Errorf("boot time produced by 2 methods should not vary more than a second")
+	}
+}
