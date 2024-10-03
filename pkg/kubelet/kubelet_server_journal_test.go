@@ -128,14 +128,14 @@ func Test_newNodeLogQuery(t *testing.T) {
 
 func Test_validateServices(t *testing.T) {
 	var (
-		service1 = "svc1"
-		service2 = "svc2"
-		service3 = "svc.foo"
-		service4 = "svc_foo"
-		service5 = "svc@foo"
-		service6 = "svc:foo"
-		invalid1 = "svc\n"
-		invalid2 = "svc.foo\n"
+		service1                 = "svc1"
+		service2                 = "svc2"
+		serviceDot               = "svc.foo"
+		serviceUnderscore        = "svc_foo"
+		serviceAt                = "svc@foo"
+		serviceColon             = "svc:foo"
+		invalidServiceNewline    = "svc\n"
+		invalidServiceNewlineDot = "svc.foo\n"
 	)
 	tests := []struct {
 		name     string
@@ -144,14 +144,14 @@ func Test_validateServices(t *testing.T) {
 	}{
 		{name: "one service", services: []string{service1}},
 		{name: "two services", services: []string{service1, service2}},
-		{name: "dot service", services: []string{service3}},
-		{name: "underscore service", services: []string{service4}},
-		{name: "at service", services: []string{service5}},
-		{name: "colon service", services: []string{service6}},
-		{name: "invalid service new line", services: []string{invalid1}, wantErr: true},
-		{name: "invalid service with dot", services: []string{invalid2}, wantErr: true},
+		{name: "dot service", services: []string{serviceDot}},
+		{name: "underscore service", services: []string{serviceUnderscore}},
+		{name: "at service", services: []string{serviceAt}},
+		{name: "colon service", services: []string{serviceColon}},
+		{name: "invalid service new line", services: []string{invalidServiceNewline}, wantErr: true},
+		{name: "invalid service with dot", services: []string{invalidServiceNewlineDot}, wantErr: true},
 		{name: "long service", services: []string{strings.Repeat(service1, 100)}, wantErr: true},
-		{name: "max number of services", services: []string{service1, service2, service3, service4, service5}, wantErr: true},
+		{name: "max number of services", services: []string{service1, service2, serviceDot, serviceUnderscore, serviceAt}, wantErr: true},
 	}
 	for _, tt := range tests {
 		errs := validateServices(tt.services)
