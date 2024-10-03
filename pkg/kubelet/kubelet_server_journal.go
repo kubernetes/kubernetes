@@ -361,12 +361,7 @@ func heuristicsCopyFileLogs(ctx context.Context, w io.Writer, logDir, service st
 
 	var err error
 	for _, logFileName := range logFileNames {
-		var logFile string
-		logFile, err = securejoin.SecureJoin(logDir, logFileName)
-		if err != nil {
-			break
-		}
-		err = heuristicsCopyFileLog(ctx, w, logFile)
+		err = heuristicsCopyFileLog(ctx, w, logDir, logFileName)
 		if err == nil {
 			break
 		} else if errors.Is(err, os.ErrNotExist) {
@@ -405,30 +400,6 @@ func newReaderCtx(ctx context.Context, r io.Reader) io.Reader {
 		ctx:    ctx,
 		Reader: r,
 	}
-}
-
-// heuristicsCopyFileLog returns the contents of the given logFile
-func heuristicsCopyFileLog(ctx context.Context, w io.Writer, logFile string) error {
-	fInfo, err := os.Stat(logFile)
-	if err != nil {
-		return err
-	}
-	// This is to account for the heuristics where logs for service foo
-	// could be in /var/log/foo/
-	if fInfo.IsDir() {
-		return os.ErrNotExist
-	}
-
-	f, err := os.Open(logFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if _, err := io.Copy(w, newReaderCtx(ctx, f)); err != nil {
-		return err
-	}
-	return nil
 }
 
 func safeServiceName(s string) error {
