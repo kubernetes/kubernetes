@@ -1422,7 +1422,8 @@
         "appArmorProfile": {
           "type": "typeValue",
           "localhostProfile": "localhostProfileValue"
-        }
+        },
+        "seLinuxChangePolicy": "seLinuxChangePolicyValue"
       },
       "imagePullSecrets": [
         {

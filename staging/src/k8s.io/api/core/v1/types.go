@@ -4449,7 +4449,7 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +featureGate=SELinuxChangePolicy
 	// +optional
-	SELinuxChangePolicy *PodSELinuxChangePolicy `json:"seLinuxChangePolicy,omitempty" protobuf:"bytes,12,opt,name=seLinuxChangePolicy"`
+	SELinuxChangePolicy *PodSELinuxChangePolicy `json:"seLinuxChangePolicy,omitempty" protobuf:"bytes,13,opt,name=seLinuxChangePolicy"`
 }
 
 // SeccompProfile defines a pod/container's seccomp profile settings.

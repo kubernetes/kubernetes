@@ -867,6 +867,7 @@ template:
       runAsGroup: 6
       runAsNonRoot: true
       runAsUser: 2
+      seLinuxChangePolicy: seLinuxChangePolicyValue
       seLinuxOptions:
         level: levelValue
         role: roleValue
