@@ -688,13 +688,55 @@
 #      initPods: 20000
 #      measurePods: 5000
 
-- name: Unschedulable
+# Measure the time it takes to schedule default measurePods after scheduling 20% of high priority Pods that trigger preemption.
+# The measurePods are expected to be scheduled after scheduler handled the higher priority Pods. It's expected that running the apiserver updates asynchronously https://github.com/kubernetes/kubernetes/issues/126858 (once fixed), should significantly speed up this test.
+- name: PreemptionBlocking
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
   - opcode: createPods
     countParam: $initPods
-    podTemplatePath: config/templates/pod-large-cpu.yaml
+    podTemplatePath: config/templates/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $blockingPods
+    podTemplatePath: config/templates/pod-high-priority.yaml
+    skipWaitToCompletion: true
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    labels: [integration-test, performance, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      blockingPods: 1
+      measurePods: 4
+  - name: 500Nodes
+    labels: [performance, short]
+    threshold: 18  # TODO Adjust the threshold
+    params:
+      initNodes: 500
+      initPods: 2000
+      blockingPods: 100
+      measurePods: 400
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 20000
+      blockingPods: 1000
+      measurePods: 4000
+
+
+# Measure the time it takes to schedule default measurePods after scheduling 20% of high priority Pods that becomes unschedulable due to the resource constraints.
+# The measurePods are expected to be scheduled after scheduler handled the higher priority Pods. It's expected that running the apiserver updates asynchronously https://github.com/kubernetes/kubernetes/issues/126858 (once fixed), should significantly speed up this test.
+- name: UnschedulableResourceFitBlocking
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/templates/pod-high-priority-large-cpu.yaml
     skipWaitToCompletion: true
   - opcode: createPods
     countParam: $measurePods
