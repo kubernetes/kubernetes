@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/ptr"
 )
 
 func Test_getLoggingCmd(t *testing.T) {
@@ -92,15 +93,15 @@ func Test_newNodeLogQuery(t *testing.T) {
 		{query: url.Values{"untilTime": []string{validTimeValue}},
 			want: &nodeLogQuery{options: options{UntilTime: &validT}}},
 
-		{query: url.Values{"tailLines": []string{"100"}}, want: &nodeLogQuery{options: options{TailLines: intPtr(100)}}},
+		{query: url.Values{"tailLines": []string{"100"}}, want: &nodeLogQuery{options: options{TailLines: ptr.To(100)}}},
 		{query: url.Values{"tailLines": []string{"foo"}}, wantErr: true},
 		{query: url.Values{"tailLines": []string{" "}}, wantErr: true},
 
 		{query: url.Values{"pattern": []string{"foo"}}, want: &nodeLogQuery{options: options{Pattern: "foo"}}},
 
 		{query: url.Values{"boot": []string{""}}, want: nil},
-		{query: url.Values{"boot": []string{"0"}}, want: &nodeLogQuery{options: options{Boot: intPtr(0)}}},
-		{query: url.Values{"boot": []string{"-23"}}, want: &nodeLogQuery{options: options{Boot: intPtr(-23)}}},
+		{query: url.Values{"boot": []string{"0"}}, want: &nodeLogQuery{options: options{Boot: ptr.To(0)}}},
+		{query: url.Values{"boot": []string{"-23"}}, want: &nodeLogQuery{options: options{Boot: ptr.To(-23)}}},
 		{query: url.Values{"boot": []string{"foo"}}, wantErr: true},
 		{query: url.Values{"boot": []string{" "}}, wantErr: true},
 
@@ -200,10 +201,10 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},
 			wantErr: true},
 		// boot is not supported on Windows.
-		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}, wantErr: runtime.GOOS == "windows"},
-		{name: "boot out of range", Services: []string{service1}, options: options{Boot: intPtr(1)}, wantErr: true},
-		{name: "tailLines", Services: []string{service1}, options: options{TailLines: intPtr(100)}},
-		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: intPtr(100000)}},
+		{name: "boot", Services: []string{service1}, options: options{Boot: ptr.To(-1)}, wantErr: runtime.GOOS == "windows"},
+		{name: "boot out of range", Services: []string{service1}, options: options{Boot: ptr.To(1)}, wantErr: true},
+		{name: "tailLines", Services: []string{service1}, options: options{TailLines: ptr.To(100)}},
+		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: ptr.To(100000)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,8 +220,4 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }
