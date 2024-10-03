@@ -136,6 +136,7 @@ func Test_validateServices(t *testing.T) {
 		serviceColon             = "svc:foo"
 		invalidServiceNewline    = "svc\n"
 		invalidServiceNewlineDot = "svc.foo\n"
+		invalidServiceSlash      = "svc/foo"
 	)
 	tests := []struct {
 		name     string
@@ -150,6 +151,7 @@ func Test_validateServices(t *testing.T) {
 		{name: "colon service", services: []string{serviceColon}},
 		{name: "invalid service new line", services: []string{invalidServiceNewline}, wantErr: true},
 		{name: "invalid service with dot", services: []string{invalidServiceNewlineDot}, wantErr: true},
+		{name: "invalid service with slash", services: []string{invalidServiceSlash}, wantErr: true},
 		{name: "long service", services: []string{strings.Repeat(service1, 100)}, wantErr: true},
 		{name: "max number of services", services: []string{service1, service2, serviceDot, serviceUnderscore, serviceAt}, wantErr: true},
 	}
