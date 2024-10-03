@@ -17,7 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"context"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -219,5 +223,66 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func Test_heuristicsCopyFileLogs(t *testing.T) {
+	ctx := context.TODO()
+	buf := &bytes.Buffer{}
+
+	dir, err := os.MkdirTemp("", "logs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
+	// Check missing logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	if !strings.Contains(buf.String(), "log not found for service.log") {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check missing service logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if !strings.Contains(buf.String(), "log not found for service") {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check explicitly-named files
+	if err := os.WriteFile(filepath.Join(dir, "service.log"), []byte("valid logs"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check service logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check that a directory doesn't cause errors
+	if err := os.Mkdir(filepath.Join(dir, "service"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check that service logs return the first matching file
+	if err := os.WriteFile(filepath.Join(dir, "service", "service.log"), []byte("error"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
 	}
 }
