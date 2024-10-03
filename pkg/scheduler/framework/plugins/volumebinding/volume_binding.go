@@ -126,7 +126,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
 		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
 	}
 	return events, nil
@@ -267,6 +267,33 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 	}
 
 	logger.V(5).Info("CSIStorageCapacity was updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalCSIDriver, modifiedCSIDriver, err := util.As[*storagev1.CSIDriver](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"CSIDriver", klog.KObj(modifiedCSIDriver),
+	)
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.CSI == nil || vol.CSI.Driver != modifiedCSIDriver.Name {
+			continue
+		}
+		if (originalCSIDriver.Spec.StorageCapacity != nil && *originalCSIDriver.Spec.StorageCapacity) &&
+			(modifiedCSIDriver.Spec.StorageCapacity == nil || !*modifiedCSIDriver.Spec.StorageCapacity) {
+			logger.V(5).Info("CSIDriver was updated and storage capacity got disabled, which may make the pod schedulable")
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("CSIDriver was created or updated but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 
