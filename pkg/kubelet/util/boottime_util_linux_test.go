@@ -35,3 +35,19 @@ func TestGetBootTime(t *testing.T) {
 		t.Errorf("Invalid system uptime")
 	}
 }
+
+func TestGetBootTimeConsistency(t *testing.T) {
+	boottime, err := GetBootTime()
+
+        if err != nil {
+                t.Errorf("Unable to get system uptime")
+        }
+
+	for i:=0;i<50;i++ {
+		time.Sleep(100 * time.Millisecond)
+		if bt, _ := GetBootTime(); bt != boottime {
+			t.Errorf("inconsistent boot time")
+			break
+		}
+	}
+}

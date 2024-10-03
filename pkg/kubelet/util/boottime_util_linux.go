@@ -26,12 +26,23 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// GetBootTime returns the time at which the machine was started, truncated to the nearest second
+// GetBootTime returns the time at which the machine was started, truncated to the nearest second.
+// It makes multiple attempts to eliminate inconsistency due to the lack of precision on uptime.
 func GetBootTime() (time.Time, error) {
-	currentTime := time.Now()
 	var info unix.Sysinfo_t
 	if err := unix.Sysinfo(&info); err != nil {
 		return time.Time{}, fmt.Errorf("error getting system uptime: %s", err)
 	}
-	return currentTime.Add(-time.Duration(info.Uptime) * time.Second).Truncate(time.Second), nil
+	uptime_p := info.Uptime
+	for i:=0;i<2;i++{
+		time.Sleep(200 * time.Millisecond)
+		if err := unix.Sysinfo(&info); err != nil {
+			return time.Time{}, fmt.Errorf("error getting system uptime: %s", err)
+		}
+		if info.Uptime == uptime_p {
+			return time.Now().Add(-time.Duration(info.Uptime) * time.Second).Truncate(time.Second), nil
+		}
+		uptime_p = info.Uptime
+	}
+	return time.Time{}, fmt.Errorf("error getting consistent boot time.")
 }
