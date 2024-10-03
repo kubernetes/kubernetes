@@ -1046,6 +1046,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.28"
+- name: SELinuxChangePolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: SELinuxMount
   versionedSpecs:
   - default: false
