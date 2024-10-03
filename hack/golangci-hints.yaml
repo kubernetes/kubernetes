@@ -87,6 +87,7 @@ linters:
     - errorlint
     - ineffassign
     - logcheck
+    - makezero
     - revive
     - staticcheck
     - stylecheck

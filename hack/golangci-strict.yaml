@@ -130,6 +130,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - makezero
     - revive
     - staticcheck
     - stylecheck
