@@ -29,8 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hnslib"
+	"github.com/Microsoft/hnslib/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -73,7 +73,7 @@ type WindowsKernelCompatTester struct{}
 
 // IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
-	_, err := hcsshim.HNSListPolicyListRequest()
+	_, err := hnslib.HNSListPolicyListRequest()
 	if err != nil {
 		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
 	}
@@ -1050,7 +1050,7 @@ func isNetworkNotFoundError(err error) bool {
 	if _, ok := err.(hcn.NetworkNotFoundError); ok {
 		return true
 	}
-	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
+	if _, ok := err.(hnslib.NetworkNotFoundError); ok {
 		return true
 	}
 	return false
@@ -1296,8 +1296,8 @@ func (proxier *Proxier) syncProxyRules() {
 			var err error
 
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
-			// Note that hcsshim.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
-			// TODO(feiskyer): add support of different endpoint ports after hcsshim.AddLoadBalancer() add that.
+			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
+			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
 			if svcInfo.targetPort == 0 {
 				svcInfo.targetPort = int(ep.port)
 			}

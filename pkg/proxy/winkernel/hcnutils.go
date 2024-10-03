@@ -20,7 +20,7 @@ limitations under the License.
 package winkernel
 
 import (
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hnslib/hcn"
 	"k8s.io/klog/v2"
 )
 

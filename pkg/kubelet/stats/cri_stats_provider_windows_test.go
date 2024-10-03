@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hnslib"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,12 +59,12 @@ type containerStats struct {
 	hcsStats  []fakeNetworkStats
 }
 
-func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
-	eps := hcsshim.HNSEndpointStats{}
+func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error) {
+	eps := hnslib.HNSEndpointStats{}
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
 			if endpointName == stat.InstanceId {
-				eps = hcsshim.HNSEndpointStats{
+				eps = hnslib.HNSEndpointStats{
 					EndpointID:      stat.EndpointId,
 					BytesSent:       stat.BytesSent,
 					BytesReceived:   stat.BytesReceived,
@@ -78,8 +78,8 @@ func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcs
 	return &eps, nil
 }
 
-func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
-	uniqueEndpoints := map[string]*hcsshim.HNSEndpoint{}
+func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error) {
+	uniqueEndpoints := map[string]*hnslib.HNSEndpoint{}
 
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
@@ -90,7 +90,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 				continue
 			}
 
-			uniqueEndpoints[stat.EndpointId] = &hcsshim.HNSEndpoint{
+			uniqueEndpoints[stat.EndpointId] = &hnslib.HNSEndpoint{
 				Name:             stat.EndpointId,
 				Id:               stat.EndpointId,
 				SharedContainers: []string{c.container.ID},
@@ -98,7 +98,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 		}
 	}
 
-	eps := []hcsshim.HNSEndpoint{}
+	eps := []hnslib.HNSEndpoint{}
 	for _, ep := range uniqueEndpoints {
 		eps = append(eps, *ep)
 	}

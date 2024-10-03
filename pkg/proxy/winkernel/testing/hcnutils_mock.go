@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hnslib/hcn"
 )
 
 var (
