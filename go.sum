@@ -127,12 +127,12 @@ github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab h1:UKkYhof1njT1
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
-github.com/Microsoft/cosesign1go v1.1.0/go.mod h1:o+sw7nhlGE6twhfjXQDWmBJO8zmfQXEmCcXEi3zha8I=
+github.com/Microsoft/cosesign1go v1.2.0/go.mod h1:1La/HcGw19rRLhPW0S6u55K6LKfti+GQSgGCtrfhVe8=
 github.com/Microsoft/didx509go v0.0.3/go.mod h1:wWt+iQsLzn3011+VfESzznLIp/Owhuj7rLF7yLglYbk=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/Microsoft/hcsshim v0.12.6 h1:qEnZjoHXv+4/s0LmKZWE0/AiZmMWEIkFfWBSf1a0wlU=
-github.com/Microsoft/hcsshim v0.12.6/go.mod h1:ZABCLVcvLMjIkzr9rUGcQ1QA0p0P3Ps+d3N1g2DsFfk=
+github.com/Microsoft/hcsshim v0.12.7-0.20241003002528-bafd4c013fbd h1:U/Jg/mGn23DSP89XO7e03G9QQJxuJSX2a6a2DSp0vA4=
+github.com/Microsoft/hcsshim v0.12.7-0.20241003002528-bafd4c013fbd/go.mod h1:ya4vIDQd7fYDgQF/RQ5wYK2Bj5YA68Pm9Q7ktuW5UyU=
 github.com/NYTimes/gziphandler v1.1.1 h1:ZUDjpQae29j0ryrS0u/B8HZfJBtBQHjqw2rQ2cqUQ3I=
 github.com/NYTimes/gziphandler v1.1.1/go.mod h1:n/CVRwUEOgIxrgPvAQhUUr9oeUtvrhMomdKFjzJNB0c=
 github.com/OneOfOne/xxhash v1.2.8/go.mod h1:eZbhyaAYD41SGSSsnmcpxVoRiQ/MPUTjUdIIOT9Um7Q=
@@ -408,7 +408,7 @@ github.com/lestrrat-go/backoff/v2 v2.0.8/go.mod h1:rHP/q/r9aT27n24JQLa7JhSQZCKBB
 github.com/lestrrat-go/blackmagic v1.0.2/go.mod h1:UrEqBzIR2U6CnzVyUtfM6oZNMt/7O7Vohk2J0OGSAtU=
 github.com/lestrrat-go/httpcc v1.0.1/go.mod h1:qiltp3Mt56+55GPVCbTdM9MlqhvzyuL6W/NMDA8vA5E=
 github.com/lestrrat-go/iter v1.0.2/go.mod h1:Momfcq3AnRlRjI5b5O8/G5/BvpzrhoFTZcn06fEOPt4=
-github.com/lestrrat-go/jwx v1.2.28/go.mod h1:nF+91HEMh/MYFVwKPl5HHsBGMPscqbQb+8IDQdIazP8=
+github.com/lestrrat-go/jwx v1.2.29/go.mod h1:hU8k2l6WF0ncx20uQdOmik/Gjg6E3/wIRtXSNFeZuB8=
 github.com/lestrrat-go/option v1.0.1/go.mod h1:5ZHFbivi4xwXxhxY9XHDe2FHo6/Z7WWmtT7T5nBBp3I=
 github.com/libopenstorage/openstorage v1.0.0 h1:GLPam7/0mpdP8ZZtKjbfcXJBTIA/T1O6CBErVEFEyIM=
 github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=
@@ -540,7 +540,7 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 h1:6fotK7
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75/go.mod h1:KO6IkyS8Y3j8OdNO85qEYBsRPuteD+YciPomcXdrMnk=
 github.com/urfave/cli v1.22.15/go.mod h1:wSan1hmo5zeyLGBjRJbzRTNk8gwoYa2B9n4q9dmRIc0=
 github.com/vbatts/tar-split v0.11.3/go.mod h1:9QlHN18E+fEH7RdG+QAJJcuya3rqT7eXSTY7wGrAokY=
-github.com/veraison/go-cose v1.2.0/go.mod h1:7ziE85vSq4ScFTg6wyoMXjucIGOf4JkFEZi/an96Ct4=
+github.com/veraison/go-cose v1.1.0/go.mod h1:7ziE85vSq4ScFTg6wyoMXjucIGOf4JkFEZi/an96Ct4=
 github.com/vishvananda/netlink v1.3.0 h1:X7l42GfcV4S6E4vHTsw48qbrV+9PVojNfIhZcwQdrZk=
 github.com/vishvananda/netlink v1.3.0/go.mod h1:i6NetklAujEcC6fK0JPjT8qSwWyO0HLn4UKG+hGqeJs=
 github.com/vishvananda/netns v0.0.4 h1:Oeaw1EM2JMxD51g9uhtC0D7erkIjgmj8+JZc26m1YX8=
