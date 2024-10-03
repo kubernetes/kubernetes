@@ -50,7 +50,9 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 			run(ctx, 1)
 		},
 		OnStoppedLeading: func() {
-			cancel()
+			if cancel != nil {
+				cancel()
+			}
 		},
 	}
 
