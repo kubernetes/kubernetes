@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -94,6 +95,71 @@ func newTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *termin
 	return to
 }
 
+// lyftSidecarTerminationOrdering constructs a terminationOrdering based on the pod spec and the currently running containers.
+// lyftSidecar will always be last to terminate.
+// We assume that the nativeSidecar is always true when using the lyft Sidecar
+func lyftSidecarTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *terminationOrdering {
+	to := &terminationOrdering{
+		prereqs:    map[string][]chan struct{}{},
+		terminated: map[string]chan struct{}{},
+	}
+
+	runningContainers := map[string]struct{}{}
+	for _, name := range runningContainerNames {
+		runningContainers[name] = struct{}{}
+	}
+
+	var mainContainerChannels []chan struct{}
+	var cleanContainerChannels []chan struct{}
+
+	// sidecar containers need to wait on main containers, so we create a channel per main container
+	// for them to wait on
+	for _, c := range pod.Spec.Containers {
+		channel := make(chan struct{})
+		to.terminated[c.Name] = channel
+		mainContainerChannels = append(mainContainerChannels, channel)
+
+		// If it's a lyft sidecar, we want to wait for all other containers to finish
+		if !isSidecar(pod, c.Name) {
+			cleanContainerChannels = append(cleanContainerChannels, channel)
+		} else {
+			to.prereqs[c.Name] = append(to.prereqs[c.Name], cleanContainerChannels...)
+		}
+		// if it's not a running container, pre-close the channel so nothing
+		// waits on it
+		if _, isRunning := runningContainers[c.Name]; !isRunning {
+			close(channel)
+		}
+	}
+
+	var previousSidecarName string
+	for i := range pod.Spec.InitContainers {
+		// get the init containers in reverse order
+		ic := pod.Spec.InitContainers[len(pod.Spec.InitContainers)-i-1]
+
+		channel := make(chan struct{})
+		to.terminated[ic.Name] = channel
+
+		// if it's not a running container, pre-close the channel so nothing
+		// waits on it
+		if _, isRunning := runningContainers[ic.Name]; !isRunning {
+			close(channel)
+		}
+
+		if podutil.IsRestartableInitContainer(&ic) {
+			// sidecars need to wait for all main containers to exit
+			to.prereqs[ic.Name] = append(to.prereqs[ic.Name], mainContainerChannels...)
+
+			// if there is a later sidecar, this container needs to wait for it to finish
+			if previousSidecarName != "" {
+				to.prereqs[ic.Name] = append(to.prereqs[ic.Name], to.terminated[previousSidecarName])
+			}
+			previousSidecarName = ic.Name
+		}
+	}
+	return to
+}
+
 // waitForTurn waits until it is time for the container with the specified name to begin terminating, up until
 // the specified grace period.  If gracePeriod = 0, there is no wait.
 func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float64 {
@@ -110,10 +176,12 @@ func (o *terminationOrdering) waitForTurn(name string, gracePeriod int64) float6
 		case <-c:
 		case <-remainingGrace.C:
 			// grace period expired, so immediately exit
+			klog.V(3).InfoS("Sidecar container is ready to terminate, grace period is expired", "container", name, "gracePeriod", gracePeriod)
 			return time.Since(start).Seconds()
 		}
 	}
 
+	klog.V(3).InfoS("Container is ready to terminate", "container", name)
 	return time.Since(start).Seconds()
 }
 

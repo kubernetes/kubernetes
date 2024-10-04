@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -610,6 +611,14 @@ func containerResourcesFromRequirements(requirements *v1.ResourceRequirements) c
 	}
 }
 
+func isSidecar(pod *v1.Pod, containerName string) bool {
+	if pod == nil {
+		klog.V(5).Infof("isSidecar: pod is nil, so returning false")
+		return false
+	}
+	return pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", containerName)] == "Sidecar"
+}
+
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
@@ -1008,6 +1017,17 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		ContainersToKill:  make(map[kubecontainer.ContainerID]containerToKillInfo),
 	}
 
+	var sidecarNames []string
+	for _, container := range pod.Spec.Containers {
+		if isSidecar(pod, container.Name) {
+			sidecarNames = append(sidecarNames, container.Name)
+		}
+	}
+
+	// determine sidecar status
+	sidecarStatus := status.GetSidecarsStatus(pod)
+	klog.Infof("Pod: %s, sidecars: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarNames, sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
+
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
@@ -1067,7 +1087,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 			return changes
 		}
-		changes.ContainersToStart = containersToStart
+		if len(sidecarNames) > 0 {
+			for idx, c := range pod.Spec.Containers {
+				if isSidecar(pod, c.Name) {
+					changes.ContainersToStart = append(changes.ContainersToStart, idx)
+				}
+			}
+			return changes
+		}
+		// Start all containers by default but exclude the ones that
+		// succeeded if RestartPolicy is OnFailure
+		for idx, c := range pod.Spec.Containers {
+			if containerSucceeded(&c, podStatus) && pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
+				continue
+			}
+			changes.ContainersToStart = append(changes.ContainersToStart, idx)
+		}
 		return changes
 	}
 
@@ -1099,6 +1134,21 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	keepCount := 0
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
+		// this works because in other cases, if it was a sidecar, we
+		// are always allowed to handle the container.
+		//
+		// if it is a non-sidecar, and there are no sidecars, then
+		// we're are also always allowed to restart the container.
+		//
+		// if there are sidecars, then we can only restart non-sidecars under
+		// the following conditions:
+		// - the non-sidecars have run before (i.e. they are not in a Waiting state) OR
+		// - the sidecars are ready (we're starting them for the first time)
+		if !isSidecar(pod, container.Name) && sidecarStatus.SidecarsPresent && sidecarStatus.ContainersWaiting && !sidecarStatus.SidecarsReady {
+			klog.Infof("Pod: %s, Container: %s, sidecar=%v skipped: Present=%v,Ready=%v,ContainerWaiting=%v", format.Pod(pod), container.Name, isSidecar(pod, container.Name), sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
+			continue
+		}
+
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
@@ -1183,6 +1233,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+		klog.Infof("Pod: %s: KillPod=true", format.Pod(pod))
 		changes.KillPod = true
 		// To prevent the restartable init containers to keep pod alive, we should
 		// not restart them.
@@ -1642,6 +1693,35 @@ func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, 
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	// if the pod is nil, we need to recover it, so we can get the
+	// grace period and also the sidecar status.
+	if pod == nil {
+		for _, container := range runningPod.Containers {
+			klog.Infof("Pod: %s, KillPod: pod nil, trying to restore from container %s", runningPod.Name, container.ID)
+			podSpec, _, err := m.restoreSpecsFromContainerLabels(ctx, container.ID)
+			if err != nil {
+				klog.Errorf("Pod: %s, KillPod: couldn't restore: %s", runningPod.Name, container.ID)
+				continue
+			}
+			pod = podSpec
+			break
+		}
+	}
+
+	if gracePeriodOverride == nil && pod != nil {
+		switch {
+		case pod.DeletionGracePeriodSeconds != nil:
+			gracePeriodOverride = pod.DeletionGracePeriodSeconds
+		case pod.Spec.TerminationGracePeriodSeconds != nil:
+			gracePeriodOverride = pod.Spec.TerminationGracePeriodSeconds
+		}
+	}
+
+	if gracePeriodOverride == nil || *gracePeriodOverride < minimumGracePeriodInSeconds {
+		min := int64(minimumGracePeriodInSeconds)
+		gracePeriodOverride = &min
+	}
+
 	err := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
 	return err.Error()
 }

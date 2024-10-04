@@ -123,6 +123,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -2901,6 +2902,8 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
 		// extra syncs may no longer be necessary. Reevaluate whether Reconcile and Sync can be
 		// merged (after resolving the next two TODOs).
+		sidecarsStatus := status.GetSidecarsStatus(pod)
+		klog.Infof("Pod: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarsStatus.SidecarsPresent, sidecarsStatus.SidecarsReady, sidecarsStatus.ContainersWaiting)
 
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		// TODO: this should be unnecessary today - determine what is the cause for this to
@@ -2913,6 +2916,17 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 				UpdateType: kubetypes.SyncPodSync,
 				StartTime:  start,
 			})
+		} else if sidecarsStatus.ContainersWaiting {
+			// if containers aren't running and the sidecars are all ready trigger a sync so that the containers get started
+			if sidecarsStatus.SidecarsPresent && sidecarsStatus.SidecarsReady {
+				klog.Infof("Pod: %s: sidecars: sidecars are ready, dispatching work", format.Pod(pod))
+				kl.podWorkers.UpdatePod(UpdatePodOptions{
+					Pod:        pod,
+					MirrorPod:  mirrorPod,
+					UpdateType: kubetypes.SyncPodSync,
+					StartTime:  start,
+				})
+			}
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.

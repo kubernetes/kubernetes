@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,13 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
+	klog "k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -1343,4 +1344,74 @@ func (m *manager) recordInProgressResizeCount() {
 		}
 	}
 	metrics.PodInProgressResizes.Set(float64(inProgressResizeCount))
+}
+
+// SidecarsStatus contains three bools, whether the pod has sidecars,
+// if the all the sidecars are ready and if the non sidecars are in a
+// waiting state.
+type SidecarsStatus struct {
+	SidecarsPresent   bool
+	SidecarsReady     bool
+	ContainersWaiting bool
+}
+
+// GetSidecarsStatus returns the SidecarsStatus for the given pod
+// We assume the worst: if we are unable to determine the status of all containers we make defensive assumptions that
+// there are sidecars, they are not ready, and that there are non-sidecars waiting. This is to prevent starting non-
+// -sidecars accidentally.
+func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
+	var containerStatusesCopy []v1.ContainerStatus
+	if pod == nil {
+		klog.Infof("Pod was nil, returning sidecar status that prevents progress")
+		return SidecarsStatus{SidecarsPresent: true, SidecarsReady: false, ContainersWaiting: true}
+	}
+	if pod.Spec.Containers == nil {
+		klog.Infof("Pod %s: Containers was nil, returning sidecar status that prevents progress", format.Pod(pod))
+		return SidecarsStatus{SidecarsPresent: true, SidecarsReady: false, ContainersWaiting: true}
+	}
+	if pod.Status.ContainerStatuses == nil {
+		klog.Infof("Pod %s: ContainerStatuses was nil, doing best effort using spec", format.Pod(pod))
+	} else {
+		// Make a copy of ContainerStatuses to avoid having the carpet pulled from under our feet
+		containerStatusesCopy = make([]v1.ContainerStatus, len(pod.Status.ContainerStatuses))
+		copy(containerStatusesCopy, pod.Status.ContainerStatuses)
+	}
+
+	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
+	for _, container := range pod.Spec.Containers {
+		foundStatus := false
+		isSidecar := false
+		if pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", container.Name)] == "Sidecar" {
+			isSidecar = true
+			sidecarsStatus.SidecarsPresent = true
+		}
+		for _, status := range containerStatusesCopy {
+			if status.Name == container.Name {
+				foundStatus = true
+				if isSidecar {
+					if !status.Ready {
+						klog.Infof("Pod %s: %s: sidecar not ready", format.Pod(pod), container.Name)
+						sidecarsStatus.SidecarsReady = false
+					} else {
+						klog.Infof("Pod %s: %s: sidecar is ready", format.Pod(pod), container.Name)
+					}
+				} else if status.State.Waiting != nil {
+					// check if non-sidecars have started
+					klog.Infof("Pod: %s: %s: non-sidecar waiting", format.Pod(pod), container.Name)
+					sidecarsStatus.ContainersWaiting = true
+				}
+				break
+			}
+		}
+		if !foundStatus {
+			if isSidecar {
+				klog.Infof("Pod %s: %s (sidecar): status not found, assuming not ready", format.Pod(pod), container.Name)
+				sidecarsStatus.SidecarsReady = false
+			} else {
+				klog.Infof("Pod: %s: %s (non-sidecar): status not found, assuming waiting", format.Pod(pod), container.Name)
+				sidecarsStatus.ContainersWaiting = true
+			}
+		}
+	}
+	return sidecarsStatus
 }

@@ -786,6 +786,12 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 
 	l := getContainerInfoFromLabels(ctx, s.Labels)
 	a := getContainerInfoFromAnnotations(ctx, s.Annotations)
+
+	annotations := make(map[string]string)
+	if a.Sidecar {
+		annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", l.ContainerName)] = "Sidecar"
+	}
+
 	// Notice that the followings are not full spec. The container killing code should not use
 	// un-restored fields.
 	pod = &v1.Pod{
@@ -794,6 +800,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 			Name:                       l.PodName,
 			Namespace:                  l.PodNamespace,
 			DeletionGracePeriodSeconds: a.PodDeletionGracePeriod,
+			Annotations:                annotations,
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: a.PodTerminationGracePeriod,
@@ -820,8 +827,15 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	var containerSpec *v1.Container
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
-			return fmt.Errorf("failed to get containerSpec %q (id=%q) in pod %q when killing container for reason %q",
-				containerName, containerID.String(), format.Pod(pod), message)
+			// after a kubelet restart, it's not 100% certain that the
+			// pod we're given has the container we need in the spec
+			// -- we try to recover that here.
+			restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
+			if err != nil {
+				return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q. error: %v",
+					containerName, containerID.String(), format.Pod(pod), message, err)
+			}
+			pod, containerSpec = restoredPod, restoredContainer
 		}
 	} else {
 		// Restore necessary information if one of the specs is nil.
@@ -885,9 +899,27 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	logger := klog.FromContext(ctx)
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
-	wg := sync.WaitGroup{}
+	// split out sidecars and non-sidecars
+	var (
+		sidecars    []*kubecontainer.Container
+		nonSidecars []*kubecontainer.Container
+	)
 
+	if gracePeriodOverride == nil {
+		minGracePeriod := int64(minimumGracePeriodInSeconds)
+		gracePeriodOverride = &minGracePeriod
+	}
+
+	for _, container := range runningPod.Containers {
+		if isSidecar(pod, container.Name) {
+			sidecars = append(sidecars, container)
+		} else {
+			nonSidecars = append(nonSidecars, container)
+		}
+	}
+	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
+
+	wg := sync.WaitGroup{}
 	wg.Add(len(runningPod.Containers))
 	var termOrdering *terminationOrdering
 	if types.HasRestartableInitContainer(pod) {
@@ -897,6 +929,15 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 		}
 		termOrdering = newTerminationOrdering(pod, runningContainerNames)
 	}
+
+	if len(sidecars) > 0 {
+		var runningContainerNames []string
+		for _, container := range runningPod.Containers {
+			runningContainerNames = append(runningContainerNames, container.Name)
+		}
+		termOrdering = lyftSidecarTerminationOrdering(pod, runningContainerNames)
+	}
+
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
