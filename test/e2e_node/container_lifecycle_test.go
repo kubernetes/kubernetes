@@ -753,7 +753,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.Exits(regular1))
 	})
 
-	ginkgo.When("a pod is terminating because its liveness probe fails", func() {
+	ginkgo.When("a pod is terminating because ActiveDeadlineSeconds expires", func() {
 		regular1 := "regular-1"
 
 		testPod := func() *v1.Pod {
@@ -764,6 +764,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				Spec: v1.PodSpec{
 					RestartPolicy:                 v1.RestartPolicyNever,
 					TerminationGracePeriodSeconds: ptr.To(int64(100)),
+					ActiveDeadlineSeconds:         ptr.To(int64(10)),
 					Containers: []v1.Container{
 						{
 							Name:  regular1,
@@ -777,12 +778,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 								ProbeHandler: v1.ProbeHandler{
 									Exec: &v1.ExecAction{
 										Command: ExecCommand(prefixedName(LivenessPrefix, regular1), execCommand{
-											ExitCode:      1,
+											ExitCode:      0,
 											ContainerName: regular1,
 										}),
 									},
 								},
-								InitialDelaySeconds: 10,
+								InitialDelaySeconds: 1,
 								PeriodSeconds:       1,
 								FailureThreshold:    1,
 							},
@@ -835,8 +836,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 			results := parseOutput(context.TODO(), f, podSpec)
 
 			ginkgo.By("Analyzing results")
+			// FIXME ExpectNoError: Fix #124648 so that readiness probe will be stopped after preStop
 			// readiness probes are called during pod termination
-			framework.ExpectNoError(results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(ReadinessPrefix, regular1)))
+			err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(ReadinessPrefix, regular1))
+			gomega.Expect(err).To(gomega.HaveOccurred())
 			// liveness probes are not called during pod termination
 			err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, regular1))
 			gomega.Expect(err).To(gomega.HaveOccurred())
@@ -866,7 +869,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							}),
 						},
 					},
-					InitialDelaySeconds: 1,
+					InitialDelaySeconds: 12, // Start probing after preStop starts
 					PeriodSeconds:       1,
 					FailureThreshold:    1,
 				},
@@ -897,7 +900,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 			results := parseOutput(context.TODO(), f, podSpec)
 
 			ginkgo.By("Analyzing results")
-			// FIXME ExpectNoError: this will be implemented in KEP 4438
+			// FIXME ExpectNoError: Fix #124648 so that liveness probe will be stopped after preStop
 			// liveness probes are called for restartable init containers during pod termination
 			err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, restartableInit1))
 			gomega.Expect(err).To(gomega.HaveOccurred())
