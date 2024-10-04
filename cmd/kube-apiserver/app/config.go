@@ -23,8 +23,12 @@ import (
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 
+	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/openshift-kube-apiserver/authorization/minimumkubeletversion"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -84,6 +88,17 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if ocfg := enablement.OpenshiftConfig(); ocfg != nil {
+		// Add MinimumKubeletVerison authorizer, to block a node from being able to access most resources if it's not new enough.
+		// We must do so here instead of in pkg/apiserver because it relies on a node informer, which is not present in generic control planes.
+		genericConfig.Authorization.Authorizer = union.New(genericConfig.Authorization.Authorizer, minimumkubeletversion.NewMinimumKubeletVersion(
+			ocfg.MinimumKubeletVersion,
+			nodeidentifier.NewDefaultNodeIdentifier(),
+			versionedInformers.Core().V1().Nodes().Informer(),
+			versionedInformers.Core().V1().Nodes().Lister(),
+		))
 	}
 
 	kubeAPIs, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(opts, genericConfig, versionedInformers, storageFactory)
