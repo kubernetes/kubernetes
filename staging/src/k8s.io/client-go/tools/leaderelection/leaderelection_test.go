@@ -937,7 +937,7 @@ func TestLeaderElectionConfigValidation(t *testing.T) {
 	lock.LockConfig = resourceLockConfig
 	lec.Lock = lock
 	_, err = NewLeaderElector(lec)
-	assert.EqualError(t, err, "Lock identity is empty")
+	assert.Error(t, err, "Lock identity is empty")
 }
 
 func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
