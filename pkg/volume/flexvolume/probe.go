@@ -33,7 +33,7 @@ import (
 )
 
 type flexVolumeProber struct {
-	mutex          sync.RWMutex
+	mutex          sync.Mutex
 	pluginDir      string         // Flexvolume driver directory
 	runner         exec.Interface // Interface to use for execing flex calls
 	watcher        utilfs.FSWatcher
