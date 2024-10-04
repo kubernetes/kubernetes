@@ -171,18 +171,18 @@ func TestValidateLeaseCandidateSpec(t *testing.T) {
 			"valid",
 			false,
 			&coordination.LeaseCandidateSpec{
-				BinaryVersion:       "1.30.0",
-				EmulationVersion:    "1.30.0",
-				LeaseName:           "test",
-				PreferredStrategies: []coordination.CoordinatedLeaseStrategy{coordination.OldestEmulationVersion},
+				BinaryVersion:    "1.30.0",
+				EmulationVersion: "1.30.0",
+				LeaseName:        "test",
+				Strategy:         coordination.OldestEmulationVersion,
 			},
 		},
 		{
 			"valid custom strategy should not require binaryVersion and emulationVersion",
 			false,
 			&coordination.LeaseCandidateSpec{
-				LeaseName:           "test",
-				PreferredStrategies: []coordination.CoordinatedLeaseStrategy{"custom.com/foo"},
+				LeaseName: "test",
+				Strategy:  coordination.CoordinatedLeaseStrategy("custom.com/foo"),
 			},
 		},
 
@@ -214,19 +214,19 @@ func TestValidateLeaseCandidateSpec(t *testing.T) {
 			"preferredStrategies bad",
 			true,
 			&coordination.LeaseCandidateSpec{
-				BinaryVersion:       "1.30.1",
-				EmulationVersion:    "1.30.1",
-				LeaseName:           "test",
-				PreferredStrategies: []coordination.CoordinatedLeaseStrategy{"foo"},
+				BinaryVersion:    "1.30.1",
+				EmulationVersion: "1.30.1",
+				LeaseName:        "test",
+				Strategy:         coordination.CoordinatedLeaseStrategy("foo"),
 			},
 		},
 		{
 			"preferredStrategies good but emulationVersion missing",
 			true,
 			&coordination.LeaseCandidateSpec{
-				BinaryVersion:       "1.30.1",
-				LeaseName:           "test",
-				PreferredStrategies: []coordination.CoordinatedLeaseStrategy{coordination.OldestEmulationVersion},
+				BinaryVersion: "1.30.1",
+				LeaseName:     "test",
+				Strategy:      coordination.OldestEmulationVersion,
 			},
 		},
 	}

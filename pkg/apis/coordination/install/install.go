@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	v1 "k8s.io/kubernetes/pkg/apis/coordination/v1"
 	"k8s.io/kubernetes/pkg/apis/coordination/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/coordination/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/coordination/v1beta1"
 )
 
@@ -36,7 +37,8 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(coordination.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha2.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha2.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }
