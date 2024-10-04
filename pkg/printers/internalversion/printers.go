@@ -34,7 +34,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -435,7 +435,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	leaseCandidateColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "LeaseName", Type: "string", Description: coordinationv1alpha1.LeaseCandidateSpec{}.SwaggerDoc()["leaseName"]},
+		{Name: "LeaseName", Type: "string", Description: coordinationv1alpha2.LeaseCandidateSpec{}.SwaggerDoc()["leaseName"]},
 		{Name: "BinaryVersion", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["binaryVersion"]},
 		{Name: "EmulationVersion", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["emulationVersion"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},

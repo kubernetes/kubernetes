@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -25,7 +26,7 @@ import (
 const GroupName = "coordination.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha2"}
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -33,14 +34,20 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	localSchemeBuilder = &coordinationv1alpha1.SchemeBuilder
-	// AddToScheme is a common registration function for mapping packaged scoped group & version keys to a scheme
-	AddToScheme = localSchemeBuilder.AddToScheme
+	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
+	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	localSchemeBuilder = &SchemeBuilder
+	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
-func init() {
-	// We only register manually written functions here. The registration of the
-	// generated functions takes place in the generated files. The separation
-	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(RegisterDefaults)
+// Adds the list of known types to api.Scheme.
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&LeaseCandidate{},
+		&LeaseCandidateList{},
+	)
+
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+	return nil
 }

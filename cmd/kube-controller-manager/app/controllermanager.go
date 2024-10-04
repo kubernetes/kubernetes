@@ -298,7 +298,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			"kube-controller-manager",
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
-			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
+			coordinationv1.OldestEmulationVersion,
 		)
 		if err != nil {
 			return err
