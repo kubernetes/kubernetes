@@ -106,7 +106,7 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		data, err := newNodeData(cmd, args, nodeOptions, out)
+		data, err := newNodeData(cmd, nodeOptions, out)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +145,7 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
 // This func takes care of validating nodeOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm upgrade node workflow
-func newNodeData(cmd *cobra.Command, args []string, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
+func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
 	// Checks if a node is a control-plane node by looking up the kube-apiserver manifest file
 	isControlPlaneNode := true
 	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())

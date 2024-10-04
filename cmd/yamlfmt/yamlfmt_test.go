@@ -19,8 +19,9 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFetchYaml(t *testing.T) {
@@ -48,5 +49,5 @@ labels:
 	writer := bufio.NewWriter(&output)
 	_ = streamYaml(writer, &indent, node)
 	_ = writer.Flush()
-	assert.Equal(t, outputYaml, string(output.Bytes()), "yaml was not formatted correctly")
+	assert.Equal(t, outputYaml, output.String(), "yaml was not formatted correctly")
 }

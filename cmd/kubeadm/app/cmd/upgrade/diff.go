@@ -184,7 +184,9 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 			Context:  cmdutil.ValueFromFlagsOrConfig(fs, "context-lines", upgradeCfg.Diff.DiffContextLines, flags.contextLines).(int),
 		}
 
-		difflib.WriteUnifiedDiff(flags.out, diff)
+		if err = difflib.WriteUnifiedDiff(flags.out, diff); err != nil {
+			return errors.Wrap(err, "error writing unified diff")
+		}
 	}
 	return nil
 }
