@@ -201,7 +201,7 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 				evictionPriority: 1,
 				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
 				// we provision an emptyDir volume instead of writing to the writable container layers.
-				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
@@ -242,7 +242,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 				evictionPriority: 1,
 				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
 				// we provision an emptyDir volume instead of writing to the writable container layers.
-				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
@@ -485,13 +485,13 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering", framework.WithSlow()
 				evictionPriority: 2,
 				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
 				// we provision an emptyDir volume instead of writing to the writable container layers.
-				pod:              diskConsumingPod("best-effort-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: diskConsumingPod("best-effort-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 1,
 				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
 				// we provision an emptyDir volume instead of writing to the writable container layers.
-				pod:              diskConsumingPod("high-priority-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: diskConsumingPod("high-priority-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
