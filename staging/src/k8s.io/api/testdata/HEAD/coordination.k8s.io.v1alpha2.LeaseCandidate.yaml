@@ -1,4 +1,4 @@
-apiVersion: coordination.k8s.io/v1alpha1
+apiVersion: coordination.k8s.io/v1alpha2
 kind: LeaseCandidate
 metadata:
   annotations:
@@ -37,6 +37,5 @@ spec:
   emulationVersion: emulationVersionValue
   leaseName: leaseNameValue
   pingTime: "2002-01-01T01:01:01.000002Z"
-  preferredStrategies:
-  - preferredStrategiesValue
   renewTime: "2003-01-01T01:01:01.000003Z"
+  strategy: strategyValue

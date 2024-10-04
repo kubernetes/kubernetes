@@ -19,22 +19,22 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
+	v1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeCoordinationV1alpha1 struct {
+type FakeCoordinationV1alpha2 struct {
 	*testing.Fake
 }
 
-func (c *FakeCoordinationV1alpha1) LeaseCandidates(namespace string) v1alpha1.LeaseCandidateInterface {
+func (c *FakeCoordinationV1alpha2) LeaseCandidates(namespace string) v1alpha2.LeaseCandidateInterface {
 	return &FakeLeaseCandidates{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCoordinationV1alpha1) RESTClient() rest.Interface {
+func (c *FakeCoordinationV1alpha2) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

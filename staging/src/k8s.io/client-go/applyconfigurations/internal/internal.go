@@ -4471,7 +4471,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
-- name: io.k8s.api.coordination.v1alpha1.LeaseCandidate
+- name: io.k8s.api.coordination.v1alpha2.LeaseCandidate
   map:
     fields:
     - name: apiVersion
@@ -4486,14 +4486,15 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec
+        namedType: io.k8s.api.coordination.v1alpha2.LeaseCandidateSpec
       default: {}
-- name: io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec
+- name: io.k8s.api.coordination.v1alpha2.LeaseCandidateSpec
   map:
     fields:
     - name: binaryVersion
       type:
         scalar: string
+      default: ""
     - name: emulationVersion
       type:
         scalar: string
@@ -4504,15 +4505,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pingTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-    - name: preferredStrategies
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
     - name: renewTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
+    - name: strategy
+      type:
+        scalar: string
 - name: io.k8s.api.coordination.v1beta1.Lease
   map:
     fields:

@@ -23,40 +23,40 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	coordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
+	coordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
 	testing "k8s.io/client-go/testing"
 )
 
 // FakeLeaseCandidates implements LeaseCandidateInterface
 type FakeLeaseCandidates struct {
-	Fake *FakeCoordinationV1alpha1
+	Fake *FakeCoordinationV1alpha2
 	ns   string
 }
 
-var leasecandidatesResource = v1alpha1.SchemeGroupVersion.WithResource("leasecandidates")
+var leasecandidatesResource = v1alpha2.SchemeGroupVersion.WithResource("leasecandidates")
 
-var leasecandidatesKind = v1alpha1.SchemeGroupVersion.WithKind("LeaseCandidate")
+var leasecandidatesKind = v1alpha2.SchemeGroupVersion.WithKind("LeaseCandidate")
 
 // Get takes name of the leaseCandidate, and returns the corresponding leaseCandidate object, and an error if there is any.
-func (c *FakeLeaseCandidates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
+func (c *FakeLeaseCandidates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.LeaseCandidate, err error) {
+	emptyResult := &v1alpha2.LeaseCandidate{}
 	obj, err := c.Fake.
 		Invokes(testing.NewGetActionWithOptions(leasecandidatesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
+	return obj.(*v1alpha2.LeaseCandidate), err
 }
 
 // List takes label and field selectors, and returns the list of LeaseCandidates that match those selectors.
-func (c *FakeLeaseCandidates) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.LeaseCandidateList, err error) {
-	emptyResult := &v1alpha1.LeaseCandidateList{}
+func (c *FakeLeaseCandidates) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.LeaseCandidateList, err error) {
+	emptyResult := &v1alpha2.LeaseCandidateList{}
 	obj, err := c.Fake.
 		Invokes(testing.NewListActionWithOptions(leasecandidatesResource, leasecandidatesKind, c.ns, opts), emptyResult)
 
@@ -68,8 +68,8 @@ func (c *FakeLeaseCandidates) List(ctx context.Context, opts v1.ListOptions) (re
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.LeaseCandidateList{ListMeta: obj.(*v1alpha1.LeaseCandidateList).ListMeta}
-	for _, item := range obj.(*v1alpha1.LeaseCandidateList).Items {
+	list := &v1alpha2.LeaseCandidateList{ListMeta: obj.(*v1alpha2.LeaseCandidateList).ListMeta}
+	for _, item := range obj.(*v1alpha2.LeaseCandidateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -85,33 +85,33 @@ func (c *FakeLeaseCandidates) Watch(ctx context.Context, opts v1.ListOptions) (w
 }
 
 // Create takes the representation of a leaseCandidate and creates it.  Returns the server's representation of the leaseCandidate, and an error, if there is any.
-func (c *FakeLeaseCandidates) Create(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.CreateOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
+func (c *FakeLeaseCandidates) Create(ctx context.Context, leaseCandidate *v1alpha2.LeaseCandidate, opts v1.CreateOptions) (result *v1alpha2.LeaseCandidate, err error) {
+	emptyResult := &v1alpha2.LeaseCandidate{}
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateActionWithOptions(leasecandidatesResource, c.ns, leaseCandidate, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
+	return obj.(*v1alpha2.LeaseCandidate), err
 }
 
 // Update takes the representation of a leaseCandidate and updates it. Returns the server's representation of the leaseCandidate, and an error, if there is any.
-func (c *FakeLeaseCandidates) Update(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.UpdateOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
+func (c *FakeLeaseCandidates) Update(ctx context.Context, leaseCandidate *v1alpha2.LeaseCandidate, opts v1.UpdateOptions) (result *v1alpha2.LeaseCandidate, err error) {
+	emptyResult := &v1alpha2.LeaseCandidate{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateActionWithOptions(leasecandidatesResource, c.ns, leaseCandidate, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
+	return obj.(*v1alpha2.LeaseCandidate), err
 }
 
 // Delete takes name of the leaseCandidate and deletes it. Returns an error if one occurs.
 func (c *FakeLeaseCandidates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(leasecandidatesResource, c.ns, name, opts), &v1alpha1.LeaseCandidate{})
+		Invokes(testing.NewDeleteActionWithOptions(leasecandidatesResource, c.ns, name, opts), &v1alpha2.LeaseCandidate{})
 
 	return err
 }
@@ -120,24 +120,24 @@ func (c *FakeLeaseCandidates) Delete(ctx context.Context, name string, opts v1.D
 func (c *FakeLeaseCandidates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	action := testing.NewDeleteCollectionActionWithOptions(leasecandidatesResource, c.ns, opts, listOpts)
 
-	_, err := c.Fake.Invokes(action, &v1alpha1.LeaseCandidateList{})
+	_, err := c.Fake.Invokes(action, &v1alpha2.LeaseCandidateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched leaseCandidate.
-func (c *FakeLeaseCandidates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
+func (c *FakeLeaseCandidates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.LeaseCandidate, err error) {
+	emptyResult := &v1alpha2.LeaseCandidate{}
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceActionWithOptions(leasecandidatesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
+	return obj.(*v1alpha2.LeaseCandidate), err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied leaseCandidate.
-func (c *FakeLeaseCandidates) Apply(ctx context.Context, leaseCandidate *coordinationv1alpha1.LeaseCandidateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.LeaseCandidate, err error) {
+func (c *FakeLeaseCandidates) Apply(ctx context.Context, leaseCandidate *coordinationv1alpha2.LeaseCandidateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.LeaseCandidate, err error) {
 	if leaseCandidate == nil {
 		return nil, fmt.Errorf("leaseCandidate provided to Apply must not be nil")
 	}
@@ -149,12 +149,12 @@ func (c *FakeLeaseCandidates) Apply(ctx context.Context, leaseCandidate *coordin
 	if name == nil {
 		return nil, fmt.Errorf("leaseCandidate.Name must be provided to Apply")
 	}
-	emptyResult := &v1alpha1.LeaseCandidate{}
+	emptyResult := &v1alpha2.LeaseCandidate{}
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceActionWithOptions(leasecandidatesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
+	return obj.(*v1alpha2.LeaseCandidate), err
 }
