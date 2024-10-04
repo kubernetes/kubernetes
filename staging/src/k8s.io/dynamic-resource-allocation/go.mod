@@ -9,7 +9,7 @@ godebug default=go1.23
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.4.2
-	github.com/google/cel-go v0.20.1
+	github.com/google/cel-go v0.21.0
 	github.com/google/go-cmp v0.6.0
 	github.com/onsi/gomega v1.33.1
 	github.com/stretchr/testify v1.9.0

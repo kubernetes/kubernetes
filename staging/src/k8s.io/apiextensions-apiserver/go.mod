@@ -9,7 +9,7 @@ godebug default=go1.23
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/cel-go v0.20.1
+	github.com/google/cel-go v0.21.0
 	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0

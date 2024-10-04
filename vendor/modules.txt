@@ -311,7 +311,7 @@ github.com/google/cadvisor/utils/sysfs
 github.com/google/cadvisor/utils/sysinfo
 github.com/google/cadvisor/version
 github.com/google/cadvisor/watcher
-# github.com/google/cel-go v0.20.1
+# github.com/google/cel-go v0.21.0
 ## explicit; go 1.18
 github.com/google/cel-go/cel
 github.com/google/cel-go/checker
@@ -930,7 +930,6 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-golang.org/x/text/width
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
