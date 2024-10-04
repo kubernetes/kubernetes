@@ -540,7 +540,13 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
-		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
+		for _, expectedVolume := range expectedVolumes {
+			_, found := vm.actualStateOfWorld.GetMountedVolumeForPodByOuterVolumeSpecName(podName, expectedVolume)
+			if !found {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
 }
 
@@ -551,7 +557,7 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
-		return len(vm.actualStateOfWorld.GetMountedVolumesForPod(podName)) == 0, nil
+		return !vm.actualStateOfWorld.PodHasMountedVolumes(podName), nil
 	}
 }
 
