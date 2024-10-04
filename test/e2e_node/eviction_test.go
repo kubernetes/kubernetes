@@ -199,6 +199,8 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
+				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
+				// we provision an emptyDir volume instead of writing to the writable container layers.
 				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
@@ -238,6 +240,8 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
+				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
+				// we provision an emptyDir volume instead of writing to the writable container layers.
 				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
@@ -479,10 +483,14 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering", framework.WithSlow()
 		specs := []podEvictSpec{
 			{
 				evictionPriority: 2,
+				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
+				// we provision an emptyDir volume instead of writing to the writable container layers.
 				pod:              diskConsumingPod("best-effort-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 1,
+				// TODO(#127864): Due to a race condition between eviction manager and containerd GC,
+				// we provision an emptyDir volume instead of writing to the writable container layers.
 				pod:              diskConsumingPod("high-priority-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
