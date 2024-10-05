@@ -49,7 +49,8 @@ func (c *CommonTokenFactory) Create(source *TokenSourceCharStreamPair, ttype int
 }
 
 func (c *CommonTokenFactory) createThin(ttype int, text string) Token {
-	t := NewCommonToken(nil, ttype, TokenDefaultChannel, -1, -1)
+	source := &TokenSourceCharStreamPair{charStream: nil, tokenSource: nil}
+	t := NewCommonToken(source, ttype, TokenDefaultChannel, -1, -1)
 	t.SetText(text)
 
 	return t
