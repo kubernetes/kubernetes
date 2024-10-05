@@ -125,8 +125,12 @@ type CommonToken struct {
 }
 
 func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start, stop int) *CommonToken {
+	var EMPTY_SOURCE = &TokenSourceCharStreamPair{
+		tokenSource: nil,
+		charStream:  nil,
+	}
 	if source == nil {
-		source = nil
+		source = EMPTY_SOURCE
 	}
 	t := &CommonToken{
 		BaseToken: BaseToken{
@@ -139,7 +143,7 @@ func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start
 		},
 	}
 
-	if t.source != nil && t.source.tokenSource != nil {
+	if t.source.tokenSource != nil {
 		t.line = source.tokenSource.GetLine()
 		t.column = source.tokenSource.GetCharPositionInLine()
 	} else {
