@@ -56,7 +56,7 @@ type PolicyList []*abac.Policy
 // NewFromFile attempts to create a policy list from the given file.
 //
 // TODO: Have policies be created via an API call and stored in REST storage.
-func NewFromFile(path string) (PolicyList, error) {
+func NewFromFile(logger klog.Logger, path string) (PolicyList, error) {
 	// File format is one map per line.  This allows easy concatenation of files,
 	// comments in files, and identification of errors by line number.
 	file, err := os.Open(path)
@@ -109,7 +109,7 @@ func NewFromFile(path string) (PolicyList, error) {
 	}
 
 	if unversionedLines > 0 {
-		klog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
+		logger.Info("Policy file contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", "path", path)
 	}
 
 	if err := scanner.Err(); err != nil {
