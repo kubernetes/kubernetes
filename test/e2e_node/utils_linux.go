@@ -20,6 +20,8 @@ limitations under the License.
 package e2enode
 
 import (
+	"fmt"
+
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
@@ -29,15 +31,19 @@ func IsCgroup2UnifiedMode() bool {
 }
 
 // addCRIProxyInjector registers an injector function for the CRIProxy.
-func addCRIProxyInjector(injector func(apiName string) error) {
+func addCRIProxyInjector(injector func(apiName string) error) error {
 	if e2eCriProxy != nil {
 		e2eCriProxy.AddInjector(injector)
+		return nil
 	}
+	return fmt.Errorf("failed to add injector because the CRI Proxy is undefined")
 }
 
 // resetCRIProxyInjector resets all injector functions for the CRIProxy.
-func resetCRIProxyInjector() {
+func resetCRIProxyInjector() error {
 	if e2eCriProxy != nil {
 		e2eCriProxy.ResetInjectors()
+		return nil
 	}
+	return fmt.Errorf("failed to reset injector because the CRI Proxy is undefined")
 }

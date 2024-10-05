@@ -297,15 +297,16 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 
 // Tear down the kubelet on the node
 var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
-	if e2eCriProxy != nil {
-		e2eCriProxy.Stop()
-	}
-
 	if e2es != nil {
 		if *startServices && *stopServices {
 			klog.Infof("Stopping node services...")
 			e2es.Stop()
 		}
+	}
+
+	if e2eCriProxy != nil {
+		framework.Logf("Stopping cri proxy service...")
+		e2eCriProxy.Stop()
 	}
 
 	klog.Infof("Tests Finished")
