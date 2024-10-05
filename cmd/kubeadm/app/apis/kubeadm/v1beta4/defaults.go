@@ -183,7 +183,7 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 // layer, but set to a random value later at runtime if not set before.
 func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 
-	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
+	if len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{{}}
 	}
 
