@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -547,26 +548,9 @@ func TestGetClusterIPByFamily(t *testing.T) {
 	}
 }
 
-func mustParseIPAddr(str string) net.Addr {
-	a, err := net.ResolveIPAddr("ip", str)
-	if err != nil {
-		panic("mustParseIPAddr")
-	}
-	return a
-}
 func mustParseIPNet(str string) net.Addr {
 	_, n, err := netutils.ParseCIDRSloppy(str)
-	if err != nil {
-		panic("mustParseIPNet")
-	}
-	return n
-}
-func mustParseUnix(str string) net.Addr {
-	n, err := net.ResolveUnixAddr("unix", str)
-	if err != nil {
-		panic("mustParseUnix")
-	}
-	return n
+	return ktesting.Must(n, err)
 }
 
 type cidrValidator struct {
@@ -602,8 +586,8 @@ func TestAddressSet(t *testing.T) {
 			"Reject IPAddr x 2",
 			func(ip net.IP) bool { return false },
 			[]net.Addr{
-				mustParseIPAddr("8.8.8.8"),
-				mustParseIPAddr("1000::"),
+				ktesting.Must(net.ResolveIPAddr("ip", "8.8.8.8")),
+				ktesting.Must(net.ResolveIPAddr("ip", "1000::")),
 			},
 			nil,
 		},
@@ -611,8 +595,8 @@ func TestAddressSet(t *testing.T) {
 			"Accept IPAddr x 2",
 			func(ip net.IP) bool { return true },
 			[]net.Addr{
-				mustParseIPAddr("8.8.8.8"),
-				mustParseIPAddr("1000::"),
+				ktesting.Must(net.ResolveIPAddr("ip", "8.8.8.8")),
+				ktesting.Must(net.ResolveIPAddr("ip", "1000::")),
 			},
 			sets.New("8.8.8.8", "1000::"),
 		},
@@ -629,8 +613,8 @@ func TestAddressSet(t *testing.T) {
 			"Accept Unix x 2",
 			func(ip net.IP) bool { return true },
 			[]net.Addr{
-				mustParseUnix("/tmp/sock1"),
-				mustParseUnix("/tmp/sock2"),
+				ktesting.Must(net.ResolveUnixAddr("unix", "/tmp/sock1")),
+				ktesting.Must(net.ResolveUnixAddr("unix", "/tmp/sock2")),
 			},
 			nil,
 		},
@@ -638,9 +622,9 @@ func TestAddressSet(t *testing.T) {
 			"Cidr IPv4",
 			newCidrValidator("192.168.1.0/24"),
 			[]net.Addr{
-				mustParseIPAddr("8.8.8.8"),
-				mustParseIPAddr("1000::"),
-				mustParseIPAddr("192.168.1.1"),
+				ktesting.Must(net.ResolveIPAddr("ip", "8.8.8.8")),
+				ktesting.Must(net.ResolveIPAddr("ip", "1000::")),
+				ktesting.Must(net.ResolveIPAddr("ip", "192.168.1.1")),
 			},
 			sets.New("192.168.1.1"),
 		},
@@ -648,9 +632,9 @@ func TestAddressSet(t *testing.T) {
 			"Cidr IPv6",
 			newCidrValidator("1000::/64"),
 			[]net.Addr{
-				mustParseIPAddr("8.8.8.8"),
-				mustParseIPAddr("1000::"),
-				mustParseIPAddr("192.168.1.1"),
+				ktesting.Must(net.ResolveIPAddr("ip", "8.8.8.8")),
+				ktesting.Must(net.ResolveIPAddr("ip", "1000::")),
+				ktesting.Must(net.ResolveIPAddr("ip", "192.168.1.1")),
 			},
 			sets.New("1000::"),
 		},
