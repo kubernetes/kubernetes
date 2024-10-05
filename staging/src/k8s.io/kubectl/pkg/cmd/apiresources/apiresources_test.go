@@ -64,7 +64,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 		{
 			name: "invalid output",
 			optionSetupFn: func(o *APIResourceOptions) {
-				o.Output = "foo"
+				*o.PrintFlags.OutputFormat = "foo"
 			},
 			expectedError: "--output foo is not available",
 		},
