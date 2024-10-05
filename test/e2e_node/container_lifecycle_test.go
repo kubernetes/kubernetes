@@ -55,6 +55,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
+	ginkgo.When("Running a pod with init containers and regular containers, restartPolicy=Never", func() {
+	ginkgo.When("A pod initializes successfully", func() {
 	ginkgo.It("should launch init container serially before a regular container", func() {
 
 		init1 := "init-1"
@@ -162,7 +164,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.StartsBefore(init3, regular1))
 		framework.ExpectNoError(results.ExitsBefore(init3, regular1))
 	})
+	})
 
+	ginkgo.When("an init container fails", func() {
 	ginkgo.It("should not launch regular containers if an init container fails", func() {
 
 		init1 := "init-1"
@@ -217,7 +221,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		framework.ExpectNoError(results.DoesntStart(regular1))
 	})
+	})
 
+	ginkgo.When("The regular container has a PostStart hook", func() {
 	ginkgo.It("should run Init container to completion before call to PostStart of regular container", func() {
 		init1 := "init-1"
 		regular1 := "regular-1"
@@ -287,7 +293,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PostStartPrefix, regular1)))
 	})
+	})
 
+	ginkgo.When("running a Pod wiht a failed regular container", func() {
 	ginkgo.It("should restart failing container when pod restartPolicy is Always", func() {
 
 		regular1 := "regular-1"
@@ -330,7 +338,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.StartsBefore(regular1, regular1))
 		framework.ExpectNoError(results.ExitsBefore(regular1, regular1))
 	})
+	})
 
+	ginkgo.When("Running a pod with multiple containers and a PostStart hook", func() {
 	ginkgo.It("should not launch second container before PostStart of the first container completed", func() {
 
 		regular1 := "regular-1"
@@ -397,9 +407,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.StartsBefore(prefixedName(PostStartPrefix, regular1), regular2))
 		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2))
 	})
+	})
 
 	ginkgo.When("have init container in a Pod with restartPolicy=Never", func() {
-
 		ginkgo.When("an init container fails to start because of a bad image", ginkgo.Ordered, func() {
 
 			init1 := "init1-1"
@@ -457,6 +467,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		})
 	})
 
+	ginkgo.When("A regular container restarts with init containers" , func() {
 	ginkgo.It("shouldn't restart init containers upon regular container restart", func() {
 		init1 := "init-1"
 		init2 := "init-2"
@@ -537,6 +548,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.HasNotRestarted(init3))
 		// while the regular container did
 		framework.ExpectNoError(results.HasRestarted(regular1))
+	})
 	})
 
 	ginkgo.When("a pod cannot terminate gracefully", func() {
@@ -619,6 +631,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		})
 	})
 
+	ginkgo.When("A regular container has a PreStop hook", func() {
+	ginkgo.When("A regular container fails a startup probe", func() {
 	ginkgo.It("should call the container's preStop hook and terminate it if its startup probe fails", func() {
 		regular1 := "regular-1"
 
@@ -685,7 +699,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.Starts(prefixedName(PreStopPrefix, regular1)))
 		framework.ExpectNoError(results.Exits(regular1))
 	})
+	})
 
+	ginkgo.When("A regular container fails a liveness probe", func() {
 	ginkgo.It("should call the container's preStop hook and terminate it if its liveness probe fails", func() {
 		regular1 := "regular-1"
 
@@ -906,6 +922,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 			err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), restartableInit1)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
+		})
+		})
+	})
 	})
 })
 
@@ -914,6 +933,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
+	ginkgo.When("A node reboots", func() {
 	ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {
 		init1 := "init-1"
 		init2 := "init-2"
@@ -1048,7 +1068,9 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 		framework.ExpectNoError(init2Restarted.IsBefore(init3Restarted))
 		framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
 	})
+	})
 
+	ginkgo.When("The kubelet restarts", func() {
 	ginkgo.When("a Pod is initialized and running", func() {
 		var client *e2epod.PodClient
 		var err error
@@ -1397,6 +1419,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 			gomega.Expect(pod.Status.InitContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
 			gomega.Expect(pod.Status.InitContainerStatuses[1].RestartCount).To(gomega.Equal(int32(0)))
 		})
+	})
 	})
 })
 
@@ -2768,6 +2791,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		})
 	})
 
+	ginkgo.When("running restartable init containers with startup probes", func() {
 	ginkgo.It("should launch restartable init containers serially considering the startup probe", func() {
 
 		restartableInit1 := "restartable-init-1"
@@ -2847,6 +2871,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		framework.ExpectNoError(results.StartsBefore(restartableInit2, regular1))
 	})
 
+	ginkgo.When("using a PreStop hook", func() {
 	ginkgo.It("should call the container's preStop hook and not launch next container if the restartable init container's startup probe fails", func() {
 
 		restartableInit1 := "restartable-init-1"
@@ -2931,7 +2956,10 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		framework.ExpectNoError(results.Exits(restartableInit1))
 		framework.ExpectNoError(results.DoesntStart(regular1))
 	})
+	})
+	})
 
+	ginkgo.When("running restartable init containers with liveness probes", func() {
 	ginkgo.It("should call the container's preStop hook and start the next container if the restartable init container's liveness probe fails", func() {
 
 		restartableInit1 := "restartable-init-1"
@@ -3015,7 +3043,10 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		framework.ExpectNoError(results.Exits(restartableInit1))
 		framework.ExpectNoError(results.Starts(regular1))
 	})
+	})
 
+	ginkgo.When("A pod with restartable init containers is terminating", func() {
+	ginkgo.When("The containers exit successfully", func() {
 	ginkgo.It("should terminate sidecars in reverse order after all main containers have exited", func() {
 		restartableInit1 := "restartable-init-1"
 		restartableInit2 := "restartable-init-2"
@@ -3102,7 +3133,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		framework.ExpectNoError(results.ExitsBefore(restartableInit3, restartableInit2))
 		framework.ExpectNoError(results.ExitsBefore(restartableInit2, restartableInit1))
 	})
+	})
 
+	ginkgo.When("The PreStop hooks don't exit", func() {
 	ginkgo.It("should terminate sidecars simultaneously if prestop doesn't exit", func() {
 		restartableInit1 := "restartable-init-1"
 		restartableInit2 := "restartable-init-2"
@@ -3231,7 +3264,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 			fmt.Sprintf("expected PostStart 3 to live for ~32 seconds, got %s", results))
 
 	})
+	})
 
+	ginkgo.When("the restartable init containers have multiple PreStop hooks", func() {
 	ginkgo.It("should call sidecar container PreStop hook simultaneously", func() {
 		restartableInit1 := "restartable-init-1"
 		restartableInit2 := "restartable-init-2"
@@ -3352,7 +3387,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		gomega.Expect(ps2-ps3).To(gomega.BeNumerically("~", 0, toleration),
 			fmt.Sprintf("expected PostStart 2 & PostStart 3 to start at the same time, got %s", results))
 	})
+	})
 
+	ginkgo.When("Restartable init containers are terminated during initialization", func() {
 	ginkgo.It("should not hang in termination if terminated during initialization", func() {
 		startInit := "start-init"
 		restartableInit1 := "restartable-init-1"
@@ -3469,7 +3506,9 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		// should delete quickly and not try to start/wait on any sidecars since they never started
 		gomega.Expect(deleteTime).To(gomega.BeNumerically("<", grace+buffer), fmt.Sprintf("should delete in < %d seconds, took %f", grace+buffer, deleteTime))
 	})
+	})
 
+	ginkgo.When("there is a non-started restartable init container", func() {
 	f.It("should terminate restartable init containers gracefully if there is a non-started restartable init container", func(ctx context.Context) {
 		init1 := "init-1"
 		restartableInit2 := "restartable-init-2"
@@ -3570,6 +3609,8 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 			time.Duration(containerTerminationSeconds+60)*time.Second)
 		framework.ExpectNoError(err, "the pod should be deleted before its terminationGracePeriodSeconds if the restartalbe init containers get termination signal correctly")
 	})
+	})
+	})
 })
 
 var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
@@ -3577,6 +3618,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
+	ginkgo.When("A node running restartable init containers reboots", func() {
 	ginkgo.It("should restart the containers in right order after the node reboot", func(ctx context.Context) {
 		init1 := "init-1"
 		restartableInit2 := "restartable-init-2"
@@ -3711,5 +3753,6 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 		framework.ExpectNoError(init1Restarted.IsBefore(restartableInit2Restarted))
 		framework.ExpectNoError(restartableInit2Restarted.IsBefore(init3Restarted))
 		framework.ExpectNoError(init3Restarted.IsBefore(regular1Restarted))
+	})
 	})
 })
