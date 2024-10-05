@@ -142,7 +142,6 @@ func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start
 		t.column = source.tokenSource.GetCharPositionInLine()
 	} else {
 		t.column = -1
-		t.line = -1
 	}
 	return t
 }
