@@ -295,7 +295,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 			})
 		})
 
-		ginkgo.When("running a Pod wiht a failed regular container", func() {
+		ginkgo.When("running a Pod with a failed regular container", func() {
 			ginkgo.It("should restart failing container when pod restartPolicy is Always", func() {
 
 				regular1 := "regular-1"
