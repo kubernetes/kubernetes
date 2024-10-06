@@ -39,6 +39,14 @@ func (c *CommonTokenFactory) Create(source *TokenSourceCharStreamPair, ttype int
 	t.line = line
 	t.column = column
 
+	if source != nil && source.tokenSource != nil {
+		t.line = line
+		t.column = column
+	} else {
+		t.line = -1
+		t.column = -1
+	}
+
 	if text != "" {
 		t.SetText(text)
 	} else if c.copyText && source.charStream != nil {
