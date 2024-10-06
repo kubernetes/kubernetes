@@ -34,7 +34,7 @@ func NewCommonTokenFactory(copyText bool) *CommonTokenFactory {
 var CommonTokenFactoryDEFAULT = NewCommonTokenFactory(false)
 
 func (c *CommonTokenFactory) Create(source *TokenSourceCharStreamPair, ttype int, text string, channel, start, stop, line, column int) Token {
-	t := NewCommonToken(nil, ttype, channel, start, stop)
+	t := NewCommonToken(source, ttype, channel, start, stop)
 
 	t.line = line
 	t.column = column
