@@ -671,6 +671,13 @@ func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 		}
 		klog.Warning("error creating inClusterConfig, falling back to default config: ", err)
 	}
+
+	if strings.Contains(kubeconfigPath, ":") {
+		configPaths := strings.Split(kubeconfigPath, ":")
+		return NewNonInteractiveDeferredLoadingClientConfig(
+			&ClientConfigLoadingRules{Precedence: configPaths},
+			&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
+	}
 	return NewNonInteractiveDeferredLoadingClientConfig(
 		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
