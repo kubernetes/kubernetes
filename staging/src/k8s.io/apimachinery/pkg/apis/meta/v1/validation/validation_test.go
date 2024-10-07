@@ -21,9 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateLabels(t *testing.T) {
@@ -130,6 +134,96 @@ func TestInvalidDryRun(t *testing.T) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
+	fieldPath := field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential")
+	tests := []struct {
+		name           string
+		opts           metav1.DeleteOptions
+		expectedErrors field.ErrorList
+	}{
+		{
+			name: "option is nil",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: nil,
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is false, PropagationPolicy is set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
+				DryRun:             []string{"All"},
+				PropagationPolicy:  ptr.To[metav1.DeletionPropagation](metav1.DeletePropagationBackground),
+				GracePeriodSeconds: ptr.To[int64](0),
+				Preconditions:      &metav1.Preconditions{},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is false, OrphanDependents is set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
+				DryRun: []string{"All"},
+				//nolint:staticcheck // until it's being removed
+				OrphanDependents:   ptr.To[bool](true),
+				GracePeriodSeconds: ptr.To[int64](0),
+				Preconditions:      &metav1.Preconditions{},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "option is true, PropagationPolicy is set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				DryRun:             []string{"All"},
+				PropagationPolicy:  ptr.To[metav1.DeletionPropagation](metav1.DeletePropagationBackground),
+				GracePeriodSeconds: ptr.To[int64](0),
+				Preconditions:      &metav1.Preconditions{},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
+				field.Invalid(fieldPath, true, "cannot be set together with .propagationPolicy"),
+				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
+				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
+			},
+		},
+		{
+			name: "option is true, OrphanDependents is set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				DryRun: []string{"All"},
+				//nolint:staticcheck // until it's being removed
+				OrphanDependents:   ptr.To[bool](true),
+				GracePeriodSeconds: ptr.To[int64](0),
+				Preconditions:      &metav1.Preconditions{},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(fieldPath, true, "cannot be set together with .dryRun"),
+				field.Invalid(fieldPath, true, "cannot be set together with .orphanDependents"),
+				field.Invalid(fieldPath, true, "cannot be set together with .gracePeriodSeconds"),
+				field.Invalid(fieldPath, true, "cannot be set together with .preconditions"),
+			},
+		},
+		{
+			name: "option is true, no other option is set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
+			},
+			expectedErrors: field.ErrorList{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errGot := ValidateDeleteOptions(&test.opts)
+			if !cmp.Equal(test.expectedErrors, errGot) {
+				t.Errorf("expected error(s) to match, diff: %s", cmp.Diff(test.expectedErrors, errGot))
+			}
+		})
+	}
 }
 
 func TestValidPatchOptions(t *testing.T) {
