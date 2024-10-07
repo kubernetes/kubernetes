@@ -27,16 +27,27 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/cel/environment"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 )
 
-// ClaimLister returns a subset of the claims that a
+// resourceClaimLister returns a subset of the claims that a
 // resourcelisters.ResourceClaimLister would return.
-type ClaimLister interface {
+type resourceClaimLister interface {
 	// ListAllAllocated returns only claims which are allocated.
 	ListAllAllocated() ([]*resourceapi.ResourceClaim, error)
+}
+
+type resourceSliceLister interface {
+	// List returns a list of all ResourceSlices.
+	List() ([]*resourceapi.ResourceSlice, error)
+}
+
+type deviceClassLister interface {
+	// List returns a list of all DeviceClasses.
+	List() ([]*resourceapi.DeviceClass, error)
+	// Get returns the DeviceClass with the given className.
+	Get(className string) (*resourceapi.DeviceClass, error)
 }
 
 // Allocator calculates how to allocate a set of unallocated claims which use
@@ -47,18 +58,18 @@ type ClaimLister interface {
 // slices).
 type Allocator struct {
 	claimsToAllocate []*resourceapi.ResourceClaim
-	claimLister      ClaimLister
-	classLister      resourcelisters.DeviceClassLister
-	sliceLister      resourcelisters.ResourceSliceLister
+	claimLister      resourceClaimLister
+	classLister      deviceClassLister
+	sliceLister      resourceSliceLister
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
 // some problem was detected which makes it impossible to allocate claims.
 func NewAllocator(ctx context.Context,
 	claimsToAllocate []*resourceapi.ResourceClaim,
-	claimLister ClaimLister,
-	classLister resourcelisters.DeviceClassLister,
-	sliceLister resourcelisters.ResourceSliceLister,
+	claimLister resourceClaimLister,
+	classLister deviceClassLister,
+	sliceLister resourceSliceLister,
 ) (*Allocator, error) {
 	return &Allocator{
 		claimsToAllocate: claimsToAllocate,
