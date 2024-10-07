@@ -31,9 +31,9 @@ import (
 	"strings"
 	"text/template"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/onsi/ginkgo/v2/types"
+
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 // ConformanceData describes the structure of the conformance.yaml file

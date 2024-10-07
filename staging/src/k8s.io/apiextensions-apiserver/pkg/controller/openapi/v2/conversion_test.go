@@ -28,7 +28,6 @@ import (
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	"gopkg.in/yaml.v2"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {

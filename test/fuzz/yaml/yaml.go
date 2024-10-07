@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigyaml "sigs.k8s.io/yaml"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 // FuzzDurationStrict is a fuzz target for strict-unmarshaling Duration defined
@@ -126,7 +126,7 @@ func FuzzTimeStrict(b []byte) int {
 	return 1
 }
 
-// FuzzYamlV2 is a fuzz target for "gopkg.in/yaml.v2" unmarshaling.
+// FuzzYamlV2 is a fuzz target for "sigs.k8s.io/yaml/goyaml.v2" unmarshaling.
 func FuzzYamlV2(b []byte) int {
 	t := struct{}{}
 	m := map[string]interface{}{}

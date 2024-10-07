@@ -29,9 +29,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 var (
