@@ -35,6 +35,7 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -113,7 +114,7 @@ func (mounter *Mounter) hasSystemd() bool {
 
 // Map unix.Statfs mount flags ro, nodev, noexec, nosuid, noatime, relatime,
 // nodiratime to mount option flag strings.
-func getBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
+func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
 	var s unix.Statfs_t
 	var mountOpts []string
 	if err := statfs(path, &s); err != nil {
@@ -136,23 +137,32 @@ func getBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_
 	return mountOpts, nil
 }
 
-// Performs a bind mount with the specified options, and then remounts
-// the mount point with the same `nodev`, `nosuid`, `noexec`, `nosuid`, `noatime`,
-// `relatime`, `nodiratime` options as the original mount point.
+// Do a bind mount including the needed remount for applying the bind opts.
+// If the remount fails and we are running in a user namespace
+// figure out if the source filesystem has the ro, nodev, noexec, nosuid,
+// noatime, relatime or nodiratime flag set and try another remount with the found flags.
 func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, source string, target string, fstype string, bindOpts []string, bindRemountOpts []string, bindRemountOptsSensitive []string, mountFlags []string, systemdMountRequired bool) error {
-	err := mounter.doMount(mounterPath, mountCmd, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
 	if err != nil {
 		return err
 	}
-	// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
-	// nodiratime flag...
-	fixMountOpts, err := getBindMountOptions(source, unix.Statfs)
-	if err != nil {
-		return &os.PathError{Op: "statfs", Path: source, Err: err}
+	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	if libcontaineruserns.RunningInUserNS() {
+		if err == nil {
+			return nil
+		}
+		// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
+		// nodiratime flag...
+		fixMountOpts, err := getUserNSBindMountOptions(source, unix.Statfs)
+		if err != nil {
+			return &os.PathError{Op: "statfs", Path: source, Err: err}
+		}
+		// ... and retry the mount with flags found above.
+		bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	} else {
+		return err
 	}
-	// ... and retry the mount with flags found above.
-	bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
-	return mounter.doMount(mounterPath, mountCmd, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
