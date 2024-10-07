@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -216,7 +215,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectory(ctx context.Context, ltr *LocalTest
 func (l *ltrMgr) setupLocalVolumeDirectoryLink(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir -p %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -236,7 +235,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLink(ctx context.Context, ltr *Local
 
 func (l *ltrMgr) setupLocalVolumeDirectoryBindMounted(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
-	cmd := fmt.Sprintf("mkdir -p %s && mount --bind %s %s", hostDir, hostDir, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s", hostDir, hostDir, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -256,7 +255,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryBindMounted(ctx context.Context, ltr
 func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(ctx context.Context, node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir -p %s && mount --bind %s %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(ctx, cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{

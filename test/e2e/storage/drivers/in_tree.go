@@ -43,7 +43,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1224,12 +1223,7 @@ func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 	framework.ExpectNoError(err)
 
 	l.hostExec = utils.NewHostExec(f)
-	// It is recommended to mount /tmp with options noexec, nodev, nosuid.
-	// tmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,seclabel,inode64)
-	// This prevents scripts and binaries from being executed from the /tmp directory.
-	// This can cause errors like "Permission denied" when executing files from `/tmp`.
-	// To pass the test that verifies the execution of files on a volume, we use `/var/tmp` instead of `/tmp`.
-	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/var/tmp")
+	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
 
 	// This can't be done in SkipUnsupportedTest because the test framework is not initialized yet
 	if l.volumeType == utils.LocalVolumeGCELocalSSD {
