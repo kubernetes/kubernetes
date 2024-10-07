@@ -98,6 +98,7 @@ EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
+LEADER_ELECT=${LEADER_ELECT:-false}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
@@ -701,7 +702,7 @@ function start_controller_manager {
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
-      --leader-elect=false \
+      --leader-elect="${LEADER_ELECT}" \
       --cert-dir="${CERT_DIR}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
@@ -729,7 +730,7 @@ function start_cloud_controller_manager {
       --configure-cloud-routes="${CONFIGURE_CLOUD_ROUTES}" \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
-      --leader-elect=false \
+      --leader-elect="${LEADER_ELECT}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     export CLOUD_CTLRMGR_PID=$!
 }
@@ -1024,7 +1025,7 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
 leaderElection:
-  leaderElect: false
+  leaderElect: ${LEADER_ELECT}
 EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
