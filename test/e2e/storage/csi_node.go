@@ -40,7 +40,18 @@ var _ = utils.SIGDescribe("CSINodes", func() {
 
 	ginkgo.Describe("CSI Conformance", func() {
 
-		ginkgo.It("should run through the lifecycle of a csinode", func(ctx context.Context) {
+		/*
+			Release: v1.32
+			Testname: CSINode, lifecycle
+			Description: Creating an initial CSINode MUST succeed. Reading a CSINode MUST
+			succeed with required name retrieved. Patching a CSINode MUST succeed with its
+			new label found. Listing CSINode with a labelSelector MUST succeed. Deleting a
+			CSINode MUST succeed and it MUST be confirmed. Creating a replacement CSINode
+			MUST succeed. Reading a CSINode MUST succeed with required name retrieved. Updating
+			a CSINode MUST succeed with its new label found. Deleting the CSINode via deleteCollection
+			MUST succeed and it MUST be confirmed.
+		*/
+		framework.ConformanceIt("should run through the lifecycle of a csinode", func(ctx context.Context) {
 
 			csiNodeClient := f.ClientSet.StorageV1().CSINodes()
 

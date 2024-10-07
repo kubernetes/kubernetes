@@ -2791,6 +2791,18 @@
     patch, and delete operations.
   release: v1.26
   file: test/e2e/storage/csi_inline.go
+- testname: CSINode, lifecycle
+  codename: '[sig-storage] CSINodes CSI Conformance should run through the lifecycle
+    of a csinode [Conformance]'
+  description: Creating an initial CSINode MUST succeed. Reading a CSINode MUST succeed
+    with required name retrieved. Patching a CSINode MUST succeed with its new label
+    found. Listing CSINode with a labelSelector MUST succeed. Deleting a CSINode MUST
+    succeed and it MUST be confirmed. Creating a replacement CSINode MUST succeed.
+    Reading a CSINode MUST succeed with required name retrieved. Updating a CSINode
+    MUST succeed with its new label found. Deleting the CSINode via deleteCollection
+    MUST succeed and it MUST be confirmed.
+  release: v1.32
+  file: test/e2e/storage/csi_node.go
 - testname: CSIStorageCapacity API
   codename: '[sig-storage] CSIStorageCapacity should support CSIStorageCapacities
     API operations [Conformance]'
