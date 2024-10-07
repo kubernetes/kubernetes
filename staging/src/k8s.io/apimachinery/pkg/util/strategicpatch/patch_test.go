@@ -1266,7 +1266,7 @@ testCases:
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
 	{
-		Description: "diff level array",
+		Description: "different level of values with same key in array",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
 			Original: []byte(`
 mergingList:
