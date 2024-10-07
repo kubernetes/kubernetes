@@ -108,7 +108,7 @@ func RegistrarSocketPath(path string) Option {
 }
 
 // RegistrarListener sets an already created listener for the plugin
-// registrarion API. Can be combined with RegistrarSocketPath.
+// registration API. Can be combined with RegistrarSocketPath.
 //
 // At least one of these two options is required.
 func RegistrarListener(listener net.Listener) Option {
