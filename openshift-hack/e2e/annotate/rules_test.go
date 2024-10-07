@@ -22,6 +22,10 @@ func (n *testNode) AppendText(text string) {
 	n.text += text
 }
 
+func (n *testNode) Labels() []string {
+	return nil
+}
+
 func TestStockRules(t *testing.T) {
 	tests := []struct {
 		name string

@@ -80,6 +80,7 @@ kube::golang::server_targets() {
     cluster/gce/gci/mounter
     cmd/watch-termination
     openshift-hack/cmd/k8s-tests
+    openshift-hack/cmd/k8s-tests-ext
   )
   echo "${targets[@]}"
 }
