@@ -278,14 +278,19 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 }
 
 func (e *transformTest) getEncryptionOptions(reload bool) []string {
+	var options []string
 	if e.transformerConfig != "" {
-		return []string{
+		options = append(options, []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount"}
+			"--disable-admission-plugins", "ServiceAccount"}...)
+	}
+	if e.corruptObjDeleteEnabled {
+		options = append(options, []string{
+			"--authorization-mode=RBAC"}...)
 	}
 
-	return nil
+	return options
 }
 
 func (e *transformTest) createEncryptionConfig() (
