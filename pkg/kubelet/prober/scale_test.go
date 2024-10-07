@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TCP sockets goes through a TIME-WAIT state (default 60 sec) before being freed,
@@ -136,7 +136,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 								StartedAt: metav1.Now(),
 							},
 						},
-						Started: utilpointer.Bool(true),
+						Started: ptr.To(true),
 					})
 				}
 				podManager.AddPod(&pod)

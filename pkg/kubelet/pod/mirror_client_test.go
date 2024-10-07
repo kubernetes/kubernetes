@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestParsePodFullName(t *testing.T) {
@@ -137,7 +137,7 @@ func TestCreateMirrorPod(t *testing.T) {
 				Kind:       "Node",
 				Name:       testNodeName,
 				UID:        testNodeUID,
-				Controller: pointer.Bool(true),
+				Controller: ptr.To(true),
 			}
 			assert.Equal(t, expectedOwnerRef, createdPod.OwnerReferences[0])
 		})

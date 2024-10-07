@@ -29,7 +29,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -66,7 +66,7 @@ var (
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
-		MemoryThrottlingFactor:          utilpointer.Float64(0.9),
+		MemoryThrottlingFactor:          ptr.To(0.9),
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
@@ -278,14 +278,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "invalid MaxParallelImagePulls",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.MaxParallelImagePulls = utilpointer.Int32(0)
+			conf.MaxParallelImagePulls = ptr.To[int32](0)
 			return conf
 		},
 		errMsg: "invalid configuration: maxParallelImagePulls 0 must be a positive number",
 	}, {
 		name: "invalid MaxParallelImagePulls and SerializeImagePulls combination",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.MaxParallelImagePulls = utilpointer.Int32(3)
+			conf.MaxParallelImagePulls = ptr.To[int32](3)
 			conf.SerializeImagePulls = true
 			return conf
 		},
@@ -293,7 +293,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "valid MaxParallelImagePulls and SerializeImagePulls combination",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.MaxParallelImagePulls = utilpointer.Int32(1)
+			conf.MaxParallelImagePulls = ptr.To[int32](1)
 			conf.SerializeImagePulls = true
 			return conf
 		},
@@ -484,7 +484,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}, {
 		name: "invalid MemoryThrottlingFactor",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.MemoryThrottlingFactor = utilpointer.Float64(1.1)
+			conf.MemoryThrottlingFactor = ptr.To(1.1)
 			return conf
 		},
 		errMsg: "invalid configuration: memoryThrottlingFactor 1.1 must be greater than 0 and less than or equal to 1.0",

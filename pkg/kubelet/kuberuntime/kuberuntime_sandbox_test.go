@@ -34,7 +34,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const testPodLogsDirectory = "/var/log/pods"
@@ -153,8 +153,8 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 		expectError     bool
 	}{
 		"unspecified RuntimeClass": {rcn: nil, expectedHandler: ""},
-		"valid RuntimeClass":       {rcn: pointer.String(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"missing RuntimeClass":     {rcn: pointer.String("phantom"), expectError: true},
+		"valid RuntimeClass":       {rcn: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
+		"missing RuntimeClass":     {rcn: ptr.To("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
