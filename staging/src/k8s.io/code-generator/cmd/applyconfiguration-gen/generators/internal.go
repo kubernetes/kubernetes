@@ -71,13 +71,12 @@ func (g *internalGenerator) GenerateType(c *generator.Context, _ *types.Type, w 
 		return err
 	}
 	sw.Do(schemaBlock, map[string]interface{}{
-		"schemaYAML":    string(schemaYAML),
-		"smdParser":     smdParser,
-		"smdNewParser":  smdNewParser,
-		"fmtSprintf":    fmtSprintf,
-		"syncOnce":      syncOnce,
-		"yamlObject":    yamlObject,
-		"yamlUnmarshal": yamlUnmarshal,
+		"schemaYAML":   string(schemaYAML),
+		"smdParser":    smdParser,
+		"smdNewParser": smdNewParser,
+		"fmtSprintf":   fmtSprintf,
+		"syncOnce":     syncOnce,
+		"yamlObject":   yamlObject,
 	})
 
 	return sw.Error()
