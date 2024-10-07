@@ -23,6 +23,7 @@ import (
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	// Admission policies
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/allowunsafedelete"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
@@ -91,6 +92,7 @@ var AllOrderedPlugins = []string{
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
+	allowunsafedelete.PluginName,            // AllowUnsafeMalformedObjectDeletion
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -106,6 +108,7 @@ var AllOrderedPlugins = []string{
 // The order of registration is irrelevant, see AllOrderedPlugins for execution order.
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
+	allowunsafedelete.Register(plugins)
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
@@ -160,6 +163,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		defaultingressclass.PluginName,          // DefaultIngressClass
 		podsecurity.PluginName,                  // PodSecurity
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
+		allowunsafedelete.PluginName,            // AllowUnsafeMalformedObjectDeletion, only active when feature gate AllowUnsafeMalformedObjectDeletion is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)

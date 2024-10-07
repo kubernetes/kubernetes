@@ -24,6 +24,7 @@ import (
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/plugin/pkg/admission/allowunsafedelete"
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates/ctbattest"
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
@@ -46,6 +47,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		ctbattest.PluginName,                 // ClusterTrustBundleAttest
 		certsubjectrestriction.PluginName,    // CertificateSubjectRestriction
 		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
+		allowunsafedelete.PluginName,         // AllowUnsafeMalformedObjectDeletion, only active when feature gate AllowUnsafeMalformedObjectDeletion is enabled
 	)
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)
