@@ -44,6 +44,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.32"
+- name: AllowParsingUserUIDFromCertAuth
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: AllowServiceLBStatusOnNonLB
   versionedSpecs:
   - default: false
