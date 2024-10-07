@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1223,6 +1224,14 @@ func (l *localDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 	framework.ExpectNoError(err)
 
 	l.hostExec = utils.NewHostExec(f)
+	// It is recommended to mount /tmp with options noexec, nodev, nosuid.
+	// tmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,seclabel,inode64)
+	// This prevents scripts and binaries from being executed from the /tmp directory.
+	// This can cause errors like "Permission denied" when executing files from `/tmp`.
+	// To pass the test that verifies the execution of files on a volume, we remount `/tmp` with the exec option.
+	remountCmd := `mount | awk '{if ($3 == "/tmp") print $0}' | grep -q "noexec" && mount -o remount,exec /tmp || true`
+	err = l.hostExec.IssueCommand(ctx, remountCmd, l.node)
+	framework.ExpectNoError(err)
 	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")
 
 	// This can't be done in SkipUnsupportedTest because the test framework is not initialized yet
