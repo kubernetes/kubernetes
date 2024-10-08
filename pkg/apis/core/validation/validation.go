@@ -4058,6 +4058,8 @@ type PodValidationOptions struct {
 	AllowRelaxedDNSSearchValidation bool
 	// Allows zero value for Pod Lifecycle Sleep Action
 	AllowPodLifecycleSleepActionZeroValue bool
+	// Allow only Recursive value of SELinuxChangePolicy.
+	AllowOnlyRecursiveSELinuxChangePolicy bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4355,6 +4357,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		}
 		if securityContext.SupplementalGroupsPolicy != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("supplementalGroupsPolicy"), "cannot be set for a windows pod"))
+		}
+		if securityContext.SELinuxChangePolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxChangePolicy"), "cannot be set for a windows pod"))
 		}
 	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
@@ -4941,6 +4946,28 @@ func ValidateHostSysctl(sysctl string, securityContext *core.PodSecurityContext,
 	return nil
 }
 
+var validSELinuxChangePolicies = sets.New(core.SELinuxChangePolicyRecursive, core.SELinuxChangePolicyMountOption)
+
+func validateSELinuxChangePolicy(seLinuxChangePolicy *core.PodSELinuxChangePolicy, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	if seLinuxChangePolicy == nil {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+
+	if opts.AllowOnlyRecursiveSELinuxChangePolicy {
+		if *seLinuxChangePolicy != core.SELinuxChangePolicyRecursive {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *seLinuxChangePolicy, []core.PodSELinuxChangePolicy{core.SELinuxChangePolicyRecursive}))
+		}
+	} else {
+		// Allow any valid SELinuxChangePolicy value.
+		if !validSELinuxChangePolicies.Has(*seLinuxChangePolicy) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, *seLinuxChangePolicy, sets.List(validSELinuxChangePolicies)))
+		}
+	}
+	return allErrs
+}
+
 // validatePodSpecSecurityContext verifies the SecurityContext of a PodSpec,
 // whether that is defined in a Pod or in an embedded PodSpec (e.g. a
 // Deployment's pod template).
@@ -4986,6 +5013,10 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 
 		if securityContext.SupplementalGroupsPolicy != nil {
 			allErrs = append(allErrs, validateSupplementalGroupsPolicy(securityContext.SupplementalGroupsPolicy, fldPath.Child("supplementalGroupsPolicy"))...)
+		}
+
+		if securityContext.SELinuxChangePolicy != nil {
+			allErrs = append(allErrs, validateSELinuxChangePolicy(securityContext.SELinuxChangePolicy, fldPath.Child("seLinuxChangePolicy"), opts)...)
 		}
 	}
 
