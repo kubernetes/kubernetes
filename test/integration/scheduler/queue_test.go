@@ -335,18 +335,57 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		},
 		{
 			name:         "Pod updated with toleration requeued to activeQ",
-			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
 			pods: []*v1.Pod{
 				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
-				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
+				st.MakePod().Name("pod1").Container("image").Obj(),
+				st.MakePod().Name("pod2").Container("image").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
 				// Trigger a PodUpdate event by adding a toleration to Pod1.
-				// It makes Pod1 schedulable.
-				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
+				// It makes Pod1 schedulable. Pod2 is not requeued because of not having toleration.
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
 					return nil, fmt.Errorf("failed to update the pod: %w", err)
 				}
 				return map[framework.ClusterEvent]uint64{framework.PodTolerationChange: 1}, nil
+			},
+			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pod rejected by the TaintToleration plugin is requeued when the Node's taint is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+			pods: []*v1.Pod{
+				// - Pod1, pod2 and pod3 don't have the required toleration and will be rejected by the TaintToleration plugin.
+				st.MakePod().Name("pod1").Toleration("taint-key").Container("image").Obj(),
+				st.MakePod().Name("pod2").Toleration("taint-key2").Container("image").Obj(),
+				st.MakePod().Name("pod3").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Trigger a NodeUpdate event that changes the existing taint to a taint that matches the toleration that pod1 has.
+				// It makes Pod1 schedulable. Pod2 and pod3 are not requeued because of not having the corresponding toleration.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update the Node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeTaintChange: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the TaintToleration plugin is requeued when a Node that has the correspoding taint is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+			pods: []*v1.Pod{
+				// - Pod1 and Pod2 don't have the required toleration and will be rejected by the TaintToleration plugin.
+				st.MakePod().Name("pod1").Toleration("taint-key").Container("image").Obj(),
+				st.MakePod().Name("pod2").Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Trigger a NodeCreated event with the taint.
+				// It makes Pod1 schedulable. Pod2 is not requeued because of not having toleration.
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, st.MakeNode().Name("fake-node2").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(), metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create the Node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeAdd: 1}, nil
 			},
 			wantRequeuedPods: sets.New("pod1"),
 		},
