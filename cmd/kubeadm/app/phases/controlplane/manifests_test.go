@@ -149,7 +149,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 		components []string
 	}{
 		{
-			name:       "KubeAPIServer KubeAPIServer KubeScheduler",
+			name:       "KubeAPIServer KubeControllerManager KubeScheduler",
 			components: []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
 		{
