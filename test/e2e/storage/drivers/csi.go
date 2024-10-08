@@ -158,6 +158,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapReadWriteOncePod:               true,
 		storageframework.CapMultiplePVsSameID:              true,
 		storageframework.CapFSResizeFromSourceNotSupported: true,
+		storageframework.CapVolumeGroupSnapshot:            true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -222,6 +223,12 @@ func (h *hostpathCSIDriver) GetVolumeAttributesClass(_ context.Context, config *
 			hostpathCSIDriverMutableParameterName: hostpathCSIDriverMutableParameterValue,
 		},
 	}, config.Framework.Namespace.Name, "e2e-vac-hostpath")
+}
+func (h *hostpathCSIDriver) GetVolumeGroupSnapshotClass(ctx context.Context, config *storageframework.PerTestConfig, parameters map[string]string) *unstructured.Unstructured {
+	snapshotter := config.GetUniqueDriverName()
+	ns := config.Framework.Namespace.Name
+
+	return utils.GenerateVolumeGroupSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework) *storageframework.PerTestConfig {

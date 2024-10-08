@@ -402,6 +402,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	VolumeSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
 
+	// Owner: sig-storage
+	// Volume group snapshot tests
+	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("volumegroupsnapshot"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	VolumeSourceXFS = framework.WithFeature(framework.ValidFeatures.Add("VolumeSourceXFS"))
 
