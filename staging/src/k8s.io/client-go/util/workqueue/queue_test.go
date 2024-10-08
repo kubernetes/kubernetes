@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue_test
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -459,4 +460,21 @@ func mustGarbageCollect(t *testing.T, i interface{}) {
 			t.Errorf("object was not garbage collected")
 		}
 	})
+}
+
+func BenchmarkQueue(b *testing.B) {
+	keys := make([]string, 100)
+	for idx := range keys {
+		keys[idx] = fmt.Sprintf("key-%d", idx)
+	}
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		q := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{})
+		b.StartTimer()
+		for j := 0; j < 100; j++ {
+			q.Add(keys[j])
+			key, _ := q.Get()
+			q.Done(key)
+		}
+	}
 }
