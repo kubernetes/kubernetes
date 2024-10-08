@@ -1194,6 +1194,10 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		// PVs are cluster-wide resources.
 		// Prepend a namespace to make the name globally unique.
 		pv.Name = fmt.Sprintf("%s-%s", namespace, pv.Name)
+		pvs := pv.Spec.PersistentVolumeSource
+		if pvs.CSI != nil {
+			pvs.CSI.VolumeHandle = pv.Name
+		}
 		if bindVolume {
 			// bind pv to "pvc-$i"
 			pv.Spec.ClaimRef = &v1.ObjectReference{
