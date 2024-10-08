@@ -237,7 +237,8 @@
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
       "github.com/klauspost/compress": [
-        "github.com/Microsoft/hcsshim"
+        "github.com/Microsoft/hcsshim",
+        "github.com/prometheus/client_golang"
       ],
       "github.com/lestrrat-go/backoff/v2": [
         "github.com/Microsoft/hcsshim"
@@ -332,9 +333,6 @@
         "github.com/google/cel-go",
         "k8s.io/mount-utils"
       ],
-      "google.golang.org/appengine": [
-        "github.com/prometheus/client_golang"
-      ],
       "google.golang.org/genproto": [
        "github.com/Microsoft/hcsshim",
         "github.com/grpc-ecosystem/go-grpc-middleware",
@@ -355,6 +353,7 @@
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/grpc-ecosystem/grpc-gateway",
       "github.com/json-iterator/go",
+ 	    "github.com/klauspost/compress",
       "github.com/mailru/easyjson",
       "github.com/pkg/errors",
       "go.opencensus.io",
