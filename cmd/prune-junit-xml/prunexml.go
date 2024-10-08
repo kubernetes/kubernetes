@@ -23,7 +23,9 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
+	"k8s.io/kubernetes/cmd/prune-junit-xml/logparse"
 	"k8s.io/kubernetes/third_party/forked/gotestsum/junitxml"
 )
 
@@ -64,25 +66,66 @@ func main() {
 
 func pruneXML(suites *junitxml.JUnitTestSuites, maxBytes int) {
 	for _, suite := range suites.Suites {
-		for _, testcase := range suite.TestCases {
+		for i := range suite.TestCases {
+			// Modify directly in the TestCases slice, if necessary.
+			testcase := &suite.TestCases[i]
 			if testcase.SkipMessage != nil {
 				if len(testcase.SkipMessage.Message) > maxBytes {
 					fmt.Printf("clipping skip message in test case : %s\n", testcase.Name)
-					head := testcase.SkipMessage.Message[:maxBytes/2]
-					tail := testcase.SkipMessage.Message[len(testcase.SkipMessage.Message)-maxBytes/2:]
-					testcase.SkipMessage.Message = head + "[...clipped...]" + tail
+					pruneString(&testcase.SkipMessage.Message, maxBytes)
 				}
 			}
 			if testcase.Failure != nil {
+				// In Go unit tests, the entire test output
+				// becomes the failure message because `go
+				// test` doesn't track why a test fails. This
+				// can make the failure message pretty large.
+				//
+				// We cannot identify the real failure here
+				// either because Kubernetes has no convention
+				// for how to format test failures. What we can
+				// do is recognize log output added by klog.
+				//
+				// Therefore here we move the full text to
+				// to the test output and only keep those
+				// lines in the failure which are not from
+				// klog.
+				if testcase.SystemOut == "" {
+					if len(testcase.SystemOut) > maxBytes {
+						fmt.Printf("clipping log output in test case: %s\n", testcase.Name)
+						pruneString(&testcase.SystemOut, maxBytes)
+					}
+					var buf strings.Builder
+					haveLogOutput := false
+					for entry := range logparse.All(strings.NewReader(testcase.Failure.Contents)) {
+						if _, ok := entry.(*logparse.KlogEntry); ok {
+							haveLogOutput = true
+							continue
+						}
+						_, _ = buf.WriteString(entry.LogData())
+					}
+					if haveLogOutput {
+						// Store the full output
+						// because it is different from
+						// the updated failure message.
+						testcase.SystemOut = testcase.Failure.Contents
+					}
+					testcase.Failure.Contents = buf.String()
+				}
+
 				if len(testcase.Failure.Contents) > maxBytes {
 					fmt.Printf("clipping failure message in test case : %s\n", testcase.Name)
-					head := testcase.Failure.Contents[:maxBytes/2]
-					tail := testcase.Failure.Contents[len(testcase.Failure.Contents)-maxBytes/2:]
-					testcase.Failure.Contents = head + "[...clipped...]" + tail
+					pruneString(&testcase.Failure.Contents, maxBytes)
 				}
 			}
 		}
 	}
+}
+
+func pruneString(str *string, maxBytes int) {
+	head := (*str)[:maxBytes/2]
+	tail := (*str)[len(*str)-maxBytes/2:]
+	*str = head + "[...clipped...]" + tail
 }
 
 // This function condenses the junit xml to have package name as top level identifier

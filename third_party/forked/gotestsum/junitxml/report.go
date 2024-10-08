@@ -8,7 +8,7 @@ import (
 
 // JUnitTestSuites is a collection of JUnit test suites.
 type JUnitTestSuites struct {
-	XMLName xml.Name `xml:"testsuites"`
+	XMLName xml.Name         `xml:"testsuites"`
 	Suites  []JUnitTestSuite `xml:"testsuite,omitempty"`
 }
 
@@ -22,7 +22,7 @@ type JUnitTestSuite struct {
 	Name       string          `xml:"name,attr"`
 	Properties []JUnitProperty `xml:"properties>property,omitempty"`
 	TestCases  []JUnitTestCase `xml:"testcase,omitempty"`
-	Timestamp  string `xml:"timestamp,attr"`
+	Timestamp  string          `xml:"timestamp,attr"`
 }
 
 // JUnitTestCase is a single test case with its result.
@@ -33,6 +33,8 @@ type JUnitTestCase struct {
 	Time        string            `xml:"time,attr"`
 	SkipMessage *JUnitSkipMessage `xml:"skipped,omitempty"`
 	Failure     *JUnitFailure     `xml:"failure,omitempty"`
+	SystemOut   string            `xml:"system-out,omitempty"`
+	SystemErr   string            `xml:"system-err,omitempty"`
 }
 
 // JUnitSkipMessage contains the reason why a testcase was skipped.
