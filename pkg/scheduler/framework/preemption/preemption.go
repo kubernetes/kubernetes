@@ -238,15 +238,8 @@ func (ev *Evaluator) findCandidates(ctx context.Context, allNodes []*framework.N
 		return nil, nil, err
 	}
 
-	offset, numCandidates := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
-	if loggerV := logger.V(5); logger.Enabled() {
-		var sample []string
-		for i := offset; i < offset+10 && i < int32(len(potentialNodes)); i++ {
-			sample = append(sample, potentialNodes[i].Node().Name)
-		}
-		loggerV.Info("Selected candidates from a pool of nodes", "potentialNodesCount", len(potentialNodes), "offset", offset, "sampleLength", len(sample), "sample", sample, "candidates", numCandidates)
-	}
-	return ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, numCandidates)
+	offset, candidatesNum := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
+	return ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, candidatesNum)
 }
 
 // callExtenders calls given <extenders> to select the list of feasible candidates.
@@ -546,18 +539,24 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn framework.PodNominator
 // candidates, ones that do not violate PDB are preferred over ones that do.
 // NOTE: This method is exported for easier testing in default preemption.
 func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
-	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, *framework.NodeToStatus, error) {
+	pdbs []*policy.PodDisruptionBudget, offset int32, candidatesNum int32) ([]Candidate, *framework.NodeToStatus, error) {
 
 	fh := ev.Handler
-	nonViolatingCandidates := newCandidateList(numCandidates)
-	violatingCandidates := newCandidateList(numCandidates)
+	nonViolatingCandidates := newCandidateList(candidatesNum)
+	violatingCandidates := newCandidateList(candidatesNum)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	nodeStatuses := framework.NewDefaultNodeToStatus()
+
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Dry run the preemption", "potentialNodesNumber", len(potentialNodes), "pdbsNumber", len(pdbs), "offset", offset, "candidatesNumber", candidatesNum)
+
 	var statusesLock sync.Mutex
 	var errs []error
 	checkNode := func(i int) {
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
+		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
+
 		stateCopy := ev.State.Clone()
 		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
 		if status.IsSuccess() && len(pods) != 0 {
@@ -575,7 +574,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 				violatingCandidates.add(c)
 			}
 			nvcSize, vcSize := nonViolatingCandidates.size(), violatingCandidates.size()
-			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
+			if nvcSize > 0 && nvcSize+vcSize >= candidatesNum {
 				cancel()
 			}
 			return
