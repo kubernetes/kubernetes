@@ -206,7 +206,7 @@ type ValidatingAdmissionPolicySpec struct {
 	ParamKind *ParamKind
 
 	// MatchConstraints specifies what resources this policy is designed to validate.
-	// The AdmissionPolicy cares about a request if it matches _all_ Constraint.
+	// The MutatingAdmissionPolicy cares about a request if it matches _all_ Constraint.
 	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
 	// ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding.
 	// Required.
@@ -1223,7 +1223,7 @@ type MutatingAdmissionPolicySpec struct {
 	// +optional
 	Variables []Variable
 
-	// mutations contain operations which are used to perform mutations.
+	// mutations contain operations to perform on matching objects.
 	// mutations may not be empty; a minimum of one mutation is required.
 	// mutations are evaluated in order, and are reinvoked according to
 	// the reinvocationPolicy.
@@ -1238,8 +1238,8 @@ type MutatingAdmissionPolicySpec struct {
 	// occur from CEL expression parse errors, type check errors, runtime errors and invalid
 	// or mis-configured policy definitions or bindings.
 	//
-	// A policy is invalid if spec.paramKind refers to a non-existent Kind.
-	// A binding is invalid if spec.paramRef.name refers to a non-existent resource.
+	// A policy is invalid if paramKind refers to a non-existent Kind.
+	// A binding is invalid if paramRef.name refers to a non-existent resource.
 	//
 	// failurePolicy does not define how validations that evaluate to false are handled.
 	//
@@ -1248,8 +1248,8 @@ type MutatingAdmissionPolicySpec struct {
 	FailurePolicy *FailurePolicyType
 
 	// matchConditions is a list of conditions that must be met for a request to be validated.
-	// Match conditions filter requests that have already been matched by the rules,
-	// namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+	// Match conditions filter requests that have already been matched by the matchConstraints,
+	// An empty list of matchConditions matches all requests.
 	// There are a maximum of 64 match conditions allowed.
 	//
 	// If a parameter object is provided, it can be accessed via the `params` handle in the same
@@ -1318,7 +1318,7 @@ type ApplyConfiguration struct {
 	// expression will be evaluated by CEL to create an apply configuration.
 	// ref: https://github.com/google/cel-spec
 	//
-	// Apply configurations are declared in CEL using object initialization.  For example, this CEL expression
+	// Apply configurations are declared in CEL using object initialization. For example, this CEL expression
 	// returns an apply configuration to set a single field:
 	//
 	//	Object{
@@ -1332,7 +1332,7 @@ type ApplyConfiguration struct {
 	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
 	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
 	//
-	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
+	// CEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:
 	//
 	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
 	// - 'oldObject' - The existing object. The value is null for CREATE requests.
@@ -1364,7 +1364,7 @@ type JSONPatch struct {
 	// For example, this CEL expression returns a JSON patch to conditionally modify a value:
 	//
 	//	  [
-	//      JSONPatch{op: "test", path: "/spec/example", value: "Red"},
+	//	    JSONPatch{op: "test", path: "/spec/example", value: "Red"},
 	//	    JSONPatch{op: "replace", path: "/spec/example", value: "Green"}
 	//	  ]
 	//
@@ -1381,23 +1381,25 @@ type JSONPatch struct {
 	// To use strings containing '/' and '~' as JSONPatch path keys, use "jsonpatch.escapeKey". For example:
 	//
 	//	  [
-	//      JSONPatch{
-	//        op: "add",
-	//        path: "/metadata/labels/" + jsonpatch.escapeKey("example.com/environment"),
-	//        value: "test"
-	//      },
+	//	    JSONPatch{
+	//	      op: "add",
+	//	      path: "/metadata/labels/" + jsonpatch.escapeKey("example.com/environment"),
+	//	      value: "test"
+	//	    },
 	//	  ]
 	//
 	// CEL expressions have access to the types needed to create JSON patches and objects:
 	//
 	// - 'JSONPatch' - CEL type of JSON Patch operations. JSONPatch has the fields 'op', 'from', 'path' and 'value'.
-	//   See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to strings,
-	//   integers, arrays, maps and Object types.
+	//   See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to any of: string,
+	//   integer, array, map or object.  If set, the 'path' and 'from' fields must be set to a
+	//   [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901/) string, where the 'jsonpatch.escapeKey()' CEL
+	//   function may be used to escape path keys containing '/' and '~'.
 	// - 'Object' - CEL type of the resource object.
 	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
 	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
 	//
-	// CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:
+	// CEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:
 	//
 	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
 	// - 'oldObject' - The existing object. The value is null for CREATE requests.
@@ -1416,8 +1418,6 @@ type JSONPatch struct {
 	//
 	// - 'jsonpatch.escapeKey' - Performs JSONPatch key escaping. '~' and  '/' are escaped as '~0' and `~1' respectively).
 	//
-	// The `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the
-	// object. No other metadata properties are accessible.
 	//
 	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
 	// Required.
@@ -1429,15 +1429,15 @@ type JSONPatch struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
 
-// MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with paramerized resources.
-// MutatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+// MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources.
+// MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators
+// configure policies for clusters.
 //
 // For a given admission request, each binding will cause its policy to be
 // evaluated N times, where N is 1 for policies/bindings that don't use
 // params, otherwise N is the number of parameters selected by the binding.
+// Each evaluation is constrained by a [runtime cost budget](https://kubernetes.io/docs/reference/using-api/cel/#runtime-cost-budget).
 //
-// The CEL expressions of a policy must have a computed CEL cost below the maximum
-// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
 // Adding/removing policies, bindings, or params can not affect whether a
 // given (policy, binding, param) combination is within its own CEL budget.
 type MutatingAdmissionPolicyBinding struct {
@@ -1465,23 +1465,25 @@ type MutatingAdmissionPolicyBindingList struct {
 
 // MutatingAdmissionPolicyBindingSpec is the specification of the MutatingAdmissionPolicyBinding.
 type MutatingAdmissionPolicyBindingSpec struct {
-	// PolicyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
+	// policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
 	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
 	// Required.
 	PolicyName string
 	// paramRef specifies the parameter resource used to configure the admission control policy.
-	// It should point to a resource of the type specified in ParamKind of the bound MutatingAdmissionPolicy.
+	// It should point to a resource of the type specified in spec.ParamKind of the bound MutatingAdmissionPolicy.
 	// If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the MutatingAdmissionPolicy applied.
 	// If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.
 	// +optional
 	ParamRef *ParamRef
 
-	// MatchResources declares what resources match this binding and will be validated by it.
-	// Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this.
-	// If this is unset, all resources matched by the policy are validated by this binding
-	// When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated.
+	// matchResources limits what resources match this binding and may be mutated by it.
+	// Note that if matchResources matches a resource, the resource must also match a policy's matchConstraints and
+	// matchConditions before the resource may be mutated.
+	// When matchResources is unset, it does not constrain resource matching, and only the policy's matchConstraints
+	// and matchConditions must match for the resource to be mutated.
+	// Additionally, matchResources.resourceRules are optional and do not constraint matching when unset.
 	// Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required.
-	// Only the CREATE, UPDATE and CONNECT operations are allowed.  DELETE operations may not be matched.
+	// The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
 	// '*' matches CREATE, UPDATE and CONNECT.
 	// +optional
 	MatchResources *MatchResources
