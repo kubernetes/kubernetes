@@ -484,12 +484,12 @@ func (uss *uniformScenarioState) finalReview() {
 		e = fmt.Sprintf(`        # HELP apiserver_flowcontrol_epoch_advance_total [ALPHA] Number of times the queueset's progress meter jumped backward
         # TYPE apiserver_flowcontrol_epoch_advance_total counter
         apiserver_flowcontrol_epoch_advance_total{priority_level=%q,success=%q} %d%s`, uss.name, "true", uss.expectedEpochAdvances, "\n")
-	}
-	err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_epoch_advance_total")
-	if err != nil {
-		uss.t.Error(err)
-	} else {
-		uss.t.Logf("Success with apiserver_flowcontrol_epoch_advance_total = %d", uss.expectedEpochAdvances)
+		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_epoch_advance_total")
+		if err != nil {
+			uss.t.Error(err)
+		} else {
+			uss.t.Logf("Success with apiserver_flowcontrol_epoch_advance_total = %d", uss.expectedEpochAdvances)
+		}
 	}
 }
 

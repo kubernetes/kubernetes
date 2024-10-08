@@ -1606,8 +1606,14 @@ func TestKMSv2InvalidKeyID(t *testing.T) {
 			defer metrics.InvalidKeyIDFromStatusTotal.Reset()
 			tt.probe.state.Store(&envelopekmsv2.State{})
 			_ = tt.probe.check(ctx)
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
-				t.Fatal(err)
+			if tt.want == "" {
+				if err := testutil.GatherAndAssertAbsent(legacyregistry.DefaultGatherer, tt.metrics...); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}

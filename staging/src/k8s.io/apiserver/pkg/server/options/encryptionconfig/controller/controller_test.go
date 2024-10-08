@@ -67,16 +67,21 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		wantLoadCalls               int
 		wantHashCalls               int
 		wantAddRateLimitedCount     uint64
+		wantMetricNames             []string
 		wantMetrics                 string
 		mockLoadEncryptionConfig    func(ctx context.Context, filepath string, reload bool, apiServerID string) (*encryptionconfig.EncryptionConfiguration, error)
 		mockGetEncryptionConfigHash func(ctx context.Context, filepath string) (string, error)
 	}{
 		{
-			name:                    "when invalid config is provided previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
-			wantLoadCalls:           1,
-			wantHashCalls:           1,
-			wantTransformerClosed:   true,
+			name:                  "when invalid config is provided previous config shouldn't be changed",
+			wantECFileHash:        "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantLoadCalls:         1,
+			wantHashCalls:         1,
+			wantTransformerClosed: true,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedFailureMetricValue,
 			wantAddRateLimitedCount: 1,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -87,10 +92,14 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			},
 		},
 		{
-			name:                    "when new valid config is provided it should be updated",
-			wantECFileHash:          "some new config hash",
-			wantLoadCalls:           1,
-			wantHashCalls:           1,
+			name:           "when new valid config is provided it should be updated",
+			wantECFileHash: "some new config hash",
+			wantLoadCalls:  1,
+			wantHashCalls:  1,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_success_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedSuccessMetricValue,
 			wantAddRateLimitedCount: 0,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -133,11 +142,15 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			},
 		},
 		{
-			name:                    "when transformer's health check fails previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
-			wantLoadCalls:           1,
-			wantHashCalls:           1,
-			wantTransformerClosed:   true,
+			name:                  "when transformer's health check fails previous config shouldn't be changed",
+			wantECFileHash:        "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantLoadCalls:         1,
+			wantHashCalls:         1,
+			wantTransformerClosed: true,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedFailureMetricValue,
 			wantAddRateLimitedCount: 1,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -157,11 +170,15 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			},
 		},
 		{
-			name:                    "when multiple health checks are present previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
-			wantLoadCalls:           1,
-			wantHashCalls:           1,
-			wantTransformerClosed:   true,
+			name:                  "when multiple health checks are present previous config shouldn't be changed",
+			wantECFileHash:        "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantLoadCalls:         1,
+			wantHashCalls:         1,
+			wantTransformerClosed: true,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedFailureMetricValue,
 			wantAddRateLimitedCount: 1,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -184,11 +201,15 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			},
 		},
 		{
-			name:                    "when invalid health check URL is provided previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
-			wantLoadCalls:           1,
-			wantHashCalls:           1,
-			wantTransformerClosed:   true,
+			name:                  "when invalid health check URL is provided previous config shouldn't be changed",
+			wantECFileHash:        "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantLoadCalls:         1,
+			wantHashCalls:         1,
+			wantTransformerClosed: true,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedFailureMetricValue,
 			wantAddRateLimitedCount: 1,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -247,11 +268,15 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			},
 		},
 		{
-			name:                    "when config hash errors transformers are closed correctly",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
-			wantLoadCalls:           0,
-			wantHashCalls:           1,
-			wantTransformerClosed:   true,
+			name:                  "when config hash errors transformers are closed correctly",
+			wantECFileHash:        "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantLoadCalls:         0,
+			wantHashCalls:         1,
+			wantTransformerClosed: true,
+			wantMetricNames: []string{
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
+			},
 			wantMetrics:             expectedFailureMetricValue,
 			wantAddRateLimitedCount: 1,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
@@ -337,12 +362,15 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 				t.Errorf("queue addRateLimitedCount does not match: want=%v, got=%v", test.wantAddRateLimitedCount, queue.addRateLimitedCount.Load())
 			}
 
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.wantMetrics),
-				"apiserver_encryption_config_controller_automatic_reload_success_total",
-				"apiserver_encryption_config_controller_automatic_reload_failures_total",
-				"apiserver_encryption_config_controller_automatic_reloads_total",
-			); err != nil {
-				t.Errorf("failed to validate metrics: %v", err)
+			if test.wantMetrics == "" {
+				if err := testutil.GatherAndAssertAbsent(legacyregistry.DefaultGatherer, test.wantMetricNames...); err != nil {
+					t.Errorf("failed to validate metrics: %v", err)
+				}
+			} else {
+				if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.wantMetrics), test.wantMetricNames...,
+				); err != nil {
+					t.Errorf("failed to validate metrics: %v", err)
+				}
 			}
 		})
 	}

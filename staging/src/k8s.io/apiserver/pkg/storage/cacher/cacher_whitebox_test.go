@@ -423,7 +423,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 				t.Fatalf("Unexpected block, got: %v, want: %v", blocked, tc.expectBlock)
 			}
 
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric)); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})

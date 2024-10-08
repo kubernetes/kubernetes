@@ -81,7 +81,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			registry := NewFakeKubeRegistry(registryVersion)
 			registry.MustRegister(tc.metric)
-			if err := GatherAndCompare(registry, strings.NewReader(tc.expected), tc.metric.FQName()); err != nil {
+			if err := GatherAndCompare(registry, strings.NewReader(tc.expected)); err != nil {
 				t.Fatal(err)
 			}
 		})

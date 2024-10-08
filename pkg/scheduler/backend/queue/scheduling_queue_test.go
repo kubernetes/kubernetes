@@ -3131,10 +3131,7 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			},
 			metricsName:                "scheduler_plugin_execution_duration_seconds",
 			pluginMetricsSamplePercent: 0,
-			wants: `
-# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
-# TYPE scheduler_plugin_execution_duration_seconds histogram
-`, // the observed value will always be 0, because we don't proceed the fake clock.
+			wants:                      ``, // the observed value will always be 0, because we don't proceed the fake clock.
 		},
 		{
 			name: "the metrics should be recorded (pluginMetricsSamplePercent=100)",
@@ -3203,8 +3200,14 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 
 			recorder.FlushMetrics()
 
-			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
-				t.Fatal(err)
+			if test.wants == "" {
+				if err := testutil.GatherAndAssertAbsent(metrics.GetGather(), test.metricsName); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}

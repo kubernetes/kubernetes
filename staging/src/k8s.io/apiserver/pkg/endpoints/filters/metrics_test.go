@@ -34,18 +34,13 @@ import (
 )
 
 func TestMetrics(t *testing.T) {
-	// Excluding authentication_duration_seconds since it is difficult to predict its values.
-	metrics := []string{
-		"authenticated_user_requests",
-		"authentication_attempts",
-	}
-
 	testCases := []struct {
 		desc        string
 		response    *authenticator.Response
 		status      bool
 		err         error
 		apiAudience authenticator.Audiences
+		wantMetrics []string
 		want        string
 	}{
 		{
@@ -54,6 +49,10 @@ func TestMetrics(t *testing.T) {
 				User: &user.DefaultInfo{Name: "admin"},
 			},
 			status: true,
+			wantMetrics: []string{
+				"authenticated_user_requests",
+				"authentication_attempts",
+			},
 			want: `
 				# HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
@@ -66,6 +65,9 @@ func TestMetrics(t *testing.T) {
 		{
 			desc: "auth failed with error",
 			err:  errors.New("some error"),
+			wantMetrics: []string{
+				"authentication_attempts",
+			},
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
@@ -74,6 +76,9 @@ func TestMetrics(t *testing.T) {
 		},
 		{
 			desc: "auth failed with status false",
+			wantMetrics: []string{
+				"authentication_attempts",
+			},
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
@@ -88,6 +93,9 @@ func TestMetrics(t *testing.T) {
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
+			wantMetrics: []string{
+				"authentication_attempts",
+			},
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
@@ -101,6 +109,10 @@ func TestMetrics(t *testing.T) {
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
+			wantMetrics: []string{
+				"authenticated_user_requests",
+				"authentication_attempts",
+			},
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
@@ -117,6 +129,10 @@ func TestMetrics(t *testing.T) {
 				Audiences: authenticator.Audiences{"audience-x"},
 			},
 			status: true,
+			wantMetrics: []string{
+				"authenticated_user_requests",
+				"authentication_attempts",
+			},
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
@@ -156,7 +172,7 @@ func TestMetrics(t *testing.T) {
 			auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 			<-done
 
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.wantMetrics...); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -164,16 +180,11 @@ func TestMetrics(t *testing.T) {
 }
 
 func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
-	// Excluding authorization_duration_seconds since it is difficult to predict its values.
-	metrics := []string{
-		"authorization_attempts_total",
-		"authorization_decision_annotations_total",
-	}
-
 	testCases := []struct {
-		desc       string
-		authorizer fakeAuthorizer
-		want       string
+		desc        string
+		authorizer  fakeAuthorizer
+		wantMetrics []string
+		want        string
 	}{
 		{
 			desc: "auth ok",
@@ -181,6 +192,9 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				authorizer.DecisionAllow,
 				"RBAC: allowed to patch pod",
 				nil,
+			},
+			wantMetrics: []string{
+				"authorization_attempts_total",
 			},
 			want: `
 			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
@@ -195,6 +209,9 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				"RBAC: not allowed to patch pod",
 				nil,
 			},
+			wantMetrics: []string{
+				"authorization_attempts_total",
+			},
 			want: `
 			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
 			# TYPE authorization_attempts_total counter
@@ -207,6 +224,9 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				authorizer.DecisionNoOpinion,
 				"",
 				errors.New("can't parse user info"),
+			},
+			wantMetrics: []string{
+				"authorization_attempts_total",
 			},
 			want: `
 			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
@@ -221,6 +241,9 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				"",
 				errors.New("can't parse user info"),
 			},
+			wantMetrics: []string{
+				"authorization_attempts_total",
+			},
 			want: `
 			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
 			# TYPE authorization_attempts_total counter
@@ -233,6 +256,9 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 				authorizer.DecisionNoOpinion,
 				"",
 				nil,
+			},
+			wantMetrics: []string{
+				"authorization_attempts_total",
 			},
 			want: `
 			# HELP authorization_attempts_total [ALPHA] Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.
@@ -263,7 +289,7 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 			req.RemoteAddr = "127.0.0.1"
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), metrics...); err != nil {
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.wantMetrics...); err != nil {
 				t.Fatal(err)
 			}
 		})

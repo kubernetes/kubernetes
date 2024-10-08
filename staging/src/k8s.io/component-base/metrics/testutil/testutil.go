@@ -17,10 +17,14 @@ limitations under the License.
 package testutil
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
@@ -62,6 +66,37 @@ func GatherAndCompare(g metrics.Gatherer, expected io.Reader, metricNames ...str
 	}
 
 	return testutil.GatherAndCompare(g, expected, metricNames...)
+}
+
+// GatherAndAssertAbsent gathers all metrics from the provided Gatherer asserts
+// that the provided metrics are not included in the metrics output.
+func GatherAndAssertAbsent(g metrics.Gatherer, metricNames ...string) error {
+	got, done, err := prometheus.ToTransactionalGatherer(g).Gather()
+	defer done()
+	if err != nil {
+		return fmt.Errorf("gathering metrics failed: %w", err)
+	}
+	for _, mf := range got {
+		for _, dontWantMetric := range metricNames {
+			if mf.GetName() == dontWantMetric {
+				promText, err := metricFamilyToText(mf)
+				if err != nil {
+					return fmt.Errorf("wanted %v to be absent. Error when converting to text:\n%v", dontWantMetric, err)
+				}
+				return fmt.Errorf("wanted %v to be absent, but got:\n%v", dontWantMetric, promText)
+			}
+		}
+	}
+	return nil
+}
+
+func metricFamilyToText(mf *dto.MetricFamily) (string, error) {
+	var buf bytes.Buffer
+	enc := expfmt.NewEncoder(&buf, expfmt.NewFormat(expfmt.TypeTextPlain))
+	if err := enc.Encode(mf); err != nil {
+		return "", fmt.Errorf("encoding gathered metrics failed: %w", err)
+	}
+	return buf.String(), nil
 }
 
 // CustomCollectAndCompare registers the provided StableCollector with a newly created

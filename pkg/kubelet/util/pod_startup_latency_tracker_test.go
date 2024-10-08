@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	testingclock "k8s.io/utils/clock/testing"
@@ -43,6 +44,8 @@ func TestNoEvents(t *testing.T) {
 
 		// expects no metrics in the output
 		wants := ""
+		reg := k8smetrics.NewKubeRegistry()
+		reg.MustRegister(metrics.PodStartSLIDuration)
 
 		metrics.Register()
 
@@ -50,7 +53,7 @@ func TestNoEvents(t *testing.T) {
 			pods: map[types.UID]*perPodState{},
 		}
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -65,13 +68,14 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 		// expects no metrics in the output
 		wants := ""
 
-		metrics.Register()
+		reg := k8smetrics.NewKubeRegistry()
+		reg.MustRegister(metrics.PodStartSLIDuration)
 
 		tracker := &basicPodStartupLatencyTracker{
 			pods: map[types.UID]*perPodState{},
 		}
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -126,7 +130,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		fakeClock := testingclock.NewFakeClock(frozenTime)
 
-		metrics.Register()
+		reg := k8smetrics.NewKubeRegistry()
+		reg.MustRegister(metrics.PodStartSLIDuration)
 
 		tracker := &basicPodStartupLatencyTracker{
 			pods:  map[types.UID]*perPodState{},
@@ -156,7 +161,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		// 3s later, observe the same pod on watch
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*3))
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -207,7 +212,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		fakeClock := testingclock.NewFakeClock(frozenTime)
 
-		metrics.Register()
+		reg := k8smetrics.NewKubeRegistry()
+		reg.MustRegister(metrics.PodStartSLIDuration)
 
 		tracker := &basicPodStartupLatencyTracker{
 			pods:  map[types.UID]*perPodState{},
@@ -254,7 +260,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		// at 30s observe the same pod on watch
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -263,7 +269,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -287,7 +293,8 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 
 		fakeClock := testingclock.NewFakeClock(frozenTime)
 
-		metrics.Register()
+		reg := k8smetrics.NewKubeRegistry()
+		reg.MustRegister(metrics.FirstNetworkPodStartSLIDuration)
 
 		tracker := &basicPodStartupLatencyTracker{
 			pods:  map[types.UID]*perPodState{},
@@ -316,7 +323,7 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 		// at 30s observe the same pod on watch
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -325,7 +332,7 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
 		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
 
-		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
+		if err := testutil.GatherAndCompare(reg, strings.NewReader(wants)); err != nil {
 			t.Fatal(err)
 		}
 

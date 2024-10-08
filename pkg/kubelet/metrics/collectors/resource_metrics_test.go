@@ -33,20 +33,6 @@ func TestCollectResourceMetrics(t *testing.T) {
 	// a static timestamp: 2021-06-23 05:11:18.302091597 +0800
 	staticTimestamp := time.Unix(0, 1624396278302091597)
 	testTime := metav1.NewTime(staticTimestamp)
-	interestedMetrics := []string{
-		"scrape_error",
-		"resource_scrape_error",
-		"node_cpu_usage_seconds_total",
-		"node_memory_working_set_bytes",
-		"node_swap_usage_bytes",
-		"container_cpu_usage_seconds_total",
-		"container_memory_working_set_bytes",
-		"container_swap_usage_bytes",
-		"container_start_time_seconds",
-		"pod_cpu_usage_seconds_total",
-		"pod_memory_working_set_bytes",
-		"pod_swap_usage_bytes",
-	}
 
 	tests := []struct {
 		name            string
@@ -409,7 +395,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)
 
-			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {
+			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics)); err != nil {
 				t.Fatal(err)
 			}
 		})

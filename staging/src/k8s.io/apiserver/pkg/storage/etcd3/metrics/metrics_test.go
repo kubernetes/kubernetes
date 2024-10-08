@@ -174,7 +174,7 @@ etcd_request_errors_total{operation="foo",type="bar"} 1
 		t.Run(test.desc, func(t *testing.T) {
 			defer registry.Reset()
 			RecordEtcdRequest(test.operation, test.typ, test.err, test.startTime)
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetricsName...); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want)); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -218,7 +218,7 @@ func TestStorageSizeCollector(t *testing.T) {
 				defer SetStorageMonitorGetter(oldGetter)
 				SetStorageMonitorGetter(test.getterOverride)
 			}
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), "apiserver_storage_size_bytes"); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want)); err != nil {
 				t.Fatal(err)
 			}
 		})

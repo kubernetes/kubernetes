@@ -72,9 +72,7 @@ func TestRecordAuthorizationDecisionsTotal(t *testing.T) {
 		dummyAuthorizer.decision = authorizer.DecisionNoOpinion
 		_, _, _ = a.Authorize(context.Background(), nil)
 		_, _, _ = a.Authorize(context.Background(), nil)
-		expectedValue := prefix + `
-		`
-		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metrics...); err != nil {
+		if err := testutil.GatherAndAssertAbsent(legacyregistry.DefaultGatherer, metrics...); err != nil {
 			t.Fatal(err)
 		}
 		authorizationDecisionsTotal.Reset()

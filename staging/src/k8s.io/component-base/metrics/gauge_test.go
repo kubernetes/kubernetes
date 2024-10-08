@@ -263,8 +263,10 @@ namespace_subsystem_metric_deprecated 1
 			}
 
 			metricName := BuildFQName(tc.GaugeOpts.Namespace, tc.GaugeOpts.Subsystem, tc.GaugeOpts.Name)
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetrics), metricName); err != nil {
-				t.Fatal(err)
+			if tc.expectedMetrics != "" {
+				if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetrics), metricName); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}
