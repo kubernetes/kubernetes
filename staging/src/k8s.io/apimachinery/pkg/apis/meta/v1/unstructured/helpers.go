@@ -125,6 +125,28 @@ func NestedInt64(obj map[string]interface{}, fields ...string) (int64, bool, err
 	return i, true, nil
 }
 
+// NestedNumberAsFloat64 returns the float64 value of a nested field. If the field's value is a
+// float64, it is returned. If the field's value is an int64 that can be losslessly converted to
+// float64, it will be converted and returned.  Returns false if value is not found and an error if
+// not a float64 or an int64 that can be accurately represented as a float64.
+func NestedNumberAsFloat64(obj map[string]interface{}, fields ...string) (float64, bool, error) {
+	val, found, err := NestedFieldNoCopy(obj, fields...)
+	if !found || err != nil {
+		return 0, found, err
+	}
+	switch x := val.(type) {
+	case int64:
+		if x != int64(float64(x)) {
+			return 0, false, fmt.Errorf("%v accessor error: int64 value %v cannot be losslessly converted to float64", jsonPath(fields), x)
+		}
+		return float64(x), true, nil
+	case float64:
+		return x, true, nil
+	default:
+		return 0, false, fmt.Errorf("%v accessor error: %v is of the type %T, expected float64 or int64", jsonPath(fields), val, val)
+	}
+}
+
 // NestedStringSlice returns a copy of []string value of a nested field.
 // Returns false if value is not found and an error if not a []interface{} or contains non-string items in the slice.
 func NestedStringSlice(obj map[string]interface{}, fields ...string) ([]string, bool, error) {
