@@ -190,7 +190,7 @@ func pullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+				{[]string{"GetImageRef"}, ErrImagePull, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}},
@@ -199,11 +199,11 @@ func pullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+				{[]string{"GetImageRef"}, ErrImagePull, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}},
-				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+				{[]string{"GetImageRef"}, ErrImagePull, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}},
@@ -252,7 +252,7 @@ func pullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
 					}},
-				{[]string(nil), ErrImagePullBackOff, false, false,
+				{[]string(nil), ErrImagePull, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}},

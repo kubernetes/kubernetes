@@ -473,7 +473,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					client := e2epod.NewPodClient(f)
 					podSpec = client.Create(context.TODO(), podSpec)
 
-					err := WaitForPodInitContainerToFail(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ImagePullBackOff", f.Timeouts.PodStart)
+					err := WaitForPodInitContainerToFail(context.TODO(), f.ClientSet, podSpec.Namespace, podSpec.Name, 0, "ErrImagePull", f.Timeouts.PodStart)
 					framework.ExpectNoError(err)
 
 					podSpec, err = client.Get(context.Background(), podSpec.Name, metav1.GetOptions{})
