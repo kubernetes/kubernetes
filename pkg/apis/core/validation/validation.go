@@ -1771,7 +1771,7 @@ var allowedTemplateObjectMetaFields = map[string]bool{
 	"Labels":      true,
 }
 
-// PersistentVolumeSpecValidationOptions contains the different settings for PeristentVolume validation
+// PersistentVolumeSpecValidationOptions contains the different settings for PersistentVolume validation
 type PersistentVolumeSpecValidationOptions struct {
 	// Allow users to modify the class of volume attributes
 	EnableVolumeAttributesClass bool
