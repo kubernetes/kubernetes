@@ -20,10 +20,12 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 )
 
@@ -31,6 +33,7 @@ func TestAuthorization(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		userInfo         user.Info
+		obj              *admissionregistration.ValidatingAdmissionPolicy
 		auth             AuthFunc
 		resourceResolver resolver.ResourceResolverFunc
 		expectErr        bool
@@ -39,6 +42,7 @@ func TestAuthorization(t *testing.T) {
 			name:      "superuser",
 			userInfo:  &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
 			expectErr: false, // success despite always-denying authorizer
+			obj:       validValidatingAdmissionPolicy(),
 			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 				return authorizer.DecisionDeny, "", nil
 			},
@@ -46,6 +50,7 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "authorized",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			obj:      validValidatingAdmissionPolicy(),
 			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 				if a.GetResource() == "replicalimits" {
 					return authorizer.DecisionAllow, "", nil
@@ -64,6 +69,7 @@ func TestAuthorization(t *testing.T) {
 		{
 			name:     "denied",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			obj:      validValidatingAdmissionPolicy(),
 			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 				if a.GetResource() == "configmaps" {
 					return authorizer.DecisionAllow, "", nil
@@ -79,22 +85,36 @@ func TestAuthorization(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name:     "param not found",
+			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			obj:      validValidatingAdmissionPolicy(),
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+				if a.GetResource() == "replicalimits" {
+					return authorizer.DecisionAllow, "", nil
+				}
+				return authorizer.DecisionDeny, "", nil
+			},
+			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+				return schema.GroupVersionResource{}, &meta.NoKindMatchError{GroupKind: gvk.GroupKind(), SearchedVersions: []string{gvk.Version}}
+			},
+			expectErr: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			strategy := NewStrategy(tc.auth, tc.resourceResolver)
 			t.Run("create", func(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
-				errs := strategy.Validate(ctx, validValidatingAdmissionPolicy())
+				errs := strategy.Validate(ctx, tc.obj)
 				if len(errs) > 0 != tc.expectErr {
 					t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
 				}
 			})
 			t.Run("update", func(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
-				obj := validValidatingAdmissionPolicy()
-				objWithUpdatedParamKind := obj.DeepCopy()
+				objWithUpdatedParamKind := tc.obj.DeepCopy()
 				objWithUpdatedParamKind.Spec.ParamKind.APIVersion += "1"
-				errs := strategy.ValidateUpdate(ctx, obj, objWithUpdatedParamKind)
+				errs := strategy.ValidateUpdate(ctx, tc.obj, objWithUpdatedParamKind)
 				if len(errs) > 0 != tc.expectErr {
 					t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
 				}

@@ -22,7 +22,7 @@ import (
 )
 
 func TestAdmissionPluginOrder(t *testing.T) {
-	// Ensure the last four admission plugins listed are policies, webhooks, quota, and deny
+	// Sanity check that the order of admission ends with mutating(policy, webhook), validating(policy, webhook), quota, deny.
 	allplugins := strings.Join(AllOrderedPlugins, ",")
 	expectSuffix := ",MutatingAdmissionPolicy,MutatingAdmissionWebhook,ValidatingAdmissionPolicy,ValidatingAdmissionWebhook,ResourceQuota,AlwaysDeny"
 	if !strings.HasSuffix(allplugins, expectSuffix) {

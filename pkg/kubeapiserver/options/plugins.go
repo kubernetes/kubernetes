@@ -162,8 +162,8 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          // DefaultIngressClass
 		podsecurity.PluginName,                  // PodSecurity
-		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 		mutatingadmissionpolicy.PluginName,      // Mutatingadmissionpolicy, only active when feature gate MutatingAdmissionpolicy is enabled
+		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
 	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)

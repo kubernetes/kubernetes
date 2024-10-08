@@ -20,12 +20,14 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 )
 
 func TestValidatingAdmissionPolicyStrategy(t *testing.T) {
-	strategy := NewStrategy(nil, nil)
+	strategy := NewStrategy(nil, replicaLimitsResolver)
 	ctx := genericapirequest.NewDefaultContext()
 	if strategy.NamespaceScoped() {
 		t.Error("ValidatingAdmissionPolicy strategy must be cluster scoped")
@@ -49,6 +51,15 @@ func TestValidatingAdmissionPolicyStrategy(t *testing.T) {
 		t.Errorf("Expected a validation error")
 	}
 }
+
+var replicaLimitsResolver resolver.ResourceResolverFunc = func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{
+		Group:    "rules.example.com",
+		Version:  "v1",
+		Resource: "replicalimits",
+	}, nil
+}
+
 func validValidatingAdmissionPolicy() *admissionregistration.ValidatingAdmissionPolicy {
 	ignore := admissionregistration.Ignore
 	return &admissionregistration.ValidatingAdmissionPolicy{

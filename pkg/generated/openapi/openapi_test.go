@@ -18,11 +18,11 @@ package openapi
 
 import (
 	"encoding/json"
-	"github.com/go-openapi/jsonreference"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"testing"
 
+	"github.com/go-openapi/jsonreference"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"

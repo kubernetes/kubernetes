@@ -7038,7 +7038,7 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
-			name: "MutaatingAdmissionPolicyBinding",
+			name: "MutatingAdmissionPolicyBinding",
 			printer: func() ([]metav1.TableRow, error) {
 				return printMutatingAdmissionPolicyBinding(&admissionregistration.MutatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
 			},
