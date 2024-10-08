@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -26,6 +27,7 @@ import (
 	"net/http"
 	"path"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,10 +54,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -65,6 +69,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -3268,6 +3273,279 @@ func TestDisableEmulationVersion(t *testing.T) {
 	}
 }
 
+func TestFeatureGateCompatibilityEmulationVersion(t *testing.T) {
+	tcs := []struct {
+		emulationVersion                          string
+		previousFeatureGates                      map[string]int
+		previousFeatureGatesWithLockToDefaultTrue map[string]struct{}
+	}{
+		// TODO(#128193): Update this test cases with each new k8s version so that n-1..3 are the correct versions (add or remove them as the k8s version evolves)
+		{
+			emulationVersion: "1.31",
+			previousFeatureGates: map[string]int{
+				"APIListChunking":                 1,
+				"APIResponseCompression":          1,
+				"APIServerIdentity":               1,
+				"APIServerTracing":                1,
+				"APIServingWithRoutine":           0,
+				"AdmissionWebhookMatchConditions": 1,
+				"AggregatedDiscoveryEndpoint":     1,
+				"AllAlpha":                        0,
+				"AllBeta":                         0,
+				"AllowDNSOnlyNodeCSR":             0,
+				"AllowInsecureKubeletCertificateSigningRequests": 0,
+				"AllowServiceLBStatusOnNonLB":                    0,
+				"AnonymousAuthConfigurableEndpoints":             0,
+				"AnyVolumeDataSource":                            1,
+				"AppArmor":                                       1,
+				"AppArmorFields":                                 1,
+				"AuthorizeNodeWithSelectors":                     0,
+				"AuthorizeWithSelectors":                         0,
+				"CPUManager":                                     1,
+				"CPUManagerPolicyAlphaOptions":                   0,
+				"CPUManagerPolicyBetaOptions":                    1,
+				"CPUManagerPolicyOptions":                        1,
+				"CRDValidationRatcheting":                        1,
+				"CSIMigrationPortworx":                           1,
+				"CSIVolumeHealth":                                0,
+				"CloudControllerManagerWebhook":                  0,
+				"CloudDualStackNodeIPs":                          1,
+				"ClusterTrustBundle":                             0,
+				"ClusterTrustBundleProjection":                   0,
+				"ComponentSLIs":                                  1,
+				"ConcurrentWatchObjectDecode":                    0,
+				"ConsistentListFromCache":                        1,
+				"ContainerCheckpoint":                            1,
+				"ContextualLogging":                              1,
+				"CoordinatedLeaderElection":                      0,
+				"CronJobsScheduledAnnotation":                    1,
+				"CrossNamespaceVolumeDataSource":                 0,
+				"CustomCPUCFSQuotaPeriod":                        0,
+				"CustomResourceFieldSelectors":                   1,
+				"DRAControlPlaneController":                      0,
+				"DevicePluginCDIDevices":                         1,
+				"DisableAllocatorDualWrite":                      0,
+				"DisableCloudProviders":                          1,
+				"DisableKubeletCloudCredentialProviders":         1,
+				"DisableNodeKubeProxyVersion":                    0,
+				"DynamicResourceAllocation":                      0,
+				"EfficientWatchResumption":                       1,
+				"ElasticIndexedJob":                              1,
+				"EventedPLEG":                                    0,
+				"ExecProbeTimeout":                               1,
+				"GracefulNodeShutdown":                           1,
+				"GracefulNodeShutdownBasedOnPodPriority":         1,
+				"HPAContainerMetrics":                            1,
+				"HPAScaleToZero":                                 0,
+				"HonorPVReclaimPolicy":                           1,
+				"ImageMaximumGCAge":                              1,
+				"ImageVolume":                                    0,
+				"InPlacePodVerticalScaling":                      0,
+				"InTreePluginPortworxUnregister":                 0,
+				"InformerResourceVersion":                        0,
+				"JobBackoffLimitPerIndex":                        1,
+				"JobManagedBy":                                   0,
+				"JobPodFailurePolicy":                            1,
+				"JobPodReplacementPolicy":                        1,
+				"JobSuccessPolicy":                               1,
+				"KMSv1":                                          0,
+				"KMSv2":                                          1,
+				"KMSv2KDF":                                       1,
+				"KubeProxyDrainingTerminatingNodes":              1,
+				"KubeletCgroupDriverFromCRI":                     1,
+				"KubeletInUserNamespace":                         0,
+				"KubeletPodResourcesDynamicResources":            0,
+				"KubeletPodResourcesGet":                         0,
+				"KubeletSeparateDiskGC":                          1,
+				"KubeletTracing":                                 1,
+				"LegacyServiceAccountTokenCleanUp":               1,
+				"LoadBalancerIPMode":                             1,
+				"LocalStorageCapacityIsolationFSQuotaMonitoring": 0,
+				"LogarithmicScaleDown":                           1,
+				"LoggingAlphaOptions":                            0,
+				"LoggingBetaOptions":                             1,
+				"MatchLabelKeysInPodAffinity":                    1,
+				"MatchLabelKeysInPodTopologySpread":              1,
+				"MaxUnavailableStatefulSet":                      0,
+				"MemoryManager":                                  1,
+				"MemoryQoS":                                      0,
+				"MinDomainsInPodTopologySpread":                  1,
+				"MultiCIDRServiceAllocator":                      0,
+				"MutatingAdmissionPolicy":                        0,
+				"NFTablesProxyMode":                              1,
+				"NewVolumeManagerReconstruction":                 1,
+				"NodeInclusionPolicyInPodTopologySpread":         1,
+				"NodeLogQuery":                                   0,
+				"NodeOutOfServiceVolumeDetach":                   1,
+				"NodeSwap":                                       1,
+				"OpenAPIEnums":                                   1,
+				"PDBUnhealthyPodEvictionPolicy":                  1,
+				"PersistentVolumeLastPhaseTransitionTime":        1,
+				"PodAndContainerStatsFromCRI":                    0,
+				"PodDeletionCost":                                1,
+				"PodDisruptionConditions":                        1,
+				"PodHostIPs":                                     1,
+				"PodIndexLabel":                                  1,
+				"PodLifecycleSleepAction":                        1,
+				"PodReadyToStartContainersCondition":             1,
+				"PodSchedulingReadiness":                         1,
+				"PortForwardWebsockets":                          1,
+				"ProcMountType":                                  0,
+				"QOSReserved":                                    0,
+				"RecoverVolumeExpansionFailure":                  0,
+				"RecursiveReadOnlyMounts":                        1,
+				"RelaxedEnvironmentVariableValidation":           0,
+				"ReloadKubeletServerCertificateFile":             1,
+				"RemainingItemCount":                             1,
+				"ResilientWatchCacheInitialization":              1,
+				"ResourceHealthStatus":                           0,
+				"RetryGenerateName":                              1,
+				"RotateKubeletServerCertificate":                 1,
+				"RuntimeClassInImageCriApi":                      0,
+				"SELinuxMount":                                   0,
+				"SELinuxMountReadWriteOncePod":                   1,
+				"SchedulerQueueingHints":                         0,
+				"SeparateCacheWatchRPC":                          1,
+				"SeparateTaintEvictionController":                1,
+				"ServerSideApply":                                1,
+				"ServerSideFieldValidation":                      1,
+				"ServiceAccountTokenJTI":                         1,
+				"ServiceAccountTokenNodeBinding":                 1,
+				"ServiceAccountTokenNodeBindingValidation":       1,
+				"ServiceAccountTokenPodNodeInfo":                 1,
+				"ServiceTrafficDistribution":                     1,
+				"SidecarContainers":                              1,
+				"SizeMemoryBackedVolumes":                        1,
+				"StableLoadBalancerNodeSet":                      1,
+				"StatefulSetAutoDeletePVC":                       1,
+				"StatefulSetStartOrdinal":                        1,
+				"StorageNamespaceIndex":                          1,
+				"StorageVersionAPI":                              0,
+				"StorageVersionHash":                             1,
+				"StorageVersionMigrator":                         0,
+				"StrictCostEnforcementForVAP":                    0,
+				"StrictCostEnforcementForWebhooks":               0,
+				"StructuredAuthenticationConfiguration":          1,
+				"StructuredAuthorizationConfiguration":           1,
+				"SupplementalGroupsPolicy":                       0,
+				"TopologyAwareHints":                             1,
+				"TopologyManagerPolicyAlphaOptions":              0,
+				"TopologyManagerPolicyBetaOptions":               1,
+				"TopologyManagerPolicyOptions":                   1,
+				"TranslateStreamCloseWebsocketRequests":          1,
+				"UnauthenticatedHTTP2DOSMitigation":              1,
+				"UnknownVersionInteroperabilityProxy":            0,
+				"UserNamespacesPodSecurityStandards":             0,
+				"UserNamespacesSupport":                          0,
+				"ValidatingAdmissionPolicy":                      1,
+				"VolumeAttributesClass":                          0,
+				"VolumeCapacityPriority":                         0,
+				"WatchBookmark":                                  1,
+				"WatchCacheInitializationPostStartHook":          0,
+				"WatchFromStorageWithoutResourceVersion":         0,
+				"WatchList":                                      0,
+				"WatchListClient":                                0,
+				"WinDSR":                                         0,
+				"WinOverlay":                                     1,
+				"WindowsHostNetwork":                             1,
+				"ZeroLimitedNominalConcurrencyShares":            1,
+			},
+			previousFeatureGatesWithLockToDefaultTrue: map[string]struct{}{
+				"AppArmor":                                {},
+				"AppArmorFields":                          {},
+				"CloudDualStackNodeIPs":                   {},
+				"CPUManager":                              {},
+				"DisableCloudProviders":                   {},
+				"DisableKubeletCloudCredentialProviders":  {},
+				"DevicePluginCDIDevices":                  {},
+				"HPAContainerMetrics":                     {},
+				"JobPodFailurePolicy":                     {},
+				"KubeProxyDrainingTerminatingNodes":       {},
+				"LegacyServiceAccountTokenCleanUp":        {},
+				"LogarithmicScaleDown":                    {},
+				"MinDomainsInPodTopologySpread":           {},
+				"NewVolumeManagerReconstruction":          {},
+				"NodeOutOfServiceVolumeDetach":            {},
+				"PDBUnhealthyPodEvictionPolicy":           {},
+				"PersistentVolumeLastPhaseTransitionTime": {},
+				"PodDisruptionConditions":                 {},
+				"PodHostIPs":                              {},
+				"PodSchedulingReadiness":                  {},
+				"ElasticIndexedJob":                       {},
+				"StableLoadBalancerNodeSet":               {},
+				"StatefulSetStartOrdinal":                 {},
+				"AdmissionWebhookMatchConditions":         {},
+				"AggregatedDiscoveryEndpoint":             {},
+				"APIListChunking":                         {},
+				"EfficientWatchResumption":                {},
+				"KMSv2":                                   {},
+				"KMSv2KDF":                                {},
+				"RemainingItemCount":                      {},
+				"ServerSideApply":                         {},
+				"ServerSideFieldValidation":               {},
+				"WatchBookmark":                           {},
+				"ZeroLimitedNominalConcurrencyShares":     {},
+				"ValidatingAdmissionPolicy":               {},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.emulationVersion, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulationVersion))
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			rt, err := restclient.TransportFor(server.ClientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req, err := http.NewRequest("GET", server.ClientConfig.Host+"/metrics", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualFeatureGates := parseFeatureGates(string(body))
+
+			for featureName, expectedValue := range tc.previousFeatureGates {
+				actualValue, exists := actualFeatureGates[featureName]
+				if !exists {
+					// if a previous feature gate had LockToDefault: true it can be removed in emulated version for n+1..3
+					if _, ok := tc.previousFeatureGatesWithLockToDefaultTrue[featureName]; ok {
+						continue
+					}
+
+					t.Errorf("feature %s not found in /metrics output", featureName)
+					continue
+				}
+				if actualValue != expectedValue {
+					t.Errorf("feature %s expected value %d, got %d", featureName, expectedValue, actualValue)
+				}
+			}
+
+			for featureName := range actualFeatureGates {
+				actualValue, exists := tc.previousFeatureGates[featureName]
+				if !exists && actualValue == 1 {
+					// new feature gates can exist in emulated version n+1..3 but must be zero/off
+					t.Errorf("unexpected feature %s found in /metrics output", featureName)
+					continue
+				}
+			}
+		})
+	}
+}
+
 type dependentClient struct {
 	t      *testing.T
 	client dynamic.ResourceInterface
@@ -3351,4 +3629,24 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func parseFeatureGates(metricsBody string) map[string]int {
+	featureGates := make(map[string]int)
+	scanner := bufio.NewScanner(strings.NewReader(metricsBody))
+	re := regexp.MustCompile(`^kubernetes_feature_enabled{name="([^"]+)",stage="[^"]*"} (\d+)`)
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := re.FindStringSubmatch(line)
+		if len(matches) == 3 {
+			featureName := matches[1]
+			valueStr := matches[2]
+			value, err := strconv.Atoi(valueStr)
+			if err != nil {
+				continue
+			}
+			featureGates[featureName] = value
+		}
+	}
+	return featureGates
 }
