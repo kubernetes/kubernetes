@@ -301,7 +301,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
-	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeSpec, seLinuxContainerContexts)
+	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeSpec, seLinuxContainerContexts, pod.Spec.SecurityContext)
 	if err != nil {
 		return "", err
 	}
@@ -392,7 +392,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	return volumeName, nil
 }
 
-func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions) (string, bool, error) {
+func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (string, bool, error) {
 	var seLinuxFileLabel string
 	var pluginSupportsSELinuxContextMount bool
 
@@ -407,6 +407,20 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 		if err != nil {
 			return "", false, err
 		}
+
+		if feature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) &&
+			podSecurityContext != nil &&
+			podSecurityContext.SELinuxChangePolicy != nil &&
+			*podSecurityContext.SELinuxChangePolicy == v1.SELinuxChangePolicyRecursive {
+			// The pod has opted into recursive SELinux label changes. Do not mount with -o context.
+			return "", pluginSupportsSELinuxContextMount, nil
+		}
+
+		// Ignoring SELinuxMount feature gate:
+		// It allows value "SELinuxChangePolicy: MountOption" in the API server to be set.
+		// If the feature gate + field value is set in the API server, but the feature gate is disabled here in kubelet,
+		// kubelet would default to "", which means "MountOption" anyway.
+
 		seLinuxSupported := util.VolumeSupportsSELinuxMount(volumeSpec)
 		if pluginSupportsSELinuxContextMount {
 			// Ensure that a volume that can be mounted with "-o context=XYZ" is
