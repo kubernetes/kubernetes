@@ -151,8 +151,9 @@ func (m *ManagerImpl) reconcileLoop(ctx context.Context) {
 // for each new resource requirement, process their responses and update the cached
 // containerResources on success.
 func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
+	metricLabel := "PrepareResources"
 	defer func(startTime time.Time) {
-		metrics.DRAOperationsDuration.WithLabelValues("PrepareResources").Observe(time.Since(startTime).Seconds())
+		metrics.DRAOperationsDuration.WithLabelValues(metricLabel).Observe(time.Since(startTime).Seconds())
 	}(time.Now())
 	logger := klog.FromContext(ctx)
 	batches := make(map[string][]*drapb.Claim)
@@ -162,6 +163,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 		logger.V(3).Info("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("prepare resource claim: %w", err)
 		}
 
@@ -176,17 +178,20 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 			*claimName,
 			metav1.GetOptions{})
 		if err != nil {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %w", *claimName, pod.Name, err)
 		}
 
 		if mustCheckOwner {
 			if err = resourceclaim.IsForPod(pod, resourceClaim); err != nil {
+				metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 				return err
 			}
 		}
 
 		// Check if pod is in the ReservedFor for the claim
 		if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("pod %s(%s) is not allowed to use resource claim %s(%s)",
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
@@ -241,6 +246,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 			return nil
 		})
 		if err != nil {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("locked cache operation: %w", err)
 		}
 	}
@@ -252,19 +258,23 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 		// Call NodePrepareResources RPC for all resource handles.
 		client, err := dra.NewDRAPluginClient(driverName)
 		if err != nil {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("failed to get gRPC client for driver %s: %w", driverName, err)
 		}
 		response, err := client.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("NodePrepareResources failed: %w", err)
 		}
 		for claimUID, result := range response.Claims {
 			reqClaim := lookupClaimRequest(claims, claimUID)
 			if reqClaim == nil {
+				metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 				return fmt.Errorf("NodePrepareResources returned result for unknown claim UID %s", claimUID)
 			}
 			if result.GetError() != "" {
+				metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 				return fmt.Errorf("NodePrepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
 
@@ -274,6 +284,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 			err := m.cache.withLock(func() error {
 				info, exists := m.cache.get(claim.Name, claim.Namespace)
 				if !exists {
+					metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claim.Name, claim.Namespace)
 				}
 				for _, device := range result.GetDevices() {
@@ -282,12 +293,14 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 				return nil
 			})
 			if err != nil {
+				metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 				return fmt.Errorf("locked cache operation: %w", err)
 			}
 		}
 
 		unfinished := len(claims) - len(response.Claims)
 		if unfinished != 0 {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("NodePrepareResources left out %d claims", unfinished)
 		}
 	}
@@ -312,6 +325,7 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 		return nil
 	})
 	if err != nil {
+		metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 		return fmt.Errorf("locked cache operation: %w", err)
 	}
 
@@ -373,13 +387,15 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
 // already been successfully unprepared.
 func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
+	metricLabel := "UnprepareResources"
 	defer func(startTime time.Time) {
-		metrics.DRAOperationsDuration.WithLabelValues("UnprepareResources").Observe(time.Since(startTime).Seconds())
+		metrics.DRAOperationsDuration.WithLabelValues(metricLabel).Observe(time.Since(startTime).Seconds())
 	}(time.Now())
 	var claimNames []string
 	for i := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		if err != nil {
+			metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
 			return fmt.Errorf("unprepare resource claim: %w", err)
 		}
 		// The claim name might be nil if no underlying resource claim
@@ -390,7 +406,12 @@ func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error
 		}
 		claimNames = append(claimNames, *claimName)
 	}
-	return m.unprepareResources(ctx, pod.UID, pod.Namespace, claimNames)
+
+	err := m.unprepareResources(ctx, pod.UID, pod.Namespace, claimNames)
+	if err != nil {
+		metrics.DRAOperationsErrorsTotal.WithLabelValues(metricLabel).Inc()
+	}
+	return err
 }
 
 func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, namespace string, claimNames []string) error {

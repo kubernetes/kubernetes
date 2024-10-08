@@ -128,7 +128,8 @@ const (
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
 	// Metric keys for DRA operations
-	DRAOperationsDurationKey = "dra_operations_duration_seconds"
+	DRAOperationsDurationKey    = "dra_operations_duration_seconds"
+	DRAOperationsErrorsTotalKey = "dra_operations_errors_total"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -932,6 +933,17 @@ var (
 		},
 		[]string{"operation_name"},
 	)
+
+	// DRAOperationsErrorsTotal is a counter that tracks the number of errors in the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DRAOperationsErrorsTotalKey,
+			Help:           "Cumulative number of errors when preparing and unpreparing resources.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1026,6 +1038,7 @@ func Register(collectors ...metrics.StableCollector) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			legacyregistry.MustRegister(DRAOperationsDuration)
+			legacyregistry.MustRegister(DRAOperationsErrorsTotal)
 		}
 	})
 }
