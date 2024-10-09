@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -143,7 +144,8 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	require.NoError(t, err)
 	// ensure storageversion garbage collector ctlr is set up
 	informersA := informers.NewSharedInformerFactory(kubeClientSetA, time.Second)
-	setupStorageVersionGC(ctx, kubeClientSetA, informersA)
+	informersACtx, informersACancel := context.WithCancel(ctx)
+	setupStorageVersionGC(informersACtx, kubeClientSetA, informersA)
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
@@ -173,6 +175,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	klog.Infof("\nServerA has created jobs\n")
 
 	// shutdown serverA
+	informersACancel()
 	serverA.TearDownFn()
 
 	var jobsB *v1.JobList
