@@ -31,4 +31,9 @@ func AddFlagEnableHelm(set *pflag.FlagSet) {
 		"helm-kube-version",
 		"", // default
 		"Kubernetes version used by Helm for Capabilities.KubeVersion")
+	set.BoolVar(
+		&theFlags.helmDebug,
+		"helm-debug",
+		false,
+		"Enable debug output from the Helm chart inflator generator.")
 }

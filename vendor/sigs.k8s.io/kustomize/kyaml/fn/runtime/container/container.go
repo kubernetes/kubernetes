@@ -167,7 +167,7 @@ func (c *Filter) setupExec() error {
 	return nil
 }
 
-// getArgs returns the command + args to run to spawn the container
+// getCommand returns the command + args to run to spawn the container
 func (c *Filter) getCommand() (string, []string) {
 	network := runtimeutil.NetworkNameNone
 	if c.ContainerSpec.Network {
