@@ -128,8 +128,9 @@ const (
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
 
 	// Metric keys for DRA operations
-	DRAOperationsDurationKey    = "dra_operations_duration_seconds"
-	DRAOperationsErrorsTotalKey = "dra_operations_errors_total"
+	DRAOperationsDurationKey     = "dra_operations_duration_seconds"
+	DRAOperationsErrorsTotalKey  = "dra_operations_errors_total"
+	DRAGRPCOperationsDurationKey = "dra_grpc_operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -927,7 +928,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           DRAOperationsDurationKey,
-			Help:           "Duration in seconds of the DRA operations",
+			Help:           "Duration in seconds of the DRA operations (PrepareResources and UnprepareResources).",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -943,6 +944,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_name"},
+	)
+
+	DRAGRPCOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DRAGRPCOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA GRPC operations",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 )
 
@@ -1039,6 +1051,7 @@ func Register(collectors ...metrics.StableCollector) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			legacyregistry.MustRegister(DRAOperationsDuration)
 			legacyregistry.MustRegister(DRAOperationsErrorsTotal)
+			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
 		}
 	})
 }
