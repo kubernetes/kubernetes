@@ -142,16 +142,11 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
-	isUnschedPodUpdateIncluded := false
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
 	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod) {
-		defer metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(metrics.SinceInSeconds(start))
-		if evt.Label == framework.UnscheduledPodUpdate.Label {
-			isUnschedPodUpdateIncluded = true
+		if evt.Label != framework.UnscheduledPodUpdate.Label {
+			defer metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(metrics.SinceInSeconds(start))
 		}
-	}
-	if !isUnschedPodUpdateIncluded {
-		// make sure we always record the latency with UnscheduledPodUpdate label.
-		defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
 	}
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
