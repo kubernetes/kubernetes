@@ -308,7 +308,8 @@ func detectStaleConntrackEntries(oldEndpointsMap, newEndpointsMap EndpointsMap, 
 			// serving to not serving. If it did change stale entries for the old
 			// endpoint have to be cleared.
 			for i := range newEndpointsMap[svcPortName] {
-				if newEndpointsMap[svcPortName][i].String() == ep.String() {
+				if newEndpointsMap[svcPortName][i].String() == ep.String() &&
+					newEndpointsMap[svcPortName][i].IsServing() == ep.IsServing() {
 					deleted = false
 					break
 				}
