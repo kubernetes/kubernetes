@@ -46,8 +46,6 @@ const (
 type FnPluginLoadingOptions struct {
 	// Allow to run executables
 	EnableExec bool
-	// Allow to run starlark
-	EnableStar bool
 	// Allow container access to network
 	Network     bool
 	NetworkName string

@@ -20,7 +20,7 @@ const (
 	BareSeqNodeWrappingKey = "bareSeqNodeWrappingKey"
 )
 
-// SeqIndentType holds the indentation style for sequence nodes
+// SequenceIndentStyle holds the indentation style for sequence nodes
 type SequenceIndentStyle string
 
 // EncoderOptions are options that can be used to configure the encoder,
