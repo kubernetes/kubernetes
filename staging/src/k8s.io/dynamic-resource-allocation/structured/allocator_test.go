@@ -358,6 +358,7 @@ func TestAllocator(t *testing.T) {
 	intAttribute := resourceapi.FullyQualifiedName("numa")
 
 	testcases := map[string]struct {
+		adminAccess      bool
 		claimsToAllocate []*resourceapi.ResourceClaim
 		allocatedClaims  []*resourceapi.ResourceClaim
 		classes          []*resourceapi.DeviceClass
@@ -930,7 +931,22 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: nil,
 		},
-		"admin-access": {
+		"admin-access-disabled": {
+			adminAccess: false,
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = true
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
+		},
+		"admin-access-enabled": {
+			adminAccess: true,
 			claimsToAllocate: func() []*resourceapi.ResourceClaim {
 				c := claim(claim0, req0, classA)
 				c.Spec.Devices.Requests[0].AdminAccess = true
@@ -1373,7 +1389,7 @@ func TestAllocator(t *testing.T) {
 				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
 
-			allocator, err := NewAllocator(ctx, toAllocate.claims, allocated, classLister, sliceLister)
+			allocator, err := NewAllocator(ctx, tc.adminAccess, toAllocate.claims, allocated, classLister, sliceLister)
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)

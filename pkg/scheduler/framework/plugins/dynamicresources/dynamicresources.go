@@ -103,6 +103,7 @@ type informationForClaim struct {
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
 	enabled                   bool
+	enableAdminAccess         bool
 	enableSchedulingQueueHint bool
 
 	fh          framework.Handle
@@ -175,6 +176,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 
 	pl := &dynamicResources{
 		enabled:                   true,
+		enableAdminAccess:         fts.EnableDRAAdminAccess,
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 
 		fh:               fh,
@@ -527,7 +529,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		//
 		// Claims are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight.
-		allocator, err := structured.NewAllocator(ctx, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

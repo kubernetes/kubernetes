@@ -46,25 +46,28 @@ type ClaimLister interface {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator struct {
-	claimsToAllocate []*resourceapi.ResourceClaim
-	claimLister      ClaimLister
-	classLister      resourcelisters.DeviceClassLister
-	sliceLister      resourcelisters.ResourceSliceLister
+	adminAccessEnabled bool
+	claimsToAllocate   []*resourceapi.ResourceClaim
+	claimLister        ClaimLister
+	classLister        resourcelisters.DeviceClassLister
+	sliceLister        resourcelisters.ResourceSliceLister
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
 // some problem was detected which makes it impossible to allocate claims.
 func NewAllocator(ctx context.Context,
+	adminAccessEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	claimLister ClaimLister,
 	classLister resourcelisters.DeviceClassLister,
 	sliceLister resourcelisters.ResourceSliceLister,
 ) (*Allocator, error) {
 	return &Allocator{
-		claimsToAllocate: claimsToAllocate,
-		claimLister:      claimLister,
-		classLister:      classLister,
-		sliceLister:      sliceLister,
+		adminAccessEnabled: adminAccessEnabled,
+		claimsToAllocate:   claimsToAllocate,
+		claimLister:        claimLister,
+		classLister:        classLister,
+		sliceLister:        sliceLister,
 	}, nil
 }
 
@@ -158,6 +161,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					// Unknown future selector type!
 					return nil, fmt.Errorf("claim %s, request %s, selector #%d: CEL expression empty (unsupported selector type?)", klog.KObj(claim), request.Name, i)
 				}
+			}
+
+			if !a.adminAccessEnabled && request.AdminAccess {
+				return nil, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.Name)
 			}
 
 			// Should be set. If it isn't, something changed and we should refuse to proceed.

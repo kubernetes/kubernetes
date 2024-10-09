@@ -388,6 +388,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.31"
+- name: DRAAdminAccess
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false

@@ -407,6 +407,7 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 func startResourceClaimController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	ephemeralController, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
+		utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1alpha3().ResourceClaims(),

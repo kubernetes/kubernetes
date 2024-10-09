@@ -28,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -172,4 +174,38 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
+	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
+}
+
+func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
+		// No need to drop anything.
+		return
+	}
+
+	for i := range newClaim.Spec.Devices.Requests {
+		if oldClaim == nil || i >= len(oldClaim.Spec.Devices.Requests) || !oldClaim.Spec.Devices.Requests[i].AdminAccess {
+			newClaim.Spec.Devices.Requests[i].AdminAccess = false
+		}
+	}
+
+	if newClaim.Status.Allocation == nil {
+		return
+	}
+	for i := range newClaim.Status.Allocation.Devices.Results {
+		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil &&
+			(oldClaim == nil || oldClaim.Status.Allocation == nil || i >= len(oldClaim.Status.Allocation.Devices.Results) || oldClaim.Status.Allocation.Devices.Results[i].AdminAccess == nil) &&
+			!requestHasAdminAccess(newClaim, newClaim.Status.Allocation.Devices.Results[i].Request) {
+			newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
+		}
+	}
+}
+
+func requestHasAdminAccess(claim *resource.ResourceClaim, requestName string) bool {
+	for _, request := range claim.Spec.Devices.Requests {
+		if request.Name == requestName && request.AdminAccess {
+			return true
+		}
+	}
+	return false
 }
