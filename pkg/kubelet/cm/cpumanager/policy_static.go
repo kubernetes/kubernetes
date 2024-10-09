@@ -49,10 +49,11 @@ type SMTAlignmentError struct {
 	RequestedCPUs         int
 	CpusPerCore           int
 	AvailablePhysicalCPUs int
+	CausedByPhysicalCPUs  bool
 }
 
 func (e SMTAlignmentError) Error() string {
-	if e.AvailablePhysicalCPUs > 0 {
+	if e.CausedByPhysicalCPUs {
 		return fmt.Sprintf("SMT Alignment Error: not enough free physical CPUs: available physical CPUs = %d, requested CPUs = %d, CPUs per core = %d", e.AvailablePhysicalCPUs, e.RequestedCPUs, e.CpusPerCore)
 	}
 	return fmt.Sprintf("SMT Alignment Error: requested %d cpus not multiple cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
@@ -118,6 +119,9 @@ type staticPolicy struct {
 	cpusToReuse map[string]cpuset.CPUSet
 	// options allow to fine-tune the behaviour of the policy
 	options StaticPolicyOptions
+	// we compute this value multiple time, and it's not supposed to change
+	// at runtime - the cpumanager can't deal with runtime topology changes anyway.
+	cpuGroupSize int
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -136,13 +140,15 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		return nil, err
 	}
 
-	klog.InfoS("Static policy created with configuration", "options", opts)
+	cpuGroupSize := topology.CPUsPerCore()
+	klog.InfoS("Static policy created with configuration", "options", opts, "cpuGroupSize", cpuGroupSize)
 
 	policy := &staticPolicy{
-		topology:    topology,
-		affinity:    affinity,
-		cpusToReuse: make(map[string]cpuset.CPUSet),
-		options:     opts,
+		topology:     topology,
+		affinity:     affinity,
+		cpusToReuse:  make(map[string]cpuset.CPUSet),
+		options:      opts,
+		cpuGroupSize: cpuGroupSize,
 	}
 
 	allCPUs := topology.CPUDetails.CPUs()
@@ -310,8 +316,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	}()
 
 	if p.options.FullPhysicalCPUsOnly {
-		CPUsPerCore := p.topology.CPUsPerCore()
-		if (numCPUs % CPUsPerCore) != 0 {
+		if (numCPUs % p.cpuGroupSize) != 0 {
 			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
 			// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
 			// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
@@ -322,8 +327,9 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
 			// CPUs on a physical core. Allocation of individual threads would never have to occur.
 			return SMTAlignmentError{
-				RequestedCPUs: numCPUs,
-				CpusPerCore:   CPUsPerCore,
+				RequestedCPUs:        numCPUs,
+				CpusPerCore:          p.cpuGroupSize,
+				CausedByPhysicalCPUs: false,
 			}
 		}
 
@@ -336,8 +342,9 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		if numCPUs > availablePhysicalCPUs {
 			return SMTAlignmentError{
 				RequestedCPUs:         numCPUs,
-				CpusPerCore:           CPUsPerCore,
+				CpusPerCore:           p.cpuGroupSize,
 				AvailablePhysicalCPUs: availablePhysicalCPUs,
+				CausedByPhysicalCPUs:  true,
 			}
 		}
 	}
@@ -491,7 +498,7 @@ func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) 
 	if p.options.DistributeCPUsAcrossNUMA {
 		cpuGroupSize := 1
 		if p.options.FullPhysicalCPUsOnly {
-			cpuGroupSize = p.topology.CPUsPerCore()
+			cpuGroupSize = p.cpuGroupSize
 		}
 		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs, cpuGroupSize, cpuSortingStrategy)
 	}

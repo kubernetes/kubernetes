@@ -509,7 +509,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			pod:             makePod("fakePod", "fakeContainerBug113537_1", "10000m", "10000m"),
-			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8},
+			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8, CausedByPhysicalCPUs: true},
 			expCPUAlloc:     false,
 			expCSet:         cpuset.New(),
 		},
@@ -1183,6 +1183,44 @@ func TestStaticPolicyOptions(t *testing.T) {
 			if !reflect.DeepEqual(opts, testCase.expectedValue) {
 				t.Fatalf("value mismatch with args %v expected value %v got %v",
 					testCase.policyOptions, testCase.expectedValue, opts)
+			}
+		})
+	}
+}
+
+func TestSMTAlignmentErrorText(t *testing.T) {
+	type smtErrTestCase struct {
+		name     string
+		err      SMTAlignmentError
+		expected string
+	}
+
+	testCases := []smtErrTestCase{
+		{
+			name:     "base SMT alignment error",
+			err:      SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
+			expected: `SMT Alignment Error: requested 15 cpus not multiple cpus per core = 4`,
+		},
+		{
+			// Note the explicit 0. The intent is to signal the lack of physical CPUs, but
+			// in the corner case of no available physical CPUs at all, without the explicit
+			// flag we cannot distinguish the case, and before PR#127959 we printed the old message
+			name:     "base SMT alignment error, no physical CPUs, missing flag",
+			err:      SMTAlignmentError{RequestedCPUs: 4, CpusPerCore: 2, AvailablePhysicalCPUs: 0},
+			expected: `SMT Alignment Error: requested 4 cpus not multiple cpus per core = 2`,
+		},
+		{
+			name:     "base SMT alignment error, no physical CPUs, explicit flag",
+			err:      SMTAlignmentError{RequestedCPUs: 4, CpusPerCore: 2, AvailablePhysicalCPUs: 0, CausedByPhysicalCPUs: true},
+			expected: `SMT Alignment Error: not enough free physical CPUs: available physical CPUs = 0, requested CPUs = 4, CPUs per core = 2`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := testCase.err.Error()
+			if got != testCase.expected {
+				t.Errorf("got=%v expected=%v", got, testCase.expected)
 			}
 		})
 	}
