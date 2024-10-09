@@ -920,9 +920,9 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 			events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
 			for _, evt := range events {
 				hint := p.isPodWorthRequeuing(logger, pInfo, evt, oldPod, newPod)
-				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, framework.UnscheduledPodUpdate.Label)
+				queue := p.requeuePodViaQueueingHint(logger, pInfo, hint, evt.Label)
 				if queue != unschedulablePods {
-					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", framework.PodUpdate, "queue", queue)
+					logger.V(5).Info("Pod moved to an internal scheduling queue because the Pod is updated", "pod", klog.KObj(newPod), "event", evt.Label, "queue", queue)
 					p.unschedulablePods.delete(pInfo.Pod, gated)
 				}
 				if queue == activeQ {

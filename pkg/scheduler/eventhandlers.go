@@ -133,13 +133,20 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
+
 	logger := sched.logger
 	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
 	// Bypass update event that carries identical objects; otherwise, a duplicated
 	// Pod may go through scheduling and cause unexpected behavior (see #96071).
 	if oldPod.ResourceVersion == newPod.ResourceVersion {
 		return
+	}
+
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
+	for _, evt := range framework.PodSchedulingPropertiesChange(newPod, oldPod) {
+		if evt.Label != framework.UnscheduledPodUpdate.Label {
+			defer metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(metrics.SinceInSeconds(start))
+		}
 	}
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
@@ -246,7 +253,12 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	}
 
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
+
+	// Save the time it takes to update the pod in the cache.
+	updatingDuration := metrics.SinceInSeconds(start)
+
 	for _, evt := range events {
+		startMoving := time.Now()
 		// SchedulingQueue.AssignedPodUpdated has a problem:
 		// It internally pre-filters Pods to move to activeQ,
 		// while taking only in-tree plugins into consideration.
@@ -257,10 +269,12 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
 		// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodUpdate, oldPod, newPod, nil)
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPod, newPod, nil)
 		} else {
 			sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod, evt)
 		}
+		movingDuration := metrics.SinceInSeconds(startMoving)
+		metrics.EventHandlingLatency.WithLabelValues(evt.Label).Observe(updatingDuration + movingDuration)
 	}
 }
 
