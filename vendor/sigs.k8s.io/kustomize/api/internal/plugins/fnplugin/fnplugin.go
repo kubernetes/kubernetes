@@ -77,7 +77,6 @@ func NewFnPlugin(o *types.FnPluginLoadingOptions) *FnPlugin {
 		runFns: runfn.RunFns{
 			Functions:      []*yaml.RNode{},
 			Network:        o.Network,
-			EnableStarlark: o.EnableStar,
 			EnableExec:     o.EnableExec,
 			StorageMounts:  toStorageMounts(o.Mounts),
 			Env:            o.Env,
