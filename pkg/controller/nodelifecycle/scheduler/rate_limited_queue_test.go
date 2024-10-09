@@ -39,6 +39,56 @@ func CheckSetEq(lhs, rhs sets.String) bool {
 	return lhs.IsSuperset(rhs) && rhs.IsSuperset(lhs)
 }
 
+func TestUniqueQueueGet(t *testing.T) {
+	var tick int64
+	now = func() time.Time {
+		t := time.Unix(tick, 0)
+		tick++
+		return t
+	}
+
+	queue := UniqueQueue{
+		queue: TimedQueue{},
+		set:   sets.NewString(),
+	}
+	queue.Add(TimedValue{Value: "first", UID: "11111", AddedAt: now(), ProcessAt: now()})
+	queue.Add(TimedValue{Value: "second", UID: "22222", AddedAt: now(), ProcessAt: now()})
+	queue.Add(TimedValue{Value: "third", UID: "33333", AddedAt: now(), ProcessAt: now()})
+
+	queuePattern := []string{"first", "second", "third"}
+	if len(queue.queue) != len(queuePattern) {
+		t.Fatalf("Queue %v should have length %d", queue.queue, len(queuePattern))
+	}
+	if !CheckQueueEq(queuePattern, queue.queue) {
+		t.Errorf("Invalid queue. Got %v, expected %v", queue.queue, queuePattern)
+	}
+
+	setPattern := sets.NewString("first", "second", "third")
+	if len(queue.set) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, queue.set) {
+		t.Errorf("Invalid map. Got %v, expected %v", queue.set, setPattern)
+	}
+
+	queue.Get()
+	queuePattern = []string{"second", "third"}
+	if len(queue.queue) != len(queuePattern) {
+		t.Fatalf("Queue %v should have length %d", queue.queue, len(queuePattern))
+	}
+	if !CheckQueueEq(queuePattern, queue.queue) {
+		t.Errorf("Invalid queue. Got %v, expected %v", queue.queue, queuePattern)
+	}
+
+	setPattern = sets.NewString("second", "third")
+	if len(queue.set) != len(setPattern) {
+		t.Fatalf("Map %v should have length %d", queue.set, len(setPattern))
+	}
+	if !CheckSetEq(setPattern, queue.set) {
+		t.Errorf("Invalid map. Got %v, expected %v", queue.set, setPattern)
+	}
+}
+
 func TestAddNode(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
 	evictor.Add("first", "11111")
@@ -305,6 +355,12 @@ func TestSwapLimiter(t *testing.T) {
 	qps = evictor.limiter.QPS()
 	if qps != createdQPS {
 		t.Fatalf("QPS does not match create one: %v instead of %v", qps, createdQPS)
+	}
+
+	prev := evictor.limiter
+	evictor.SwapLimiter(createdQPS)
+	if prev != evictor.limiter {
+		t.Fatalf("Limiter should not be swapped if the QPS is the same.")
 	}
 }
 
