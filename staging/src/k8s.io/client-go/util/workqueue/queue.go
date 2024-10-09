@@ -212,7 +212,6 @@ type Typed[t comparable] struct {
 }
 
 type empty struct{}
-type t interface{}
 type set[t comparable] map[t]empty
 
 func (s set[t]) has(item t) bool {

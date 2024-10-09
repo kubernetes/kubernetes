@@ -467,6 +467,7 @@ func BenchmarkQueue(b *testing.B) {
 	for idx := range keys {
 		keys[idx] = fmt.Sprintf("key-%d", idx)
 	}
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		q := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{})
