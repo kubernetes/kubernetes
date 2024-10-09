@@ -232,6 +232,16 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		fmt.Println("[kubelet-start] Would stop the kubelet")
 	}
 
+	// Write the instance kubelet configuration file to disk.
+	if features.Enabled(initCfg.FeatureGates, features.NodeLocalCRISocket) {
+		kubeletConfig := &kubeletconfig.KubeletConfiguration{
+			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
+		}
+		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
+			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+		}
+	}
+
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
 	if err := kubeletphase.WriteConfigToDisk(&initCfg.ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
 		return err
@@ -323,9 +333,11 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
-	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "error uploading crisocket")
+	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
+		klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
+		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+			return errors.Wrap(err, "error writing CRISocket for this node")
+		}
 	}
 
 	return nil
