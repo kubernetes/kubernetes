@@ -366,3 +366,37 @@ return_path_error:
 
 	return patchSets, patchFiles, ignoredFiles, nil
 }
+
+// GetSinglePatchFromFile reads a single patch file and returns the patch data and its type.
+func GetSinglePatchFromFile(patchFilePath string, output io.Writer) ([]byte, error) {
+	// Read the patch file.
+	data, err := os.ReadFile(patchFilePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not read patch file %q", patchFilePath)
+	}
+
+	if output == nil {
+		output = io.Discard
+	}
+	fmt.Fprintf(output, "[patches] Reading patch from file: %s\n", patchFilePath)
+
+	// Convert the patch data to JSON (since it's YAML).
+	patchBytes, err := yaml.YAMLToJSON(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert patch YAML to JSON")
+	}
+
+	return patchBytes, nil
+}
+
+// ApplyStrategicMergePatch applies a strategic merge patch to the provided data.
+func ApplyStrategicMergePatch(originalData []byte, patchBytes []byte, patchObject interface{}, output io.Writer) ([]byte, error) {
+	// Apply the strategic merge patch.
+	patchedData, err := strategicpatch.StrategicMergePatch(originalData, patchBytes, patchObject)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to apply strategic merge patch")
+	}
+
+	fmt.Fprintf(output, "[patches] Successfully applied strategic merge patch\n")
+	return patchedData, nil
+}
