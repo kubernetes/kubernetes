@@ -306,6 +306,11 @@ const (
 	// This file should exist under KubeletRunDirectory
 	KubeletConfigurationFileName = "config.yaml"
 
+	// KubeletInstanceConfigurationFileName specifies the file name on the node which stores Instance configuration of kubelet
+	// It configures specific containerRuntimeEndpoint for each node
+	// This file should exist under KubeletRunDirectory
+	KubeletInstanceConfigurationFileName = "instance-config.yaml"
+
 	// KubeletEnvFileName is a file "kubeadm init" writes at runtime. Using that interface, kubeadm can customize certain
 	// kubelet flags conditionally based on the environment at runtime. Also, parameters given to the configuration file
 	// might be passed through this file. "kubeadm init" writes one variable, with the name ${KubeletEnvFileVariableName}.

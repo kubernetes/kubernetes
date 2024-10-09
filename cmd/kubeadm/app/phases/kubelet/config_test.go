@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -106,6 +108,76 @@ func TestApplyKubeletConfigPatches(t *testing.T) {
 
 	if !bytes.Equal(output, expectedOutput) {
 		t.Fatalf("expected output:\n%s\ngot\n%s\n", expectedOutput, output)
+	}
+}
+
+func TestApplyKubeletConfigPatchFromFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		kubeletConfig []byte
+		patchContent  string
+		expectError   bool
+		expectedPatch []byte
+	}{
+		{
+			name:          "valid patch application",
+			kubeletConfig: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\n"),
+			patchContent:  `containerRuntimeEndpoint: unix:///run/containerd/containerd.sock`,
+			expectError:   false,
+			expectedPatch: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\ncontainerRuntimeEndpoint: unix:///run/containerd/containerd.sock\nkind: KubeletConfiguration\n"),
+		},
+		{
+			name:          "overwrite patch application",
+			kubeletConfig: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\ncontainerRuntimeEndpoint: unix:///run/crio/crio.sock\n"),
+			patchContent:  `containerRuntimeEndpoint: unix:///run/containerd/containerd.sock`,
+			expectError:   false,
+			expectedPatch: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\ncontainerRuntimeEndpoint: unix:///run/containerd/containerd.sock\nkind: KubeletConfiguration\n"),
+		},
+		{
+			name:          "invalid patch format",
+			kubeletConfig: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\n"),
+			patchContent:  `invalid-patch-content`,
+			expectError:   true,
+		},
+		{
+			name:          "empty patch file",
+			kubeletConfig: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\n"),
+			patchContent:  ``,
+			expectError:   false,
+			expectedPatch: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\n"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := new(bytes.Buffer)
+
+			// Create a temporary file to store the patch content
+			patchFile, err := os.CreateTemp("", "instance-config-*.yml")
+			if err != nil {
+				t.Errorf("Error creating temporary file: %v", err)
+			}
+			defer func() {
+				_ = os.Remove(patchFile.Name())
+				_ = patchFile.Close()
+			}()
+
+			_, err = patchFile.Write([]byte(tt.patchContent))
+			if err != nil {
+				t.Errorf("Error Write instance config to file: %v", err)
+			}
+
+			// Apply the patch
+			result, err := applyKubeletConfigPatchFromFile(tt.kubeletConfig, patchFile.Name(), output)
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// Use cmp.Diff to compare the expected and actual results
+			if diff := cmp.Diff(tt.expectedPatch, result); diff != "" {
+				t.Errorf("Unexpected diff (-expected,+got):\n%s", diff)
+			}
+		})
 	}
 }
 
