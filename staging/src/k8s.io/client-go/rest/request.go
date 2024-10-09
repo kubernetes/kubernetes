@@ -39,6 +39,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -803,39 +804,99 @@ type WatchListResult struct {
 }
 
 func (r WatchListResult) Into(obj runtime.Object) error {
-	if r.err != nil {
-		return r.err
+	if obj == nil {
+		return fmt.Errorf("object pointer can not be nil")
 	}
 
-	listPointer, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return err
-	}
-	listItemsPtr, err := meta.GetItemsPtr(obj)
-	if err != nil {
-		return err
-	}
-	listVal, err := conversion.EnforcePtr(listItemsPtr)
-	if err != nil {
-		return err
-	}
-	if listVal.Kind() != reflect.Slice {
-		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	_, err := r.decode(obj)
+	return err
+}
+
+func (r WatchListResult) Decode() (runtime.Object, error) {
+	return r.decode(nil)
+}
+
+func (r WatchListResult) decode(into runtime.Object) (runtime.Object, error) {
+	if r.err != nil {
+		return nil, r.err
 	}
 
 	encodedInitialEventsListBlueprint, err := base64.StdEncoding.DecodeString(r.base64EncodedInitialEventsListBlueprint)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	initialEventsListBlueprint, _, err := r.negotiatedObjectDecoder.Decode(encodedInitialEventsListBlueprint, nil, obj)
+
+	out, gvk, err := r.negotiatedObjectDecoder.Decode(encodedInitialEventsListBlueprint, nil, into)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	initialEventsListBlueprintValue := reflect.ValueOf(initialEventsListBlueprint).Elem()
-	if listPointer.Type() != initialEventsListBlueprintValue.Type() {
-		return fmt.Errorf("received list type = %v from the server doesn't match the list type = %v", initialEventsListBlueprintValue.Type(), listPointer.Type())
+
+	if into == nil {
+		into = out
+	} else if out != into {
+		return nil, fmt.Errorf("unable to decode %s into %v", gvk, reflect.TypeOf(into))
 	}
-	listPointer.Set(initialEventsListBlueprintValue)
+
+	listMeta, err := meta.CommonAccessor(into)
+	if err != nil {
+		return nil, err
+	}
+	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
+
+	if table.IsTable(into) {
+		return r.mergeTableRows(into)
+	}
+
+	if meta.IsListType(into) {
+		return r.mergeListItems(into)
+	}
+
+	return nil, fmt.Errorf("unable to decode %s, either list or table", gvk)
+}
+
+func (r WatchListResult) mergeTableRows(obj runtime.Object) (runtime.Object, error) {
+	var totalRows []any
+
+	for i, item := range r.items {
+		if i == 0 {
+			col, err := table.GetColumnDefinitions(item)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := table.SetColumnDefinitions(obj, col); err != nil {
+				return nil, err
+			}
+		}
+
+		if err := table.EachTableRow(item, func(row any) error {
+			totalRows = append(totalRows, row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := table.SetTableRows(obj, totalRows); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (r WatchListResult) mergeListItems(obj runtime.Object) (runtime.Object, error) {
+	listItemsPtr, err := meta.GetItemsPtr(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	listVal, err := conversion.EnforcePtr(listItemsPtr)
+	if err != nil {
+		return nil, err
+	}
+	if listVal.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+	}
 
 	if len(r.items) == 0 {
 		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
@@ -843,18 +904,13 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		listVal.Set(reflect.MakeSlice(listVal.Type(), len(r.items), len(r.items)))
 		for i, o := range r.items {
 			if listVal.Type().Elem() != reflect.TypeOf(o).Elem() {
-				return fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
+				return nil, fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
 			}
-			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+			listVal.Index(i).Set(reflect.ValueOf(r.items[i]).Elem())
 		}
 	}
 
-	listMeta, err := meta.ListAccessor(obj)
-	if err != nil {
-		return err
-	}
-	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
-	return nil
+	return obj, nil
 }
 
 // WatchList establishes a stream to get a consistent snapshot of data
@@ -918,8 +974,12 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface, negoti
 				items = append(items, event.Object)
 				lastKey = key
 			case watch.Bookmark:
-				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
-					base64EncodedInitialEventsListBlueprint := meta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey]
+				initialEventsAnnotation, base64EncodedInitialEventsListBlueprint, err := hasInitialEventsAnnotation(event.Object)
+				if err != nil {
+					return WatchListResult{err: err}
+				}
+
+				if initialEventsAnnotation {
 					if len(base64EncodedInitialEventsListBlueprint) == 0 {
 						return WatchListResult{err: fmt.Errorf("%q annotation is missing content", metav1.InitialEventsListBlueprintAnnotationKey)}
 					}
@@ -1662,4 +1722,43 @@ func objectKeyFromMeta(objMeta metav1.Object) string {
 		return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
 	}
 	return objMeta.GetName()
+}
+
+func hasInitialEventsAnnotation(object runtime.Object) (bool, string, error) {
+	if !table.IsTable(object) {
+		meta, err := meta.Accessor(object)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to parse metadata from object: %#v", object)
+		}
+
+		if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+			return true, meta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey], nil
+		}
+
+		return false, "", nil
+	}
+
+	var (
+		isInitialEvent bool
+		blueprint      string
+	)
+	err := table.EachTableRowObject(object, func(row runtime.Object) error {
+		if isInitialEvent {
+			return nil
+		}
+
+		meta, err := meta.Accessor(row)
+		if err != nil {
+			return fmt.Errorf("failed to parse metadata from object: %#v", object)
+		}
+
+		if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+			isInitialEvent = true
+			blueprint = meta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey]
+		}
+
+		return nil
+	})
+
+	return isInitialEvent, blueprint, err
 }

@@ -17,11 +17,16 @@ limitations under the License.
 package table
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 )
 
@@ -67,4 +72,141 @@ func ConvertToHumanReadableDateType(timestamp metav1.Time) string {
 		return "<unknown>"
 	}
 	return duration.HumanDuration(time.Since(timestamp.Time))
+}
+
+func IsTable(obj runtime.Object) bool {
+	visit := func(gvk schema.GroupVersionKind) bool {
+		if gvk.Kind != "Table" {
+			return false
+		}
+
+		return gvk.GroupVersion() == metav1.SchemeGroupVersion || gvk.GroupVersion() == metav1beta1.SchemeGroupVersion
+	}
+
+	switch t := obj.(type) {
+	case *metav1.Table: // metav1beta1.Table is an alias of metav1.Table
+		return true
+	case *unstructured.UnstructuredList:
+		return visit(t.GroupVersionKind())
+	case *unstructured.Unstructured:
+		return visit(t.GroupVersionKind())
+	}
+
+	return false
+}
+
+func SetTableRows(obj runtime.Object, rows []any) error {
+	switch t := obj.(type) {
+	case *metav1.Table:
+		for i := range t.Rows {
+			var ok bool
+			t.Rows[i], ok = rows[i].(metav1.TableRow)
+			if !ok {
+				return fmt.Errorf("unexpected row #%d type: %T", i, rows[i])
+			}
+		}
+	case *unstructured.UnstructuredList:
+		t.Object["rows"] = rows
+	case *unstructured.Unstructured:
+		t.Object["rows"] = rows
+	default:
+		return fmt.Errorf("unsupported type %T", obj)
+	}
+
+	return nil
+}
+
+func EachTableRow(obj runtime.Object, fn func(any) error) error {
+	visit := func(object map[string]any) error {
+		items, ok := object["rows"]
+		if !ok {
+			return nil
+		}
+
+		rows, ok := items.([]any)
+		if !ok {
+			return errors.New("content is not a table")
+		}
+		for i := range rows {
+			if err := fn(rows[i]); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	switch t := obj.(type) {
+	case *metav1.Table:
+		for i := range t.Rows {
+			if err := fn(t.Rows[i]); err != nil {
+				return err
+			}
+		}
+	case *unstructured.UnstructuredList:
+		return visit(t.Object)
+	case *unstructured.Unstructured:
+		return visit(t.Object)
+	default:
+		return fmt.Errorf("unsupported type %T", obj)
+	}
+
+	return nil
+}
+
+func EachTableRowObject(obj runtime.Object, fn func(object runtime.Object) error) error {
+	return EachTableRow(obj, func(row any) error {
+		switch t := row.(type) {
+		case metav1.TableRow:
+			if t.Object.Object != nil {
+				return fn(t.Object.Object)
+			}
+
+			return fn(&runtime.Unknown{Raw: t.Object.Raw})
+		case map[string]any:
+			var innerObject = &unstructured.Unstructured{}
+
+			if obj, ok := t["object"]; ok {
+				var found bool
+				innerObject.Object, found = obj.(map[string]any)
+				if !found {
+					return fmt.Errorf("unexpected object type %T", obj)
+				}
+			}
+
+			return fn(innerObject)
+		default:
+			return fmt.Errorf("unsupported type %T", row)
+		}
+	})
+}
+
+func GetColumnDefinitions(obj runtime.Object) (any, error) {
+	switch t := obj.(type) {
+	case *metav1.Table:
+		return t.ColumnDefinitions, nil
+	case *unstructured.Unstructured:
+		return t.Object["columnDefinitions"], nil
+	default:
+		return nil, fmt.Errorf("unsupported type %T", obj)
+	}
+}
+
+func SetColumnDefinitions(obj runtime.Object, columnDefinitions any) error {
+	switch t := obj.(type) {
+	case *metav1.Table:
+		var ok bool
+		t.ColumnDefinitions, ok = columnDefinitions.([]metav1.TableColumnDefinition)
+		if !ok {
+			return fmt.Errorf("unexpected table column definitions type %T", columnDefinitions)
+		}
+	case *unstructured.Unstructured:
+		t.Object["columnDefinitions"] = columnDefinitions
+	case *unstructured.UnstructuredList:
+		t.Object["columnDefinitions"] = columnDefinitions
+	default:
+		return fmt.Errorf("unsupported type %T", obj)
+	}
+
+	return nil
 }

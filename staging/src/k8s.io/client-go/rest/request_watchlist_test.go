@@ -49,19 +49,31 @@ func TestWatchListResult(t *testing.T) {
 		expectedErr    error
 	}{
 		{
-			name:        "not a pointer",
-			result:      fakeObj{},
+			name:   "not a pointer",
+			result: fakeObj{},
+			target: WatchListResult{
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
 			expectedErr: fmt.Errorf("expected pointer, but got rest.fakeObj type"),
 		},
 		{
-			name:        "nil input won't panic",
-			result:      nil,
-			expectedErr: fmt.Errorf("expected pointer, but got invalid kind"),
+			name:   "nil input won't panic",
+			result: nil,
+			target: WatchListResult{
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
+			expectedErr: fmt.Errorf("object pointer can not be nil"),
 		},
 		{
-			name:        "not a list",
-			result:      &v1.Pod{},
-			expectedErr: fmt.Errorf("*v1.Pod is not a list: no Items field in this object"),
+			name:   "not a list",
+			result: &v1.Pod{},
+			target: WatchListResult{
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
+			expectedErr: fmt.Errorf("unable to decode /v1, Kind=PodList into *v1.Pod"),
 		},
 		{
 			name:   "invalid base64EncodedInitialEventsListBlueprint",
@@ -129,7 +141,7 @@ func TestWatchListResult(t *testing.T) {
 				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
 				negotiatedObjectDecoder:                 newJSONSerializer(),
 			},
-			expectedErr: fmt.Errorf("received list type = v1.PodList from the server doesn't match the list type = v1.SecretList"),
+			expectedErr: fmt.Errorf("unable to decode /v1, Kind=PodList into *v1.SecretList"),
 		},
 	}
 	for _, scenario := range scenarios {
@@ -299,7 +311,7 @@ func TestWatchListFailure(t *testing.T) {
 			}(scenario.watcher, scenario.watchEvents)
 
 			res := target.handleWatchList(scenario.ctx, scenario.watcher, nil /*TODO*/)
-			resErr := res.Into(nil)
+			_, resErr := res.Decode()
 			if resErr == nil {
 				t.Fatal("expected to get an error, got nil")
 			}
@@ -324,7 +336,7 @@ func TestWatchListWhenFeatureGateDisabled(t *testing.T) {
 
 	res := target.WatchList(context.TODO())
 
-	resErr := res.Into(nil)
+	_, resErr := res.Decode()
 	if resErr == nil {
 		t.Fatal("expected to get an error, got nil")
 	}
