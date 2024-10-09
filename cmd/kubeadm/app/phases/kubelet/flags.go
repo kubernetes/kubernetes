@@ -29,6 +29,7 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -37,6 +38,8 @@ type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
 	pauseImage               string
 	registerTaintsUsingFlags bool
+	// TODO: remove this field once the feature NodeLocalCRISocket is GA.
+	criSocket string
 }
 
 // GetNodeNameAndHostname obtains the name for this Node using the following precedence
@@ -64,6 +67,11 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		nodeRegOpts:              nodeReg,
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
+		criSocket:                nodeReg.CRISocket,
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		flagOpts.criSocket = ""
 	}
 	stringMap := buildKubeletArgs(flagOpts)
 	argList := kubeadmutil.ArgumentsToCommand(stringMap, nodeReg.KubeletExtraArgs)
@@ -76,7 +84,9 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 // that are common to both Linux and Windows
 func buildKubeletArgsCommon(opts kubeletFlagsOpts) []kubeadmapi.Arg {
 	kubeletFlags := []kubeadmapi.Arg{}
-	kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "container-runtime-endpoint", Value: opts.nodeRegOpts.CRISocket})
+	if opts.criSocket != "" {
+		kubeletFlags = append(kubeletFlags, kubeadmapi.Arg{Name: "container-runtime-endpoint", Value: opts.criSocket})
+	}
 
 	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
 	// and prevents its garbage collection

@@ -37,11 +37,11 @@ func TestBuildKubeletArgs(t *testing.T) {
 			name: "hostname override",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					KubeletExtraArgs: []kubeadmapi.Arg{
 						{Name: "hostname-override", Value: "override-name"},
 					},
 				},
+				criSocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			expected: []kubeadmapi.Arg{
 				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
@@ -52,7 +52,6 @@ func TestBuildKubeletArgs(t *testing.T) {
 			name: "register with taints",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					Taints: []v1.Taint{
 						{
 							Key:    "foo",
@@ -66,6 +65,7 @@ func TestBuildKubeletArgs(t *testing.T) {
 						},
 					},
 				},
+				criSocket:                "unix:///var/run/containerd/containerd.sock",
 				registerTaintsUsingFlags: true,
 			},
 			expected: []kubeadmapi.Arg{
@@ -76,10 +76,9 @@ func TestBuildKubeletArgs(t *testing.T) {
 		{
 			name: "pause image is set",
 			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
-				},
-				pauseImage: "registry.k8s.io/pause:ver",
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{},
+				criSocket:   "unix:///var/run/containerd/containerd.sock",
+				pauseImage:  "registry.k8s.io/pause:ver",
 			},
 			expected: []kubeadmapi.Arg{
 				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},

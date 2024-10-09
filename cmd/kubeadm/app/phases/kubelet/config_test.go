@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -106,6 +108,74 @@ func TestApplyKubeletConfigPatches(t *testing.T) {
 
 	if !bytes.Equal(output, expectedOutput) {
 		t.Fatalf("expected output:\n%s\ngot\n%s\n", expectedOutput, output)
+	}
+}
+
+func TestApplyKubeletConfigPatchFromFile(t *testing.T) {
+	const kubeletConfigGVK = "apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\n"
+
+	tests := []struct {
+		name           string
+		kubeletConfig  []byte
+		patchContent   []byte
+		expectError    bool
+		expectedResult []byte
+	}{
+		{
+			name:           "apply new field",
+			kubeletConfig:  []byte(kubeletConfigGVK),
+			patchContent:   []byte("containerRuntimeEndpoint: unix:///run/containerd/containerd.sock"),
+			expectError:    false,
+			expectedResult: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\ncontainerRuntimeEndpoint: unix:///run/containerd/containerd.sock\nkind: KubeletConfiguration\n"),
+		},
+		{
+			name:           "overwrite existing field",
+			kubeletConfig:  []byte(kubeletConfigGVK + "containerRuntimeEndpoint: unix:///run/crio/crio.sock\n"),
+			patchContent:   []byte("containerRuntimeEndpoint: unix:///run/containerd/containerd.sock"),
+			expectError:    false,
+			expectedResult: []byte("apiVersion: kubelet.config.k8s.io/v1beta1\ncontainerRuntimeEndpoint: unix:///run/containerd/containerd.sock\nkind: KubeletConfiguration\n"),
+		},
+		{
+			name:          "invalid patch contents",
+			kubeletConfig: []byte(kubeletConfigGVK),
+			patchContent:  []byte("invalid-patch-content"),
+			expectError:   true,
+		},
+		{
+			name:           "empty patch file",
+			kubeletConfig:  []byte(kubeletConfigGVK),
+			patchContent:   []byte(""),
+			expectError:    false,
+			expectedResult: []byte(kubeletConfigGVK),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := io.Discard
+
+			// Create a temporary file to store the patch content.
+			patchFile, err := os.CreateTemp("", "instance-config-*.yml")
+			if err != nil {
+				t.Errorf("Error creating temporary file: %v", err)
+			}
+			defer func() {
+				_ = patchFile.Close()
+				_ = os.Remove(patchFile.Name())
+			}()
+
+			_, err = patchFile.Write(tt.patchContent)
+			if err != nil {
+				t.Errorf("Error writing instance config to file: %v", err)
+			}
+
+			// Apply the patch.
+			result, err := applyKubeletConfigPatchFromFile(tt.kubeletConfig, patchFile.Name(), output)
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			assert.Equal(t, tt.expectedResult, result)
+		})
 	}
 }
 
