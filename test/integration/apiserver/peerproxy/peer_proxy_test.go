@@ -132,12 +132,13 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// set lease duration to 1s for serverA to ensure that storageversions for serverA are updated
 	// once it is shutdown
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 10
-	controlplaneapiserver.IdentityLeaseGCPeriod = time.Second
-	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+	controlplaneapiserver.IdentityLeaseGCPeriod = 2 * time.Second
+	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = time.Second
 
 	// start serverA with all APIs enabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-a")
+	t.Log("starting apiserver for ServerA")
 	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
@@ -151,6 +152,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// start serverB with some api disabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-b")
+	t.Log("starting apiserver for ServerB")
 	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{
 		fmt.Sprintf("--runtime-config=%v", "batch/v1=false")}, etcd)
 	defer serverB.TearDownFn()
@@ -163,6 +165,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// start serverC with all APIs enabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-c")
+	t.Log("starting apiserver for ServerC")
 	serverC := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
 	defer serverC.TearDownFn()
 
@@ -177,14 +180,24 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	var jobsB *v1.JobList
 	// list jobs using ServerB which it should proxy to ServerC and get back valid response
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+
+		t.Log("retrieving jobs from ServerB")
 		jobsB, err = kubeClientSetB.BatchV1().Jobs("default").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
+			t.Logf("error trying to list jobs from ServerB: %v", err)
 			return false, nil
 		}
+
 		if jobsB != nil {
 			return true, nil
 		}
+		t.Log("retrieved nil jobs from ServerB")
 		return false, nil
 	})
 	klog.Infof("\nServerB has retrieved jobs list of length %v \n\n", len(jobsB.Items))
