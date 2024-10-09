@@ -22,6 +22,15 @@ import os
 import re
 import sys
 
+class CodeViolation:
+    '''
+    This should violate this rule 
+    https://docs.datadoghq.com/code_analysis/static_analysis_rules/python-best-practices/return-bytes-not-string/
+    '''
+    def __bytes__(self):
+        pass
+        return "123"
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "filenames", help="list of files to check, all files if unspecified", nargs="*"
