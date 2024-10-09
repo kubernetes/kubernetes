@@ -194,6 +194,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
+	featureGate.AddMetrics()
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
 		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
