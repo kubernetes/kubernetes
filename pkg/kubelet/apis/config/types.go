@@ -769,3 +769,74 @@ type CrashLoopBackOffConfig struct {
 	// +optional
 	MaxContainerRestartPeriod *metav1.Duration
 }
+
+// ImagePullIntent is a record of the kubelet attempting to pull an image.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePullIntent struct {
+	metav1.TypeMeta
+
+	// Image is the image spec from a Container's `image` field.
+	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
+	// characters like ':' and '/'.
+	Image string
+}
+
+// ImagePullRecord is a record of an image that was pulled by the kubelet.
+//
+// If there are no records in the `kubernetesSecrets` field and both `nodeWideCredentials`
+// and `anonymous` are `false`, credentials must be re-checked the next time an
+// image represented by this record is being requested.
+//
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type ImagePulledRecord struct {
+	metav1.TypeMeta
+
+	// LastUpdatedTime is the time of the last update to this record
+	LastUpdatedTime metav1.Time
+
+	// ImageRef is a reference to the image represented by this file as received
+	// from the CRI.
+	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
+	// characters like ':' and '/'.
+	ImageRef string
+
+	// CredentialMapping maps `image` to the set of credentials that it was
+	// previously pulled with.
+	// `image` in this case is the content of a pod's container `image` field that's
+	// got its tag/digest removed.
+	//
+	// Example:
+	//   Container requests the `hello-world:latest@sha256:91fb4b041da273d5a3273b6d587d62d518300a6ad268b28628f74997b93171b2` image:
+	//     "credentialMapping": {
+	//       "hello-world": { "nodePodsAccessible": true }
+	//     }
+	CredentialMapping map[string]ImagePullCredentials
+}
+
+// ImagePullCredentials describe credentials that can be used to pull an image.
+type ImagePullCredentials struct {
+	// KuberneteSecretCoordinates is an index of coordinates of all the kubernetes
+	// secrets that were used to pull the image.
+	// +optional
+	KubernetesSecrets []ImagePullSecret
+
+	// NodePodsAccessible is a flag denoting the pull credentials are accessible
+	// by all the pods on the node, or that no credentials are needed for the pull.
+	//
+	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
+	// +optional
+	NodePodsAccessible bool
+}
+
+// ImagePullSecret is a representation of a Kubernetes secret object coordinates along
+// with a credential hash of the pull secret credentials this object contains.
+type ImagePullSecret struct {
+	UID       string
+	Namespace string
+	Name      string
+
+	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
+	// content of the secret specified by the UID/Namespace/Name coordinates.
+	CredentialHash string
+}
