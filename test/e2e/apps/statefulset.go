@@ -1158,6 +1158,39 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
+	/*
+		    Release: v1.32
+			Testname: StatefulSet, create and patch a StatefulSet with PersistentVolumeClaimRetentionPolicy
+	        Description: When a StatefulSet is created with PersistentVolumeClaimRetentionPolicy it MUST
+	    	succeed. It MUST succeed when the PersistentVolumeClaimRetentionPolicy is patched.
+	*/
+	framework.ConformanceIt("should create and patch a StatefulSet with PersistentVolumeClaimRetentionPolicy", func(ctx context.Context) {
+		ginkgo.By("creating the StatefulSet with a PersistentVolumeClaimRetentionPolicy")
+		ss := e2estatefulset.NewStatefulSet("ss2", f.Namespace.Name, "pvc-autodelete-test", 3, nil, nil, map[string]string{"app": "test"})
+		ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+			WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+		}
+		ss, err := f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, ss, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create StatefulSet")
+		e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+
+		ginkgo.By("patching the StatefulSet PersistentVolumeClaimRetentionPolicy")
+		ssPatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{"test-ss": "patched"},
+			},
+			"spec": map[string]interface{}{
+				"persistentVolumeClaimRetentionPolicy": map[string]interface{}{
+					"whenScaled": "Delete",
+				},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal StatefulSet JSON patch")
+		ss, err = f.ClientSet.AppsV1().StatefulSets(ns).Patch(ctx, ss.GetName(), types.StrategicMergePatchType, []byte(ssPatch), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch StatefulSet")
+		e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+	})
+
 	f.Describe("Deploy clustered applications", feature.StatefulSet, framework.WithSlow(), func() {
 		var appTester *clusterAppTester
 
