@@ -360,8 +360,28 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 			defer func() { _ = cli.Close() }()
 
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			defer cancel()
+
+			// List members and quickly return if the member does not exist.
+			listResp, err := cli.MemberList(ctx)
+			if err != nil {
+				klog.V(5).Infof("Failed to check whether the member %s exists: %v", strconv.FormatUint(id, 16), err)
+				lastError = err
+				return false, nil
+			}
+			found := false
+			for _, member := range listResp.Members {
+				if member.GetID() == id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				klog.V(5).Infof("Member %s was not found; assuming it was already removed", strconv.FormatUint(id, 16))
+				return true, nil
+			}
+
 			resp, err = cli.MemberRemove(ctx, id)
-			cancel()
 			if err == nil {
 				return true, nil
 			}
@@ -421,29 +441,40 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	var (
 		lastError   error
 		respMembers []*etcdserverpb.Member
-		learnerID   uint64
 		resp        *clientv3.MemberAddResponse
 	)
 	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
-			if isLearner {
-				// if learnerID is set, it means the etcd member is already added successfully.
-				if learnerID == 0 {
-					klog.V(1).Info("[etcd] Adding etcd member as learner")
-					resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
-					if err != nil {
-						lastError = err
-						return false, nil
-					}
-					learnerID = resp.Member.ID
+
+			// List members and quickly return if the member already exists.
+			listResp, err := cli.MemberList(ctx)
+			if err != nil {
+				klog.V(5).Infof("Failed to check whether the member %q exists: %v", peerAddrs, err)
+				lastError = err
+				return false, nil
+			}
+			found := false
+			for _, member := range listResp.Members {
+				if member.GetPeerURLs()[0] == peerAddrs {
+					found = true
+					break
 				}
-				respMembers = resp.Members
+			}
+			if found {
+				klog.V(5).Infof("The peer URL %q for the added etcd member already exists. Skipping etcd member addition", peerAddrs)
+				respMembers = listResp.Members
 				return true, nil
 			}
 
-			resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
+			if isLearner {
+				klog.V(1).Infof("[etcd] Adding etcd member %q as learner", peerAddrs)
+				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
+			} else {
+				klog.V(1).Infof("[etcd] Adding etcd member %q", peerAddrs)
+				resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
+			}
 			if err == nil {
 				respMembers = resp.Members
 				return true, nil
