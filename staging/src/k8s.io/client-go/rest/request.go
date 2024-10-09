@@ -807,10 +807,6 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		return r.err
 	}
 
-	listPointer, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return err
-	}
 	listItemsPtr, err := meta.GetItemsPtr(obj)
 	if err != nil {
 		return err
@@ -825,17 +821,15 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 
 	encodedInitialEventsListBlueprint, err := base64.StdEncoding.DecodeString(r.base64EncodedInitialEventsListBlueprint)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode the recevied bluepirnt list, err %w", err)
 	}
 	initialEventsListBlueprint, _, err := r.negotiatedObjectDecoder.Decode(encodedInitialEventsListBlueprint, nil, obj)
 	if err != nil {
 		return err
 	}
-	initialEventsListBlueprintValue := reflect.ValueOf(initialEventsListBlueprint).Elem()
-	if listPointer.Type() != initialEventsListBlueprintValue.Type() {
-		return fmt.Errorf("received list type = %v from the server doesn't match the list type = %v", initialEventsListBlueprintValue.Type(), listPointer.Type())
+	if initialEventsListBlueprint != obj {
+		return fmt.Errorf("received list type = %T from the server doesn't match the list type = %T", initialEventsListBlueprint, obj)
 	}
-	listPointer.Set(initialEventsListBlueprintValue)
 
 	if len(r.items) == 0 {
 		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))

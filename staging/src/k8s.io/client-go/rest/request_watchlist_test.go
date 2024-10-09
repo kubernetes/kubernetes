@@ -51,12 +51,12 @@ func TestWatchListResult(t *testing.T) {
 		{
 			name:        "not a pointer",
 			result:      fakeObj{},
-			expectedErr: fmt.Errorf("expected pointer, but got rest.fakeObj type"),
+			expectedErr: fmt.Errorf("rest.fakeObj is not a list: expected pointer, but got rest.fakeObj type"),
 		},
 		{
 			name:        "nil input won't panic",
 			result:      nil,
-			expectedErr: fmt.Errorf("expected pointer, but got invalid kind"),
+			expectedErr: fmt.Errorf("<nil> is not a list: expected pointer, but got invalid kind"),
 		},
 		{
 			name:        "not a list",
@@ -70,7 +70,7 @@ func TestWatchListResult(t *testing.T) {
 				base64EncodedInitialEventsListBlueprint: "invalid",
 				negotiatedObjectDecoder:                 newJSONSerializer(),
 			},
-			expectedErr: fmt.Errorf("illegal base64 data at input byte 4"),
+			expectedErr: fmt.Errorf("failed to decode the recevied bluepirnt list, err illegal base64 data at input byte 4"),
 		},
 		{
 			name:   "empty list",
@@ -129,7 +129,7 @@ func TestWatchListResult(t *testing.T) {
 				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
 				negotiatedObjectDecoder:                 newJSONSerializer(),
 			},
-			expectedErr: fmt.Errorf("received list type = v1.PodList from the server doesn't match the list type = v1.SecretList"),
+			expectedErr: fmt.Errorf("received list type = *v1.PodList from the server doesn't match the list type = *v1.SecretList"),
 		},
 	}
 	for _, scenario := range scenarios {
