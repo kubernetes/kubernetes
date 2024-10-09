@@ -21,11 +21,11 @@ import (
 	"fmt"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 func NewQueryParamVerifier(dynamicClient dynamic.Interface, openAPIGetter discovery.OpenAPISchemaInterface, queryParam VerifiableQueryParam) *QueryParamVerifier {

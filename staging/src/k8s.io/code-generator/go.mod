@@ -14,11 +14,11 @@ require (
 	github.com/google/gofuzz v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/text v0.17.0
-	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -39,6 +39,7 @@ require (
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect

@@ -19,12 +19,12 @@ package kubeadm
 import (
 	"context"
 
-	"gopkg.in/yaml.v2"
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

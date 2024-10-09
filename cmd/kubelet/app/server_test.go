@@ -24,11 +24,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {

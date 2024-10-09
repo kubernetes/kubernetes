@@ -33,5 +33,4 @@ var (
 	smdParser            = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "Parser")
 	testingTypeConverter = types.Ref("k8s.io/client-go/testing", "TypeConverter")
 	yamlObject           = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "YAMLObject")
-	yamlUnmarshal        = types.Ref("gopkg.in/yaml.v2", "Unmarshal")
 )
