@@ -574,28 +574,28 @@ func TestPlugin(t *testing.T) {
 			// Because the pending claim asks for admin access, allocation succeeds despite resources
 			// being exhausted.
 			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{adminAccess(structuredClaim(pendingClaim)), structuredClaim(otherAllocatedClaim)},
+			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: adminAccess(structuredClaim(allocatedClaim)),
+					inFlightClaim: adminAccess(allocatedClaim),
 				},
 				prebind: result{
-					assumedClaim: reserve(adminAccess(structuredClaim(allocatedClaim)), podWithClaimName),
+					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
 					changes: change{
 						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
-								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
-								claim.Status = adminAccess(structuredClaim(inUseClaim)).Status
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = adminAccess(inUseClaim).Status
 							}
 							return claim
 						},
 					},
 				},
 				postbind: result{
-					assumedClaim: reserve(adminAccess(structuredClaim(allocatedClaim)), podWithClaimName),
+					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
 				},
 			},
 		},
@@ -604,28 +604,28 @@ func TestPlugin(t *testing.T) {
 			// The allocated claim uses admin access, so a second claim may use
 			// the same device.
 			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{structuredClaim(pendingClaim), adminAccess(structuredClaim(otherAllocatedClaim))},
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, adminAccess(otherAllocatedClaim)},
 			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
 			want: want{
 				reserve: result{
-					inFlightClaim: structuredClaim(allocatedClaim),
+					inFlightClaim: allocatedClaim,
 				},
 				prebind: result{
-					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
 					changes: change{
 						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
-								claim.Finalizers = structuredClaim(allocatedClaim).Finalizers
-								claim.Status = structuredClaim(inUseClaim).Status
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
 							}
 							return claim
 						},
 					},
 				},
 				postbind: result{
-					assumedClaim: reserve(structuredClaim(allocatedClaim), podWithClaimName),
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
 				},
 			},
 		},

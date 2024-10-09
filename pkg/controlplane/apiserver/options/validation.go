@@ -77,6 +77,13 @@ func validateNodeSelectorAuthorizationFeature() []error {
 	return nil
 }
 
+func validateDRAAdminAccessFeature() []error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		return []error{fmt.Errorf("DRAAdminAccess feature requires DynamicResourceAllocation feature to be enabled")}
+	}
+	return nil
+}
+
 func validateUnknownVersionInteroperabilityProxyFeature() []error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
@@ -121,6 +128,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
+	errs = append(errs, validateDRAAdminAccessFeature()...)
 
 	return errs
 }

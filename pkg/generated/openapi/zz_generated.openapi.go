@@ -46504,7 +46504,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 					},
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.",
+							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
 							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
@@ -46560,7 +46560,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 					},
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess is a copy of the AdminAccess value in the request which caused this device to be allocated.\n\nNew allocations are required to have this set. Old allocations made by Kubernetes 1.31 do not have it yet. Clients which want to support Kubernetes 1.31 need to look up the request and retrieve the value from there if this field is not set.",
+							Description: "AdminAccess is a copy of the AdminAccess value in the request which caused this device to be allocated.\n\nNew allocations are required to have this set when the DRAAdminAccess feature gate is enabled. Old allocations made by Kubernetes 1.31 do not have it yet. Clients which want to support Kubernetes 1.31 need to look up the request and retrieve the value from there if this field is not set.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
