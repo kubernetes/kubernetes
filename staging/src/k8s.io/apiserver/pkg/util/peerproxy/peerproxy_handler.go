@@ -199,7 +199,8 @@ func (h *peerProxyHandler) resolveServingLocation(apiservers *sync.Map) (bool, [
 		apiserverKey := key.(string)
 		if apiserverKey == h.serverId {
 			locallyServiceable = true
-			// stop iteration
+			// stop iteration and reset any errors encountered so far.
+			respErr = nil
 			return false
 		}
 
