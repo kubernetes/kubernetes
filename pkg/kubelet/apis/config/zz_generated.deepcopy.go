@@ -193,6 +193,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	}
 	out.Authentication = in.Authentication
 	out.Authorization = in.Authorization
+	if in.PreloadedImagesVerificationAllowlist != nil {
+		in, out := &in.PreloadedImagesVerificationAllowlist, &out.PreloadedImagesVerificationAllowlist
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ClusterDNS != nil {
 		in, out := &in.ClusterDNS, &out.ClusterDNS
 		*out = make([]string, len(*in))
