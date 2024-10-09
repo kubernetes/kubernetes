@@ -320,7 +320,7 @@ func TestPullWithSecrets(t *testing.T) {
 	}
 	for description, test := range tests {
 		builtInKeyRing := &credentialprovider.BasicDockerKeyring{}
-		builtInKeyRing.Add(test.builtInDockerConfig)
+		builtInKeyRing.Add(nil, test.builtInDockerConfig)
 		_, fakeImageService, fakeManager, err := customTestRuntimeManager(builtInKeyRing)
 		require.NoError(t, err)
 
