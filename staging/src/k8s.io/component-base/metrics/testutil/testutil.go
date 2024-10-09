@@ -81,7 +81,7 @@ func GatherAndAssertAbsent(g metrics.Gatherer, metricNames ...string) error {
 			if mf.GetName() == dontWantMetric {
 				promText, err := metricFamilyToText(mf)
 				if err != nil {
-					return fmt.Errorf("wanted %v to be absent. Error when converting to text:\n%v", dontWantMetric, err)
+					return fmt.Errorf("wanted %v to be absent. Error when converting to text:\n%w", dontWantMetric, err)
 				}
 				return fmt.Errorf("wanted %v to be absent, but got:\n%v", dontWantMetric, promText)
 			}

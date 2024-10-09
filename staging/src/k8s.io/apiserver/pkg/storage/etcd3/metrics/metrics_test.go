@@ -73,10 +73,8 @@ func TestRecordEtcdRequest(t *testing.T) {
 		etcdRequestLatency,
 	}
 
-	testedMetricsName := make([]string, 0, len(testedMetrics))
 	for _, m := range testedMetrics {
 		registry.MustRegister(m)
-		testedMetricsName = append(testedMetricsName, m.FQName())
 	}
 
 	testCases := []struct {
