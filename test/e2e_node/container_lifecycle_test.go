@@ -398,6 +398,311 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		framework.ExpectNoError(results.ExitsBefore(prefixedName(PostStartPrefix, regular1), regular2))
 	})
 
+	ginkgo.When("A pod is running a regular container with restartPolicy=Never", func() {
+
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		bufferSeconds := int64(20)
+		exitSeconds := 60
+
+		originalPodSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "container-image-update-never",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:            regular1,
+						Image:           agnhostImage,
+						ImagePullPolicy: v1.PullAlways,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    exitSeconds,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:            regular2,
+						Image:           agnhostImage,
+						ImagePullPolicy: v1.PullAlways,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    exitSeconds,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(originalPodSpec)
+		newImage := busyboxImage
+
+		ginkgo.It("should successfully restart when the image is updated", func(ctx context.Context) {
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = newImage
+				})
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to restart with new image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Running != nil && containerStatus.Image == newImage && containerStatus.RestartCount > 0 {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container is running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+		})
+
+		ginkgo.It("should restart when the image is updated with a bad image", func(ctx context.Context) {
+			originalPodSpec.Name = "container-image-update-never-invalid"
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
+				})
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to fail due to image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ErrImagePull" {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container has not restarted", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+		})
+
+		ginkgo.It("should successfully restart when the image is updated and restartPolicy=OnFailure", func(ctx context.Context) {
+			originalPodSpec.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+			originalPodSpec.Name = "container-image-update-onfailure"
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = newImage
+				})
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to restart with new image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Running != nil && containerStatus.Image == newImage && containerStatus.RestartCount > 0 {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container is running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+
+		})
+
+		ginkgo.It("should restart when the image is updated with a bad image and restartPolicy=OnFailure", func(ctx context.Context) {
+			originalPodSpec.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+			originalPodSpec.Name = "container-image-update-onfailure-invalid"
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
+				})
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to fail due to image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ErrImagePull" {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container has not restarted", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+		})
+	})
+
+	ginkgo.When("A pod is running a regular container with restartPolicy=Always", func() {
+		regular1 := "regular-1"
+		regular2 := "regular-2"
+		bufferSeconds := int64(20)
+		exitSeconds := 60
+
+		originalPodSpec := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "container-image-update-always",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:            regular1,
+						Image:           agnhostImage,
+						ImagePullPolicy: v1.PullAlways,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    exitSeconds,
+							ExitCode: 0,
+						}),
+					},
+					{
+						Name:            regular2,
+						Image:           agnhostImage,
+						ImagePullPolicy: v1.PullAlways,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:    exitSeconds,
+							ExitCode: 0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(originalPodSpec)
+		newImage := busyboxImage
+
+		ginkgo.It("should successfully restart when the image is updated", func(ctx context.Context) {
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = newImage
+				})
+
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to restart with new image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Running != nil && containerStatus.Image == newImage && containerStatus.RestartCount > 0 {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container is running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+
+		})
+
+		ginkgo.It("should restart when the image is updated with a bad image", func(ctx context.Context) {
+			originalPodSpec.Name = "container-image-update-always-invalid"
+			client := e2epod.NewPodClient(f)
+			podSpec := client.Create(ctx, originalPodSpec)
+
+			ginkgo.By("running the pod", func() {
+				err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podSpec.Name, podSpec.Namespace)
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("updating the image", func() {
+				client.Update(ctx, podSpec.Name, func(pod *v1.Pod) {
+					pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
+				})
+
+			})
+
+			ginkgo.By("verifying that the updated container restarts", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "wait for container to fail due to image",
+					time.Duration(bufferSeconds)*time.Second, func(pod *v1.Pod) (bool, error) {
+						containerStatus := pod.Status.ContainerStatuses[0]
+						if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == "ErrImagePull" {
+							return true, nil
+						}
+						return false, nil
+					})
+				framework.ExpectNoError(err)
+			})
+
+			ginkgo.By("verifying that the other container did not restart", func() {
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "the container has not restarted", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					containerStatus := pod.Status.ContainerStatuses[1]
+					return containerStatus.State.Running != nil && containerStatus.RestartCount < 1, nil
+				})
+				framework.ExpectNoError(err)
+			})
+		})
+	})
+
 	ginkgo.When("have init container in a Pod with restartPolicy=Never", func() {
 
 		ginkgo.When("an init container fails to start because of a bad image", ginkgo.Ordered, func() {
