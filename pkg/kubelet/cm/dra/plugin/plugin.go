@@ -51,6 +51,7 @@ func NewDRAPluginClient(pluginName string) (*Plugin, error) {
 }
 
 type Plugin struct {
+	name          string
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
