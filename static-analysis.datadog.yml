@@ -2,3 +2,7 @@ schema-version: v1
 rulesets:
   - go-best-practices
   - go-security
+<<<<<<< HEAD
+=======
+  - python-best-practices
+>>>>>>> 03946b09a24 (Kubernetes: Testing automated scans)
