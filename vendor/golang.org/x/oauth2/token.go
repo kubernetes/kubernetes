@@ -49,6 +49,13 @@ type Token struct {
 	// mechanisms for that TokenSource will not be used.
 	Expiry time.Time `json:"expiry,omitempty"`
 
+	// ExpiresIn is the OAuth2 wire format "expires_in" field,
+	// which specifies how many seconds later the token expires,
+	// relative to an unknown time base approximately around "now".
+	// It is the application's responsibility to populate
+	// `Expiry` from `ExpiresIn` when required.
+	ExpiresIn int64 `json:"expires_in,omitempty"`
+
 	// raw optionally contains extra metadata from the server
 	// when updating a token.
 	raw interface{}

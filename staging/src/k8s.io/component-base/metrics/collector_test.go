@@ -96,7 +96,7 @@ func TestBaseCustomCollector(t *testing.T) {
 	`
 
 	err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), alphaDesc.fqName,
-		internalDesc.fqName, stableDesc.fqName, deprecatedDesc.fqName, hiddenDesc.fqName)
+		internalDesc.fqName, stableDesc.fqName, deprecatedDesc.fqName)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,7 +35,7 @@ func TestNoMetricsCollected(t *testing.T) {
 		},
 	}
 
-	if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(""), ""); err != nil {
+	if err := testutil.CustomCollectAndCompare(collector, strings.NewReader("")); err != nil {
 		t.Fatal(err)
 	}
 }

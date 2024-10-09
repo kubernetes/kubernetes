@@ -57,6 +57,12 @@ var exceptionMetrics = []string{
 	"get_token_count",
 	"get_token_fail_count",
 	"node_collector_evictions_number",
+
+	// kubelet
+	"kubelet_evented_pleg_connection_error_count",
+	"kubelet_evented_pleg_connection_success_count",
+	"kubelet_pleg_discard_events",
+	"kubelet_topology_manager_admission_duration_ms",
 }
 
 // A Problem is an issue detected by a Linter.

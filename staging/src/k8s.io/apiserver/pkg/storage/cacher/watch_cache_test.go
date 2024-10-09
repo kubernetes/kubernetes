@@ -1145,7 +1145,6 @@ func TestHistogramCacheReadWait(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	ctx := context.Background()
-	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
 	store := newTestWatchCache(2, &cache.Indexers{})
 	defer store.Stop()
 
@@ -1201,7 +1200,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			if _, _, _, err := store.WaitUntilFreshAndGet(ctx, test.resourceVersion, "prefix/ns/bar"); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want)); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})

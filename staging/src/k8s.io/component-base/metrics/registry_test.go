@@ -369,7 +369,7 @@ func TestEnableHiddenMetrics(t *testing.T) {
 			}
 
 			tc.counter.Inc() // no-ops, because counter hasn't been initialized
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(""), tc.fqName); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader("")); err != nil {
 				t.Fatal(err)
 			}
 
@@ -451,7 +451,7 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 			customCollector := newTestCustomCollector(tc.descriptors...)
 			registry.CustomMustRegister(customCollector)
 
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetricsBeforeEnable), tc.metricNames...); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetricsBeforeEnable)); err != nil {
 				t.Fatalf("before enable test failed: %v", err)
 			}
 
@@ -512,7 +512,7 @@ func TestRegistryReset(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry.Reset()
-	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput), "reset_metric", "not_reset_metric"); err != nil {
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput), "not_reset_metric"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -550,7 +550,7 @@ func TestDisabledMetrics(t *testing.T) {
         should_be_enabled 1
 `
 
-	if err := testutil.GatherAndCompare(registry, strings.NewReader(enabledMetricOutput), "should_be_disabled", "should_be_enabled"); err != nil {
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(enabledMetricOutput), "should_be_enabled"); err != nil {
 		t.Fatal(err)
 	}
 }

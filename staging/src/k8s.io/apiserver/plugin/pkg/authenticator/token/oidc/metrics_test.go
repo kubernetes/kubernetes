@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -95,12 +95,13 @@ func TestRecordAuthenticationLatency(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			jwtAuthenticatorLatencyMetric.Reset()
-			RegisterMetrics()
+			reg := metrics.NewKubeRegistry()
+			reg.MustRegister(jwtAuthenticatorLatencyMetric)
 
 			a := newInstrumentedAuthenticatorWithClock(testIssuer, tt.authenticator, dummyClock{})
 			_, _, _ = a.AuthenticateToken(context.Background(), "token")
 
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.expectedValue), "apiserver_authentication_jwt_authenticator_latency_seconds"); err != nil {
+			if err := testutil.GatherAndCompare(reg, strings.NewReader(tt.expectedValue)); err != nil {
 				t.Fatal(err)
 			}
 		})
