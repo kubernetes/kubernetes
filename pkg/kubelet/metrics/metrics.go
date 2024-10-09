@@ -134,7 +134,8 @@ const (
 	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
 
 	// Metric keys for DRA operations
-	DRAOperationsDurationKey = "operations_duration_seconds"
+	DRAOperationsDurationKey     = "operations_duration_seconds"
+	DRAGRPCOperationsDurationKey = "grpc_operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -954,6 +955,18 @@ var (
 		},
 		[]string{"operation_name", "is_error"},
 	)
+
+	// DRAGRPCOperationsDuration tracks the duration of the DRA GRPC operations.
+	DRAGRPCOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAGRPCOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA gRPC operations",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name", "method_name", "grpc_status_code"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1049,6 +1062,7 @@ func Register(collectors ...metrics.StableCollector) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 			legacyregistry.MustRegister(DRAOperationsDuration)
+			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
 		}
 	})
 }
