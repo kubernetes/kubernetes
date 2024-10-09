@@ -393,75 +393,65 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 }
 
 func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (string, bool, error) {
+	if !feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		return "", false, nil
+	}
+
+	if !dsw.seLinuxTranslator.SELinuxEnabled() {
+		return "", false, nil
+	}
+
+	pluginSupportsSELinuxContextMount, err := dsw.getSELinuxMountSupport(volumeSpec)
+	if err != nil {
+		return "", false, err
+	}
+
+	if feature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) &&
+		podSecurityContext != nil &&
+		podSecurityContext.SELinuxChangePolicy != nil &&
+		*podSecurityContext.SELinuxChangePolicy == v1.SELinuxChangePolicyRecursive {
+		// The pod has opted into recursive SELinux label changes. Do not mount with -o context.
+		return "", pluginSupportsSELinuxContextMount, nil
+	}
+
+	if !pluginSupportsSELinuxContextMount {
+		return "", pluginSupportsSELinuxContextMount, nil
+	}
+
+	seLinuxSupported := util.VolumeSupportsSELinuxMount(volumeSpec)
 	var seLinuxFileLabel string
-	var pluginSupportsSELinuxContextMount bool
-
-	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		var err error
-
-		if !dsw.seLinuxTranslator.SELinuxEnabled() {
-			return "", false, nil
-		}
-
-		pluginSupportsSELinuxContextMount, err = dsw.getSELinuxMountSupport(volumeSpec)
+	// Ensure that a volume that can be mounted with "-o context=XYZ" is
+	// used only by containers with the same SELinux contexts.
+	for _, containerContext := range seLinuxContainerContexts {
+		newLabel, err := dsw.seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
 		if err != nil {
-			return "", false, err
-		}
-
-		if feature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) &&
-			podSecurityContext != nil &&
-			podSecurityContext.SELinuxChangePolicy != nil &&
-			*podSecurityContext.SELinuxChangePolicy == v1.SELinuxChangePolicyRecursive {
-			// The pod has opted into recursive SELinux label changes. Do not mount with -o context.
-			return "", pluginSupportsSELinuxContextMount, nil
-		}
-
-		// Ignoring SELinuxMount feature gate:
-		// It allows value "SELinuxChangePolicy: MountOption" in the API server to be set.
-		// If the feature gate + field value is set in the API server, but the feature gate is disabled here in kubelet,
-		// kubelet would default to "", which means "MountOption" anyway.
-
-		seLinuxSupported := util.VolumeSupportsSELinuxMount(volumeSpec)
-		if pluginSupportsSELinuxContextMount {
-			// Ensure that a volume that can be mounted with "-o context=XYZ" is
-			// used only by containers with the same SELinux contexts.
-			for _, containerContext := range seLinuxContainerContexts {
-				newLabel, err := dsw.seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
-				if err != nil {
-					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %w", containerContext, err)
-					accessMode := getVolumeAccessMode(volumeSpec)
-					err := handleSELinuxMetricError(
-						fullErr,
-						seLinuxSupported,
-						seLinuxContainerContextWarnings.WithLabelValues(accessMode),
-						seLinuxContainerContextErrors.WithLabelValues(accessMode))
-					if err != nil {
-						return "", false, err
-					}
-				}
-				if seLinuxFileLabel == "" {
-					seLinuxFileLabel = newLabel
-					continue
-				}
-				if seLinuxFileLabel != newLabel {
-					accessMode := getVolumeAccessMode(volumeSpec)
-
-					fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
-					err := handleSELinuxMetricError(
-						fullErr,
-						seLinuxSupported,
-						seLinuxPodContextMismatchWarnings.WithLabelValues(accessMode),
-						seLinuxPodContextMismatchErrors.WithLabelValues(accessMode))
-					if err != nil {
-						return "", false, err
-					}
-				}
+			fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %w", containerContext, err)
+			accessMode := getVolumeAccessMode(volumeSpec)
+			err := handleSELinuxMetricError(
+				fullErr,
+				seLinuxSupported,
+				seLinuxContainerContextWarnings.WithLabelValues(accessMode),
+				seLinuxContainerContextErrors.WithLabelValues(accessMode))
+			if err != nil {
+				return "", false, err
 			}
-		} else {
-			// Volume plugin does not support SELinux context mount.
-			// DSW will track this volume with SELinux label "", i.e. no mount with
-			// -o context.
-			seLinuxFileLabel = ""
+		}
+		if seLinuxFileLabel == "" {
+			seLinuxFileLabel = newLabel
+			continue
+		}
+		if seLinuxFileLabel != newLabel {
+			accessMode := getVolumeAccessMode(volumeSpec)
+
+			fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
+			err := handleSELinuxMetricError(
+				fullErr,
+				seLinuxSupported,
+				seLinuxPodContextMismatchWarnings.WithLabelValues(accessMode),
+				seLinuxPodContextMismatchErrors.WithLabelValues(accessMode))
+			if err != nil {
+				return "", false, err
+			}
 		}
 	}
 	return seLinuxFileLabel, pluginSupportsSELinuxContextMount, nil
