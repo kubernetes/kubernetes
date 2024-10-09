@@ -5452,6 +5452,15 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 				if len(list) == max {
 					more = true
 				}
+				isReady := endpointSlices[i].Endpoints[j].Conditions.Ready == nil || *endpointSlices[i].Endpoints[j].Conditions.Ready
+				if !isReady {
+					// ready indicates that this endpoint is prepared to receive traffic,
+					// according to whatever system is managing the endpoint. A nil value
+					// indicates an unknown state. In most cases consumers should interpret this
+					// unknown state as ready.
+					// More info: vendor/k8s.io/api/discovery/v1/types.go
+					continue
+				}
 				if !more {
 					list = append(list, endpointSlices[i].Endpoints[j].Addresses[0])
 				}
@@ -5467,6 +5476,15 @@ func formatEndpointSlices(endpointSlices []discoveryv1.EndpointSlice, ports sets
 							more = true
 						}
 						addr := endpointSlices[i].Endpoints[k].Addresses[0]
+						isReady := endpointSlices[i].Endpoints[k].Conditions.Ready == nil || *endpointSlices[i].Endpoints[k].Conditions.Ready
+						if !isReady {
+							// ready indicates that this endpoint is prepared to receive traffic,
+							// according to whatever system is managing the endpoint. A nil value
+							// indicates an unknown state. In most cases consumers should interpret this
+							// unknown state as ready.
+							// More info: vendor/k8s.io/api/discovery/v1/types.go
+							continue
+						}
 						if !more {
 							hostPort := net.JoinHostPort(addr, strconv.Itoa(int(*port.Port)))
 							list = append(list, hostPort)
