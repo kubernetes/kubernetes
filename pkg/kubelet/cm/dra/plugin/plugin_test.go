@@ -114,7 +114,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 	wg := sync.WaitGroup{}
 	m := sync.Mutex{}
 
+	pluginName := "dummy-plugin"
 	p := &Plugin{
+		name:              pluginName,
 		backgroundCtx:     tCtx,
 		endpoint:          addr,
 		clientCallTimeout: defaultClientCallTimeout,
@@ -132,15 +134,15 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins.add("dummy-plugin", p)
-	defer draPlugins.delete("dummy-plugin")
+	draPlugins.add(p)
+	defer draPlugins.delete(pluginName)
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client, err := NewDRAPluginClient("dummy-plugin")
+			client, err := NewDRAPluginClient(pluginName)
 			if err != nil {
 				t.Error(err)
 				return
@@ -205,7 +207,7 @@ func TestNewDRAPluginClient(t *testing.T) {
 		{
 			description: "plugin exists",
 			setup: func(name string) tearDown {
-				draPlugins.add(name, &Plugin{})
+				draPlugins.add(&Plugin{name: name})
 				return func() {
 					draPlugins.delete(name)
 				}
@@ -251,7 +253,9 @@ func TestNodeUnprepareResources(t *testing.T) {
 			}
 			defer teardown()
 
+			pluginName := "dummy-plugin"
 			p := &Plugin{
+				name:              pluginName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
 				clientCallTimeout: defaultClientCallTimeout,
@@ -268,10 +272,10 @@ func TestNodeUnprepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			draPlugins.add("dummy-plugin", p)
-			defer draPlugins.delete("dummy-plugin")
+			draPlugins.add(p)
+			defer draPlugins.delete(pluginName)
 
-			client, err := NewDRAPluginClient("dummy-plugin")
+			client, err := NewDRAPluginClient(pluginName)
 			if err != nil {
 				t.Fatal(err)
 			}
