@@ -430,7 +430,8 @@ const (
 	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	DebugCustomProfile      FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
+	// DebugCustomProfile should be dropped in 1.34
+	DebugCustomProfile FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
