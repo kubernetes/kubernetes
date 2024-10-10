@@ -1158,7 +1158,7 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 		}
 	}
 	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
-	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResouces"))...)
+	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResources"))...)
 	allErrors = append(allErrors, validateValidationActions(spec.ValidationActions, fldPath.Child("validationActions"))...)
 
 	return allErrors
