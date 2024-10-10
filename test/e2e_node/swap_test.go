@@ -92,6 +92,11 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 			pod.Spec.PriorityClassName = "system-node-critical"
 
 			pod = runPodAndWaitUntilScheduled(f, pod)
+
+			if !isPodCgroupV2(f, pod) {
+				e2eskipper.Skipf("swap tests require cgroup v2")
+			}
+
 			gomega.Expect(types.IsCriticalPod(pod)).To(gomega.BeTrueBecause("pod should be critical"))
 
 			ginkgo.By("expecting pod to not have swap access")
