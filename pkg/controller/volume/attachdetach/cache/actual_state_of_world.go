@@ -137,9 +137,6 @@ type ActualStateOfWorld interface {
 	// attached for the given node. It reports a boolean indicating if there is an update for that
 	// node and the corresponding attachedVolumes list.
 	GetVolumesToReportAttachedForNode(logger klog.Logger, name types.NodeName) (bool, []v1.AttachedVolume)
-
-	// GetNodesToUpdateStatusFor returns the map of nodeNames to nodeToUpdateStatusFor
-	GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -704,10 +701,6 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttachedForNode(logger klog.Log
 	}
 
 	return true, volumesToReportAttached
-}
-
-func (asw *actualStateOfWorld) GetNodesToUpdateStatusFor() map[types.NodeName]nodeToUpdateStatusFor {
-	return asw.nodesToUpdateStatusFor
 }
 
 func (asw *actualStateOfWorld) getAttachedVolumeFromUpdateObject(volumesToReportAsAttached map[v1.UniqueVolumeName]v1.UniqueVolumeName) []v1.AttachedVolume {
