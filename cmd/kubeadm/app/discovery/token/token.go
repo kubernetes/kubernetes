@@ -208,7 +208,7 @@ func getClusterInfo(client clientset.Interface, kubeconfig *clientcmdapi.Config,
 	}
 
 	klog.V(1).Infof("[discovery] Waiting for the cluster-info ConfigMap to receive a JWS signature"+
-		"for token ID %q", token.ID)
+		" for token ID %q", token.ID)
 
 	var lastError error
 	err = wait.PollUntilContextTimeout(context.Background(),
