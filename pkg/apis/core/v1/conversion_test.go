@@ -373,7 +373,7 @@ func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {
 	}
 	for i, input := range testInputs {
 		v1PodStatus := v1.PodStatus{}
-		if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&input, &v1PodStatus, nil); nil != err {
+		if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(&input, &v1PodStatus, nil); err != nil {
 			t.Errorf("%v: Convert core.PodStatus to v1.PodStatus failed with error %v", i, err.Error())
 		}
 
@@ -569,7 +569,7 @@ func Test_core_NodeSpec_to_v1_NodeSpec(t *testing.T) {
 	for i, testInput := range testInputs {
 		v1NodeSpec := v1.NodeSpec{}
 		// convert
-		if err := corev1.Convert_core_NodeSpec_To_v1_NodeSpec(&testInput, &v1NodeSpec, nil); nil != err {
+		if err := corev1.Convert_core_NodeSpec_To_v1_NodeSpec(&testInput, &v1NodeSpec, nil); err != nil {
 			t.Errorf("%v: Convert core.NodeSpec to v1.NodeSpec failed with error %v", i, err.Error())
 		}
 
@@ -638,14 +638,15 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 		{
 			PodCIDR: "ace:cab:deca::/8",
 		},
-		// Both are provided
+		// Both are provided - 4
 		{
 			PodCIDR:  "10.0.1.0/24",
-			PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			PodCIDRs: []string{"10.0.1.0/24"},
 		},
-		// list only
+		// Both are provided - 6
 		{
-			PodCIDRs: []string{"10.0.1.0/24", "ace:cab:deca::/8"},
+			PodCIDR:  "ace:cab:deca::/8",
+			PodCIDRs: []string{"ace:cab:deca::/8"},
 		},
 		// Both are provided 4,6
 		{
@@ -656,6 +657,14 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 		{
 			PodCIDR:  "ace:cab:deca::/8",
 			PodCIDRs: []string{"ace:cab:deca::/8", "10.0.1.0/24"},
+		},
+		// list only - 4
+		{
+			PodCIDRs: []string{"10.0.1.0/24"},
+		},
+		// list only - 6
+		{
+			PodCIDRs: []string{"ace:cab:deca::/8"},
 		},
 		// list only 4,6
 		{
