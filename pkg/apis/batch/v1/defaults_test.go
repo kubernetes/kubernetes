@@ -102,6 +102,7 @@ func TestSetDefaultJob(t *testing.T) {
 					PodFailurePolicy: &batchv1.PodFailurePolicy{
 						Rules: []batchv1.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batchv1.PodFailurePolicyActionFailJob,
 								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -119,6 +120,7 @@ func TestSetDefaultJob(t *testing.T) {
 								},
 							},
 							{
+								Name:   ptr.To("1"),
 								Action: batchv1.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
@@ -126,6 +128,7 @@ func TestSetDefaultJob(t *testing.T) {
 								},
 							},
 							{
+								Name:   ptr.To("2"),
 								Action: batchv1.PodFailurePolicyActionFailJob,
 								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -171,6 +174,7 @@ func TestSetDefaultJob(t *testing.T) {
 					PodFailurePolicy: &batchv1.PodFailurePolicy{
 						Rules: []batchv1.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batchv1.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,

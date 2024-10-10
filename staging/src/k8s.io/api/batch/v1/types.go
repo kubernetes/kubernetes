@@ -244,6 +244,13 @@ type PodFailurePolicyRule struct {
 	// +listType=atomic
 	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty" protobuf:"bytes,3,opt,name=onPodConditions"`
+
+	// Name of the pod failure policy rule. Defaults to the index of the rule if unset.
+	// The name must be unique within the given Job, and the Job failure condition
+	// reason that would be generated from a given rule name
+	// (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.
+	// +optional
+	Name *string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
