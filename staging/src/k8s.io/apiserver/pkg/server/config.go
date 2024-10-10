@@ -79,6 +79,7 @@ import (
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/tracing"
+	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -1093,6 +1094,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	}
 
 	if c.EnableMetrics {
+		statusz.Install(s.Handler.NonGoRestfulMux)
 		if c.EnableProfiling {
 			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 			slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
