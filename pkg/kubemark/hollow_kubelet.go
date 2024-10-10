@@ -127,7 +127,7 @@ func (hk *HollowKubelet) Run(ctx context.Context) {
 	if err := kubeletapp.RunKubelet(ctx, &options.KubeletServer{
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
-	}, hk.KubeletDeps, false); err != nil {
+	}, hk.KubeletDeps); err != nil {
 		klog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
 	select {}
