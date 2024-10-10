@@ -433,36 +433,38 @@ func TestEventf(t *testing.T) {
 	clock := testclocks.NewFakeClock(time.Now())
 	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
-		clock.Step(1 * time.Second)
-		//nolint:logcheck // Intentionally testing StartLogging here.
-		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
-			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			clock.Step(1 * time.Second)
+			//nolint:logcheck // Intentionally testing StartLogging here.
+			logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+				if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
+					t.Errorf("Expected '%v', got '%v'", e, a)
+				}
+				logCalled <- struct{}{}
+			})
+			oldEnd := len(logSink.GetBuffer().String())
+			structuredLogWatcher := eventBroadcaster.StartStructuredLogging(0)
+			recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
+
+			<-logCalled
+
+			// We don't get notified by the structured test logger directly.
+			// Instead, we periodically check what new output it has produced.
+			assert.EventuallyWithT(t, func(t *assert.CollectT) {
+				assert.Equal(t, item.expectStructuredLog, logSink.GetBuffer().String()[oldEnd:], "new structured log output")
+			}, time.Minute, time.Millisecond)
+
+			// validate event
+			if item.expectUpdate {
+				actualEvent := <-patchEvent
+				validateEvent(actualEvent, item.expect, t)
+			} else {
+				actualEvent := <-createEvent
+				validateEvent(actualEvent, item.expect, t)
 			}
-			logCalled <- struct{}{}
+			logWatcher.Stop()
+			structuredLogWatcher.Stop()
 		})
-		oldEnd := len(logSink.GetBuffer().String())
-		structuredLogWatcher := eventBroadcaster.StartStructuredLogging(0)
-		recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
-
-		<-logCalled
-
-		// We don't get notified by the structured test logger directly.
-		// Instead, we periodically check what new output it has produced.
-		assert.EventuallyWithT(t, func(t *assert.CollectT) {
-			assert.Equal(t, item.expectStructuredLog, logSink.GetBuffer().String()[oldEnd:], "new structured log output")
-		}, time.Minute, time.Millisecond)
-
-		// validate event
-		if item.expectUpdate {
-			actualEvent := <-patchEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		} else {
-			actualEvent := <-createEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		}
-		logWatcher.Stop()
-		structuredLogWatcher.Stop()
 	}
 	sinkWatcher.Stop()
 }
@@ -726,27 +728,29 @@ func TestEventfNoNamespace(t *testing.T) {
 	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
-		clock.Step(1 * time.Second)
-		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
-			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			clock.Step(1 * time.Second)
+			logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+				if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
+					t.Errorf("Expected '%v', got '%v'", e, a)
+				}
+				logCalled <- struct{}{}
+			})
+			recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
+
+			<-logCalled
+
+			// validate event
+			if item.expectUpdate {
+				actualEvent := <-patchEvent
+				validateEvent(actualEvent, item.expect, t)
+			} else {
+				actualEvent := <-createEvent
+				validateEvent(actualEvent, item.expect, t)
 			}
-			logCalled <- struct{}{}
+
+			logWatcher.Stop()
 		})
-		recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
-
-		<-logCalled
-
-		// validate event
-		if item.expectUpdate {
-			actualEvent := <-patchEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		} else {
-			actualEvent := <-createEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		}
-
-		logWatcher.Stop()
 	}
 	sinkWatcher.Stop()
 }
@@ -1020,17 +1024,19 @@ func TestMultiSinkCache(t *testing.T) {
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	for index, item := range table {
-		clock.Step(1 * time.Second)
-		recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
+		t.Run(fmt.Sprintf("watcher1-%d", index), func(t *testing.T) {
+			clock.Step(1 * time.Second)
+			recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
 
-		// validate event
-		if item.expectUpdate {
-			actualEvent := <-patchEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		} else {
-			actualEvent := <-createEvent
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		}
+			// validate event
+			if item.expectUpdate {
+				actualEvent := <-patchEvent
+				validateEvent(actualEvent, item.expect, t)
+			} else {
+				actualEvent := <-createEvent
+				validateEvent(actualEvent, item.expect, t)
+			}
+		})
 	}
 	// Stop before creating more events, otherwise the On* callbacks above
 	// get stuck writing to the channel that we don't read from anymore.
@@ -1039,17 +1045,19 @@ func TestMultiSinkCache(t *testing.T) {
 	// Another StartRecordingToSink call should start to record events with new clean cache.
 	sinkWatcher2 := eventBroadcaster.StartRecordingToSink(&testEvents2)
 	for index, item := range table {
-		clock.Step(1 * time.Second)
-		recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
+		t.Run(fmt.Sprintf("watcher2-%d", index), func(t *testing.T) {
+			clock.Step(1 * time.Second)
+			recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
 
-		// validate event
-		if item.expectUpdate {
-			actualEvent := <-patchEvent2
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		} else {
-			actualEvent := <-createEvent2
-			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
-		}
+			// validate event
+			if item.expectUpdate {
+				actualEvent := <-patchEvent2
+				validateEvent(actualEvent, item.expect, t)
+			} else {
+				actualEvent := <-createEvent2
+				validateEvent(actualEvent, item.expect, t)
+			}
+		})
 	}
 
 	sinkWatcher2.Stop()
