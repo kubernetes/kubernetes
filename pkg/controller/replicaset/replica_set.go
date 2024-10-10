@@ -702,13 +702,20 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 
 	// list all pods to include the pods that don't match the rs`s selector
 	// anymore but has the stale controller ref.
-	// TODO: Do the List and Filter in a single pass, or use an index.
+	// List and filter pods in a single pass
+	var filteredPods []*v1.Pod
 	allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	// Ignore inactive pods.
-	filteredPods := controller.FilterActivePods(logger, allPods)
+	for _, pod := range allPods {
+		if controller.IsPodActive(pod) {
+			filteredPods = append(filteredPods, pod)
+		} else {
+			logger.V(4).Info("Ignoring inactive pod", "pod", klog.KObj(pod), "phase", pod.Status.Phase, "deletionTime", klog.SafePtr(pod.DeletionTimestamp))
+		}
+	}
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
