@@ -24,26 +24,28 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // KubeletAuth implements AuthInterface
 type KubeletAuth struct {
 	// authenticator identifies the user for requests to the Kubelet API
 	authenticator.Request
-	// authorizerAttributeGetter builds authorization.Attributes for a request to the Kubelet API
-	authorizer.RequestAttributesGetter
+	// KubeletRequestAttributesGetter builds authorization.Attributes for a request to the Kubelet API
+	NodeRequestAttributesGetter
 	// authorizer determines whether a given authorization.Attributes is allowed
 	authorizer.Authorizer
 }
 
 // NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
-func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter authorizer.RequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
+func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 
 // NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.
-func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
+func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) NodeRequestAttributesGetter {
 	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
 }
 
@@ -63,7 +65,7 @@ func isSubpath(subpath, path string) bool {
 //	/stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
 //	/metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
 //	/logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
-func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
+func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes {
 
 	apiVerb := ""
 	switch r.Method {
@@ -81,35 +83,60 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 
 	requestPath := r.URL.Path
 
-	// Default attributes mirror the API attributes that would allow this access to the kubelet API
-	attrs := authorizer.AttributesRecord{
+	fineGrained := utilfeature.DefaultFeatureGate.Enabled(features.KubeletFineGrainedAuthz)
+	var attrs []authorizer.Attributes
+	switch {
+	case isSubpath(requestPath, statsPath):
+		attrs = append(attrs, attributes(u, apiVerb, "stats", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, metricsPath):
+		attrs = append(attrs, attributes(u, apiVerb, "metrics", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, logsPath):
+		// "log" to match other log subresources (pods/log, etc)
+		attrs = append(attrs, attributes(u, apiVerb, "log", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, checkpointPath):
+		attrs = append(attrs, attributes(u, apiVerb, "checkpoint", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, podsPath):
+		if fineGrained {
+			attrs = append(attrs, attributes(u, apiVerb, "pods", string(n.nodeName), requestPath))
+		}
+		attrs = append(attrs, attributes(u, apiVerb, "proxy", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, runningPodsPath):
+		if fineGrained {
+			attrs = append(attrs, attributes(u, apiVerb, "pods", string(n.nodeName), requestPath))
+		}
+		attrs = append(attrs, attributes(u, apiVerb, "proxy", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, healthzPath):
+		if fineGrained {
+			attrs = append(attrs, attributes(u, apiVerb, "healthz", string(n.nodeName), requestPath))
+		}
+		attrs = append(attrs, attributes(u, apiVerb, "proxy", string(n.nodeName), requestPath))
+	case isSubpath(requestPath, configzPath):
+		if fineGrained {
+			attrs = append(attrs, attributes(u, apiVerb, "configz", string(n.nodeName), requestPath))
+		}
+		attrs = append(attrs, attributes(u, apiVerb, "proxy", string(n.nodeName), requestPath))
+	default:
+		attrs = append(attrs, attributes(u, apiVerb, "proxy", string(n.nodeName), requestPath))
+	}
+
+	for _, attr := range attrs {
+		klog.V(5).InfoS("Node request attributes", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
+	}
+
+	return attrs
+}
+
+func attributes(u user.Info, apiVerb, subresource, nodeName, requestPath string) authorizer.AttributesRecord {
+	return authorizer.AttributesRecord{
 		User:            u,
 		Verb:            apiVerb,
 		Namespace:       "",
 		APIGroup:        "",
 		APIVersion:      "v1",
 		Resource:        "nodes",
-		Subresource:     "proxy",
-		Name:            string(n.nodeName),
+		Subresource:     subresource,
+		Name:            nodeName,
 		ResourceRequest: true,
 		Path:            requestPath,
 	}
-
-	// Override subresource for specific paths
-	// This allows subdividing access to the kubelet API
-	switch {
-	case isSubpath(requestPath, statsPath):
-		attrs.Subresource = "stats"
-	case isSubpath(requestPath, metricsPath):
-		attrs.Subresource = "metrics"
-	case isSubpath(requestPath, logsPath):
-		// "log" to match other log subresources (pods/log, etc)
-		attrs.Subresource = "log"
-	case isSubpath(requestPath, checkpointPath):
-		attrs.Subresource = "checkpoint"
-	}
-
-	klog.V(5).InfoS("Node request attributes", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
-
-	return attrs
 }

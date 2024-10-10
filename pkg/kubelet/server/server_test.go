@@ -291,14 +291,14 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
-	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
+	attributesFunc   func(user.Info, *http.Request) []authorizer.Attributes
 	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	return f.authenticateFunc(req)
 }
-func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
+func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) []authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
 func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
@@ -349,8 +349,8 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		authenticateFunc: func(req *http.Request) (*authenticator.Response, bool, error) {
 			return &authenticator.Response{User: &user.DefaultInfo{Name: "test"}}, true, nil
 		},
-		attributesFunc: func(u user.Info, req *http.Request) authorizer.Attributes {
-			return &authorizer.AttributesRecord{User: u}
+		attributesFunc: func(u user.Info, req *http.Request) []authorizer.Attributes {
+			return []authorizer.Attributes{&authorizer.AttributesRecord{User: u}}
 		},
 		authorizeFunc: func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 			return authorizer.DecisionAllow, "", nil
@@ -546,7 +546,7 @@ func TestAuthzCoverage(t *testing.T) {
 		}
 	}
 
-	for _, tc := range AuthzTestCases() {
+	for _, tc := range AuthzTestCases(false) {
 		expectedCases[tc.Method+":"+tc.Path] = true
 	}
 
@@ -566,7 +566,7 @@ func TestAuthFilters(t *testing.T) {
 
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
-	for _, tc := range AuthzTestCases() {
+	for _, tc := range AuthzTestCases(false) {
 		t.Run(tc.Method+":"+tc.Path, func(t *testing.T) {
 			var (
 				expectedUser = AuthzTestUser()
@@ -580,14 +580,14 @@ func TestAuthFilters(t *testing.T) {
 				calledAuthenticate = true
 				return &authenticator.Response{User: expectedUser}, true, nil
 			}
-			fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+			fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
 				calledAttributes = true
 				require.Equal(t, expectedUser, u)
 				return attributesGetter.GetRequestAttributes(u, req)
 			}
 			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 				calledAuthorize = true
-				tc.AssertAttributes(t, a)
+				tc.AssertAttributes(t, []authorizer.Attributes{a})
 				return authorizer.DecisionNoOpinion, "", nil
 			}
 
@@ -609,7 +609,7 @@ func TestAuthFilters(t *testing.T) {
 func TestAuthenticationError(t *testing.T) {
 	var (
 		expectedUser       = &user.DefaultInfo{Name: "test"}
-		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+		expectedAttributes = []authorizer.Attributes{&authorizer.AttributesRecord{User: expectedUser}}
 
 		calledAuthenticate = false
 		calledAuthorize    = false
@@ -622,7 +622,7 @@ func TestAuthenticationError(t *testing.T) {
 		calledAuthenticate = true
 		return &authenticator.Response{User: expectedUser}, true, nil
 	}
-	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
 		calledAttributes = true
 		return expectedAttributes
 	}
@@ -647,7 +647,7 @@ func TestAuthenticationError(t *testing.T) {
 func TestAuthenticationFailure(t *testing.T) {
 	var (
 		expectedUser       = &user.DefaultInfo{Name: "test"}
-		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+		expectedAttributes = []authorizer.Attributes{&authorizer.AttributesRecord{User: expectedUser}}
 
 		calledAuthenticate = false
 		calledAuthorize    = false
@@ -660,7 +660,7 @@ func TestAuthenticationFailure(t *testing.T) {
 		calledAuthenticate = true
 		return nil, false, nil
 	}
-	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
 		calledAttributes = true
 		return expectedAttributes
 	}
@@ -685,7 +685,7 @@ func TestAuthenticationFailure(t *testing.T) {
 func TestAuthorizationSuccess(t *testing.T) {
 	var (
 		expectedUser       = &user.DefaultInfo{Name: "test"}
-		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+		expectedAttributes = []authorizer.Attributes{&authorizer.AttributesRecord{User: expectedUser}}
 
 		calledAuthenticate = false
 		calledAuthorize    = false
@@ -698,7 +698,7 @@ func TestAuthorizationSuccess(t *testing.T) {
 		calledAuthenticate = true
 		return &authenticator.Response{User: expectedUser}, true, nil
 	}
-	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
 		calledAttributes = true
 		return expectedAttributes
 	}
