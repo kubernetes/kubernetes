@@ -171,7 +171,7 @@ func (c *Controller) addFinalizer(ctx context.Context, pv *v1.PersistentVolume) 
 
 func (c *Controller) removeFinalizer(ctx context.Context, pv *v1.PersistentVolume) error {
 	pvClone := pv.DeepCopy()
-	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
+	pvClone.ObjectMeta.Finalizers = slice.Remove(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(ctx, pvClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
