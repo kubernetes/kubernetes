@@ -134,9 +134,9 @@ func (m *podContainerManagerImpl) GetPodCgroupConfig(pod *v1.Pod, resource v1.Re
 	return m.cgroupManager.GetCgroupConfig(podCgroupName, resource)
 }
 
-func (m *podContainerManagerImpl) SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+func (m *podContainerManagerImpl) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	podCgroupName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.SetCgroupConfig(podCgroupName, resource, resourceConfig)
+	return m.cgroupManager.SetCgroupConfig(podCgroupName, resourceConfig)
 }
 
 // Kill one process ID
@@ -350,6 +350,6 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil, nil
 }
 
-func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ *ResourceConfig) error {
 	return nil
 }
