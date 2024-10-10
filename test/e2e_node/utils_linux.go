@@ -27,3 +27,17 @@ import (
 func IsCgroup2UnifiedMode() bool {
 	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
+
+// addCRIProxyInjector registers an injector function for the CRIProxy.
+func addCRIProxyInjector(injector func(apiName string) error) {
+	if e2eCriProxy != nil {
+		e2eCriProxy.AddInjector(injector)
+	}
+}
+
+// resetCRIProxyInjector resets all injector functions for the CRIProxy.
+func resetCRIProxyInjector() {
+	if e2eCriProxy != nil {
+		e2eCriProxy.ResetInjectors()
+	}
+}
