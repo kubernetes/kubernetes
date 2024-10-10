@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -60,6 +60,7 @@ type CSILimits struct {
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
+	vaLister      storagelisters.VolumeAttachmentLister
 
 	randomVolumeIDPrefix string
 
@@ -183,54 +184,38 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		logger.V(5).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
 	}
 
-	newVolumes := make(map[string]string)
-	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true /* new pod */, newVolumes); err != nil {
-		if apierrors.IsNotFound(err) {
-			// PVC is not found. This Pod will never be schedulable until PVC is created.
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
-		}
-		return framework.AsStatus(err)
-	}
-
-	// If the pod doesn't have any new CSI volumes, the predicate will always be true
-	if len(newVolumes) == 0 {
-		return nil
-	}
-
 	// If the node doesn't have volume limits, the predicate will always be true
 	nodeVolumeLimits := getVolumeLimits(csiNode)
 	if len(nodeVolumeLimits) == 0 {
 		return nil
 	}
 
-	attachedVolumes := make(map[string]string)
-	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterAttachableVolumes(logger, existingPod.Pod, csiNode, false /* existing pod */, attachedVolumes); err != nil {
-			return framework.AsStatus(err)
-		}
+	// Get volume counts from VolumeAttachments
+	attachedVolumes, err := pl.listAttachedVolumes(logger, node.Name)
+	if err != nil {
+		return framework.AsStatus(err)
 	}
 
-	attachedVolumeCount := map[string]int{}
-	for volumeUniqueName, driverName := range attachedVolumes {
-		// Don't count single volume used in multiple pods more than once
-		delete(newVolumes, volumeUniqueName)
-		attachedVolumeCount[driverName]++
+	// Count new volumes from the pod
+	newVolumes := make(map[string]int)
+	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true, newVolumes); err != nil {
+		return framework.AsStatus(err)
 	}
 
-	// Count the new volumes count per driver
-	newVolumeCount := map[string]int{}
-	for _, driverName := range newVolumes {
-		newVolumeCount[driverName]++
-	}
+	for driverName, newVolumesCount := range newVolumes {
 
-	for driverName, count := range newVolumeCount {
-		maxVolumeLimit, ok := nodeVolumeLimits[driverName]
-		if ok {
-			currentVolumeCount := attachedVolumeCount[driverName]
-			logger.V(5).Info("Found plugin volume limits", "node", node.Name, "driverName", driverName,
-				"maxLimits", maxVolumeLimit, "currentVolumeCount", currentVolumeCount, "newVolumeCount", count,
+		if maxVolumesLimit, ok := nodeVolumeLimits[driverName]; ok {
+			attachedCount := attachedVolumes[driverName]
+
+			logger.V(5).Info("Checking volume limits",
+				"node", node.Name,
+				"driverName", driverName,
+				"maxVolumesLimit", maxVolumesLimit,
+				"attachedCount", attachedCount,
+				"newVolumesCount", newVolumesCount,
 				"pod", klog.KObj(pod))
-			if currentVolumeCount+count > int(maxVolumeLimit) {
+
+			if attachedCount+newVolumesCount > int(maxVolumesLimit) {
 				return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 			}
 		}
@@ -239,11 +224,32 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	return nil
 }
 
+func (pl *CSILimits) listAttachedVolumes(logger klog.Logger, nodeName string) (map[string]int, error) {
+	attachedVolumes := make(map[string]int)
+
+	vas, err := pl.vaLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, va := range vas {
+		if va.Spec.NodeName == nodeName {
+			if va.Spec.Attacher == "" {
+				logger.V(5).Info("VolumeAttachment has no attacher", "VolumeAttachment", klog.KObj(va))
+				continue
+			}
+			attachedVolumes[va.Spec.Attacher]++
+		}
+	}
+
+	return attachedVolumes, nil
+}
+
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
 // The result map is a map of volumeUniqueName to driver name. The volumeUniqueName is a unique name for
 // the volume in the format of "driverName/volumeHandle". And driver name is the CSI driver name.
 func (pl *CSILimits) filterAttachableVolumes(
-	logger klog.Logger, pod *v1.Pod, csiNode *storagev1.CSINode, newPod bool, result map[string]string) error {
+	logger klog.Logger, pod *v1.Pod, csiNode *storagev1.CSINode, newPod bool, result map[string]int) error {
 	for _, vol := range pod.Spec.Volumes {
 		pvcName := ""
 		isEphemeral := false
@@ -297,14 +303,13 @@ func (pl *CSILimits) filterAttachableVolumes(
 			}
 		}
 
-		driverName, volumeHandle := pl.getCSIDriverInfo(logger, csiNode, pvc)
-		if driverName == "" || volumeHandle == "" {
+		driverName, _ := pl.getCSIDriverInfo(logger, csiNode, pvc)
+		if driverName == "" {
 			logger.V(5).Info("Could not find a CSI driver name or volume handle, not counting volume")
 			continue
 		}
 
-		volumeUniqueName := fmt.Sprintf("%s/%s", driverName, volumeHandle)
-		result[volumeUniqueName] = driverName
+		result[driverName]++
 	}
 	return nil
 }
@@ -312,7 +317,7 @@ func (pl *CSILimits) filterAttachableVolumes(
 // checkAttachableInlineVolume takes an inline volume and add to the result map if the
 // volume is migratable and CSI migration for this plugin has been enabled.
 func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Volume, csiNode *storagev1.CSINode,
-	pod *v1.Pod, result map[string]string) error {
+	pod *v1.Pod, result map[string]int) error {
 	if !pl.translator.IsInlineMigratable(vol) {
 		return nil
 	}
@@ -344,8 +349,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 	if translatedPV.Spec.PersistentVolumeSource.CSI == nil {
 		return nil
 	}
-	volumeUniqueName := fmt.Sprintf("%s/%s", driverName, translatedPV.Spec.PersistentVolumeSource.CSI.VolumeHandle)
-	result[volumeUniqueName] = driverName
+	result[driverName]++
 	return nil
 }
 
@@ -453,6 +457,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
+	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
@@ -460,6 +465,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 		pvLister:             pvLister,
 		pvcLister:            pvcLister,
 		scLister:             scLister,
+		vaLister:             vaLister,
 		randomVolumeIDPrefix: rand.String(32),
 		translator:           csiTranslator,
 	}, nil
