@@ -1374,7 +1374,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 
 			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
 			newSize := tc.newPVSize.DeepCopy()
-			dsw.UpdatePersistentVolumeSize(volumeName, &newSize)
+			dsw.UpdatePersistentVolumeSize(volumeName, newSize)
 
 			_, _, podExistErr := asw.PodExistsInVolume(podName, volumeName, newSize, "" /* SELinuxLabel */)
 			if tc.expansionFailed {

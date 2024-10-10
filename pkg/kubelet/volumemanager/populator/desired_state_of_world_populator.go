@@ -384,8 +384,8 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		return
 	}
 
-	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
-	pvcStatusCap := pvc.Status.Capacity.Storage()
+	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage().DeepCopy()
+	pvcStatusCap := pvc.Status.Capacity.Storage().DeepCopy()
 	dswp.desiredStateOfWorld.UpdatePersistentVolumeSize(uniqueVolumeName, pvCap)
 	klog.V(5).InfoS("NodeExpandVolume updating size", "actualSize", pvcStatusCap.String(), "desiredSize", pvCap.String(), "volumeName", uniqueVolumeName)
 	// in case the actualStateOfWorld was rebuild after kubelet restart ensure that claimSize is set to accurate value

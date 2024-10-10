@@ -1436,7 +1436,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		claimSize := actualStateOfWorld.GetClaimSize(volumeToMount.VolumeName)
 
 		// only fetch claimSize if it was not set previously
-		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize == nil && !volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
+		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize.IsZero() && !volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1445,7 +1445,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			}
 			pvcStatusSize := pvc.Status.Capacity.Storage()
 			if pvcStatusSize != nil {
-				claimSize = pvcStatusSize
+				claimSize = pvcStatusSize.DeepCopy()
 			}
 		}
 
@@ -1964,7 +1964,7 @@ func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 		return false, e1, e2
 	}
 	if resizeDone {
-		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, &newSize)
+		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, newSize)
 		if !markingDone {
 			// On failure, return error. Caller will log and retry.
 			genericFailureError := fmt.Errorf("unable to mark volume as resized")
