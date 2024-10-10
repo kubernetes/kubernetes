@@ -819,6 +819,26 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 	return nil
 }
 
+func containersStarted(containers []v1.Container, podStatus *kubecontainer.PodStatus) bool {
+	for _, c := range containers {
+		cStatus := podStatus.FindContainerStatusByName(c.Name)
+		if cStatus == nil || (cStatus != nil && cStatus.State == kubecontainer.ContainerStateCreated) {
+			return false
+		}
+	}
+	return true
+}
+
+func initContainersAnyFailed(containers []v1.Container, podStatus *kubecontainer.PodStatus) bool {
+	for _, c := range containers {
+		cStatus := podStatus.FindContainerStatusByName(c.Name)
+		if cStatus != nil && isInitContainerFailed(cStatus) {
+			return true
+		}
+	}
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
@@ -838,10 +858,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
-		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
+		if !shouldRestartOnFailure(pod) && attempt != 0 &&
+			(containersStarted(pod.Spec.Containers, podStatus) || initContainersAnyFailed(pod.Spec.InitContainers, podStatus)) {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox, and just kill the pod if it is already done.
-			// if all containers are done and should not be started, there is no need to create a new sandbox.
+			// if all containers are done(ever started) or init containers failed and should not be started, there is no need to create a new sandbox.
+			// here we keep consistent with the logic in getPhase function.
 			// this stops confusing logs on pods whose containers all have exit codes, but we recreate a sandbox before terminating it.
 			//
 			// If ContainerStatuses is empty, we assume that we've never
