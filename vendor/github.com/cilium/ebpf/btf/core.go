@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -15,11 +16,16 @@ import (
 // Code in this file is derived from libbpf, which is available under a BSD
 // 2-Clause license.
 
+// A constant used when CO-RE relocation has to remove instructions.
+//
+// Taken from libbpf.
+const COREBadRelocationSentinel = 0xbad2310
+
 // COREFixup is the result of computing a CO-RE relocation for a target.
 type COREFixup struct {
 	kind   coreKind
-	local  uint32
-	target uint32
+	local  uint64
+	target uint64
 	// True if there is no valid fixup. The instruction is replaced with an
 	// invalid dummy.
 	poison bool
@@ -41,9 +47,22 @@ func (f *COREFixup) String() string {
 
 func (f *COREFixup) Apply(ins *asm.Instruction) error {
 	if f.poison {
-		const badRelo = 0xbad2310
+		// Relocation is poisoned, replace the instruction with an invalid one.
+		if ins.OpCode.IsDWordLoad() {
+			// Replace a dword load with a invalid dword load to preserve instruction size.
+			*ins = asm.LoadImm(asm.R10, COREBadRelocationSentinel, asm.DWord)
+		} else {
+			// Replace all single size instruction with a invalid call instruction.
+			*ins = asm.BuiltinFunc(COREBadRelocationSentinel).Call()
+		}
 
-		*ins = asm.BuiltinFunc(badRelo).Call()
+		// Add context to the kernel verifier output.
+		if source := ins.Source(); source != nil {
+			*ins = ins.WithSource(asm.Comment(fmt.Sprintf("instruction poisoned by CO-RE: %s", source)))
+		} else {
+			*ins = ins.WithSource(asm.Comment("instruction poisoned by CO-RE"))
+		}
+
 		return nil
 	}
 
@@ -119,10 +138,11 @@ const (
 	reloTypeSize                        /* type size in bytes */
 	reloEnumvalExists                   /* enum value existence in target kernel */
 	reloEnumvalValue                    /* enum value integer value */
+	reloTypeMatches                     /* type matches kernel type */
 )
 
 func (k coreKind) checksForExistence() bool {
-	return k == reloEnumvalExists || k == reloTypeExists || k == reloFieldExists
+	return k == reloEnumvalExists || k == reloTypeExists || k == reloFieldExists || k == reloTypeMatches
 }
 
 func (k coreKind) String() string {
@@ -151,30 +171,43 @@ func (k coreKind) String() string {
 		return "enumval_exists"
 	case reloEnumvalValue:
 		return "enumval_value"
+	case reloTypeMatches:
+		return "type_matches"
 	default:
-		return "unknown"
+		return fmt.Sprintf("unknown (%d)", k)
 	}
 }
 
 // CORERelocate calculates changes needed to adjust eBPF instructions for differences
 // in types.
 //
+// targets forms the set of types to relocate against. The first element has to be
+// BTF for vmlinux, the following must be types for kernel modules.
+//
+// resolveLocalTypeID is called for each local type which requires a stable TypeID.
+// Calling the function with the same type multiple times must produce the same
+// result. It is the callers responsibility to ensure that the relocated instructions
+// are loaded with matching BTF.
+//
 // Returns a list of fixups which can be applied to instructions to make them
 // match the target type(s).
 //
 // Fixups are returned in the order of relos, e.g. fixup[i] is the solution
 // for relos[i].
-func CORERelocate(relos []*CORERelocation, target *Spec, bo binary.ByteOrder) ([]COREFixup, error) {
-	if target == nil {
-		var err error
-		target, _, err = kernelSpec()
-		if err != nil {
-			return nil, fmt.Errorf("load kernel spec: %w", err)
-		}
+func CORERelocate(relos []*CORERelocation, targets []*Spec, bo binary.ByteOrder, resolveLocalTypeID func(Type) (TypeID, error)) ([]COREFixup, error) {
+	if len(targets) == 0 {
+		// Explicitly check for nil here since the argument used to be optional.
+		return nil, fmt.Errorf("targets must be provided")
 	}
 
-	if bo != target.byteOrder {
-		return nil, fmt.Errorf("can't relocate %s against %s", bo, target.byteOrder)
+	// We can't encode type IDs that aren't for vmlinux into instructions at the
+	// moment.
+	resolveTargetTypeID := targets[0].TypeID
+
+	for _, target := range targets {
+		if bo != target.imm.byteOrder {
+			return nil, fmt.Errorf("can't relocate %s against %s", bo, target.imm.byteOrder)
+		}
 	}
 
 	type reloGroup struct {
@@ -194,14 +227,15 @@ func CORERelocate(relos []*CORERelocation, target *Spec, bo binary.ByteOrder) ([
 				return nil, fmt.Errorf("%s: unexpected accessor %v", relo.kind, relo.accessor)
 			}
 
+			id, err := resolveLocalTypeID(relo.typ)
+			if err != nil {
+				return nil, fmt.Errorf("%s: get type id: %w", relo.kind, err)
+			}
+
 			result[i] = COREFixup{
-				kind:  relo.kind,
-				local: uint32(relo.id),
-				// NB: Using relo.id as the target here is incorrect, since
-				// it doesn't match the BTF we generate on the fly. This isn't
-				// too bad for now since there are no uses of the local type ID
-				// in the kernel, yet.
-				target: uint32(relo.id),
+				kind:   relo.kind,
+				local:  uint64(relo.id),
+				target: uint64(id),
 			}
 			continue
 		}
@@ -221,8 +255,23 @@ func CORERelocate(relos []*CORERelocation, target *Spec, bo binary.ByteOrder) ([
 			return nil, fmt.Errorf("relocate unnamed or anonymous type %s: %w", localType, ErrNotSupported)
 		}
 
-		targets := target.namedTypes[newEssentialName(localTypeName)]
-		fixups, err := coreCalculateFixups(group.relos, target, targets, bo)
+		essentialName := newEssentialName(localTypeName)
+
+		var targetTypes []Type
+		for _, target := range targets {
+			namedTypeIDs := target.imm.namedTypes[essentialName]
+			targetTypes = slices.Grow(targetTypes, len(namedTypeIDs))
+			for _, id := range namedTypeIDs {
+				typ, err := target.TypeByID(id)
+				if err != nil {
+					return nil, err
+				}
+
+				targetTypes = append(targetTypes, typ)
+			}
+		}
+
+		fixups, err := coreCalculateFixups(group.relos, targetTypes, bo, resolveTargetTypeID)
 		if err != nil {
 			return nil, fmt.Errorf("relocate %s: %w", localType, err)
 		}
@@ -245,19 +294,14 @@ var errIncompatibleTypes = errors.New("incompatible types")
 //
 // The best target is determined by scoring: the less poisoning we have to do
 // the better the target is.
-func coreCalculateFixups(relos []*CORERelocation, targetSpec *Spec, targets []Type, bo binary.ByteOrder) ([]COREFixup, error) {
+func coreCalculateFixups(relos []*CORERelocation, targets []Type, bo binary.ByteOrder, resolveTargetTypeID func(Type) (TypeID, error)) ([]COREFixup, error) {
 	bestScore := len(relos)
 	var bestFixups []COREFixup
 	for _, target := range targets {
-		targetID, err := targetSpec.TypeID(target)
-		if err != nil {
-			return nil, fmt.Errorf("target type ID: %w", err)
-		}
-
 		score := 0 // lower is better
 		fixups := make([]COREFixup, 0, len(relos))
 		for _, relo := range relos {
-			fixup, err := coreCalculateFixup(relo, target, targetID, bo)
+			fixup, err := coreCalculateFixup(relo, target, bo, resolveTargetTypeID)
 			if err != nil {
 				return nil, fmt.Errorf("target %s: %s: %w", target, relo.kind, err)
 			}
@@ -308,13 +352,12 @@ func coreCalculateFixups(relos []*CORERelocation, targetSpec *Spec, targets []Ty
 
 var errNoSignedness = errors.New("no signedness")
 
-// coreCalculateFixup calculates the fixup for a single local type, target type
-// and relocation.
-func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo binary.ByteOrder) (COREFixup, error) {
-	fixup := func(local, target uint32) (COREFixup, error) {
+// coreCalculateFixup calculates the fixup given a relocation and a target type.
+func coreCalculateFixup(relo *CORERelocation, target Type, bo binary.ByteOrder, resolveTargetTypeID func(Type) (TypeID, error)) (COREFixup, error) {
+	fixup := func(local, target uint64) (COREFixup, error) {
 		return COREFixup{kind: relo.kind, local: local, target: target}, nil
 	}
-	fixupWithoutValidation := func(local, target uint32) (COREFixup, error) {
+	fixupWithoutValidation := func(local, target uint64) (COREFixup, error) {
 		return COREFixup{kind: relo.kind, local: local, target: target, skipLocalValidation: true}, nil
 	}
 	poison := func() (COREFixup, error) {
@@ -328,12 +371,27 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 	local := relo.typ
 
 	switch relo.kind {
+	case reloTypeMatches:
+		if len(relo.accessor) > 1 || relo.accessor[0] != 0 {
+			return zero, fmt.Errorf("unexpected accessor %v", relo.accessor)
+		}
+
+		err := coreTypesMatch(local, target, nil)
+		if errors.Is(err, errIncompatibleTypes) {
+			return poison()
+		}
+		if err != nil {
+			return zero, err
+		}
+
+		return fixup(1, 1)
+
 	case reloTypeIDTarget, reloTypeSize, reloTypeExists:
 		if len(relo.accessor) > 1 || relo.accessor[0] != 0 {
 			return zero, fmt.Errorf("unexpected accessor %v", relo.accessor)
 		}
 
-		err := coreAreTypesCompatible(local, target)
+		err := CheckTypeCompatibility(local, target)
 		if errors.Is(err, errIncompatibleTypes) {
 			return poison()
 		}
@@ -346,7 +404,16 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 			return fixup(1, 1)
 
 		case reloTypeIDTarget:
-			return fixup(uint32(relo.id), uint32(targetID))
+			targetID, err := resolveTargetTypeID(target)
+			if errors.Is(err, ErrNotFound) {
+				// Probably a relocation trying to get the ID
+				// of a type from a kmod.
+				return poison()
+			}
+			if err != nil {
+				return zero, err
+			}
+			return fixup(uint64(relo.id), uint64(targetID))
 
 		case reloTypeSize:
 			localSize, err := Sizeof(local)
@@ -359,7 +426,7 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 				return zero, err
 			}
 
-			return fixup(uint32(localSize), uint32(targetSize))
+			return fixup(uint64(localSize), uint64(targetSize))
 		}
 
 	case reloEnumvalValue, reloEnumvalExists:
@@ -376,11 +443,11 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 			return fixup(1, 1)
 
 		case reloEnumvalValue:
-			return fixup(uint32(localValue.Value), uint32(targetValue.Value))
+			return fixup(localValue.Value, targetValue.Value)
 		}
 
 	case reloFieldByteOffset, reloFieldByteSize, reloFieldExists, reloFieldLShiftU64, reloFieldRShiftU64, reloFieldSigned:
-		if _, ok := as[*Fwd](target); ok {
+		if _, ok := As[*Fwd](target); ok {
 			// We can't relocate fields using a forward declaration, so
 			// skip it. If a non-forward declaration is present in the BTF
 			// we'll find it in one of the other iterations.
@@ -405,7 +472,7 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 			return fixup(1, 1)
 
 		case reloFieldByteOffset:
-			return maybeSkipValidation(fixup(localField.offset, targetField.offset))
+			return maybeSkipValidation(fixup(uint64(localField.offset), uint64(targetField.offset)))
 
 		case reloFieldByteSize:
 			localSize, err := Sizeof(localField.Type)
@@ -417,24 +484,24 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 			if err != nil {
 				return zero, err
 			}
-			return maybeSkipValidation(fixup(uint32(localSize), uint32(targetSize)))
+			return maybeSkipValidation(fixup(uint64(localSize), uint64(targetSize)))
 
 		case reloFieldLShiftU64:
-			var target uint32
+			var target uint64
 			if bo == binary.LittleEndian {
 				targetSize, err := targetField.sizeBits()
 				if err != nil {
 					return zero, err
 				}
 
-				target = uint32(64 - targetField.bitfieldOffset - targetSize)
+				target = uint64(64 - targetField.bitfieldOffset - targetSize)
 			} else {
 				loadWidth, err := Sizeof(targetField.Type)
 				if err != nil {
 					return zero, err
 				}
 
-				target = uint32(64 - Bits(loadWidth*8) + targetField.bitfieldOffset)
+				target = uint64(64 - Bits(loadWidth*8) + targetField.bitfieldOffset)
 			}
 			return fixupWithoutValidation(0, target)
 
@@ -444,26 +511,26 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 				return zero, err
 			}
 
-			return fixupWithoutValidation(0, uint32(64-targetSize))
+			return fixupWithoutValidation(0, uint64(64-targetSize))
 
 		case reloFieldSigned:
 			switch local := UnderlyingType(localField.Type).(type) {
 			case *Enum:
-				target, ok := as[*Enum](targetField.Type)
+				target, ok := As[*Enum](targetField.Type)
 				if !ok {
 					return zero, fmt.Errorf("target isn't *Enum but %T", targetField.Type)
 				}
 
-				return fixup(boolToUint32(local.Signed), boolToUint32(target.Signed))
+				return fixup(boolToUint64(local.Signed), boolToUint64(target.Signed))
 			case *Int:
-				target, ok := as[*Int](targetField.Type)
+				target, ok := As[*Int](targetField.Type)
 				if !ok {
 					return zero, fmt.Errorf("target isn't *Int but %T", targetField.Type)
 				}
 
 				return fixup(
-					uint32(local.Encoding&Signed),
-					uint32(target.Encoding&Signed),
+					uint64(local.Encoding&Signed),
+					uint64(target.Encoding&Signed),
 				)
 			default:
 				return zero, fmt.Errorf("type %T: %w", local, errNoSignedness)
@@ -474,7 +541,7 @@ func coreCalculateFixup(relo *CORERelocation, target Type, targetID TypeID, bo b
 	return zero, ErrNotSupported
 }
 
-func boolToUint32(val bool) uint32 {
+func boolToUint64(val bool) uint64 {
 	if val {
 		return 1
 	}
@@ -540,7 +607,7 @@ func (ca coreAccessor) String() string {
 }
 
 func (ca coreAccessor) enumValue(t Type) (*EnumValue, error) {
-	e, ok := as[*Enum](t)
+	e, ok := As[*Enum](t)
 	if !ok {
 		return nil, fmt.Errorf("not an enum: %s", t)
 	}
@@ -666,7 +733,7 @@ func coreFindField(localT Type, localAcc coreAccessor, targetT Type) (coreField,
 
 			localMember := localMembers[acc]
 			if localMember.Name == "" {
-				localMemberType, ok := as[composite](localMember.Type)
+				localMemberType, ok := As[composite](localMember.Type)
 				if !ok {
 					return coreField{}, coreField{}, fmt.Errorf("unnamed field with type %s: %s", localMember.Type, ErrNotSupported)
 				}
@@ -680,7 +747,7 @@ func coreFindField(localT Type, localAcc coreAccessor, targetT Type) (coreField,
 				continue
 			}
 
-			targetType, ok := as[composite](target.Type)
+			targetType, ok := As[composite](target.Type)
 			if !ok {
 				return coreField{}, coreField{}, fmt.Errorf("target not composite: %w", errImpossibleRelocation)
 			}
@@ -726,7 +793,7 @@ func coreFindField(localT Type, localAcc coreAccessor, targetT Type) (coreField,
 
 		case *Array:
 			// For arrays, acc is the index in the target.
-			targetType, ok := as[*Array](target.Type)
+			targetType, ok := As[*Array](target.Type)
 			if !ok {
 				return coreField{}, coreField{}, fmt.Errorf("target not array: %w", errImpossibleRelocation)
 			}
@@ -799,7 +866,7 @@ func coreFindMember(typ composite, name string) (Member, bool, error) {
 		if visited[target] {
 			continue
 		}
-		if len(visited) >= maxTypeDepth {
+		if len(visited) >= maxResolveDepth {
 			// This check is different than libbpf, which restricts the entire
 			// path to BPF_CORE_SPEC_MAX_LEN items.
 			return Member{}, false, fmt.Errorf("type is nested too deep")
@@ -820,7 +887,7 @@ func coreFindMember(typ composite, name string) (Member, bool, error) {
 				continue
 			}
 
-			comp, ok := as[composite](member.Type)
+			comp, ok := As[composite](member.Type)
 			if !ok {
 				return Member{}, false, fmt.Errorf("anonymous non-composite type %T not allowed", member.Type)
 			}
@@ -839,7 +906,7 @@ func coreFindEnumValue(local Type, localAcc coreAccessor, target Type) (localVal
 		return nil, nil, err
 	}
 
-	targetEnum, ok := as[*Enum](target)
+	targetEnum, ok := As[*Enum](target)
 	if !ok {
 		return nil, nil, errImpossibleRelocation
 	}
@@ -860,7 +927,11 @@ func coreFindEnumValue(local Type, localAcc coreAccessor, target Type) (localVal
 //
 // Only layout compatibility is checked, ignoring names of the root type.
 func CheckTypeCompatibility(localType Type, targetType Type) error {
-	return coreAreTypesCompatible(localType, targetType)
+	return coreAreTypesCompatible(localType, targetType, nil)
+}
+
+type pair struct {
+	A, B Type
 }
 
 /* The comment below is from bpf_core_types_are_compat in libbpf.c:
@@ -886,59 +957,60 @@ func CheckTypeCompatibility(localType Type, targetType Type) error {
  *
  * Returns errIncompatibleTypes if types are not compatible.
  */
-func coreAreTypesCompatible(localType Type, targetType Type) error {
+func coreAreTypesCompatible(localType Type, targetType Type, visited map[pair]struct{}) error {
+	localType = UnderlyingType(localType)
+	targetType = UnderlyingType(targetType)
 
-	var (
-		localTs, targetTs typeDeque
-		l, t              = &localType, &targetType
-		depth             = 0
-	)
+	if reflect.TypeOf(localType) != reflect.TypeOf(targetType) {
+		return fmt.Errorf("type mismatch between %v and %v: %w", localType, targetType, errIncompatibleTypes)
+	}
 
-	for ; l != nil && t != nil; l, t = localTs.Shift(), targetTs.Shift() {
-		if depth >= maxTypeDepth {
-			return errors.New("types are nested too deep")
+	if _, ok := visited[pair{localType, targetType}]; ok {
+		return nil
+	}
+	if visited == nil {
+		visited = make(map[pair]struct{})
+	}
+	visited[pair{localType, targetType}] = struct{}{}
+
+	switch lv := localType.(type) {
+	case *Void, *Struct, *Union, *Enum, *Fwd, *Int:
+		return nil
+
+	case *Pointer:
+		tv := targetType.(*Pointer)
+		return coreAreTypesCompatible(lv.Target, tv.Target, visited)
+
+	case *Array:
+		tv := targetType.(*Array)
+		if err := coreAreTypesCompatible(lv.Index, tv.Index, visited); err != nil {
+			return err
 		}
 
-		localType = UnderlyingType(*l)
-		targetType = UnderlyingType(*t)
+		return coreAreTypesCompatible(lv.Type, tv.Type, visited)
 
-		if reflect.TypeOf(localType) != reflect.TypeOf(targetType) {
-			return fmt.Errorf("type mismatch: %w", errIncompatibleTypes)
+	case *FuncProto:
+		tv := targetType.(*FuncProto)
+		if err := coreAreTypesCompatible(lv.Return, tv.Return, visited); err != nil {
+			return err
 		}
 
-		switch lv := (localType).(type) {
-		case *Void, *Struct, *Union, *Enum, *Fwd, *Int:
-			// Nothing to do here
+		if len(lv.Params) != len(tv.Params) {
+			return fmt.Errorf("function param mismatch: %w", errIncompatibleTypes)
+		}
 
-		case *Pointer, *Array:
-			depth++
-			walkType(localType, localTs.Push)
-			walkType(targetType, targetTs.Push)
-
-		case *FuncProto:
-			tv := targetType.(*FuncProto)
-			if len(lv.Params) != len(tv.Params) {
-				return fmt.Errorf("function param mismatch: %w", errIncompatibleTypes)
+		for i, localParam := range lv.Params {
+			targetParam := tv.Params[i]
+			if err := coreAreTypesCompatible(localParam.Type, targetParam.Type, visited); err != nil {
+				return err
 			}
-
-			depth++
-			walkType(localType, localTs.Push)
-			walkType(targetType, targetTs.Push)
-
-		default:
-			return fmt.Errorf("unsupported type %T", localType)
 		}
-	}
 
-	if l != nil {
-		return fmt.Errorf("dangling local type %T", *l)
-	}
+		return nil
 
-	if t != nil {
-		return fmt.Errorf("dangling target type %T", *t)
+	default:
+		return fmt.Errorf("unsupported type %T", localType)
 	}
-
-	return nil
 }
 
 /* coreAreMembersCompatible checks two types for field-based relocation compatibility.
@@ -970,19 +1042,6 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 	localType = UnderlyingType(localType)
 	targetType = UnderlyingType(targetType)
 
-	doNamesMatch := func(a, b string) error {
-		if a == "" || b == "" {
-			// allow anonymous and named type to match
-			return nil
-		}
-
-		if newEssentialName(a) == newEssentialName(b) {
-			return nil
-		}
-
-		return fmt.Errorf("names don't match: %w", errImpossibleRelocation)
-	}
-
 	_, lok := localType.(composite)
 	_, tok := targetType.(composite)
 	if lok && tok {
@@ -999,13 +1058,204 @@ func coreAreMembersCompatible(localType Type, targetType Type) error {
 
 	case *Enum:
 		tv := targetType.(*Enum)
-		return doNamesMatch(lv.Name, tv.Name)
+		if !coreEssentialNamesMatch(lv.Name, tv.Name) {
+			return fmt.Errorf("names %q and %q don't match: %w", lv.Name, tv.Name, errImpossibleRelocation)
+		}
+
+		return nil
 
 	case *Fwd:
 		tv := targetType.(*Fwd)
-		return doNamesMatch(lv.Name, tv.Name)
+		if !coreEssentialNamesMatch(lv.Name, tv.Name) {
+			return fmt.Errorf("names %q and %q don't match: %w", lv.Name, tv.Name, errImpossibleRelocation)
+		}
+
+		return nil
 
 	default:
 		return fmt.Errorf("type %s: %w", localType, ErrNotSupported)
 	}
+}
+
+// coreEssentialNamesMatch compares two names while ignoring their flavour suffix.
+//
+// This should only be used on names which are in the global scope, like struct
+// names, typedefs or enum values.
+func coreEssentialNamesMatch(a, b string) bool {
+	if a == "" || b == "" {
+		// allow anonymous and named type to match
+		return true
+	}
+
+	return newEssentialName(a) == newEssentialName(b)
+}
+
+/* The comment below is from __bpf_core_types_match in relo_core.c:
+ *
+ * Check that two types "match". This function assumes that root types were
+ * already checked for name match.
+ *
+ * The matching relation is defined as follows:
+ * - modifiers and typedefs are stripped (and, hence, effectively ignored)
+ * - generally speaking types need to be of same kind (struct vs. struct, union
+ *   vs. union, etc.)
+ *   - exceptions are struct/union behind a pointer which could also match a
+ *     forward declaration of a struct or union, respectively, and enum vs.
+ *     enum64 (see below)
+ * Then, depending on type:
+ * - integers:
+ *   - match if size and signedness match
+ * - arrays & pointers:
+ *   - target types are recursively matched
+ * - structs & unions:
+ *   - local members need to exist in target with the same name
+ *   - for each member we recursively check match unless it is already behind a
+ *     pointer, in which case we only check matching names and compatible kind
+ * - enums:
+ *   - local variants have to have a match in target by symbolic name (but not
+ *     numeric value)
+ *   - size has to match (but enum may match enum64 and vice versa)
+ * - function pointers:
+ *   - number and position of arguments in local type has to match target
+ *   - for each argument and the return value we recursively check match
+ */
+func coreTypesMatch(localType Type, targetType Type, visited map[pair]struct{}) error {
+	localType = UnderlyingType(localType)
+	targetType = UnderlyingType(targetType)
+
+	if !coreEssentialNamesMatch(localType.TypeName(), targetType.TypeName()) {
+		return fmt.Errorf("type name %q don't match %q: %w", localType.TypeName(), targetType.TypeName(), errIncompatibleTypes)
+	}
+
+	if reflect.TypeOf(localType) != reflect.TypeOf(targetType) {
+		return fmt.Errorf("type mismatch between %v and %v: %w", localType, targetType, errIncompatibleTypes)
+	}
+
+	if _, ok := visited[pair{localType, targetType}]; ok {
+		return nil
+	}
+	if visited == nil {
+		visited = make(map[pair]struct{})
+	}
+	visited[pair{localType, targetType}] = struct{}{}
+
+	switch lv := (localType).(type) {
+	case *Void:
+
+	case *Fwd:
+		if targetType.(*Fwd).Kind != lv.Kind {
+			return fmt.Errorf("fwd kind mismatch between %v and %v: %w", localType, targetType, errIncompatibleTypes)
+		}
+
+	case *Enum:
+		return coreEnumsMatch(lv, targetType.(*Enum))
+
+	case composite:
+		tv := targetType.(composite)
+
+		if len(lv.members()) > len(tv.members()) {
+			return errIncompatibleTypes
+		}
+
+		localMembers := lv.members()
+		targetMembers := map[string]Member{}
+		for _, member := range tv.members() {
+			targetMembers[member.Name] = member
+		}
+
+		for _, localMember := range localMembers {
+			targetMember, found := targetMembers[localMember.Name]
+			if !found {
+				return fmt.Errorf("no field %q in %v: %w", localMember.Name, targetType, errIncompatibleTypes)
+			}
+
+			err := coreTypesMatch(localMember.Type, targetMember.Type, visited)
+			if err != nil {
+				return err
+			}
+		}
+
+	case *Int:
+		if !coreEncodingMatches(lv, targetType.(*Int)) {
+			return fmt.Errorf("int mismatch between %v and %v: %w", localType, targetType, errIncompatibleTypes)
+		}
+
+	case *Pointer:
+		tv := targetType.(*Pointer)
+
+		// Allow a pointer to a forward declaration to match a struct
+		// or union.
+		if fwd, ok := As[*Fwd](lv.Target); ok && fwd.matches(tv.Target) {
+			return nil
+		}
+
+		if fwd, ok := As[*Fwd](tv.Target); ok && fwd.matches(lv.Target) {
+			return nil
+		}
+
+		return coreTypesMatch(lv.Target, tv.Target, visited)
+
+	case *Array:
+		tv := targetType.(*Array)
+
+		if lv.Nelems != tv.Nelems {
+			return fmt.Errorf("array mismatch between %v and %v: %w", localType, targetType, errIncompatibleTypes)
+		}
+
+		return coreTypesMatch(lv.Type, tv.Type, visited)
+
+	case *FuncProto:
+		tv := targetType.(*FuncProto)
+
+		if len(lv.Params) != len(tv.Params) {
+			return fmt.Errorf("function param mismatch: %w", errIncompatibleTypes)
+		}
+
+		for i, lparam := range lv.Params {
+			if err := coreTypesMatch(lparam.Type, tv.Params[i].Type, visited); err != nil {
+				return err
+			}
+		}
+
+		return coreTypesMatch(lv.Return, tv.Return, visited)
+
+	default:
+		return fmt.Errorf("unsupported type %T", localType)
+	}
+
+	return nil
+}
+
+// coreEncodingMatches returns true if both ints have the same size and signedness.
+// All encodings other than `Signed` are considered unsigned.
+func coreEncodingMatches(local, target *Int) bool {
+	return local.Size == target.Size && (local.Encoding == Signed) == (target.Encoding == Signed)
+}
+
+// coreEnumsMatch checks two enums match, which is considered to be the case if the following is true:
+// - size has to match (but enum may match enum64 and vice versa)
+// - local variants have to have a match in target by symbolic name (but not numeric value)
+func coreEnumsMatch(local *Enum, target *Enum) error {
+	if local.Size != target.Size {
+		return fmt.Errorf("size mismatch between %v and %v: %w", local, target, errIncompatibleTypes)
+	}
+
+	// If there are more values in the local than the target, there must be at least one value in the local
+	// that isn't in the target, and therefor the types are incompatible.
+	if len(local.Values) > len(target.Values) {
+		return fmt.Errorf("local has more values than target: %w", errIncompatibleTypes)
+	}
+
+outer:
+	for _, lv := range local.Values {
+		for _, rv := range target.Values {
+			if coreEssentialNamesMatch(lv.Name, rv.Name) {
+				continue outer
+			}
+		}
+
+		return fmt.Errorf("no match for %v in %v: %w", lv, target, errIncompatibleTypes)
+	}
+
+	return nil
 }

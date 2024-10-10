@@ -3,6 +3,7 @@ package link
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"unsafe"
 
@@ -78,6 +79,18 @@ func (pe *perfEvent) Close() error {
 	return nil
 }
 
+// PerfEvent is implemented by some Link types which use a perf event under
+// the hood.
+type PerfEvent interface {
+	// PerfEvent returns a file for the underlying perf event.
+	//
+	// It is the callers responsibility to close the returned file.
+	//
+	// Making changes to the associated perf event lead to
+	// undefined behaviour.
+	PerfEvent() (*os.File, error)
+}
+
 // perfEventLink represents a bpf perf link.
 type perfEventLink struct {
 	RawLink
@@ -86,28 +99,14 @@ type perfEventLink struct {
 
 func (pl *perfEventLink) isLink() {}
 
-// Pinning requires the underlying perf event FD to stay open.
-//
-// | PerfEvent FD | BpfLink FD | Works |
-// |--------------|------------|-------|
-// | Open         | Open       | Yes   |
-// | Closed       | Open       | No    |
-// | Open         | Closed     | No (Pin() -> EINVAL) |
-// | Closed       | Closed     | No (Pin() -> EINVAL) |
-//
-// There is currently no pretty way to recover the perf event FD
-// when loading a pinned link, so leave as not supported for now.
-func (pl *perfEventLink) Pin(string) error {
-	return fmt.Errorf("perf event link pin: %w", ErrNotSupported)
-}
-
-func (pl *perfEventLink) Unpin() error {
-	return fmt.Errorf("perf event link unpin: %w", ErrNotSupported)
-}
-
 func (pl *perfEventLink) Close() error {
 	if err := pl.fd.Close(); err != nil {
 		return fmt.Errorf("perf link close: %w", err)
+	}
+
+	// when created from pinned link
+	if pl.pe == nil {
+		return nil
 	}
 
 	if err := pl.pe.Close(); err != nil {
@@ -118,6 +117,54 @@ func (pl *perfEventLink) Close() error {
 
 func (pl *perfEventLink) Update(prog *ebpf.Program) error {
 	return fmt.Errorf("perf event link update: %w", ErrNotSupported)
+}
+
+var _ PerfEvent = (*perfEventLink)(nil)
+
+func (pl *perfEventLink) PerfEvent() (*os.File, error) {
+	// when created from pinned link
+	if pl.pe == nil {
+		return nil, ErrNotSupported
+	}
+
+	fd, err := pl.pe.fd.Dup()
+	if err != nil {
+		return nil, err
+	}
+
+	return fd.File("perf-event"), nil
+}
+
+func (pl *perfEventLink) Info() (*Info, error) {
+	var info sys.PerfEventLinkInfo
+	if err := sys.ObjInfo(pl.fd, &info); err != nil {
+		return nil, fmt.Errorf("perf event link info: %s", err)
+	}
+
+	var extra2 interface{}
+	switch info.PerfEventType {
+	case sys.BPF_PERF_EVENT_KPROBE, sys.BPF_PERF_EVENT_KRETPROBE:
+		var kprobeInfo sys.KprobeLinkInfo
+		if err := sys.ObjInfo(pl.fd, &kprobeInfo); err != nil {
+			return nil, fmt.Errorf("kprobe link info: %s", err)
+		}
+		extra2 = &KprobeInfo{
+			address: kprobeInfo.Addr,
+			missed:  kprobeInfo.Missed,
+		}
+	}
+
+	extra := &PerfEventInfo{
+		Type:  info.PerfEventType,
+		extra: extra2,
+	}
+
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		extra,
+	}, nil
 }
 
 // perfEventIoctl implements Link and handles the perf event lifecycle
@@ -152,6 +199,17 @@ func (pi *perfEventIoctl) Unpin() error {
 
 func (pi *perfEventIoctl) Info() (*Info, error) {
 	return nil, fmt.Errorf("perf event ioctl info: %w", ErrNotSupported)
+}
+
+var _ PerfEvent = (*perfEventIoctl)(nil)
+
+func (pi *perfEventIoctl) PerfEvent() (*os.File, error) {
+	fd, err := pi.fd.Dup()
+	if err != nil {
+		return nil, err
+	}
+
+	return fd.File("perf-event"), nil
 }
 
 // attach the given eBPF prog to the perf event stored in pe.
@@ -229,7 +287,11 @@ func openTracepointPerfEvent(tid uint64, pid int) (*sys.FD, error) {
 		Wakeup:      1,
 	}
 
-	fd, err := unix.PerfEventOpen(&attr, pid, 0, -1, unix.PERF_FLAG_FD_CLOEXEC)
+	cpu := 0
+	if pid != perfAllThreads {
+		cpu = -1
+	}
+	fd, err := unix.PerfEventOpen(&attr, pid, cpu, -1, unix.PERF_FLAG_FD_CLOEXEC)
 	if err != nil {
 		return nil, fmt.Errorf("opening tracepoint perf event: %w", err)
 	}

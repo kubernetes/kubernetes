@@ -8,7 +8,7 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[InvalidSource-255]
+	_ = x[InvalidSource-65535]
 	_ = x[ImmSource-0]
 	_ = x[RegSource-8]
 }
@@ -25,7 +25,7 @@ func (i Source) String() string {
 		return _Source_name_0
 	case i == 8:
 		return _Source_name_1
-	case i == 255:
+	case i == 65535:
 		return _Source_name_2
 	default:
 		return "Source(" + strconv.FormatInt(int64(i), 10) + ")"
@@ -62,41 +62,51 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[InvalidALUOp-255]
+	_ = x[InvalidALUOp-65535]
 	_ = x[Add-0]
 	_ = x[Sub-16]
 	_ = x[Mul-32]
 	_ = x[Div-48]
+	_ = x[SDiv-304]
 	_ = x[Or-64]
 	_ = x[And-80]
 	_ = x[LSh-96]
 	_ = x[RSh-112]
 	_ = x[Neg-128]
 	_ = x[Mod-144]
+	_ = x[SMod-400]
 	_ = x[Xor-160]
 	_ = x[Mov-176]
+	_ = x[MovSX8-432]
+	_ = x[MovSX16-688]
+	_ = x[MovSX32-944]
 	_ = x[ArSh-192]
 	_ = x[Swap-208]
 }
 
-const _ALUOp_name = "AddSubMulDivOrAndLShRShNegModXorMovArShSwapInvalidALUOp"
+const _ALUOp_name = "AddSubMulDivOrAndLShRShNegModXorMovArShSwapSDivSModMovSX8MovSX16MovSX32InvalidALUOp"
 
 var _ALUOp_map = map[ALUOp]string{
-	0:   _ALUOp_name[0:3],
-	16:  _ALUOp_name[3:6],
-	32:  _ALUOp_name[6:9],
-	48:  _ALUOp_name[9:12],
-	64:  _ALUOp_name[12:14],
-	80:  _ALUOp_name[14:17],
-	96:  _ALUOp_name[17:20],
-	112: _ALUOp_name[20:23],
-	128: _ALUOp_name[23:26],
-	144: _ALUOp_name[26:29],
-	160: _ALUOp_name[29:32],
-	176: _ALUOp_name[32:35],
-	192: _ALUOp_name[35:39],
-	208: _ALUOp_name[39:43],
-	255: _ALUOp_name[43:55],
+	0:     _ALUOp_name[0:3],
+	16:    _ALUOp_name[3:6],
+	32:    _ALUOp_name[6:9],
+	48:    _ALUOp_name[9:12],
+	64:    _ALUOp_name[12:14],
+	80:    _ALUOp_name[14:17],
+	96:    _ALUOp_name[17:20],
+	112:   _ALUOp_name[20:23],
+	128:   _ALUOp_name[23:26],
+	144:   _ALUOp_name[26:29],
+	160:   _ALUOp_name[29:32],
+	176:   _ALUOp_name[32:35],
+	192:   _ALUOp_name[35:39],
+	208:   _ALUOp_name[39:43],
+	304:   _ALUOp_name[43:47],
+	400:   _ALUOp_name[47:51],
+	432:   _ALUOp_name[51:57],
+	688:   _ALUOp_name[57:64],
+	944:   _ALUOp_name[64:71],
+	65535: _ALUOp_name[71:83],
 }
 
 func (i ALUOp) String() string {

@@ -18,8 +18,11 @@ var (
 	uprobeRefCtrOffsetShift = 32
 	haveRefCtrOffsetPMU     = internal.NewFeatureTest("RefCtrOffsetPMU", "4.20", func() error {
 		_, err := os.Stat(uprobeRefCtrOffsetPMUPath)
-		if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
 			return internal.ErrNotSupported
+		}
+		if err != nil {
+			return err
 		}
 		return nil
 	})
@@ -33,10 +36,10 @@ var (
 type Executable struct {
 	// Path of the executable on the filesystem.
 	path string
-	// Parsed ELF and dynamic symbols' addresses.
-	addresses map[string]uint64
+	// Parsed ELF and dynamic symbols' cachedAddresses.
+	cachedAddresses map[string]uint64
 	// Keep track of symbol table lazy load.
-	addressesOnce sync.Once
+	cacheAddressesOnce sync.Once
 }
 
 // UprobeOptions defines additional parameters that will be used
@@ -105,8 +108,8 @@ func OpenExecutable(path string) (*Executable, error) {
 	}
 
 	return &Executable{
-		path:      path,
-		addresses: make(map[string]uint64),
+		path:            path,
+		cachedAddresses: make(map[string]uint64),
 	}, nil
 }
 
@@ -150,7 +153,7 @@ func (ex *Executable) load(f *internal.SafeELFFile) error {
 			}
 		}
 
-		ex.addresses[s.Name] = address
+		ex.cachedAddresses[s.Name] = address
 	}
 
 	return nil
@@ -159,13 +162,13 @@ func (ex *Executable) load(f *internal.SafeELFFile) error {
 // address calculates the address of a symbol in the executable.
 //
 // opts must not be nil.
-func (ex *Executable) address(symbol string, opts *UprobeOptions) (uint64, error) {
-	if opts.Address > 0 {
-		return opts.Address + opts.Offset, nil
+func (ex *Executable) address(symbol string, address, offset uint64) (uint64, error) {
+	if address > 0 {
+		return address + offset, nil
 	}
 
 	var err error
-	ex.addressesOnce.Do(func() {
+	ex.cacheAddressesOnce.Do(func() {
 		var f *internal.SafeELFFile
 		f, err = internal.OpenSafeELFFile(ex.path)
 		if err != nil {
@@ -180,7 +183,7 @@ func (ex *Executable) address(symbol string, opts *UprobeOptions) (uint64, error
 		return 0, fmt.Errorf("lazy load symbols: %w", err)
 	}
 
-	address, ok := ex.addresses[symbol]
+	address, ok := ex.cachedAddresses[symbol]
 	if !ok {
 		return 0, fmt.Errorf("symbol %s: %w", symbol, ErrNoSymbol)
 	}
@@ -196,7 +199,7 @@ func (ex *Executable) address(symbol string, opts *UprobeOptions) (uint64, error
 			"(consider providing UprobeOptions.Address)", ex.path, symbol, ErrNotSupported)
 	}
 
-	return address + opts.Offset, nil
+	return address + offset, nil
 }
 
 // Uprobe attaches the given eBPF program to a perf event that fires when the
@@ -219,6 +222,8 @@ func (ex *Executable) address(symbol string, opts *UprobeOptions) (uint64, error
 //
 // Functions provided by shared libraries can currently not be traced and
 // will result in an ErrNotSupported.
+//
+// The returned Link may implement [PerfEvent].
 func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program, opts *UprobeOptions) (Link, error) {
 	u, err := ex.uprobe(symbol, prog, opts, false)
 	if err != nil {
@@ -253,6 +258,8 @@ func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program, opts *UprobeOpti
 //
 // Functions provided by shared libraries can currently not be traced and
 // will result in an ErrNotSupported.
+//
+// The returned Link may implement [PerfEvent].
 func (ex *Executable) Uretprobe(symbol string, prog *ebpf.Program, opts *UprobeOptions) (Link, error) {
 	u, err := ex.uprobe(symbol, prog, opts, true)
 	if err != nil {
@@ -281,7 +288,7 @@ func (ex *Executable) uprobe(symbol string, prog *ebpf.Program, opts *UprobeOpti
 		opts = &UprobeOptions{}
 	}
 
-	offset, err := ex.address(symbol, opts)
+	offset, err := ex.address(symbol, opts.Address, opts.Offset)
 	if err != nil {
 		return nil, err
 	}

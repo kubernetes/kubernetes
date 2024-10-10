@@ -1,0 +1,12 @@
+kernel="ghcr.io/cilium/ci-kernels:stable"
+smp="cpus=2"
+memory="1G"
+user="root"
+setup=[
+  "mount -t cgroup2 -o nosuid,noexec,nodev cgroup2 /sys/fs/cgroup",
+  "/bin/sh -c 'modprobe bpf_testmod || true'",
+  "dmesg --clear",
+]
+teardown=[
+  "dmesg --read-clear",
+]

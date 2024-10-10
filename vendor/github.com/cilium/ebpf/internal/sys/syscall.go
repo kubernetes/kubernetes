@@ -11,7 +11,7 @@ import (
 // ENOTSUPP is a Linux internal error code that has leaked into UAPI.
 //
 // It is not the same as ENOTSUP or EOPNOTSUPP.
-var ENOTSUPP = syscall.Errno(524)
+const ENOTSUPP = syscall.Errno(524)
 
 // BPF wraps SYS_BPF.
 //
@@ -71,9 +71,49 @@ func (i *LinkInfo) info() (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
 }
 
+func (i *TracingLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *CgroupLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *NetNsLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *XDPLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *TcxLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *NetfilterLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *NetkitLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *KprobeMultiLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *KprobeLinkInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
 var _ Info = (*BtfInfo)(nil)
 
 func (i *BtfInfo) info() (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
+}
+
+func (i *PerfEventLinkInfo) info() (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(i), uint32(unsafe.Sizeof(*i))
 }
 
@@ -123,7 +163,7 @@ type TypeID uint32
 // MapFlags control map behaviour.
 type MapFlags uint32
 
-//go:generate stringer -type MapFlags
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type MapFlags
 
 const (
 	BPF_F_NO_PREALLOC MapFlags = 1 << iota
@@ -139,6 +179,17 @@ const (
 	BPF_F_MMAPABLE
 	BPF_F_PRESERVE_ELEMS
 	BPF_F_INNER_MAP
+	BPF_F_LINK
+	BPF_F_PATH_FD
+)
+
+// Flags used by bpf_mprog.
+const (
+	BPF_F_REPLACE = 1 << (iota + 2)
+	BPF_F_BEFORE
+	BPF_F_AFTER
+	BPF_F_ID
+	BPF_F_LINK_MPROG = 1 << 13 // aka BPF_F_LINK
 )
 
 // wrappedErrno wraps syscall.Errno to prevent direct comparisons with

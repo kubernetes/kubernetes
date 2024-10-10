@@ -59,6 +59,8 @@ func (ko *KprobeOptions) cookie() uint64 {
 // If attaching to symbol fails, automatically retries with the running
 // platform's syscall prefix (e.g. __x64_) to support attaching to syscalls
 // in a portable fashion.
+//
+// The returned Link may implement [PerfEvent].
 func Kprobe(symbol string, prog *ebpf.Program, opts *KprobeOptions) (Link, error) {
 	k, err := kprobe(symbol, prog, opts, false)
 	if err != nil {
@@ -90,6 +92,8 @@ func Kprobe(symbol string, prog *ebpf.Program, opts *KprobeOptions) (Link, error
 //
 // On kernels 5.10 and earlier, setting a kretprobe on a nonexistent symbol
 // incorrectly returns unix.EINVAL instead of os.ErrNotExist.
+//
+// The returned Link may implement [PerfEvent].
 func Kretprobe(symbol string, prog *ebpf.Program, opts *KprobeOptions) (Link, error) {
 	k, err := kprobe(symbol, prog, opts, true)
 	if err != nil {
@@ -274,7 +278,11 @@ func pmuProbe(args tracefs.ProbeArgs) (*perfEvent, error) {
 		}
 	}
 
-	rawFd, err := unix.PerfEventOpen(&attr, args.Pid, 0, -1, unix.PERF_FLAG_FD_CLOEXEC)
+	cpu := 0
+	if args.Pid != perfAllThreads {
+		cpu = -1
+	}
+	rawFd, err := unix.PerfEventOpen(&attr, args.Pid, cpu, -1, unix.PERF_FLAG_FD_CLOEXEC)
 
 	// On some old kernels, kprobe PMU doesn't allow `.` in symbol names and
 	// return -EINVAL. Return ErrNotSupported to allow falling back to tracefs.

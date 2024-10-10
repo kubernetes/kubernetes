@@ -21,24 +21,28 @@ func _() {
 	_ = x[BPF_F_MMAPABLE-1024]
 	_ = x[BPF_F_PRESERVE_ELEMS-2048]
 	_ = x[BPF_F_INNER_MAP-4096]
+	_ = x[BPF_F_LINK-8192]
+	_ = x[BPF_F_PATH_FD-16384]
 }
 
-const _MapFlags_name = "BPF_F_NO_PREALLOCBPF_F_NO_COMMON_LRUBPF_F_NUMA_NODEBPF_F_RDONLYBPF_F_WRONLYBPF_F_STACK_BUILD_IDBPF_F_ZERO_SEEDBPF_F_RDONLY_PROGBPF_F_WRONLY_PROGBPF_F_CLONEBPF_F_MMAPABLEBPF_F_PRESERVE_ELEMSBPF_F_INNER_MAP"
+const _MapFlags_name = "BPF_F_NO_PREALLOCBPF_F_NO_COMMON_LRUBPF_F_NUMA_NODEBPF_F_RDONLYBPF_F_WRONLYBPF_F_STACK_BUILD_IDBPF_F_ZERO_SEEDBPF_F_RDONLY_PROGBPF_F_WRONLY_PROGBPF_F_CLONEBPF_F_MMAPABLEBPF_F_PRESERVE_ELEMSBPF_F_INNER_MAPBPF_F_LINKBPF_F_PATH_FD"
 
 var _MapFlags_map = map[MapFlags]string{
-	1:    _MapFlags_name[0:17],
-	2:    _MapFlags_name[17:36],
-	4:    _MapFlags_name[36:51],
-	8:    _MapFlags_name[51:63],
-	16:   _MapFlags_name[63:75],
-	32:   _MapFlags_name[75:95],
-	64:   _MapFlags_name[95:110],
-	128:  _MapFlags_name[110:127],
-	256:  _MapFlags_name[127:144],
-	512:  _MapFlags_name[144:155],
-	1024: _MapFlags_name[155:169],
-	2048: _MapFlags_name[169:189],
-	4096: _MapFlags_name[189:204],
+	1:     _MapFlags_name[0:17],
+	2:     _MapFlags_name[17:36],
+	4:     _MapFlags_name[36:51],
+	8:     _MapFlags_name[51:63],
+	16:    _MapFlags_name[63:75],
+	32:    _MapFlags_name[75:95],
+	64:    _MapFlags_name[95:110],
+	128:   _MapFlags_name[110:127],
+	256:   _MapFlags_name[127:144],
+	512:   _MapFlags_name[144:155],
+	1024:  _MapFlags_name[155:169],
+	2048:  _MapFlags_name[169:189],
+	4096:  _MapFlags_name[189:204],
+	8192:  _MapFlags_name[204:214],
+	16384: _MapFlags_name[214:227],
 }
 
 func (i MapFlags) String() string {

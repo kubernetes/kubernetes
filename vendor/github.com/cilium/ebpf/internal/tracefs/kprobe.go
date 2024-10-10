@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/cilium/ebpf/internal"
@@ -20,7 +21,7 @@ var (
 	ErrInvalidMaxActive = errors.New("can only set maxactive on kretprobes")
 )
 
-//go:generate stringer -type=ProbeType -linecomment
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -type=ProbeType -linecomment
 
 type ProbeType uint8
 
@@ -110,7 +111,7 @@ func sanitizeTracefsPath(path ...string) (string, error) {
 // Since kernel 4.1 tracefs should be mounted by default at /sys/kernel/tracing,
 // but may be also be available at /sys/kernel/debug/tracing if debugfs is mounted.
 // The available tracefs paths will depends on distribution choices.
-var getTracefsPath = internal.Memoize(func() (string, error) {
+var getTracefsPath = sync.OnceValues(func() (string, error) {
 	for _, p := range []struct {
 		path   string
 		fsType int64

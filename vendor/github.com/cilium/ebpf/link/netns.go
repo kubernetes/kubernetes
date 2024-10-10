@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 // NetNsLink is a program attached to a network namespace.
@@ -33,4 +34,22 @@ func AttachNetNs(ns int, prog *ebpf.Program) (*NetNsLink, error) {
 	}
 
 	return &NetNsLink{*link}, nil
+}
+
+func (ns *NetNsLink) Info() (*Info, error) {
+	var info sys.NetNsLinkInfo
+	if err := sys.ObjInfo(ns.fd, &info); err != nil {
+		return nil, fmt.Errorf("netns link info: %s", err)
+	}
+	extra := &NetNsInfo{
+		NetnsIno:   info.NetnsIno,
+		AttachType: info.AttachType,
+	}
+
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		extra,
+	}, nil
 }

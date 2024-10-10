@@ -27,6 +27,7 @@ const (
 	EACCES
 	EILSEQ
 	EOPNOTSUPP
+	ESTALE
 )
 
 // Constants are distinct to avoid breaking switch statements.
@@ -41,6 +42,7 @@ const (
 	BPF_F_MMAPABLE
 	BPF_F_INNER_MAP
 	BPF_F_KPROBE_MULTI_RETURN
+	BPF_F_UPROBE_MULTI_RETURN
 	BPF_F_XDP_HAS_FRAGS
 	BPF_OBJ_NAME_LEN
 	BPF_TAG_SIZE
@@ -89,6 +91,9 @@ const (
 	BPF_FS_MAGIC
 	TRACEFS_MAGIC
 	DEBUGFS_MAGIC
+	BPF_RB_NO_WAKEUP
+	BPF_RB_FORCE_WAKEUP
+	BPF_F_LOCK
 )
 
 type Statfs_t struct {
@@ -290,5 +295,17 @@ func Fstat(fd int, stat *Stat_t) error {
 }
 
 func SetsockoptInt(fd, level, opt, value int) error {
+	return errNonLinux
+}
+
+type CPUSet struct{}
+
+func (*CPUSet) Set(int) {}
+
+func SchedSetaffinity(pid int, set *CPUSet) error {
+	return errNonLinux
+}
+
+func SchedGetaffinity(pid int, set *CPUSet) error {
 	return errNonLinux
 }

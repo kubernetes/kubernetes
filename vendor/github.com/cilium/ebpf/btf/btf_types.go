@@ -2,12 +2,15 @@ package btf
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"unsafe"
+
+	"github.com/cilium/ebpf/internal"
 )
 
-//go:generate stringer -linecomment -output=btf_types_string.go -type=FuncLinkage,VarLinkage,btfKind
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -linecomment -output=btf_types_string.go -type=FuncLinkage,VarLinkage,btfKind
 
 // btfKind describes a Type.
 type btfKind uint8
@@ -69,6 +72,63 @@ const (
 	btfTypeKindFlagMask  = 1
 )
 
+var btfHeaderLen = binary.Size(&btfHeader{})
+
+type btfHeader struct {
+	Magic   uint16
+	Version uint8
+	Flags   uint8
+	HdrLen  uint32
+
+	TypeOff   uint32
+	TypeLen   uint32
+	StringOff uint32
+	StringLen uint32
+}
+
+// typeStart returns the offset from the beginning of the .BTF section
+// to the start of its type entries.
+func (h *btfHeader) typeStart() int64 {
+	return int64(h.HdrLen + h.TypeOff)
+}
+
+// stringStart returns the offset from the beginning of the .BTF section
+// to the start of its string table.
+func (h *btfHeader) stringStart() int64 {
+	return int64(h.HdrLen + h.StringOff)
+}
+
+// parseBTFHeader parses the header of the .BTF section.
+func parseBTFHeader(r io.Reader, bo binary.ByteOrder) (*btfHeader, error) {
+	var header btfHeader
+	if err := binary.Read(r, bo, &header); err != nil {
+		return nil, fmt.Errorf("can't read header: %v", err)
+	}
+
+	if header.Magic != btfMagic {
+		return nil, fmt.Errorf("incorrect magic value %v", header.Magic)
+	}
+
+	if header.Version != 1 {
+		return nil, fmt.Errorf("unexpected version %v", header.Version)
+	}
+
+	if header.Flags != 0 {
+		return nil, fmt.Errorf("unsupported flags %v", header.Flags)
+	}
+
+	remainder := int64(header.HdrLen) - int64(binary.Size(&header))
+	if remainder < 0 {
+		return nil, errors.New("header length shorter than btfHeader size")
+	}
+
+	if _, err := io.CopyN(internal.DiscardZeroes{}, r, remainder); err != nil {
+		return nil, fmt.Errorf("header padding: %v", err)
+	}
+
+	return &header, nil
+}
+
 var btfTypeLen = binary.Size(btfType{})
 
 // btfType is equivalent to struct btf_type in Documentation/bpf/btf.rst.
@@ -91,6 +151,19 @@ type btfType struct {
 	 * "type" is a type_id referring to another type.
 	 */
 	SizeType uint32
+}
+
+var btfTypeSize = int(unsafe.Sizeof(btfType{}))
+
+func unmarshalBtfType(bt *btfType, b []byte, bo binary.ByteOrder) (int, error) {
+	if len(b) < btfTypeSize {
+		return 0, fmt.Errorf("not enough bytes to unmarshal btfType")
+	}
+
+	bt.NameOff = bo.Uint32(b[0:])
+	bt.Info = bo.Uint32(b[4:])
+	bt.SizeType = bo.Uint32(b[8:])
+	return btfTypeSize, nil
 }
 
 func mask(len uint32) uint32 {
@@ -240,6 +313,17 @@ const (
 	btfIntBitsShift     = 0
 )
 
+var btfIntLen = int(unsafe.Sizeof(btfInt{}))
+
+func unmarshalBtfInt(bi *btfInt, b []byte, bo binary.ByteOrder) (int, error) {
+	if len(b) < btfIntLen {
+		return 0, fmt.Errorf("not enough bytes to unmarshal btfInt")
+	}
+
+	bi.Raw = bo.Uint32(b[0:])
+	return btfIntLen, nil
+}
+
 func (bi btfInt) Encoding() IntEncoding {
 	return IntEncoding(readBits(bi.Raw, btfIntEncodingLen, btfIntEncodingShift))
 }
@@ -270,10 +354,42 @@ type btfArray struct {
 	Nelems    uint32
 }
 
+var btfArrayLen = int(unsafe.Sizeof(btfArray{}))
+
+func unmarshalBtfArray(ba *btfArray, b []byte, bo binary.ByteOrder) (int, error) {
+	if len(b) < btfArrayLen {
+		return 0, fmt.Errorf("not enough bytes to unmarshal btfArray")
+	}
+
+	ba.Type = TypeID(bo.Uint32(b[0:]))
+	ba.IndexType = TypeID(bo.Uint32(b[4:]))
+	ba.Nelems = bo.Uint32(b[8:])
+	return btfArrayLen, nil
+}
+
 type btfMember struct {
 	NameOff uint32
 	Type    TypeID
 	Offset  uint32
+}
+
+var btfMemberLen = int(unsafe.Sizeof(btfMember{}))
+
+func unmarshalBtfMembers(members []btfMember, b []byte, bo binary.ByteOrder) (int, error) {
+	off := 0
+	for i := range members {
+		if off+btfMemberLen > len(b) {
+			return 0, fmt.Errorf("not enough bytes to unmarshal btfMember %d", i)
+		}
+
+		members[i].NameOff = bo.Uint32(b[off+0:])
+		members[i].Type = TypeID(bo.Uint32(b[off+4:]))
+		members[i].Offset = bo.Uint32(b[off+8:])
+
+		off += btfMemberLen
+	}
+
+	return off, nil
 }
 
 type btfVarSecinfo struct {
@@ -282,13 +398,61 @@ type btfVarSecinfo struct {
 	Size   uint32
 }
 
+var btfVarSecinfoLen = int(unsafe.Sizeof(btfVarSecinfo{}))
+
+func unmarshalBtfVarSecInfos(secinfos []btfVarSecinfo, b []byte, bo binary.ByteOrder) (int, error) {
+	off := 0
+	for i := range secinfos {
+		if off+btfVarSecinfoLen > len(b) {
+			return 0, fmt.Errorf("not enough bytes to unmarshal btfVarSecinfo %d", i)
+		}
+
+		secinfos[i].Type = TypeID(bo.Uint32(b[off+0:]))
+		secinfos[i].Offset = bo.Uint32(b[off+4:])
+		secinfos[i].Size = bo.Uint32(b[off+8:])
+
+		off += btfVarSecinfoLen
+	}
+
+	return off, nil
+}
+
 type btfVariable struct {
 	Linkage uint32
+}
+
+var btfVariableLen = int(unsafe.Sizeof(btfVariable{}))
+
+func unmarshalBtfVariable(bv *btfVariable, b []byte, bo binary.ByteOrder) (int, error) {
+	if len(b) < btfVariableLen {
+		return 0, fmt.Errorf("not enough bytes to unmarshal btfVariable")
+	}
+
+	bv.Linkage = bo.Uint32(b[0:])
+	return btfVariableLen, nil
 }
 
 type btfEnum struct {
 	NameOff uint32
 	Val     uint32
+}
+
+var btfEnumLen = int(unsafe.Sizeof(btfEnum{}))
+
+func unmarshalBtfEnums(enums []btfEnum, b []byte, bo binary.ByteOrder) (int, error) {
+	off := 0
+	for i := range enums {
+		if off+btfEnumLen > len(b) {
+			return 0, fmt.Errorf("not enough bytes to unmarshal btfEnum %d", i)
+		}
+
+		enums[i].NameOff = bo.Uint32(b[off+0:])
+		enums[i].Val = bo.Uint32(b[off+4:])
+
+		off += btfEnumLen
+	}
+
+	return off, nil
 }
 
 type btfEnum64 struct {
@@ -297,75 +461,59 @@ type btfEnum64 struct {
 	ValHi32 uint32
 }
 
+var btfEnum64Len = int(unsafe.Sizeof(btfEnum64{}))
+
+func unmarshalBtfEnums64(enums []btfEnum64, b []byte, bo binary.ByteOrder) (int, error) {
+	off := 0
+	for i := range enums {
+		if off+btfEnum64Len > len(b) {
+			return 0, fmt.Errorf("not enough bytes to unmarshal btfEnum64 %d", i)
+		}
+
+		enums[i].NameOff = bo.Uint32(b[off+0:])
+		enums[i].ValLo32 = bo.Uint32(b[off+4:])
+		enums[i].ValHi32 = bo.Uint32(b[off+8:])
+
+		off += btfEnum64Len
+	}
+
+	return off, nil
+}
+
 type btfParam struct {
 	NameOff uint32
 	Type    TypeID
+}
+
+var btfParamLen = int(unsafe.Sizeof(btfParam{}))
+
+func unmarshalBtfParams(params []btfParam, b []byte, bo binary.ByteOrder) (int, error) {
+	off := 0
+	for i := range params {
+		if off+btfParamLen > len(b) {
+			return 0, fmt.Errorf("not enough bytes to unmarshal btfParam %d", i)
+		}
+
+		params[i].NameOff = bo.Uint32(b[off+0:])
+		params[i].Type = TypeID(bo.Uint32(b[off+4:]))
+
+		off += btfParamLen
+	}
+
+	return off, nil
 }
 
 type btfDeclTag struct {
 	ComponentIdx uint32
 }
 
-func readTypes(r io.Reader, bo binary.ByteOrder, typeLen uint32) ([]rawType, error) {
-	var header btfType
-	// because of the interleaving between types and struct members it is difficult to
-	// precompute the numbers of raw types this will parse
-	// this "guess" is a good first estimation
-	sizeOfbtfType := uintptr(btfTypeLen)
-	tyMaxCount := uintptr(typeLen) / sizeOfbtfType / 2
-	types := make([]rawType, 0, tyMaxCount)
+var btfDeclTagLen = int(unsafe.Sizeof(btfDeclTag{}))
 
-	for id := TypeID(1); ; id++ {
-		if err := binary.Read(r, bo, &header); err == io.EOF {
-			return types, nil
-		} else if err != nil {
-			return nil, fmt.Errorf("can't read type info for id %v: %v", id, err)
-		}
-
-		var data interface{}
-		switch header.Kind() {
-		case kindInt:
-			data = new(btfInt)
-		case kindPointer:
-		case kindArray:
-			data = new(btfArray)
-		case kindStruct:
-			fallthrough
-		case kindUnion:
-			data = make([]btfMember, header.Vlen())
-		case kindEnum:
-			data = make([]btfEnum, header.Vlen())
-		case kindForward:
-		case kindTypedef:
-		case kindVolatile:
-		case kindConst:
-		case kindRestrict:
-		case kindFunc:
-		case kindFuncProto:
-			data = make([]btfParam, header.Vlen())
-		case kindVar:
-			data = new(btfVariable)
-		case kindDatasec:
-			data = make([]btfVarSecinfo, header.Vlen())
-		case kindFloat:
-		case kindDeclTag:
-			data = new(btfDeclTag)
-		case kindTypeTag:
-		case kindEnum64:
-			data = make([]btfEnum64, header.Vlen())
-		default:
-			return nil, fmt.Errorf("type id %v: unknown kind: %v", id, header.Kind())
-		}
-
-		if data == nil {
-			types = append(types, rawType{header, nil})
-			continue
-		}
-
-		if err := binary.Read(r, bo, data); err != nil {
-			return nil, fmt.Errorf("type id %d: kind %v: can't read %T: %v", id, header.Kind(), data, err)
-		}
-
-		types = append(types, rawType{header, data})
+func unmarshalBtfDeclTag(bdt *btfDeclTag, b []byte, bo binary.ByteOrder) (int, error) {
+	if len(b) < btfDeclTagLen {
+		return 0, fmt.Errorf("not enough bytes to unmarshal btfDeclTag")
 	}
+
+	bdt.ComponentIdx = bo.Uint32(b[0:])
+	return btfDeclTagLen, nil
 }

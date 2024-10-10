@@ -18,6 +18,25 @@ func (f *tracing) Update(new *ebpf.Program) error {
 	return fmt.Errorf("tracing update: %w", ErrNotSupported)
 }
 
+func (f *tracing) Info() (*Info, error) {
+	var info sys.TracingLinkInfo
+	if err := sys.ObjInfo(f.fd, &info); err != nil {
+		return nil, fmt.Errorf("tracing link info: %s", err)
+	}
+	extra := &TracingInfo{
+		TargetObjId: info.TargetObjId,
+		TargetBtfId: info.TargetBtfId,
+		AttachType:  info.AttachType,
+	}
+
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		extra,
+	}, nil
+}
+
 // AttachFreplace attaches the given eBPF program to the function it replaces.
 //
 // The program and name can either be provided at link time, or can be provided

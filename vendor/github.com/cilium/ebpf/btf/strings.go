@@ -6,14 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/maps"
 )
 
 type stringTable struct {
 	base    *stringTable
 	offsets []uint32
+	prevIdx int
 	strings []string
 }
 
@@ -60,7 +61,7 @@ func readStringTable(r sizedReader, base *stringTable) (*stringTable, error) {
 		return nil, errors.New("first item in string table is non-empty")
 	}
 
-	return &stringTable{base, offsets, strings}, nil
+	return &stringTable{base, offsets, 0, strings}, nil
 }
 
 func splitNull(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -83,51 +84,34 @@ func (st *stringTable) Lookup(offset uint32) (string, error) {
 }
 
 func (st *stringTable) lookup(offset uint32) (string, error) {
-	i := search(st.offsets, offset)
-	if i == len(st.offsets) || st.offsets[i] != offset {
+	// Fast path: zero offset is the empty string, looked up frequently.
+	if offset == 0 && st.base == nil {
+		return "", nil
+	}
+
+	// Accesses tend to be globally increasing, so check if the next string is
+	// the one we want. This skips the binary search in about 50% of cases.
+	if st.prevIdx+1 < len(st.offsets) && st.offsets[st.prevIdx+1] == offset {
+		st.prevIdx++
+		return st.strings[st.prevIdx], nil
+	}
+
+	i, found := slices.BinarySearch(st.offsets, offset)
+	if !found {
 		return "", fmt.Errorf("offset %d isn't start of a string", offset)
+	}
+
+	// Set the new increment index, but only if its greater than the current.
+	if i > st.prevIdx+1 {
+		st.prevIdx = i
 	}
 
 	return st.strings[i], nil
 }
 
-func (st *stringTable) Marshal(w io.Writer) error {
-	for _, str := range st.strings {
-		_, err := io.WriteString(w, str)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write([]byte{0})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Num returns the number of strings in the table.
 func (st *stringTable) Num() int {
 	return len(st.strings)
-}
-
-// search is a copy of sort.Search specialised for uint32.
-//
-// Licensed under https://go.dev/LICENSE
-func search(ints []uint32, needle uint32) int {
-	// Define f(-1) == false and f(n) == true.
-	// Invariant: f(i-1) == false, f(j) == true.
-	i, j := 0, len(ints)
-	for i < j {
-		h := int(uint(i+j) >> 1) // avoid overflow when computing h
-		// i ≤ h < j
-		if !(ints[h] >= needle) {
-			i = h + 1 // preserves f(i-1) == false
-		} else {
-			j = h // preserves f(j) == true
-		}
-	}
-	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i
 }
 
 // stringTableBuilder builds BTF string tables.

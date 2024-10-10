@@ -77,7 +77,13 @@ func (gf *GoFormatter) writeTypeDecl(name string, typ Type) error {
 	gf.w.WriteString("; const ( ")
 	for _, ev := range e.Values {
 		id := gf.enumIdentifier(name, ev.Name)
-		fmt.Fprintf(&gf.w, "%s %s = %d; ", id, name, ev.Value)
+		var value any
+		if e.Signed {
+			value = int64(ev.Value)
+		} else {
+			value = ev.Value
+		}
+		fmt.Fprintf(&gf.w, "%s %s = %d; ", id, name, value)
 	}
 	gf.w.WriteString(")")
 
@@ -112,7 +118,7 @@ func (gf *GoFormatter) writeType(typ Type, depth int) error {
 //	uint32
 func (gf *GoFormatter) writeTypeLit(typ Type, depth int) error {
 	depth++
-	if depth > maxTypeDepth {
+	if depth > maxResolveDepth {
 		return errNestedTooDeep
 	}
 
@@ -259,7 +265,7 @@ func (gf *GoFormatter) writeStructField(m Member, depth int) error {
 		}
 
 		depth++
-		if depth > maxTypeDepth {
+		if depth > maxResolveDepth {
 			return errNestedTooDeep
 		}
 
@@ -332,7 +338,7 @@ func (gf *GoFormatter) writePadding(bytes uint32) {
 
 func skipQualifiers(typ Type) Type {
 	result := typ
-	for depth := 0; depth <= maxTypeDepth; depth++ {
+	for depth := 0; depth <= maxResolveDepth; depth++ {
 		switch v := (result).(type) {
 		case qualifier:
 			result = v.qualify()

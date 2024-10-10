@@ -37,7 +37,7 @@ func (ufe *UnsupportedFeatureError) Is(target error) bool {
 type FeatureTest struct {
 	// The name of the feature being detected.
 	Name string
-	// Version in in the form Major.Minor[.Patch].
+	// Version in the form Major.Minor[.Patch].
 	Version string
 	// The feature test itself.
 	Fn FeatureTestFn
