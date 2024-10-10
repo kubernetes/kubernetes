@@ -926,6 +926,120 @@ func Test_NodesShutdown(t *testing.T) {
 	}
 }
 
+func Test_InstanceExistsGracePeriod(t *testing.T) {
+	testcases := []struct {
+		name         string
+		fakeCloud    *fakecloud.Cloud
+		existingNode *v1.Node
+	}{
+		{
+			name: "newly-created node with InstanceID returning InstanceNotFound gets deleted after grace period elapses",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			fakeCloud: &fakecloud.Cloud{
+				ErrShutdownByProviderID: nil,
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.InstanceNotFound,
+				},
+			},
+		},
+		{
+			name: "node is shutdown but provider says it does not exist",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.Local),
+						},
+					},
+				},
+			},
+			fakeCloud: &fakecloud.Cloud{
+				NodeShutdown:            true,
+				ExistsByProviderID:      false,
+				ErrShutdownByProviderID: nil,
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			testcase.existingNode.CreationTimestamp = metav1.Now()
+
+			clientset := fake.NewSimpleClientset(testcase.existingNode)
+			informer := informers.NewSharedInformerFactory(clientset, time.Second)
+			nodeInformer := informer.Core().V1().Nodes()
+
+			if err := syncNodeStore(ctx, nodeInformer, clientset); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+			cloudNodeLifecycleController := &CloudNodeLifecycleController{
+				nodeLister:                nodeInformer.Lister(),
+				kubeClient:                clientset,
+				cloud:                     testcase.fakeCloud,
+				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				nodeMonitorPeriod:         1 * time.Second,
+				instanceExistsGracePeriod: 5 * time.Second,
+			}
+
+			w := eventBroadcaster.StartStructuredLogging(0)
+			defer w.Stop()
+			cloudNodeLifecycleController.MonitorNodes(ctx)
+
+			// node should still exist
+			updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, testcase.existingNode.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error happens when getting the node: %v", err)
+			}
+			if !reflect.DeepEqual(updatedNode, testcase.existingNode) {
+				t.Logf("actual nodes: %v", updatedNode)
+				t.Logf("expected nodes: %v", testcase.existingNode)
+				t.Error("unexpected updated nodes")
+			}
+
+			// wait for the grace period to elapse
+			time.Sleep(cloudNodeLifecycleController.instanceExistsGracePeriod)
+
+			// and check again
+			cloudNodeLifecycleController.MonitorNodes(ctx)
+
+			// node should be deleted
+			_, err = clientset.CoreV1().Nodes().Get(ctx, testcase.existingNode.Name, metav1.GetOptions{})
+			if !apierrors.IsNotFound(err) {
+				t.Fatalf("expected node to be deleted, but got error: %v", err)
+			}
+		})
+	}
+}
+
 func Test_GetProviderID(t *testing.T) {
 	testcases := []struct {
 		name               string
