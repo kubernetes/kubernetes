@@ -439,6 +439,14 @@ func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *api.PodSpec) b
 		podEnvVarNames = gatherPodEnvVarNames(podSpec)
 	}
 
+	// If the changed field is not the environment variable name and
+	// the RelaxedEnvironmentVariableValidation feature gate is not enabled,
+	// we will still use relaxed validation to prevent workload
+	// failures when updating other fields after cluster rollback.
+	if oldPodEnvVarNames.Equal(podEnvVarNames) {
+		return true
+	}
+
 	for env := range podEnvVarNames {
 		if relaxedEnvVarUsed(env, oldPodEnvVarNames) {
 			return true
