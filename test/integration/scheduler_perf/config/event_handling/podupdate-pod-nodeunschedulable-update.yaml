@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nodeunschedulable-{{ .Index }}
+  labels:
+    type: unsched
+spec:
+  tolerations:
+  - key: node.kubernetes.io/unschedulable
+    operator: Exists
+    effect: NoSchedule
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause

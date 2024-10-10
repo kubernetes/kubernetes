@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-tainttoleration-{{ .Index }}
+  labels:
+    type: unsched
+spec:
+  tolerations:
+  - key: toleration
+    operator: Exists
+    effect: NoSchedule
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
