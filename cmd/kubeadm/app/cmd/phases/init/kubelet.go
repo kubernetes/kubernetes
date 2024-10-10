@@ -79,7 +79,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Write the instance kubelet configuration file to disk.
 	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
-		if err := kubeletphase.WriteInstanceConfigToDisk(&data.Cfg().NodeRegistration, data.KubeletDir()); err != nil {
+		if err := kubeletphase.WriteInstanceConfigToDisk(data.Cfg().NodeRegistration.CRISocket, data.KubeletDir()); err != nil {
 			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
 		}
 	}

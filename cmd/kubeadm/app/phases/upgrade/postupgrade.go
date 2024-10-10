@@ -35,6 +35,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -122,6 +123,30 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	}
 
 	errs := []error{}
+
+	// We will first check if instance-config.yaml exists,
+	// and if it doesn't, then we get the containerRuntimeEndpoint from kubeadm-flags.env and write to instance-config.yaml
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		_, err := os.Stat(filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName))
+		if os.IsNotExist(err) {
+			containerRuntimeEndpoint, err := kubeletphase.ReadKubeadmFlags(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName), out)
+			if err != nil {
+				errs = append(errs, errors.Wrap(err, "error reading kubeadm flags file"))
+			}
+
+			if err := kubeletphase.WriteInstanceConfigToDisk(containerRuntimeEndpoint, kubeletDir); err != nil {
+				errs = append(errs, errors.Wrap(err, "error writing instance kubelet configuration to disk"))
+			}
+
+			if dryRun { // Print what contents would be written
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				if err != nil {
+					errs = append(errs, errors.Wrap(err, "error printing instance config file on dryrun"))
+				}
+			}
+		}
+	}
+
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
@@ -130,7 +155,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	if dryRun { // Print what contents would be written
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		if err != nil {
-			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+			errs = append(errs, errors.Wrap(err, "error printing config file on dryrun"))
 		}
 	}
 	return errorsutil.NewAggregate(errs)

@@ -226,3 +226,77 @@ func TestApplyPatchesToConfig(t *testing.T) {
 		t.Fatalf("expected port: %d, got: %d", expectedPort, *newTyped.HealthzPort)
 	}
 }
+
+func TestReadKubeadmFlags(t *testing.T) {
+	tests := []struct {
+		name              string
+		fileContent       string
+		expectedEndpoint  string
+		expectError       bool
+		expectedLogOutput string
+	}{
+		{
+			name:              "valid kubeadm flags with container-runtime-endpoint",
+			fileContent:       `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.10"`,
+			expectedEndpoint:  "unix:///var/run/containerd/containerd.sock",
+			expectError:       false,
+			expectedLogOutput: "[info] Reading line: KUBELET_KUBEADM_ARGS=\"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.10\"\n[info] Found container-runtime-endpoint: --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock\n",
+		},
+		{
+			name:              "no container-runtime-endpoint found",
+			fileContent:       `KUBELET_KUBEADM_ARGS="--pod-infra-container-image=registry.k8s.io/pause:3.10"`,
+			expectedEndpoint:  "",
+			expectError:       true,
+			expectedLogOutput: "[info] Reading line: KUBELET_KUBEADM_ARGS=\"--pod-infra-container-image=registry.k8s.io/pause:3.10\"\n",
+		},
+		{
+			name:              "no KUBELET_KUBEADM_ARGS line",
+			fileContent:       `# This is a comment, no args here`,
+			expectedEndpoint:  "",
+			expectError:       true,
+			expectedLogOutput: "",
+		},
+		{
+			name:              "invalid file format",
+			fileContent:       "",
+			expectedEndpoint:  "",
+			expectError:       true,
+			expectedLogOutput: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "kubeadm-flags-*.env")
+			if err != nil {
+				t.Errorf("Error creating temporary file: %v", err)
+			}
+
+			defer func() {
+				_ = os.Remove(tmpFile.Name())
+				_ = tmpFile.Close()
+			}()
+
+			_, err = tmpFile.WriteString(tt.fileContent)
+			if err != nil {
+				t.Errorf("Error Write args to file: %v", err)
+			}
+
+			output := new(bytes.Buffer)
+
+			endpoint, err := ReadKubeadmFlags(tmpFile.Name(), output)
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.expectedEndpoint, endpoint); diff != "" {
+				t.Errorf("Unexpected diff (-expected,+got):\n%s", diff)
+			}
+
+			// Compare the log output
+			if diff := cmp.Diff(tt.expectedLogOutput, output.String()); diff != "" {
+				t.Errorf("Unexpected diff (-expected,+got):\n%s", diff)
+			}
+		})
+	}
+}
