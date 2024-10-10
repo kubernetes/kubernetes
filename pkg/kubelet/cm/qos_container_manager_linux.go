@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -58,6 +60,7 @@ type qosContainerManagerImpl struct {
 	getNodeAllocatable func() v1.ResourceList
 	cgroupRoot         CgroupName
 	qosReserved        map[v1.ResourceName]int64
+	group              singleflight.Group
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
@@ -307,81 +310,92 @@ func (m *qosContainerManagerImpl) setMemoryQoS(configs map[v1.PodQOSClass]*Cgrou
 }
 
 func (m *qosContainerManagerImpl) UpdateCgroups() error {
-	m.Lock()
-	defer m.Unlock()
+	_, err, _ := m.group.Do("qos", func() (interface{}, error) {
+		m.Lock()
+		defer m.Unlock()
 
-	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
-		v1.PodQOSGuaranteed: {
-			Name:               m.qosContainersInfo.Guaranteed,
-			ResourceParameters: &ResourceConfig{},
-		},
-		v1.PodQOSBurstable: {
-			Name:               m.qosContainersInfo.Burstable,
-			ResourceParameters: &ResourceConfig{},
-		},
-		v1.PodQOSBestEffort: {
-			Name:               m.qosContainersInfo.BestEffort,
-			ResourceParameters: &ResourceConfig{},
-		},
-	}
+		// All update requests made until this point will wait for the current call.
+		// activePods callback is called after Forget, this ensures that pods
+		// added/removed before UpdateCgroups call are taken into account
+		// New update requests after Forget will trigger a new function invocation
+		// that will wait until the mutex that we acquired above is released
+		m.group.Forget("qos")
 
-	// update the qos level cgroup settings for cpu shares
-	if err := m.setCPUCgroupConfig(qosConfigs); err != nil {
-		return err
-	}
+		qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
+			v1.PodQOSGuaranteed: {
+				Name:               m.qosContainersInfo.Guaranteed,
+				ResourceParameters: &ResourceConfig{},
+			},
+			v1.PodQOSBurstable: {
+				Name:               m.qosContainersInfo.Burstable,
+				ResourceParameters: &ResourceConfig{},
+			},
+			v1.PodQOSBestEffort: {
+				Name:               m.qosContainersInfo.BestEffort,
+				ResourceParameters: &ResourceConfig{},
+			},
+		}
 
-	// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
-	if err := m.setHugePagesConfig(qosConfigs); err != nil {
-		return err
-	}
+		// update the qos level cgroup settings for cpu shares
+		if err := m.setCPUCgroupConfig(qosConfigs); err != nil {
+			return nil, err
+		}
 
-	// update the qos level cgrougs v2 settings of memory qos if feature enabled
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-		libcontainercgroups.IsCgroup2UnifiedMode() {
-		m.setMemoryQoS(qosConfigs)
-	}
+		// update the qos level cgroup settings for huge pages (ensure they remain unbounded)
+		if err := m.setHugePagesConfig(qosConfigs); err != nil {
+			return nil, err
+		}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {
-		for resource, percentReserve := range m.qosReserved {
-			switch resource {
-			case v1.ResourceMemory:
-				m.setMemoryReserve(qosConfigs, percentReserve)
+		// update the qos level cgrougs v2 settings of memory qos if feature enabled
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+			libcontainercgroups.IsCgroup2UnifiedMode() {
+			m.setMemoryQoS(qosConfigs)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.QOSReserved) {
+			for resource, percentReserve := range m.qosReserved {
+				switch resource {
+				case v1.ResourceMemory:
+					m.setMemoryReserve(qosConfigs, percentReserve)
+				}
+			}
+
+			updateSuccess := true
+			for _, config := range qosConfigs {
+				err := m.cgroupManager.Update(config)
+				if err != nil {
+					updateSuccess = false
+				}
+			}
+			if updateSuccess {
+				klog.V(4).InfoS("Updated QoS cgroup configuration")
+				return nil, nil
+			}
+
+			// If the resource can adjust the ResourceConfig to increase likelihood of
+			// success, call the adjustment function here.  Otherwise, the Update() will
+			// be called again with the same values.
+			for resource, percentReserve := range m.qosReserved {
+				switch resource {
+				case v1.ResourceMemory:
+					m.retrySetMemoryReserve(qosConfigs, percentReserve)
+				}
 			}
 		}
 
-		updateSuccess := true
 		for _, config := range qosConfigs {
 			err := m.cgroupManager.Update(config)
 			if err != nil {
-				updateSuccess = false
+				klog.ErrorS(err, "Failed to update QoS cgroup configuration")
+				return nil, err
 			}
 		}
-		if updateSuccess {
-			klog.V(4).InfoS("Updated QoS cgroup configuration")
-			return nil
-		}
 
-		// If the resource can adjust the ResourceConfig to increase likelihood of
-		// success, call the adjustment function here.  Otherwise, the Update() will
-		// be called again with the same values.
-		for resource, percentReserve := range m.qosReserved {
-			switch resource {
-			case v1.ResourceMemory:
-				m.retrySetMemoryReserve(qosConfigs, percentReserve)
-			}
-		}
-	}
+		klog.V(4).InfoS("Updated QoS cgroup configuration")
+		return nil, nil
+	})
 
-	for _, config := range qosConfigs {
-		err := m.cgroupManager.Update(config)
-		if err != nil {
-			klog.ErrorS(err, "Failed to update QoS cgroup configuration")
-			return err
-		}
-	}
-
-	klog.V(4).InfoS("Updated QoS cgroup configuration")
-	return nil
+	return err
 }
 
 type qosContainerManagerNoop struct {
