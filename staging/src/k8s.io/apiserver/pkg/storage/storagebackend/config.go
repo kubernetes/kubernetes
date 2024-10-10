@@ -53,6 +53,9 @@ type TransportConfig struct {
 	EgressLookup egressselector.Lookup
 	// The TracerProvider can add tracing the connection
 	TracerProvider oteltrace.TracerProvider
+	// enable grpc client health checking
+	// see https://grpc.io/docs/guides/health-checking/#enabling-client-health-checking
+	EnableGrpcHealthcheck bool
 }
 
 // Config is configuration for creating a storage backend.
