@@ -68,6 +68,7 @@ type RuntimeHelper interface {
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 }
 
+// test
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
 func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
