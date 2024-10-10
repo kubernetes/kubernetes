@@ -373,7 +373,7 @@ func (b *Builder) URL(httpAttemptCount int, urls ...*url.URL) *Builder {
 	for _, u := range urls {
 		b.paths = append(b.paths, &URLVisitor{
 			URL:              u,
-			StreamVisitor:    NewStreamVisitor(nil, b.mapper, u.String(), b.schema),
+			StreamVisitor:    NewStreamVisitor(nil, b.mapper, u.String(), b.schema, WithStrictStreamVisitor()),
 			HttpAttemptCount: httpAttemptCount,
 		})
 	}
