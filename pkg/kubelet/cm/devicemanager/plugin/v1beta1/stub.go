@@ -156,7 +156,9 @@ func (m *Stub) Start() error {
 
 	go func() {
 		defer m.wg.Done()
-		m.server.Serve(sock)
+		if err = m.server.Serve(sock); err != nil {
+			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+		}
 	}()
 
 	var lastDialErr error
