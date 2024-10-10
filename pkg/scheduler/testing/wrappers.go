@@ -224,6 +224,12 @@ func (c *ContainerWrapper) ResourceLimits(limMap map[v1.ResourceName]string) *Co
 	return c
 }
 
+// RestartPolicy sets the container's restartPolicy to the given restartPolicy.
+func (c *ContainerWrapper) RestartPolicy(restartPolicy v1.ContainerRestartPolicy) *ContainerWrapper {
+	c.Container.RestartPolicy = &restartPolicy
+	return c
+}
+
 // PodWrapper wraps a Pod inside.
 type PodWrapper struct{ v1.Pod }
 
@@ -698,6 +704,17 @@ func (p *PodWrapper) InitReq(resMap map[v1.ResourceName]string) *PodWrapper {
 
 	name := fmt.Sprintf("init-con%d", len(p.Spec.InitContainers))
 	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	return p
+}
+
+// SidecarReq adds a new sidecar container to the inner pod with given resource map.
+func (p *PodWrapper) SidecarReq(resMap map[v1.ResourceName]string) *PodWrapper {
+	if len(resMap) == 0 {
+		return p
+	}
+
+	name := fmt.Sprintf("sidecar-con%d", len(p.Spec.InitContainers))
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).RestartPolicy(v1.ContainerRestartPolicyAlways).Resources(resMap).Obj())
 	return p
 }
 
