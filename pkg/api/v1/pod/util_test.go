@@ -32,12 +32,14 @@ import (
 )
 
 func TestFindPort(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
-		name       string
-		containers []v1.Container
-		port       intstr.IntOrString
-		expected   int
-		pass       bool
+		name           string
+		containers     []v1.Container
+		initContainers []v1.Container
+		port           intstr.IntOrString
+		expected       int
+		pass           bool
 	}{{
 		name:       "valid int, no ports",
 		containers: []v1.Container{{}},
@@ -182,10 +184,39 @@ func TestFindPort(t *testing.T) {
 			expected: 11,
 			pass:     true,
 		},
+		{
+			name: "Sidecar initContainer named port",
+			initContainers: []v1.Container{{
+				RestartPolicy: &restartAlways,
+				Ports: []v1.ContainerPort{{
+					Name:          "a",
+					ContainerPort: 80,
+					HostPort:      -1,
+					Protocol:      "TCP",
+				}},
+			}},
+			port:     intstr.FromString("a"),
+			expected: 80,
+			pass:     true,
+		},
+		{
+			name: "Invalid(restartPolicy != Always) initContainer named port",
+			initContainers: []v1.Container{{
+				Ports: []v1.ContainerPort{{
+					Name:          "a",
+					ContainerPort: 80,
+					HostPort:      -1,
+					Protocol:      "TCP",
+				}},
+			}},
+			port:     intstr.FromString("a"),
+			expected: 0,
+			pass:     false,
+		},
 	}
 
 	for _, tc := range testCases {
-		port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers}},
+		port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers}},
 			&v1.ServicePort{Protocol: "TCP", TargetPort: tc.port})
 		if err != nil && tc.pass {
 			t.Errorf("unexpected error for %s: %v", tc.name, err)
