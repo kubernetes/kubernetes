@@ -1223,6 +1223,73 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.Set[string]{},
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			name:         "Pod rejected by the VolumeRestriction plugin is requeued when the PVC bound to the pod is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().
+					Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				pvc2 := st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj()
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc2, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to add pvc1: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.PvcAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the VolumeRestriction plugin is requeued when the pod is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().
+					Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").Container("image").PVC("pvc1").Obj(),
+				st.MakePod().Name("pod3").Container("image").PVC("pvc2").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+					return nil, fmt.Errorf("failed to delete pod1: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.AssignedPodDelete: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
 	}
 
 	for _, tt := range tests {
