@@ -159,7 +159,7 @@ func TestDoProbe(t *testing.T) {
 			} else {
 				testRootDir = tempDir
 			}
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), testRootDir)
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), testRootDir, "")
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
