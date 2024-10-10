@@ -587,7 +587,43 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.New("pod2"),
 			enableSchedulingQueueHint: []bool{true},
 		},
-
+		{
+			name:         "Pod rejected by the PodAffinity plugin is requeued when creating pod which matches podAffinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPods:  []*v1.Pod{},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Create a pod to make it match the pod1's podAffinity
+				pod := st.MakePod().Name("pod2").Label("service", "securityscan").Container("image").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create pod2: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.AssignedPodAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected by the PodAffinity plugin is requeued when deleting pod which matches podAntiAffinity",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Label("service", "securityscan").Container("image").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Delete pod to make it match the pod2's podAntiAffinity
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to delete pod1: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.AssignedPodDelete: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
 		{
 			name:         "Pod rejected by the PodAffinity plugin is requeued when updating the label of the node to make it match the pod affinity",
 			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
