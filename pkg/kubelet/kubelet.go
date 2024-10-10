@@ -1962,6 +1962,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	sctx := context.WithoutCancel(ctx)
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if err := kl.syncPLEGCache(pod, podStatus, &result); err != nil {
+			klog.ErrorS(err, "Failed to update pod cache", "pod", klog.KObj(pod))
+			return false, err
+		}
+	}
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
 		for _, r := range result.SyncResults {
@@ -1985,6 +1991,27 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	return false, nil
+}
+
+// syncPLEGCache updates PLEG cache after pod lifecycle actions are completed
+// so that pod worker actions and PLEG cache are synced.
+func (kl *Kubelet) syncPLEGCache(pod *v1.Pod, podStatus *kubecontainer.PodStatus, result *kubecontainer.PodSyncResult) error {
+	needsUpdate := false
+	for _, r := range result.SyncResults {
+		if r.Error == nil && (r.Action == kubecontainer.StartContainer || r.Action == kubecontainer.KillContainer) {
+			needsUpdate = true
+			break
+		}
+	}
+	if !needsUpdate {
+		return nil
+	}
+
+	runtimePod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
+	if err, _ := kl.pleg.UpdateCache(&runtimePod, pod.UID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SyncTerminatingPod is expected to terminate all running containers in a pod. Once this method
@@ -2042,10 +2069,27 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// catch race conditions introduced by callers updating pod status out of order.
 	// TODO: have KillPod return the terminal status of stopped containers and write that into the
 	//  cache immediately
-	stoppedPodStatus, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
-		return err
+	var stoppedPodStatus *kubecontainer.PodStatus
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// Update the PLEG cache so that podworker actions and PLEG cache are synched.
+		runtimePod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
+		if err, _ := kl.pleg.UpdateCache(&runtimePod, pod.UID); err != nil {
+			klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
+			return err
+		}
+		var err error
+		stoppedPodStatus, err = kl.podCache.Get(pod.UID)
+		if err != nil {
+			klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
+			return err
+		}
+	} else {
+		var err error
+		stoppedPodStatus, err = kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
+		if err != nil {
+			klog.ErrorS(err, "Unable to read pod status prior to final pod termination", "pod", klog.KObj(pod), "podUID", pod.UID)
+			return err
+		}
 	}
 	preserveDataFromBeforeStopping(stoppedPodStatus, podStatus)
 	var runningContainers []string
