@@ -18,6 +18,7 @@ package topologymanager
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -202,10 +203,8 @@ func TestManagerScope(t *testing.T) {
 }
 
 type mockHintProvider struct {
-	th map[string][]TopologyHint
-	//TODO: Add this field and add some tests to make sure things error out
-	//appropriately on allocation errors.
-	//allocateError error
+	th            map[string][]TopologyHint
+	allocateError error
 }
 
 func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
@@ -217,8 +216,7 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 }
 
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
-	//return allocateError
-	return nil
+	return m.allocateError
 }
 
 type mockPolicy struct {
@@ -329,6 +327,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -355,6 +354,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -381,6 +381,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -399,6 +400,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -421,6 +423,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -443,6 +446,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -469,6 +473,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -495,6 +500,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: true,
@@ -513,6 +519,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: false,
@@ -531,6 +538,7 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: false,
@@ -576,8 +584,168 @@ func TestAdmit(t *testing.T) {
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}
-		if !ctnActual.Admit && ctnActual.Reason != ErrorTopologyAffinity {
-			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, ctnActual.Reason)
+		if !podActual.Admit && podActual.Reason != ErrorTopologyAffinity {
+			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, podActual.Reason)
+		}
+	}
+}
+
+func TestAdmitWithError(t *testing.T) {
+
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			0: {10, 11},
+			1: {11, 10},
+		},
+	}
+	opts := PolicyOptions{}
+	bePolicy := NewBestEffortPolicy(numaInfo, opts)
+	restrictedPolicy := NewRestrictedPolicy(numaInfo, opts)
+
+	tcases := []struct {
+		name     string
+		qosClass v1.PodQOSClass
+		policy   Policy
+		hp       []HintProvider
+		expected bool
+		reason   string
+		message  string
+	}{
+		{
+			name:     "Hint Provider has no preference",
+			qosClass: v1.PodQOSBurstable,
+			policy:   restrictedPolicy,
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+					nil,
+				},
+			},
+			expected: false,
+			reason:   ErrorTopologyAffinity,
+			message:  "Resources cannot be allocated with Topology locality due to hint Provider has no preference for NUMA affinity with any resource",
+		},
+		{
+			name:     "Not enough cpus available.",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   restrictedPolicy,
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+						},
+					},
+					fmt.Errorf("not enough cpus available to satisfy request: requested=5, available=2"),
+				},
+			},
+			expected: false,
+			reason:   ErrorAllocateResource,
+			message:  "Allocate resources failed due to not enough cpus available to satisfy request: requested=5, available=2",
+		},
+		{
+			name:     "No healthy devices present.",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   restrictedPolicy,
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"test.io/pci_net_f1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+					fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices test.io/pci_net_f1"),
+				},
+			},
+			expected: false,
+			reason:   ErrorAllocateResource,
+			message:  "Allocate resources failed due to no healthy devices present; cannot allocate unhealthy devices test.io/pci_net_f1",
+		},
+		{
+			name:     "failed to get the default NUMA affinity.",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   bePolicy,
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+					fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+				},
+			},
+			expected: false,
+			reason:   ErrorAllocateResource,
+			message:  "Allocate resources failed due to [memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available",
+		},
+	}
+
+	for _, tc := range tcases {
+		ctnScopeManager := manager{}
+		ctnScopeManager.scope = NewContainerScope(tc.policy)
+		ctnScopeManager.scope.(*containerScope).hintProviders = tc.hp
+
+		podScopeManager := manager{}
+		podScopeManager.scope = NewPodScope(tc.policy)
+		podScopeManager.scope.(*podScope).hintProviders = tc.hp
+
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				QOSClass: tc.qosClass,
+			},
+		}
+
+		podAttr := lifecycle.PodAdmitAttributes{
+			Pod: pod,
+		}
+
+		// Container scope Admit
+		ctnActual := ctnScopeManager.Admit(&podAttr)
+		if ctnActual.Admit != tc.expected {
+			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
+		}
+		if ctnActual.Reason != tc.reason {
+			t.Errorf("Error occurred, expected Reason in result to be %v got %v", tc.reason, ctnActual.Reason)
+		}
+		if !reflect.DeepEqual(ctnActual.Message, tc.message) {
+			t.Errorf("Error occurred, expected Admit message in result to be %v got %v", tc.message, ctnActual.Message)
+		}
+
+		// Pod scope Admit
+		podActual := podScopeManager.Admit(&podAttr)
+		if podActual.Admit != tc.expected {
+			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
+		}
+		if podActual.Reason != tc.reason {
+			t.Errorf("Error occurred, expected Reason in result to be %v got %v", tc.reason, podActual.Reason)
+		}
+		if !reflect.DeepEqual(podActual.Message, tc.message) {
+			t.Errorf("Error occurred, expected Admit message in result to be %v got %v", tc.message, podActual.Message)
 		}
 	}
 }

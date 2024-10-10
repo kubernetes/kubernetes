@@ -44,6 +44,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -54,6 +55,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -73,6 +75,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -83,6 +86,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -103,6 +107,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -123,6 +128,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -146,6 +152,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -156,6 +163,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -179,6 +187,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -189,6 +198,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -212,6 +222,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -226,6 +237,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -249,6 +261,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -267,6 +280,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -304,6 +318,7 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -332,6 +347,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -346,6 +362,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -366,6 +383,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -380,6 +398,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -393,6 +412,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 					map[string][]TopologyHint{
 						"resource": {},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -412,6 +432,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -431,6 +452,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -450,6 +472,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -460,6 +483,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -479,6 +503,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -489,6 +514,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -508,6 +534,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -518,6 +545,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -537,6 +565,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -547,6 +576,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -570,6 +600,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -580,6 +611,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -599,6 +631,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -609,6 +642,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -632,6 +666,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -642,6 +677,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -665,6 +701,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -675,6 +712,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -698,6 +736,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -708,6 +747,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -731,6 +771,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -741,6 +782,7 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -769,6 +811,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -783,6 +826,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -806,6 +850,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -828,6 +873,7 @@ func (p *bestEffortPolicy) mergeTestCasesNoPolicies(numaNodes []int) []policyMer
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -856,6 +902,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -870,6 +917,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -893,6 +941,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -907,6 +956,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -930,6 +980,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -944,6 +995,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -967,6 +1019,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -989,6 +1042,7 @@ func (p *bestEffortPolicy) mergeTestCasesClosestNUMA(numaNodes []int) []policyMe
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1014,6 +1068,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1028,6 +1083,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1041,6 +1097,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 					map[string][]TopologyHint{
 						"resource": {},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1060,6 +1117,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1079,6 +1137,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1098,6 +1157,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -1108,6 +1168,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1127,6 +1188,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -1137,6 +1199,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1156,6 +1219,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -1166,6 +1230,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1189,6 +1254,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -1199,6 +1265,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1232,6 +1299,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 			},
 			expected: TopologyHint{
@@ -1259,8 +1327,10 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 							},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
+					nil,
 					nil,
 				},
 			},
