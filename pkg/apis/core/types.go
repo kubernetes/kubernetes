@@ -2215,9 +2215,9 @@ type SecretKeySelector struct {
 	Optional *bool
 }
 
-// EnvFromSource represents the source of a set of ConfigMaps
+// EnvFromSource represents the source of a set of ConfigMaps or Secrets
 type EnvFromSource struct {
-	// An optional identifier to prepend to each key in the ConfigMap.
+	// Optional text to prepend to the name of each environment variable.
 	// +optional
 	Prefix string
 	// The ConfigMap to select from.
