@@ -474,7 +474,10 @@ func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceCo
 }
 
 func writeCgroupMemoryLimit(memoryLimitFileLocation string, resourceConfig *ResourceConfig) error {
-	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
+	memLimit := "max"
+	if *resourceConfig.Memory > -1 {
+		memLimit = strconv.FormatInt(*resourceConfig.Memory, 10)
+	}
 	if err := os.WriteFile(memoryLimitFileLocation, []byte(memLimit), 0700); err != nil {
 		return fmt.Errorf("failed to write %v to %v: %w", memLimit, memoryLimitFileLocation, err)
 	}
