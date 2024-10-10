@@ -139,11 +139,11 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 	}
 	objMeta, err := meta.Accessor(obj)
 	if err != nil {
-		return NewInternalErrorf(
-			"can't enforce preconditions %v on un-introspectable object %v, got error: %v",
-			*p,
-			obj,
-			err)
+		return NewInternalError(
+			fmt.Errorf("can't enforce preconditions %v on un-introspectable object %v, got error: %w",
+				*p,
+				obj,
+				err))
 	}
 	if p.UID != nil && *p.UID != objMeta.GetUID() {
 		err := fmt.Sprintf(
