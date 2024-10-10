@@ -91,10 +91,6 @@ type fakeKubelet struct {
 	streamingRuntime  streaming.Server
 }
 
-func (fk *fakeKubelet) ResyncInterval() time.Duration {
-	return fk.resyncInterval
-}
-
 func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
 	return fk.loopEntryTime
 }
