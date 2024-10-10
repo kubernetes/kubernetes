@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"flag"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,88 +27,98 @@ import (
 
 // VModuleConfigurationPflag implements the pflag.Value interface for a
 // VModuleConfiguration. The value pointer must not be nil.
-func VModuleConfigurationPflag(value *VModuleConfiguration) pflag.Value {
-	return vmoduleConfigurationPFlag{value}
+func VModuleConfigurationPflag(value *VModuleConfiguration, parentValue flag.Value) pflag.Value {
+	return &vmoduleConfigurationPFlag{value: value, parentValue: parentValue}
 }
 
 type vmoduleConfigurationPFlag struct {
-	value *VModuleConfiguration
+	value       *VModuleConfiguration
+	parentValue flag.Value
 }
 
 // String returns the -vmodule parameter (comma-separated list of pattern=N).
-func (wrapper vmoduleConfigurationPFlag) String() string {
-	if wrapper.value == nil {
-		return ""
+func (wrapper *vmoduleConfigurationPFlag) String() string {
+	if wrapper.value != nil {
+		var patterns []string
+		for _, item := range *wrapper.value {
+			patterns = append(patterns, fmt.Sprintf("%s=%d", item.FilePattern, item.Verbosity))
+		}
+		return strings.Join(patterns, ",")
 	}
-	var patterns []string
-	for _, item := range *wrapper.value {
-		patterns = append(patterns, fmt.Sprintf("%s=%d", item.FilePattern, item.Verbosity))
+	if wrapper.parentValue != nil {
+		return wrapper.parentValue.String()
 	}
-	return strings.Join(patterns, ",")
+	return ""
 }
 
 // Set parses the -vmodule parameter (comma-separated list of pattern=N).
-func (wrapper vmoduleConfigurationPFlag) Set(value string) error {
-	// This code mirrors https://github.com/kubernetes/klog/blob/9ad246211af1ed84621ee94a26fcce0038b69cd1/klog.go#L287-L313
+func (wrapper *vmoduleConfigurationPFlag) Set(value string) error {
+	if wrapper.value != nil {
+		// This code mirrors https://github.com/kubernetes/klog/blob/9ad246211af1ed84621ee94a26fcce0038b69cd1/klog.go#L287-L313
 
-	for _, pat := range strings.Split(value, ",") {
-		if len(pat) == 0 {
-			// Empty strings such as from a trailing comma can be ignored.
-			continue
+		for _, pat := range strings.Split(value, ",") {
+			if len(pat) == 0 {
+				// Empty strings such as from a trailing comma can be ignored.
+				continue
+			}
+			patLev := strings.Split(pat, "=")
+			if len(patLev) != 2 || len(patLev[0]) == 0 || len(patLev[1]) == 0 {
+				return fmt.Errorf("%q does not have the pattern=N format", pat)
+			}
+			pattern := patLev[0]
+			// 31 instead of 32 to ensure that it also fits into int32.
+			v, err := strconv.ParseUint(patLev[1], 10, 31)
+			if err != nil {
+				return fmt.Errorf("parsing verbosity in %q: %v", pat, err)
+			}
+			*wrapper.value = append(*wrapper.value, VModuleItem{FilePattern: pattern, Verbosity: VerbosityLevel(v)})
 		}
-		patLev := strings.Split(pat, "=")
-		if len(patLev) != 2 || len(patLev[0]) == 0 || len(patLev[1]) == 0 {
-			return fmt.Errorf("%q does not have the pattern=N format", pat)
-		}
-		pattern := patLev[0]
-		// 31 instead of 32 to ensure that it also fits into int32.
-		v, err := strconv.ParseUint(patLev[1], 10, 31)
-		if err != nil {
-			return fmt.Errorf("parsing verbosity in %q: %v", pat, err)
-		}
-		*wrapper.value = append(*wrapper.value, VModuleItem{FilePattern: pattern, Verbosity: VerbosityLevel(v)})
+	}
+	if wrapper.parentValue != nil {
+		return wrapper.parentValue.Set(value)
 	}
 	return nil
 }
 
-func (wrapper vmoduleConfigurationPFlag) Type() string {
+func (wrapper *vmoduleConfigurationPFlag) Type() string {
 	return "pattern=N,..."
 }
 
 // VerbosityLevelPflag implements the pflag.Value interface for a verbosity
 // level value.
-func VerbosityLevelPflag(value *VerbosityLevel) pflag.Value {
-	return verbosityLevelPflag{value}
+func VerbosityLevelPflag(value *VerbosityLevel, parentValue pflag.Value) pflag.Value {
+	return &verbosityLevelPflag{value: value, parentValue: parentValue}
 }
 
 type verbosityLevelPflag struct {
-	value *VerbosityLevel
+	value       *VerbosityLevel
+	parentValue pflag.Value
 }
 
-func (wrapper verbosityLevelPflag) String() string {
-	if wrapper.value == nil {
-		return "0"
+func (wrapper *verbosityLevelPflag) String() string {
+	if wrapper.value != nil {
+		return strconv.FormatInt(int64(*wrapper.value), 10)
 	}
-	return strconv.FormatInt(int64(*wrapper.value), 10)
-}
-
-func (wrapper verbosityLevelPflag) Get() interface{} {
-	if wrapper.value == nil {
-		return VerbosityLevel(0)
+	if wrapper.parentValue != nil {
+		return wrapper.parentValue.String()
 	}
-	return *wrapper.value
+	return "0"
+
 }
 
-func (wrapper verbosityLevelPflag) Set(value string) error {
+func (wrapper *verbosityLevelPflag) Set(value string) error {
 	// Limited to int32 for compatibility with klog.
 	v, err := strconv.ParseUint(value, 10, 31)
 	if err != nil {
 		return err
 	}
 	*wrapper.value = VerbosityLevel(v)
+	if wrapper.parentValue != nil {
+		return wrapper.parentValue.Set(value)
+	}
 	return nil
 }
 
-func (wrapper verbosityLevelPflag) Type() string {
+func (wrapper *verbosityLevelPflag) Type() string {
 	return "Level"
 }

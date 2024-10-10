@@ -65,7 +65,7 @@ func (f textFactory) Create(c LoggingConfiguration, o LoggingOptions) (logr.Logg
 	loggerConfig := textlogger.NewConfig(options...)
 
 	// This should never fail, we produce a valid string here.
-	_ = loggerConfig.VModule().Set(VModuleConfigurationPflag(&c.VModule).String())
+	_ = loggerConfig.VModule().Set(VModuleConfigurationPflag(&c.VModule, nil).String())
 
 	return textlogger.NewLogger(loggerConfig),
 		RuntimeControl{
