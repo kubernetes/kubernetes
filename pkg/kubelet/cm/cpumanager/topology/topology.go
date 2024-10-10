@@ -18,6 +18,8 @@ package topology
 
 import (
 	"fmt"
+	"slices"
+	"sort"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog/v2"
@@ -36,12 +38,14 @@ type CPUDetails map[int]CPUInfo
 // Core - physical CPU, cadvisor - Core
 // Socket - socket, cadvisor - Socket
 // NUMA Node - NUMA cell, cadvisor - Node
+// UnCoreCache - Split L3 Cache Topology, cadvisor
 type CPUTopology struct {
-	NumCPUs      int
-	NumCores     int
-	NumSockets   int
-	NumNUMANodes int
-	CPUDetails   CPUDetails
+	NumCPUs        int
+	NumCores       int
+	NumUnCoreCache int
+	NumSockets     int
+	NumNUMANodes   int
+	CPUDetails     CPUDetails
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with
@@ -90,11 +94,12 @@ func (topo *CPUTopology) CPUNUMANodeID(cpu int) (int, error) {
 	return info.NUMANodeID, nil
 }
 
-// CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
+// CPUInfo contains the NUMA, socket, unCoreCache and core IDs associated with a CPU.
 type CPUInfo struct {
-	NUMANodeID int
-	SocketID   int
-	CoreID     int
+	NUMANodeID    int
+	SocketID      int
+	CoreID        int
+	UnCoreCacheID int
 }
 
 // KeepOnly returns a new CPUDetails object with only the supplied cpus.
@@ -106,6 +111,73 @@ func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 		}
 	}
 	return result
+}
+
+// UncoreCaches returns all the uncorecache Id (L3 Index) associated with the CPUs in this CPUDetails
+func (d CPUDetails) UncoreCaches() cpuset.CPUSet {
+	var numUnCoreIDs []int
+	for _, info := range d {
+		numUnCoreIDs = append(numUnCoreIDs, info.UnCoreCacheID)
+	}
+	return cpuset.New(numUnCoreIDs...)
+}
+
+// UnCoresInNUMANodes returns all of the uncore IDs associated with the given
+// NUMANode IDs in this CPUDetails.
+func (d CPUDetails) UnCoreInNUMANodes(ids ...int) cpuset.CPUSet {
+	var unCoreIDs []int
+	for _, id := range ids {
+		for _, info := range d {
+			if info.NUMANodeID == id {
+				unCoreIDs = append(unCoreIDs, info.UnCoreCacheID)
+			}
+		}
+	}
+	return cpuset.New(unCoreIDs...)
+}
+
+// CoresNeededInUnCoreCache returns either the full list of all available unique core IDs associated with the given
+// UnCoreCache IDs in this CPUDetails or subset that matches the ask.
+func (d CPUDetails) CoresNeededInUnCoreCache(numCoresNeeded int, ids ...int) cpuset.CPUSet {
+	var coreIDs []int
+	for _, id := range ids {
+		for _, info := range d {
+			if info.UnCoreCacheID == id {
+
+				if !slices.Contains(coreIDs, info.CoreID) {
+					coreIDs = append(coreIDs, info.CoreID)
+				}
+			}
+		}
+	}
+	sort.Ints(coreIDs)
+
+	// return only unique coreID
+	var coresNeeded []int
+
+	if len(coreIDs) > numCoresNeeded {
+		// return only what is needed
+		coresNeeded = coreIDs[0:numCoresNeeded]
+	} else {
+		// return the full list
+		coresNeeded = coreIDs
+	}
+	klog.V(2).InfoS("Available coreIDs : ", "coresNeeded", coresNeeded)
+	return cpuset.New(coresNeeded...)
+}
+
+// CPUsInUnCoreCaches returns all the logical CPU IDs associated with the given
+// UnCoreCache IDs in this CPUDetails
+func (d CPUDetails) CPUsInUnCoreCaches(ids ...int) cpuset.CPUSet {
+	var cpuIDs []int
+	for _, id := range ids {
+		for cpu, info := range d {
+			if info.UnCoreCacheID == id {
+				cpuIDs = append(cpuIDs, cpu)
+			}
+		}
+	}
+	return cpuset.New(cpuIDs...)
 }
 
 // NUMANodes returns all of the NUMANode IDs associated with the CPUs in this
@@ -260,9 +332,10 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 			if coreID, err := getUniqueCoreID(core.Threads); err == nil {
 				for _, cpu := range core.Threads {
 					CPUDetails[cpu] = CPUInfo{
-						CoreID:     coreID,
-						SocketID:   core.SocketID,
-						NUMANodeID: node.Id,
+						CoreID:        coreID,
+						SocketID:      core.SocketID,
+						NUMANodeID:    node.Id,
+						UnCoreCacheID: core.UncoreCaches[0].Id,
 					}
 				}
 			} else {
@@ -273,11 +346,12 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	}
 
 	return &CPUTopology{
-		NumCPUs:      machineInfo.NumCores,
-		NumSockets:   machineInfo.NumSockets,
-		NumCores:     numPhysicalCores,
-		NumNUMANodes: CPUDetails.NUMANodes().Size(),
-		CPUDetails:   CPUDetails,
+		NumCPUs:        machineInfo.NumCores,
+		NumSockets:     machineInfo.NumSockets,
+		NumCores:       numPhysicalCores,
+		NumNUMANodes:   CPUDetails.NUMANodes().Size(),
+		NumUnCoreCache: CPUDetails.UncoreCaches().Size(),
+		CPUDetails:     CPUDetails,
 	}, nil
 }
 
