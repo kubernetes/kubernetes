@@ -132,7 +132,11 @@ type ClaimAllocation struct {
 
 	// Driver must populate this field with resources that were
 	// allocated for the claim in case of successful allocation.
+	//
+	// If the AdminAccess field is left unset, it gets set to
+	// false before updating the claim.
 	Allocation *resourceapi.AllocationResult
+
 	// In case of error allocating particular claim, driver must
 	// populate this field.
 	Error error
@@ -563,7 +567,13 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 		}
 		logger.V(5).Info("successfully allocated", "claim", klog.KObj(claimAllocation.Claim))
 		claim := claimAllocation.Claim.DeepCopy()
-		claim.Status.Allocation = claimAllocation.Allocation
+		claim.Status.Allocation = claimAllocation.Allocation.DeepCopy()
+		noAdminAccess := false
+		for i := range claim.Status.Allocation.Devices.Results {
+			if claim.Status.Allocation.Devices.Results[i].AdminAccess == nil {
+				claim.Status.Allocation.Devices.Results[i].AdminAccess = &noAdminAccess
+			}
+		}
 		claim.Status.Allocation.Controller = ctrl.name
 		if selectedUser != nil && ctrl.setReservedFor {
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
