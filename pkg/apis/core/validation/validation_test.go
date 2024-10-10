@@ -24147,7 +24147,7 @@ func TestValidateSleepAction(t *testing.T) {
 	testCases := []struct {
 		name        string
 		action      *core.SleepAction
-		gracePeriod int64
+		gracePeriod *int64
 		expectErr   field.ErrorList
 	}{
 		{
@@ -24155,14 +24155,14 @@ func TestValidateSleepAction(t *testing.T) {
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 30,
+			gracePeriod: ptr.To[int64](30),
 		},
 		{
 			name: "negative seconds",
 			action: &core.SleepAction{
 				Seconds: -1,
 			},
-			gracePeriod: 30,
+			gracePeriod: ptr.To[int64](30),
 			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
 		},
 		{
@@ -24170,14 +24170,22 @@ func TestValidateSleepAction(t *testing.T) {
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 3,
+			gracePeriod: ptr.To[int64](3),
 			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+		},
+		{
+			name: "gracePeriod is nil",
+			action: &core.SleepAction{
+				Seconds: 5,
+			},
+			gracePeriod: nil,
+			expectErr:   field.ErrorList{},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath)
+			errs := validateSleepAction(tc.action, tc.gracePeriod, fldPath)
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
