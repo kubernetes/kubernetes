@@ -52,7 +52,9 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	t.Cleanup(cancel)
+	defer func() {
+		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
+	}()
 
 	// ensure to stop cert reloading after shutdown
 	transport.DialerStopCh = ctx.Done()
@@ -76,7 +78,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
 		[]string{}, etcd)
-	defer serverA.TearDownFn()
+	t.Cleanup(serverA.TearDownFn)
 
 	// start another test server with some api disabled
 	// override hostname to ensure unique ips
@@ -85,7 +87,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
 		[]string{fmt.Sprintf("--runtime-config=%s", "batch/v1=false")}, etcd)
-	defer serverB.TearDownFn()
+	t.Cleanup(serverB.TearDownFn)
 
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
@@ -113,7 +115,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	t.Cleanup(cancel)
+	defer func() {
+		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
+	}()
 
 	// ensure to stop cert reloading after shutdown
 	transport.DialerStopCh = ctx.Done()
@@ -157,7 +161,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	t.Log("starting apiserver for ServerB")
 	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{
 		fmt.Sprintf("--runtime-config=%v", "batch/v1=false")}, etcd)
-	defer serverB.TearDownFn()
+	t.Cleanup(serverB.TearDownFn)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
 	// ensure storageversion garbage collector ctlr is set up
@@ -169,7 +173,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	server.SetHostnameFuncForTests("test-server-c")
 	t.Log("starting apiserver for ServerC")
 	serverC := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
-	defer serverC.TearDownFn()
+	t.Cleanup(serverC.TearDownFn)
 
 	// create jobs resource using serverA
 	job := createJobResource()
