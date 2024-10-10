@@ -819,14 +819,15 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			},
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
 				// Trigger an Node update event.
-				// It should requeue pod4 only because this node only has zone label, and doesn't have node label that pod3 requires.
+				// It should requeue pod4 because the update adds the "zone" label to fake-node2.
+				// Also, it should requeue pod3 because it deletes the "node" label from fake-node2.
 				node := st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
 					return nil, fmt.Errorf("failed to update node: %w", err)
 				}
 				return map[framework.ClusterEvent]uint64{framework.NodeLabelChange: 1}, nil
 			},
-			wantRequeuedPods:          sets.New("pod4"),
+			wantRequeuedPods:          sets.New("pod3", "pod4"),
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
@@ -907,6 +908,29 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				return map[framework.ClusterEvent]uint64{framework.NodeTaintChange: 1}, nil
 			},
 			wantRequeuedPods: sets.New("pod4"),
+		},
+		{
+			name: "Pods with PodTopologySpread should not be requeued when a Node is updated to have not the topology label",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node1").Label("region", "fake-node").Obj(),
+				st.MakeNode().Name("fake-node2").Label("region", "fake-node").Obj(),
+			},
+			initialPods: []*v1.Pod{},
+			pods: []*v1.Pod{
+				// - Pod1 will not be scheduled, because no node has node label.
+				st.MakePod().Name("pod1").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// Trigger an assigned Node update event.
+				// It should not requeue pod1 because no node has node label.
+				node := st.MakeNode().Name("fake-node2").Label("region", "fake-node1").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeLabelChange: 1}, nil
+			},
+			wantRequeuedPods:          sets.Set[string]{},
+			enableSchedulingQueueHint: []bool{true},
 		},
 		{
 			name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PV is added",
