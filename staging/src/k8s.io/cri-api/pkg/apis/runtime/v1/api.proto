@@ -221,8 +221,10 @@ enum MountPropagation {
 message Mount {
     // Path of the mount within the container.
     string container_path = 1;
-    // Path of the mount on the host. If the hostPath doesn't exist, then runtimes
-    // should report error. If the hostpath is a symbolic link, runtimes should
+    // Path of the mount on the host. Has to be empty if the image field below
+    // is provided, because those fields are mutually exclusive. If the image
+    // field below is nil and the host path doesn't exist, then runtimes should
+    // report an error. If the hostpath is a symbolic link, runtimes should
     // follow the symlink and mount the real destination to container.
     string host_path = 2;
     // If set, the mount is read-only.
