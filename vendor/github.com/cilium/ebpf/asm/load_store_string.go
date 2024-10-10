@@ -13,6 +13,7 @@ func _() {
 	_ = x[AbsMode-32]
 	_ = x[IndMode-64]
 	_ = x[MemMode-96]
+	_ = x[MemSXMode-128]
 	_ = x[XAddMode-192]
 }
 
@@ -21,8 +22,9 @@ const (
 	_Mode_name_1 = "AbsMode"
 	_Mode_name_2 = "IndMode"
 	_Mode_name_3 = "MemMode"
-	_Mode_name_4 = "XAddMode"
-	_Mode_name_5 = "InvalidMode"
+	_Mode_name_4 = "MemSXMode"
+	_Mode_name_5 = "XAddMode"
+	_Mode_name_6 = "InvalidMode"
 )
 
 func (i Mode) String() string {
@@ -35,10 +37,12 @@ func (i Mode) String() string {
 		return _Mode_name_2
 	case i == 96:
 		return _Mode_name_3
-	case i == 192:
+	case i == 128:
 		return _Mode_name_4
-	case i == 255:
+	case i == 192:
 		return _Mode_name_5
+	case i == 255:
+		return _Mode_name_6
 	default:
 		return "Mode(" + strconv.FormatInt(int64(i), 10) + ")"
 	}

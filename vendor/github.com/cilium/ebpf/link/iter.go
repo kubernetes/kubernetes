@@ -25,10 +25,6 @@ type IterOptions struct {
 
 // AttachIter attaches a BPF seq_file iterator.
 func AttachIter(opts IterOptions) (*Iter, error) {
-	if err := haveBPFLink(); err != nil {
-		return nil, err
-	}
-
 	progFd := opts.Program.FD()
 	if progFd < 0 {
 		return nil, fmt.Errorf("invalid program: %s", sys.ErrClosedFd)
@@ -52,6 +48,9 @@ func AttachIter(opts IterOptions) (*Iter, error) {
 
 	fd, err := sys.LinkCreateIter(&attr)
 	if err != nil {
+		if haveFeatErr := haveBPFLink(); haveFeatErr != nil {
+			return nil, haveFeatErr
+		}
 		return nil, fmt.Errorf("can't link iterator: %w", err)
 	}
 

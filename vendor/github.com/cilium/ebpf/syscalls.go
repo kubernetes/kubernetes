@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 
@@ -119,6 +120,7 @@ var haveInnerMaps = internal.NewFeatureTest("inner maps", "5.10", func() error {
 		MaxEntries: 1,
 		MapFlags:   unix.BPF_F_INNER_MAP,
 	})
+
 	if err != nil {
 		return internal.ErrNotSupported
 	}
@@ -135,6 +137,7 @@ var haveNoPreallocMaps = internal.NewFeatureTest("prealloc maps", "4.6", func() 
 		MaxEntries: 1,
 		MapFlags:   unix.BPF_F_NO_PREALLOC,
 	})
+
 	if err != nil {
 		return internal.ErrNotSupported
 	}
@@ -223,8 +226,8 @@ var haveBatchAPI = internal.NewFeatureTest("map batch api", "5.6", func() error 
 
 	keys := []uint32{1, 2}
 	values := []uint32{3, 4}
-	kp, _ := marshalPtr(keys, 8)
-	vp, _ := marshalPtr(values, 8)
+	kp, _ := marshalMapSyscallInput(keys, 8)
+	vp, _ := marshalMapSyscallInput(values, 8)
 
 	err = sys.MapUpdateBatch(&sys.MapUpdateBatchAttr{
 		MapFd:  fd.Uint(),
@@ -265,11 +268,8 @@ var haveBPFToBPFCalls = internal.NewFeatureTest("bpf2bpf calls", "4.16", func() 
 	}
 
 	fd, err := progLoad(insns, SocketFilter, "MIT")
-	if errors.Is(err, unix.EINVAL) {
-		return internal.ErrNotSupported
-	}
 	if err != nil {
-		return err
+		return internal.ErrNotSupported
 	}
 	_ = fd.Close()
 	return nil
@@ -302,4 +302,36 @@ var haveSyscallWrapper = internal.NewFeatureTest("syscall wrapper", "4.17", func
 	}
 
 	return evt.Close()
+})
+
+var haveProgramExtInfos = internal.NewFeatureTest("program ext_infos", "5.0", func() error {
+	insns := asm.Instructions{
+		asm.Mov.Imm(asm.R0, 0),
+		asm.Return(),
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, insns.Size()))
+	if err := insns.Marshal(buf, internal.NativeEndian); err != nil {
+		return err
+	}
+	bytecode := buf.Bytes()
+
+	_, err := sys.ProgLoad(&sys.ProgLoadAttr{
+		ProgType:    sys.ProgType(SocketFilter),
+		License:     sys.NewStringPointer("MIT"),
+		Insns:       sys.NewSlicePointer(bytecode),
+		InsnCnt:     uint32(len(bytecode) / asm.InstructionSize),
+		FuncInfoCnt: 1,
+		ProgBtfFd:   math.MaxUint32,
+	})
+
+	if errors.Is(err, unix.EBADF) {
+		return nil
+	}
+
+	if errors.Is(err, unix.E2BIG) {
+		return ErrNotSupported
+	}
+
+	return err
 })

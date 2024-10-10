@@ -41,6 +41,8 @@ func NewHandle(b *Builder) (*Handle, error) {
 //
 // Returns an error wrapping ErrNotSupported if the kernel doesn't support BTF.
 func NewHandleFromRawBTF(btf []byte) (*Handle, error) {
+	const minLogSize = 64 * 1024
+
 	if uint64(len(btf)) > math.MaxUint32 {
 		return nil, errors.New("BTF exceeds the maximum size")
 	}
@@ -50,26 +52,54 @@ func NewHandleFromRawBTF(btf []byte) (*Handle, error) {
 		BtfSize: uint32(len(btf)),
 	}
 
-	fd, err := sys.BtfLoad(attr)
-	if err == nil {
-		return &Handle{fd, attr.BtfSize, false}, nil
+	var (
+		logBuf []byte
+		err    error
+	)
+	for {
+		var fd *sys.FD
+		fd, err = sys.BtfLoad(attr)
+		if err == nil {
+			return &Handle{fd, attr.BtfSize, false}, nil
+		}
+
+		if attr.BtfLogTrueSize != 0 && attr.BtfLogSize >= attr.BtfLogTrueSize {
+			// The log buffer already has the correct size.
+			break
+		}
+
+		if attr.BtfLogSize != 0 && !errors.Is(err, unix.ENOSPC) {
+			// Up until at least kernel 6.0, the BTF verifier does not return ENOSPC
+			// if there are other verification errors. ENOSPC is only returned when
+			// the BTF blob is correct, a log was requested, and the provided buffer
+			// is too small. We're therefore not sure whether we got the full
+			// log or not.
+			break
+		}
+
+		// Make an educated guess how large the buffer should be. Start
+		// at a reasonable minimum and then double the size.
+		logSize := uint32(max(len(logBuf)*2, minLogSize))
+		if int(logSize) < len(logBuf) {
+			return nil, errors.New("overflow while probing log buffer size")
+		}
+
+		if attr.BtfLogTrueSize != 0 {
+			// The kernel has given us a hint how large the log buffer has to be.
+			logSize = attr.BtfLogTrueSize
+		}
+
+		logBuf = make([]byte, logSize)
+		attr.BtfLogSize = logSize
+		attr.BtfLogBuf = sys.NewSlicePointer(logBuf)
+		attr.BtfLogLevel = 1
 	}
 
 	if err := haveBTF(); err != nil {
 		return nil, err
 	}
 
-	logBuf := make([]byte, 64*1024)
-	attr.BtfLogBuf = sys.NewSlicePointer(logBuf)
-	attr.BtfLogSize = uint32(len(logBuf))
-	attr.BtfLogLevel = 1
-
-	// Up until at least kernel 6.0, the BTF verifier does not return ENOSPC
-	// if there are other verification errors. ENOSPC is only returned when
-	// the BTF blob is correct, a log was requested, and the provided buffer
-	// is too small.
-	_, ve := sys.BtfLoad(attr)
-	return nil, internal.ErrorWithLog("load btf", err, logBuf, errors.Is(ve, unix.ENOSPC))
+	return nil, internal.ErrorWithLog("load btf", err, logBuf)
 }
 
 // NewHandleFromID returns the BTF handle for a given id.

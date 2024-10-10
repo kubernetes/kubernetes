@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 type cgroupAttachFlags uint32
@@ -143,8 +144,7 @@ func (cg *progAttachCgroup) Update(prog *ebpf.Program) error {
 		// Atomically replacing multiple programs requires at least
 		// 5.5 (commit 7dd68b3279f17921 "bpf: Support replacing cgroup-bpf
 		// program in MULTI mode")
-		args.Flags |= uint32(flagReplace)
-		args.Replace = cg.current
+		args.Anchor = ReplaceProgram(cg.current)
 	}
 
 	if err := RawAttachProgram(args); err != nil {
@@ -187,4 +187,22 @@ func newLinkCgroup(cgroup *os.File, attach ebpf.AttachType, prog *ebpf.Program) 
 	}
 
 	return &linkCgroup{*link}, err
+}
+
+func (cg *linkCgroup) Info() (*Info, error) {
+	var info sys.CgroupLinkInfo
+	if err := sys.ObjInfo(cg.fd, &info); err != nil {
+		return nil, fmt.Errorf("cgroup link info: %s", err)
+	}
+	extra := &CgroupInfo{
+		CgroupId:   info.CgroupId,
+		AttachType: info.AttachType,
+	}
+
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		extra,
+	}, nil
 }

@@ -15,12 +15,26 @@ import (
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/kallsyms"
 	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal/sysenc"
 	"github.com/cilium/ebpf/internal/unix"
 )
 
 // ErrNotSupported is returned whenever the kernel doesn't support a feature.
 var ErrNotSupported = internal.ErrNotSupported
+
+// errBadRelocation is returned when the verifier rejects a program due to a
+// bad CO-RE relocation.
+//
+// This error is detected based on heuristics and therefore may not be reliable.
+var errBadRelocation = errors.New("bad CO-RE relocation")
+
+// errUnknownKfunc is returned when the verifier rejects a program due to an
+// unknown kfunc.
+//
+// This error is detected based on heuristics and therefore may not be reliable.
+var errUnknownKfunc = errors.New("unknown kfunc")
 
 // ProgramID represents the unique ID of an eBPF program.
 type ProgramID uint32
@@ -32,13 +46,13 @@ const (
 	outputPad = 256 + 2
 )
 
-// DefaultVerifierLogSize is the default number of bytes allocated for the
-// verifier log.
+// Deprecated: the correct log size is now detected automatically and this
+// constant is unused.
 const DefaultVerifierLogSize = 64 * 1024
 
-// maxVerifierLogSize is the maximum size of verifier log buffer the kernel
-// will accept before returning EINVAL.
-const maxVerifierLogSize = math.MaxUint32 >> 2
+// minVerifierLogSize is the default number of bytes allocated for the
+// verifier log.
+const minVerifierLogSize = 64 * 1024
 
 // ProgramOptions control loading a program into the kernel.
 type ProgramOptions struct {
@@ -52,22 +66,15 @@ type ProgramOptions struct {
 	// verifier output enabled. Upon error, the program load will be repeated
 	// with LogLevelBranch and the given (or default) LogSize value.
 	//
-	// Setting this to a non-zero value will unconditionally enable the verifier
+	// Unless LogDisabled is set, setting this to a non-zero value will enable the verifier
 	// log, populating the [ebpf.Program.VerifierLog] field on successful loads
 	// and including detailed verifier errors if the program is rejected. This
 	// will always allocate an output buffer, but will result in only a single
 	// attempt at loading the program.
 	LogLevel LogLevel
 
-	// Controls the output buffer size for the verifier log, in bytes. See the
-	// documentation on ProgramOptions.LogLevel for details about how this value
-	// is used.
-	//
-	// If this value is set too low to fit the verifier log, the resulting
-	// [ebpf.VerifierError]'s Truncated flag will be true, and the error string
-	// will also contain a hint to that effect.
-	//
-	// Defaults to DefaultVerifierLogSize.
+	// Deprecated: the correct log buffer size is determined automatically
+	// and this field is ignored.
 	LogSize int
 
 	// Disables the verifier log completely, regardless of other options.
@@ -79,6 +86,14 @@ type ProgramOptions struct {
 	// (containers) or where it is in a non-standard location. Defaults to
 	// use the kernel BTF from a well-known location if nil.
 	KernelTypes *btf.Spec
+
+	// Type information used for CO-RE relocations of kernel modules,
+	// indexed by module name.
+	//
+	// This is useful in environments where the kernel BTF is not available
+	// (containers) or where it is in a non-standard location. Defaults to
+	// use the kernel module BTF from a well-known location if nil.
+	KernelModuleTypes map[string]*btf.Spec
 }
 
 // ProgramSpec defines a Program.
@@ -147,6 +162,28 @@ func (ps *ProgramSpec) Tag() (string, error) {
 	return ps.Instructions.Tag(internal.NativeEndian)
 }
 
+// KernelModule returns the kernel module, if any, the AttachTo function is contained in.
+func (ps *ProgramSpec) KernelModule() (string, error) {
+	if ps.AttachTo == "" {
+		return "", nil
+	}
+
+	switch ps.Type {
+	default:
+		return "", nil
+	case Tracing:
+		switch ps.AttachType {
+		default:
+			return "", nil
+		case AttachTraceFEntry:
+		case AttachTraceFExit:
+		}
+		fallthrough
+	case Kprobe:
+		return kallsyms.KernelModule(ps.AttachTo)
+	}
+}
+
 // VerifierError is returned by [NewProgram] and [NewProgramWithOptions] if a
 // program is rejected by the verifier.
 //
@@ -196,6 +233,15 @@ func NewProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 	return prog, err
 }
 
+var (
+	coreBadLoad = []byte(fmt.Sprintf("(18) r10 = 0x%x\n", btf.COREBadRelocationSentinel))
+	// This log message was introduced by ebb676daa1a3 ("bpf: Print function name in
+	// addition to function id") which first appeared in v4.10 and has remained
+	// unchanged since.
+	coreBadCall  = []byte(fmt.Sprintf("invalid func unknown#%d\n", btf.COREBadRelocationSentinel))
+	kfuncBadCall = []byte(fmt.Sprintf("invalid func unknown#%d\n", kfuncCallPoisonBase))
+)
+
 func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, error) {
 	if len(spec.Instructions) == 0 {
 		return nil, errors.New("instructions cannot be empty")
@@ -207,10 +253,6 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 
 	if spec.ByteOrder != nil && spec.ByteOrder != internal.NativeEndian {
 		return nil, fmt.Errorf("can't load %s program on %s", spec.ByteOrder, internal.NativeEndian)
-	}
-
-	if opts.LogSize < 0 {
-		return nil, errors.New("ProgramOptions.LogSize must be a positive value; disable verifier logs using ProgramOptions.LogDisabled")
 	}
 
 	// Kernels before 5.0 (6c4fc209fcf9 "bpf: remove useless version check for prog load")
@@ -241,14 +283,41 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 	insns := make(asm.Instructions, len(spec.Instructions))
 	copy(insns, spec.Instructions)
 
-	handle, fib, lib, err := btf.MarshalExtInfos(insns)
-	if err != nil && !errors.Is(err, btf.ErrNotSupported) {
-		return nil, fmt.Errorf("load ext_infos: %w", err)
+	kmodName, err := spec.KernelModule()
+	if err != nil {
+		return nil, fmt.Errorf("kernel module search: %w", err)
 	}
-	if handle != nil {
-		defer handle.Close()
 
-		attr.ProgBtfFd = uint32(handle.FD())
+	var targets []*btf.Spec
+	if opts.KernelTypes != nil {
+		targets = append(targets, opts.KernelTypes)
+	}
+	if kmodName != "" && opts.KernelModuleTypes != nil {
+		if modBTF, ok := opts.KernelModuleTypes[kmodName]; ok {
+			targets = append(targets, modBTF)
+		}
+	}
+
+	var b btf.Builder
+	if err := applyRelocations(insns, targets, kmodName, spec.ByteOrder, &b); err != nil {
+		return nil, fmt.Errorf("apply CO-RE relocations: %w", err)
+	}
+
+	errExtInfos := haveProgramExtInfos()
+	if !b.Empty() && errors.Is(errExtInfos, ErrNotSupported) {
+		// There is at least one CO-RE relocation which relies on a stable local
+		// type ID.
+		// Return ErrNotSupported instead of E2BIG if there is no BTF support.
+		return nil, errExtInfos
+	}
+
+	if errExtInfos == nil {
+		// Only add func and line info if the kernel supports it. This allows
+		// BPF compiled with modern toolchains to work on old kernels.
+		fib, lib, err := btf.MarshalExtInfos(insns, &b)
+		if err != nil {
+			return nil, fmt.Errorf("marshal ext_infos: %w", err)
+		}
 
 		attr.FuncInfoRecSize = btf.FuncInfoSize
 		attr.FuncInfoCnt = uint32(len(fib)) / btf.FuncInfoSize
@@ -259,8 +328,14 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 		attr.LineInfo = sys.NewSlicePointer(lib)
 	}
 
-	if err := applyRelocations(insns, opts.KernelTypes, spec.ByteOrder); err != nil {
-		return nil, fmt.Errorf("apply CO-RE relocations: %w", err)
+	if !b.Empty() {
+		handle, err := btf.NewHandle(&b)
+		if err != nil {
+			return nil, fmt.Errorf("load BTF: %w", err)
+		}
+		defer handle.Close()
+
+		attr.ProgBtfFd = uint32(handle.FD())
 	}
 
 	kconfig, err := resolveKconfigReferences(insns)
@@ -277,7 +352,7 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 	if err != nil {
 		return nil, fmt.Errorf("fixing up kfuncs: %w", err)
 	}
-	defer handles.close()
+	defer handles.Close()
 
 	if len(handles) > 0 {
 		fdArray := handles.fdArray()
@@ -318,39 +393,67 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 		}
 	}
 
-	if opts.LogSize == 0 {
-		opts.LogSize = DefaultVerifierLogSize
-	}
-
-	// The caller requested a specific verifier log level. Set up the log buffer.
+	// The caller requested a specific verifier log level. Set up the log buffer
+	// so that there is a chance of loading the program in a single shot.
 	var logBuf []byte
 	if !opts.LogDisabled && opts.LogLevel != 0 {
-		logBuf = make([]byte, opts.LogSize)
+		logBuf = make([]byte, minVerifierLogSize)
 		attr.LogLevel = opts.LogLevel
 		attr.LogSize = uint32(len(logBuf))
 		attr.LogBuf = sys.NewSlicePointer(logBuf)
 	}
 
-	fd, err := sys.ProgLoad(attr)
-	if err == nil {
-		return &Program{unix.ByteSliceToString(logBuf), fd, spec.Name, "", spec.Type}, nil
-	}
+	for {
+		var fd *sys.FD
+		fd, err = sys.ProgLoad(attr)
+		if err == nil {
+			return &Program{unix.ByteSliceToString(logBuf), fd, spec.Name, "", spec.Type}, nil
+		}
 
-	// An error occurred loading the program, but the caller did not explicitly
-	// enable the verifier log. Re-run with branch-level verifier logs enabled to
-	// obtain more info. Preserve the original error to return it to the caller.
-	// An undersized log buffer will result in ENOSPC regardless of the underlying
-	// cause.
-	var err2 error
-	if !opts.LogDisabled && opts.LogLevel == 0 {
-		logBuf = make([]byte, opts.LogSize)
-		attr.LogLevel = LogLevelBranch
-		attr.LogSize = uint32(len(logBuf))
+		if opts.LogDisabled {
+			break
+		}
+
+		if attr.LogTrueSize != 0 && attr.LogSize >= attr.LogTrueSize {
+			// The log buffer already has the correct size.
+			break
+		}
+
+		if attr.LogSize != 0 && !errors.Is(err, unix.ENOSPC) {
+			// Logging is enabled and the error is not ENOSPC, so we can infer
+			// that the log buffer is large enough.
+			break
+		}
+
+		if attr.LogLevel == 0 {
+			// Logging is not enabled but loading the program failed. Enable
+			// basic logging.
+			attr.LogLevel = LogLevelBranch
+		}
+
+		// Make an educated guess how large the buffer should be. Start
+		// at minVerifierLogSize and then double the size.
+		logSize := uint32(max(len(logBuf)*2, minVerifierLogSize))
+		if int(logSize) < len(logBuf) {
+			return nil, errors.New("overflow while probing log buffer size")
+		}
+
+		if attr.LogTrueSize != 0 {
+			// The kernel has given us a hint how large the log buffer has to be.
+			logSize = attr.LogTrueSize
+		}
+
+		logBuf = make([]byte, logSize)
+		attr.LogSize = logSize
 		attr.LogBuf = sys.NewSlicePointer(logBuf)
-
-		_, err2 = sys.ProgLoad(attr)
 	}
 
+	end := bytes.IndexByte(logBuf, 0)
+	if end < 0 {
+		end = len(logBuf)
+	}
+
+	tail := logBuf[max(end-256, 0):end]
 	switch {
 	case errors.Is(err, unix.EPERM):
 		if len(logBuf) > 0 && logBuf[0] == 0 {
@@ -359,22 +462,31 @@ func newProgramWithOptions(spec *ProgramSpec, opts ProgramOptions) (*Program, er
 			return nil, fmt.Errorf("load program: %w (MEMLOCK may be too low, consider rlimit.RemoveMemlock)", err)
 		}
 
-		fallthrough
-
 	case errors.Is(err, unix.EINVAL):
-		if hasFunctionReferences(spec.Instructions) {
-			if err := haveBPFToBPFCalls(); err != nil {
-				return nil, fmt.Errorf("load program: %w", err)
-			}
+		if bytes.Contains(tail, coreBadCall) {
+			err = errBadRelocation
+			break
+		} else if bytes.Contains(tail, kfuncBadCall) {
+			err = errUnknownKfunc
+			break
 		}
 
-		if opts.LogSize > maxVerifierLogSize {
-			return nil, fmt.Errorf("load program: %w (ProgramOptions.LogSize exceeds maximum value of %d)", err, maxVerifierLogSize)
+	case errors.Is(err, unix.EACCES):
+		if bytes.Contains(tail, coreBadLoad) {
+			err = errBadRelocation
+			break
 		}
 	}
 
-	truncated := errors.Is(err, unix.ENOSPC) || errors.Is(err2, unix.ENOSPC)
-	return nil, internal.ErrorWithLog("load program", err, logBuf, truncated)
+	// hasFunctionReferences may be expensive, so check it last.
+	if (errors.Is(err, unix.EINVAL) || errors.Is(err, unix.EPERM)) &&
+		hasFunctionReferences(spec.Instructions) {
+		if err := haveBPFToBPFCalls(); err != nil {
+			return nil, fmt.Errorf("load program: %w", err)
+		}
+	}
+
+	return nil, internal.ErrorWithLog("load program", err, logBuf)
 }
 
 // NewProgramFromFD creates a program from a raw fd.
@@ -553,7 +665,7 @@ type RunOptions struct {
 }
 
 // Test runs the Program in the kernel with the given input and returns the
-// value returned by the eBPF program. outLen may be zero.
+// value returned by the eBPF program.
 //
 // Note: the kernel expects at least 14 bytes input for an ethernet header for
 // XDP and SKB programs.
@@ -702,10 +814,6 @@ func (p *Program) run(opts *RunOptions) (uint32, time.Duration, error) {
 		Cpu:         opts.CPU,
 	}
 
-	if attr.Repeat == 0 {
-		attr.Repeat = 1
-	}
-
 retry:
 	for {
 		err := sys.ProgRun(&attr)
@@ -714,7 +822,7 @@ retry:
 		}
 
 		if errors.Is(err, unix.EINTR) {
-			if attr.Repeat == 1 {
+			if attr.Repeat <= 1 {
 				// Older kernels check whether enough repetitions have been
 				// executed only after checking for pending signals.
 				//
@@ -763,14 +871,14 @@ retry:
 	return attr.Retval, total, nil
 }
 
-func unmarshalProgram(buf []byte) (*Program, error) {
-	if len(buf) != 4 {
-		return nil, errors.New("program id requires 4 byte value")
+func unmarshalProgram(buf sysenc.Buffer) (*Program, error) {
+	var id uint32
+	if err := buf.Unmarshal(&id); err != nil {
+		return nil, err
 	}
 
 	// Looking up an entry in a nested map or prog array returns an id,
 	// not an fd.
-	id := internal.NativeEndian.Uint32(buf)
 	return NewProgramFromID(ProgramID(id))
 }
 
@@ -921,7 +1029,12 @@ func findProgramTargetInKernel(name string, progType ProgramType, attachType Att
 	}
 
 	id, err := spec.TypeID(target)
-	return module, id, err
+	if err != nil {
+		module.Close()
+		return nil, 0, err
+	}
+
+	return module, id, nil
 }
 
 // findTargetInKernel attempts to find a named type in the current kernel.
@@ -999,7 +1112,9 @@ func findTargetInProgram(prog *Program, name string, progType ProgramType, attac
 
 	var typeName string
 	switch (match{progType, attachType}) {
-	case match{Extension, AttachNone}:
+	case match{Extension, AttachNone},
+		match{Tracing, AttachTraceFEntry},
+		match{Tracing, AttachTraceFExit}:
 		typeName = name
 	default:
 		return 0, errUnrecognizedAttachType

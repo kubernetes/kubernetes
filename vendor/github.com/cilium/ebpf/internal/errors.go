@@ -12,7 +12,7 @@ import (
 //
 // The default error output is a summary of the full log. The latter can be
 // accessed via VerifierError.Log or by formatting the error, see Format.
-func ErrorWithLog(source string, err error, log []byte, truncated bool) *VerifierError {
+func ErrorWithLog(source string, err error, log []byte) *VerifierError {
 	const whitespace = "\t\r\v\n "
 
 	// Convert verifier log C string by truncating it on the first 0 byte
@@ -23,7 +23,7 @@ func ErrorWithLog(source string, err error, log []byte, truncated bool) *Verifie
 
 	log = bytes.Trim(log, whitespace)
 	if len(log) == 0 {
-		return &VerifierError{source, err, nil, truncated}
+		return &VerifierError{source, err, nil, false}
 	}
 
 	logLines := bytes.Split(log, []byte{'\n'})
@@ -34,7 +34,7 @@ func ErrorWithLog(source string, err error, log []byte, truncated bool) *Verifie
 		lines = append(lines, string(bytes.TrimRight(line, whitespace)))
 	}
 
-	return &VerifierError{source, err, lines, truncated}
+	return &VerifierError{source, err, lines, false}
 }
 
 // VerifierError includes information from the eBPF verifier.
@@ -46,7 +46,7 @@ type VerifierError struct {
 	Cause error
 	// The verifier output split into lines.
 	Log []string
-	// Whether the log output is truncated, based on several heuristics.
+	// Deprecated: the log is never truncated anymore.
 	Truncated bool
 }
 
@@ -70,7 +70,7 @@ func (le *VerifierError) Error() string {
 	}
 
 	lines := log[n-1:]
-	if n >= 2 && (includePreviousLine(log[n-1]) || le.Truncated) {
+	if n >= 2 && includePreviousLine(log[n-1]) {
 		// Add one more line of context if it aids understanding the error.
 		lines = log[n-2:]
 	}
@@ -81,22 +81,9 @@ func (le *VerifierError) Error() string {
 	}
 
 	omitted := len(le.Log) - len(lines)
-	if omitted == 0 && !le.Truncated {
-		return b.String()
-	}
-
-	b.WriteString(" (")
-	if le.Truncated {
-		b.WriteString("truncated")
-	}
-
 	if omitted > 0 {
-		if le.Truncated {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(&b, "%d line(s) omitted", omitted)
+		fmt.Fprintf(&b, " (%d line(s) omitted)", omitted)
 	}
-	b.WriteString(")")
 
 	return b.String()
 }
@@ -186,10 +173,6 @@ func (le *VerifierError) Format(f fmt.State, verb rune) {
 			if omitted > 0 {
 				fmt.Fprintf(f, "\n\t(%d line(s) omitted)", omitted)
 			}
-		}
-
-		if le.Truncated {
-			fmt.Fprintf(f, "\n\t(truncated)")
 		}
 
 	default:

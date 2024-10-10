@@ -1,6 +1,6 @@
 package asm
 
-//go:generate stringer -output func_string.go -type=BuiltinFunc
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -output func_string.go -type=BuiltinFunc
 
 // BuiltinFunc is a built-in eBPF function.
 type BuiltinFunc int32

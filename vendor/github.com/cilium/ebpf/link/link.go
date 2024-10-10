@@ -1,9 +1,9 @@
 package link
 
 import (
-	"bytes"
-	"encoding/binary"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
@@ -48,14 +48,34 @@ type Link interface {
 
 // NewLinkFromFD creates a link from a raw fd.
 //
-// You should not use fd after calling this function.
+// Deprecated: use [NewFromFD] instead.
 func NewLinkFromFD(fd int) (Link, error) {
+	return NewFromFD(fd)
+}
+
+// NewFromFD creates a link from a raw fd.
+//
+// You should not use fd after calling this function.
+func NewFromFD(fd int) (Link, error) {
 	sysFD, err := sys.NewFD(fd)
 	if err != nil {
 		return nil, err
 	}
 
 	return wrapRawLink(&RawLink{fd: sysFD})
+}
+
+// NewFromID returns the link associated with the given id.
+//
+// Returns ErrNotExist if there is no link with the given id.
+func NewFromID(id ID) (Link, error) {
+	getFdAttr := &sys.LinkGetFdByIdAttr{Id: id}
+	fd, err := sys.LinkGetFdById(getFdAttr)
+	if err != nil {
+		return nil, fmt.Errorf("get link fd from ID %d: %w", id, err)
+	}
+
+	return wrapRawLink(&RawLink{fd, ""})
 }
 
 // LoadPinnedLink loads a link that was persisted into a bpffs.
@@ -96,8 +116,18 @@ func wrapRawLink(raw *RawLink) (_ Link, err error) {
 		return &NetNsLink{*raw}, nil
 	case KprobeMultiType:
 		return &kprobeMultiLink{*raw}, nil
+	case UprobeMultiType:
+		return &uprobeMultiLink{*raw}, nil
 	case PerfEventType:
-		return nil, fmt.Errorf("recovering perf event fd: %w", ErrNotSupported)
+		return &perfEventLink{*raw, nil}, nil
+	case TCXType:
+		return &tcxLink{*raw}, nil
+	case NetfilterType:
+		return &netfilterLink{*raw}, nil
+	case NetkitType:
+		return &netkitLink{*raw}, nil
+	case XDPType:
+		return &xdpLink{*raw}, nil
 	default:
 		return raw, nil
 	}
@@ -128,10 +158,85 @@ type Info struct {
 	extra   interface{}
 }
 
-type TracingInfo sys.TracingLinkInfo
-type CgroupInfo sys.CgroupLinkInfo
-type NetNsInfo sys.NetNsLinkInfo
-type XDPInfo sys.XDPLinkInfo
+type TracingInfo struct {
+	AttachType  sys.AttachType
+	TargetObjId uint32
+	TargetBtfId sys.TypeID
+}
+
+type CgroupInfo struct {
+	CgroupId   uint64
+	AttachType sys.AttachType
+	_          [4]byte
+}
+
+type NetNsInfo struct {
+	NetnsIno   uint32
+	AttachType sys.AttachType
+}
+
+type TCXInfo struct {
+	Ifindex    uint32
+	AttachType sys.AttachType
+}
+
+type XDPInfo struct {
+	Ifindex uint32
+}
+
+type NetfilterInfo struct {
+	Pf       uint32
+	Hooknum  uint32
+	Priority int32
+	Flags    uint32
+}
+
+type NetkitInfo struct {
+	Ifindex    uint32
+	AttachType sys.AttachType
+}
+
+type KprobeMultiInfo struct {
+	count  uint32
+	flags  uint32
+	missed uint64
+}
+
+// AddressCount is the number of addresses hooked by the kprobe.
+func (kpm *KprobeMultiInfo) AddressCount() (uint32, bool) {
+	return kpm.count, kpm.count > 0
+}
+
+func (kpm *KprobeMultiInfo) Flags() (uint32, bool) {
+	return kpm.flags, kpm.count > 0
+}
+
+func (kpm *KprobeMultiInfo) Missed() (uint64, bool) {
+	return kpm.missed, kpm.count > 0
+}
+
+type PerfEventInfo struct {
+	Type  sys.PerfEventType
+	extra interface{}
+}
+
+func (r *PerfEventInfo) Kprobe() *KprobeInfo {
+	e, _ := r.extra.(*KprobeInfo)
+	return e
+}
+
+type KprobeInfo struct {
+	address uint64
+	missed  uint64
+}
+
+func (kp *KprobeInfo) Address() (uint64, bool) {
+	return kp.address, kp.address > 0
+}
+
+func (kp *KprobeInfo) Missed() (uint64, bool) {
+	return kp.missed, kp.address > 0
+}
 
 // Tracing returns tracing type-specific link info.
 //
@@ -157,11 +262,51 @@ func (r Info) NetNs() *NetNsInfo {
 	return e
 }
 
-// ExtraNetNs returns XDP type-specific link info.
+// XDP returns XDP type-specific link info.
 //
 // Returns nil if the type-specific link info isn't available.
 func (r Info) XDP() *XDPInfo {
 	e, _ := r.extra.(*XDPInfo)
+	return e
+}
+
+// TCX returns TCX type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) TCX() *TCXInfo {
+	e, _ := r.extra.(*TCXInfo)
+	return e
+}
+
+// Netfilter returns netfilter type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) Netfilter() *NetfilterInfo {
+	e, _ := r.extra.(*NetfilterInfo)
+	return e
+}
+
+// Netkit returns netkit type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) Netkit() *NetkitInfo {
+	e, _ := r.extra.(*NetkitInfo)
+	return e
+}
+
+// KprobeMulti returns kprobe-multi type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) KprobeMulti() *KprobeMultiInfo {
+	e, _ := r.extra.(*KprobeMultiInfo)
+	return e
+}
+
+// PerfEvent returns perf-event type-specific link info.
+//
+// Returns nil if the type-specific link info isn't available.
+func (r Info) PerfEvent() *PerfEventInfo {
+	e, _ := r.extra.(*PerfEventInfo)
 	return e
 }
 
@@ -295,6 +440,9 @@ func (l *RawLink) UpdateArgs(opts RawLinkUpdateOptions) error {
 }
 
 // Info returns metadata about the link.
+//
+// Linktype specific metadata is not included and can be retrieved
+// via the linktype specific Info() method.
 func (l *RawLink) Info() (*Info, error) {
 	var info sys.LinkInfo
 
@@ -302,35 +450,81 @@ func (l *RawLink) Info() (*Info, error) {
 		return nil, fmt.Errorf("link info: %s", err)
 	}
 
-	var extra interface{}
-	switch info.Type {
-	case CgroupType:
-		extra = &CgroupInfo{}
-	case NetNsType:
-		extra = &NetNsInfo{}
-	case TracingType:
-		extra = &TracingInfo{}
-	case XDPType:
-		extra = &XDPInfo{}
-	case RawTracepointType, IterType,
-		PerfEventType, KprobeMultiType:
-		// Extra metadata not supported.
-	default:
-		return nil, fmt.Errorf("unknown link info type: %d", info.Type)
-	}
-
-	if extra != nil {
-		buf := bytes.NewReader(info.Extra[:])
-		err := binary.Read(buf, internal.NativeEndian, extra)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read extra link info: %w", err)
-		}
-	}
-
 	return &Info{
 		info.Type,
 		info.Id,
 		ebpf.ProgramID(info.ProgId),
-		extra,
+		nil,
 	}, nil
+}
+
+// Iterator allows iterating over links attached into the kernel.
+type Iterator struct {
+	// The ID of the current link. Only valid after a call to Next
+	ID ID
+	// The current link. Only valid until a call to Next.
+	// See Take if you want to retain the link.
+	Link Link
+	err  error
+}
+
+// Next retrieves the next link.
+//
+// Returns true if another link was found. Call [Iterator.Err] after the function returns false.
+func (it *Iterator) Next() bool {
+	id := it.ID
+	for {
+		getIdAttr := &sys.LinkGetNextIdAttr{Id: id}
+		err := sys.LinkGetNextId(getIdAttr)
+		if errors.Is(err, os.ErrNotExist) {
+			// There are no more links.
+			break
+		} else if err != nil {
+			it.err = fmt.Errorf("get next link ID: %w", err)
+			break
+		}
+
+		id = getIdAttr.NextId
+		l, err := NewFromID(id)
+		if errors.Is(err, os.ErrNotExist) {
+			// Couldn't load the link fast enough. Try next ID.
+			continue
+		} else if err != nil {
+			it.err = fmt.Errorf("get link for ID %d: %w", id, err)
+			break
+		}
+
+		if it.Link != nil {
+			it.Link.Close()
+		}
+		it.ID, it.Link = id, l
+		return true
+	}
+
+	// No more links or we encountered an error.
+	if it.Link != nil {
+		it.Link.Close()
+	}
+	it.Link = nil
+	return false
+}
+
+// Take the ownership of the current link.
+//
+// It's the callers responsibility to close the link.
+func (it *Iterator) Take() Link {
+	l := it.Link
+	it.Link = nil
+	return l
+}
+
+// Err returns an error if iteration failed for some reason.
+func (it *Iterator) Err() error {
+	return it.err
+}
+
+func (it *Iterator) Close() {
+	if it.Link != nil {
+		it.Link.Close()
+	}
 }

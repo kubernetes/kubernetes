@@ -4,6 +4,9 @@ BasedOnStyle:    LLVM
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: true
 AlignEscapedNewlines: DontAlign
+# mkdocs annotations in source code are written as trailing comments
+# and alignment pushes these really far away from the content.
+AlignTrailingComments: false
 AlwaysBreakBeforeMultilineStrings: true
 AlwaysBreakTemplateDeclarations: false
 AllowAllParametersOfDeclarationOnNextLine: false
@@ -16,4 +19,7 @@ UseTab:          ForContinuationAndIndentation
 ColumnLimit:     1000
 # Go compiler comments need to stay unindented.
 CommentPragmas: '^go:.*'
+# linux/bpf.h needs to be included before bpf/bpf_helpers.h for types like __u64
+# and sorting makes this impossible.
+SortIncludes: false
 ...

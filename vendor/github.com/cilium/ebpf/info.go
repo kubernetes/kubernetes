@@ -20,6 +20,23 @@ import (
 	"github.com/cilium/ebpf/internal/unix"
 )
 
+// The *Info structs expose metadata about a program or map. Most
+// fields are exposed via a getter:
+//
+//     func (*MapInfo) ID() (MapID, bool)
+//
+// This is because the metadata available changes based on kernel version.
+// The second boolean return value indicates whether a particular field is
+// available on the current kernel.
+//
+// Always add new metadata as such a getter, unless you can somehow get the
+// value of the field on all supported kernels. Also document which version
+// a particular field first appeared in.
+//
+// Some metadata is a buffer which needs additional parsing. In this case,
+// store the undecoded data in the Info struct and provide a getter which
+// decodes it when necessary. See ProgramInfo.Instructions for an example.
+
 // MapInfo describes a map.
 type MapInfo struct {
 	Type       MapType
@@ -30,6 +47,8 @@ type MapInfo struct {
 	Flags      uint32
 	// Name as supplied by user space at load time. Available from 4.15.
 	Name string
+
+	btf btf.ID
 }
 
 func newMapInfoFromFd(fd *sys.FD) (*MapInfo, error) {
@@ -50,6 +69,7 @@ func newMapInfoFromFd(fd *sys.FD) (*MapInfo, error) {
 		info.MaxEntries,
 		uint32(info.MapFlags),
 		unix.ByteSliceToString(info.Name[:]),
+		btf.ID(info.BtfId),
 	}, nil
 }
 
@@ -77,12 +97,27 @@ func (mi *MapInfo) ID() (MapID, bool) {
 	return mi.id, mi.id > 0
 }
 
+// BTFID returns the BTF ID associated with the Map.
+//
+// The ID is only valid as long as the associated Map is kept alive.
+// Available from 4.18.
+//
+// The bool return value indicates whether this optional field is available and
+// populated. (The field may be available but not populated if the kernel
+// supports the field but the Map was loaded without BTF information.)
+func (mi *MapInfo) BTFID() (btf.ID, bool) {
+	return mi.btf, mi.btf > 0
+}
+
 // programStats holds statistics of a program.
 type programStats struct {
 	// Total accumulated runtime of the program ins ns.
 	runtime time.Duration
 	// Total number of times the program was called.
 	runCount uint64
+	// Total number of times the programm was NOT called.
+	// Added in commit 9ed9e9ba2337 ("bpf: Count the number of times recursion was prevented").
+	recursionMisses uint64
 }
 
 // ProgramInfo describes a program.
@@ -101,6 +136,11 @@ type ProgramInfo struct {
 
 	maps  []MapID
 	insns []byte
+
+	lineInfos    []byte
+	numLineInfos uint32
+	funcInfos    []byte
+	numFuncInfos uint32
 }
 
 func newProgramInfoFromFd(fd *sys.FD) (*ProgramInfo, error) {
@@ -120,18 +160,22 @@ func newProgramInfoFromFd(fd *sys.FD) (*ProgramInfo, error) {
 		Name: unix.ByteSliceToString(info.Name[:]),
 		btf:  btf.ID(info.BtfId),
 		stats: &programStats{
-			runtime:  time.Duration(info.RunTimeNs),
-			runCount: info.RunCnt,
+			runtime:         time.Duration(info.RunTimeNs),
+			runCount:        info.RunCnt,
+			recursionMisses: info.RecursionMisses,
 		},
 	}
 
 	// Start with a clean struct for the second call, otherwise we may get EFAULT.
 	var info2 sys.ProgInfo
 
+	makeSecondCall := false
+
 	if info.NrMapIds > 0 {
 		pi.maps = make([]MapID, info.NrMapIds)
 		info2.NrMapIds = info.NrMapIds
 		info2.MapIds = sys.NewPointer(unsafe.Pointer(&pi.maps[0]))
+		makeSecondCall = true
 	} else if haveProgramInfoMapIDs() == nil {
 		// This program really has no associated maps.
 		pi.maps = make([]MapID, 0)
@@ -150,9 +194,28 @@ func newProgramInfoFromFd(fd *sys.FD) (*ProgramInfo, error) {
 		pi.insns = make([]byte, info.XlatedProgLen)
 		info2.XlatedProgLen = info.XlatedProgLen
 		info2.XlatedProgInsns = sys.NewSlicePointer(pi.insns)
+		makeSecondCall = true
 	}
 
-	if info.NrMapIds > 0 || info.XlatedProgLen > 0 {
+	if info.NrLineInfo > 0 {
+		pi.lineInfos = make([]byte, btf.LineInfoSize*info.NrLineInfo)
+		info2.LineInfo = sys.NewSlicePointer(pi.lineInfos)
+		info2.LineInfoRecSize = btf.LineInfoSize
+		info2.NrLineInfo = info.NrLineInfo
+		pi.numLineInfos = info.NrLineInfo
+		makeSecondCall = true
+	}
+
+	if info.NrFuncInfo > 0 {
+		pi.funcInfos = make([]byte, btf.FuncInfoSize*info.NrFuncInfo)
+		info2.FuncInfo = sys.NewSlicePointer(pi.funcInfos)
+		info2.FuncInfoRecSize = btf.FuncInfoSize
+		info2.NrFuncInfo = info.NrFuncInfo
+		pi.numFuncInfos = info.NrFuncInfo
+		makeSecondCall = true
+	}
+
+	if makeSecondCall {
 		if err := sys.ObjInfo(fd, &info2); err != nil {
 			return nil, err
 		}
@@ -232,6 +295,16 @@ func (pi *ProgramInfo) Runtime() (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
+// RecursionMisses returns the total number of times the program was NOT called.
+// This can happen when another bpf program is already running on the cpu, which
+// is likely to happen for example when you interrupt bpf program execution.
+func (pi *ProgramInfo) RecursionMisses() (uint64, bool) {
+	if pi.stats != nil {
+		return pi.stats.recursionMisses, true
+	}
+	return 0, false
+}
+
 // Instructions returns the 'xlated' instruction stream of the program
 // after it has been verified and rewritten by the kernel. These instructions
 // cannot be loaded back into the kernel as-is, this is mainly used for
@@ -245,7 +318,13 @@ func (pi *ProgramInfo) Runtime() (time.Duration, bool) {
 //
 // The first instruction is marked as a symbol using the Program's name.
 //
-// Available from 4.13. Requires CAP_BPF or equivalent.
+// If available, the instructions will be annotated with metadata from the
+// BTF. This includes line information and function information. Reading
+// this metadata requires CAP_SYS_ADMIN or equivalent. If capability is
+// unavailable, the instructions will be returned without metadata.
+//
+// Available from 4.13. Requires CAP_BPF or equivalent for plain instructions.
+// Requires CAP_SYS_ADMIN for instructions with metadata.
 func (pi *ProgramInfo) Instructions() (asm.Instructions, error) {
 	// If the calling process is not BPF-capable or if the kernel doesn't
 	// support getting xlated instructions, the field will be zero.
@@ -259,8 +338,55 @@ func (pi *ProgramInfo) Instructions() (asm.Instructions, error) {
 		return nil, fmt.Errorf("unmarshaling instructions: %w", err)
 	}
 
-	// Tag the first instruction with the name of the program, if available.
-	insns[0] = insns[0].WithSymbol(pi.Name)
+	if pi.btf != 0 {
+		btfh, err := btf.NewHandleFromID(pi.btf)
+		if err != nil {
+			// Getting a BTF handle requires CAP_SYS_ADMIN, if not available we get an -EPERM.
+			// Ignore it and fall back to instructions without metadata.
+			if !errors.Is(err, unix.EPERM) {
+				return nil, fmt.Errorf("unable to get BTF handle: %w", err)
+			}
+		}
+
+		// If we have a BTF handle, we can use it to assign metadata to the instructions.
+		if btfh != nil {
+			defer btfh.Close()
+
+			spec, err := btfh.Spec(nil)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get BTF spec: %w", err)
+			}
+
+			lineInfos, err := btf.LoadLineInfos(
+				bytes.NewReader(pi.lineInfos),
+				internal.NativeEndian,
+				pi.numLineInfos,
+				spec,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("parse line info: %w", err)
+			}
+
+			funcInfos, err := btf.LoadFuncInfos(
+				bytes.NewReader(pi.funcInfos),
+				internal.NativeEndian,
+				pi.numFuncInfos,
+				spec,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("parse func info: %w", err)
+			}
+
+			btf.AssignMetadataToInstructions(insns, funcInfos, lineInfos, btf.CORERelocationInfos{})
+		}
+	}
+
+	fn := btf.FuncMetadata(&insns[0])
+	name := pi.Name
+	if fn != nil {
+		name = fn.Name
+	}
+	insns[0] = insns[0].WithSymbol(name)
 
 	return insns, nil
 }

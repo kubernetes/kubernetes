@@ -250,17 +250,43 @@ func putValueNumber(data []byte, typ btf.Type, value string) error {
 		return fmt.Errorf("cannot parse value: %w", err)
 	}
 
-	switch size {
+	return PutInteger(data, integer, n)
+}
+
+// PutInteger writes n into data.
+//
+// integer determines how much is written into data and what the valid values
+// are.
+func PutInteger(data []byte, integer *btf.Int, n uint64) error {
+	// This function should match set_kcfg_value_num in libbpf.
+	if integer.Encoding == btf.Bool && n > 1 {
+		return fmt.Errorf("invalid boolean value: %d", n)
+	}
+
+	if len(data) < int(integer.Size) {
+		return fmt.Errorf("can't fit an integer of size %d into a byte slice of length %d", integer.Size, len(data))
+	}
+
+	switch integer.Size {
 	case 1:
+		if integer.Encoding == btf.Signed && (int64(n) > math.MaxInt8 || int64(n) < math.MinInt8) {
+			return fmt.Errorf("can't represent %d as a signed integer of size %d", int64(n), integer.Size)
+		}
 		data[0] = byte(n)
 	case 2:
+		if integer.Encoding == btf.Signed && (int64(n) > math.MaxInt16 || int64(n) < math.MinInt16) {
+			return fmt.Errorf("can't represent %d as a signed integer of size %d", int64(n), integer.Size)
+		}
 		internal.NativeEndian.PutUint16(data, uint16(n))
 	case 4:
+		if integer.Encoding == btf.Signed && (int64(n) > math.MaxInt32 || int64(n) < math.MinInt32) {
+			return fmt.Errorf("can't represent %d as a signed integer of size %d", int64(n), integer.Size)
+		}
 		internal.NativeEndian.PutUint32(data, uint32(n))
 	case 8:
 		internal.NativeEndian.PutUint64(data, uint64(n))
 	default:
-		return fmt.Errorf("size (%d) is not valid, expected: 1, 2, 4 or 8", size)
+		return fmt.Errorf("size (%d) is not valid, expected: 1, 2, 4 or 8", integer.Size)
 	}
 
 	return nil

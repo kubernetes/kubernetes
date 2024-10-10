@@ -1,11 +1,14 @@
 package ebpf
 
 import (
+	"debug/elf"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
+	"slices"
 
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
@@ -40,10 +43,12 @@ func (hs handles) fdArray() []int32 {
 	return fda
 }
 
-func (hs handles) close() {
-	for _, h := range hs {
-		h.Close()
+func (hs *handles) Close() error {
+	var errs []error
+	for _, h := range *hs {
+		errs = append(errs, h.Close())
 	}
+	return errors.Join(errs...)
 }
 
 // splitSymbols splits insns into subsections delimited by Symbol Instructions.
@@ -55,21 +60,33 @@ func splitSymbols(insns asm.Instructions) (map[string]asm.Instructions, error) {
 		return nil, errors.New("insns is empty")
 	}
 
-	if insns[0].Symbol() == "" {
+	currentSym := insns[0].Symbol()
+	if currentSym == "" {
 		return nil, errors.New("insns must start with a Symbol")
 	}
 
-	var name string
+	start := 0
 	progs := make(map[string]asm.Instructions)
-	for _, ins := range insns {
-		if sym := ins.Symbol(); sym != "" {
-			if progs[sym] != nil {
-				return nil, fmt.Errorf("insns contains duplicate Symbol %s", sym)
-			}
-			name = sym
+	for i, ins := range insns[1:] {
+		i := i + 1
+
+		sym := ins.Symbol()
+		if sym == "" {
+			continue
 		}
 
-		progs[name] = append(progs[name], ins)
+		// New symbol, flush the old one out.
+		progs[currentSym] = slices.Clone(insns[start:i])
+
+		if progs[sym] != nil {
+			return nil, fmt.Errorf("insns contains duplicate Symbol %s", sym)
+		}
+		currentSym = sym
+		start = i
+	}
+
+	if tail := insns[start:]; len(tail) > 0 {
+		progs[currentSym] = slices.Clone(tail)
 	}
 
 	return progs, nil
@@ -104,7 +121,7 @@ func hasFunctionReferences(insns asm.Instructions) bool {
 //
 // Passing a nil target will relocate against the running kernel. insns are
 // modified in place.
-func applyRelocations(insns asm.Instructions, target *btf.Spec, bo binary.ByteOrder) error {
+func applyRelocations(insns asm.Instructions, targets []*btf.Spec, kmodName string, bo binary.ByteOrder, b *btf.Builder) error {
 	var relos []*btf.CORERelocation
 	var reloInsns []*asm.Instruction
 	iter := insns.Iterate()
@@ -123,7 +140,26 @@ func applyRelocations(insns asm.Instructions, target *btf.Spec, bo binary.ByteOr
 		bo = internal.NativeEndian
 	}
 
-	fixups, err := btf.CORERelocate(relos, target, bo)
+	if len(targets) == 0 {
+		kernelTarget, err := btf.LoadKernelSpec()
+		if err != nil {
+			return fmt.Errorf("load kernel spec: %w", err)
+		}
+		targets = append(targets, kernelTarget)
+
+		if kmodName != "" {
+			kmodTarget, err := btf.LoadKernelModuleSpec(kmodName)
+			// Ignore ErrNotExists to cater to kernels which have CONFIG_DEBUG_INFO_BTF_MODULES disabled.
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("load kernel module spec: %w", err)
+			}
+			if err == nil {
+				targets = append(targets, kmodTarget)
+			}
+		}
+	}
+
+	fixups, err := btf.CORERelocate(relos, targets, bo, b.Add)
 	if err != nil {
 		return err
 	}
@@ -228,14 +264,24 @@ func fixupAndValidate(insns asm.Instructions) error {
 	return nil
 }
 
+// POISON_CALL_KFUNC_BASE in libbpf.
+// https://github.com/libbpf/libbpf/blob/2778cbce609aa1e2747a69349f7f46a2f94f0522/src/libbpf.c#L5767
+const kfuncCallPoisonBase = 2002000000
+
 // fixupKfuncs loops over all instructions in search for kfunc calls.
 // If at least one is found, the current kernels BTF and module BTFis are searched to set Instruction.Constant
 // and Instruction.Offset to the correct values.
-func fixupKfuncs(insns asm.Instructions) (handles, error) {
+func fixupKfuncs(insns asm.Instructions) (_ handles, err error) {
+	closeOnError := func(c io.Closer) {
+		if err != nil {
+			c.Close()
+		}
+	}
+
 	iter := insns.Iterate()
 	for iter.Next() {
 		ins := iter.Ins
-		if ins.IsKfuncCall() {
+		if metadata := ins.Metadata.Get(kfuncMetaKey{}); metadata != nil {
 			goto fixups
 		}
 	}
@@ -250,10 +296,13 @@ fixups:
 	}
 
 	fdArray := make(handles, 0)
+	defer closeOnError(&fdArray)
+
 	for {
 		ins := iter.Ins
 
-		if !ins.IsKfuncCall() {
+		metadata := ins.Metadata.Get(kfuncMetaKey{})
+		if metadata == nil {
 			if !iter.Next() {
 				// break loop if this was the last instruction in the stream.
 				break
@@ -262,30 +311,49 @@ fixups:
 		}
 
 		// check meta, if no meta return err
-		kfm, _ := ins.Metadata.Get(kfuncMeta{}).(*btf.Func)
+		kfm, _ := metadata.(*kfuncMeta)
 		if kfm == nil {
-			return nil, fmt.Errorf("kfunc call has no kfuncMeta")
+			return nil, fmt.Errorf("kfuncMetaKey doesn't contain kfuncMeta")
 		}
 
 		target := btf.Type((*btf.Func)(nil))
-		spec, module, err := findTargetInKernel(kernelSpec, kfm.Name, &target)
+		spec, module, err := findTargetInKernel(kernelSpec, kfm.Func.Name, &target)
+		if kfm.Binding == elf.STB_WEAK && errors.Is(err, btf.ErrNotFound) {
+			if ins.IsKfuncCall() {
+				// If the kfunc call is weak and not found, poison the call. Use a recognizable constant
+				// to make it easier to debug. And set src to zero so the verifier doesn't complain
+				// about the invalid imm/offset values before dead-code elimination.
+				ins.Constant = kfuncCallPoisonBase
+				ins.Src = 0
+			} else if ins.OpCode.IsDWordLoad() {
+				// If the kfunc DWordLoad is weak and not found, set its address to 0.
+				ins.Constant = 0
+				ins.Src = 0
+			} else {
+				return nil, fmt.Errorf("only kfunc calls and dword loads may have kfunc metadata")
+			}
+
+			iter.Next()
+			continue
+		}
+		// Error on non-weak kfunc not found.
 		if errors.Is(err, btf.ErrNotFound) {
-			return nil, fmt.Errorf("kfunc %q: %w", kfm.Name, ErrNotSupported)
+			return nil, fmt.Errorf("kfunc %q: %w", kfm.Func.Name, ErrNotSupported)
 		}
-		if err != nil {
-			return nil, err
-		}
-
-		if err := btf.CheckTypeCompatibility(kfm.Type, target.(*btf.Func).Type); err != nil {
-			return nil, &incompatibleKfuncError{kfm.Name, err}
-		}
-
-		id, err := spec.TypeID(target)
 		if err != nil {
 			return nil, err
 		}
 
 		idx, err := fdArray.add(module)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := btf.CheckTypeCompatibility(kfm.Func.Type, target.(*btf.Func).Type); err != nil {
+			return nil, &incompatibleKfuncError{kfm.Func.Name, err}
+		}
+
+		id, err := spec.TypeID(target)
 		if err != nil {
 			return nil, err
 		}
