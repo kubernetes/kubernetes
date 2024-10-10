@@ -110,7 +110,7 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		// up it needs to do now that the pod has been deleted. Otherwise we may
 		// run into a data race condition in which the PostTestExec function
 		// deletes the CPU manager's checkpoint file while the CPU manager is still
-		// doing work and we end with a new checkpoint file after PosttestExec has
+		// doing work and we end with a new checkpoint file after PostTestExec has
 		// finished. This issues would result in the kubelet panicking after we try
 		// and set the kubelet config.
 		time.Sleep(15 * time.Second)

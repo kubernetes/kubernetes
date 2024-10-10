@@ -104,7 +104,7 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 				if initialConfig.KubeReserved == nil {
 					initialConfig.KubeReserved = map[string]string{}
 				}
-				// There's a race condition observed between system OOM and cgroup OOM if node alocatable
+				// There's a race condition observed between system OOM and cgroup OOM if node allocatable
 				// memory is equal to node capacity. Hence, reserving a fraction of node's memory capacity for
 				// K8s components such that node allocatable memory is less than node capacity to
 				// observe OOM kills at cgroup level instead of system OOM kills.
