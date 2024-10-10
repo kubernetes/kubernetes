@@ -188,6 +188,7 @@ func (p *staticPolicy) Start(s state.State) error {
 		klog.ErrorS(err, "Static policy invalid state, please drain node and remove policy state file")
 		return err
 	}
+	p.initializeMetrics(s)
 	return nil
 }
 
@@ -357,8 +358,10 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 		return err
 	}
+
 	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 	p.updateCPUsToReuse(pod, container, cpuset)
+	p.updateMetricsOnAllocate(cpuset)
 
 	return nil
 }
@@ -384,6 +387,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 		// Mutate the shared pool, adding released cpus.
 		toRelease = toRelease.Difference(cpusInUse)
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		p.updateMetricsOnRelease(toRelease)
 	}
 	return nil
 }
@@ -706,4 +710,31 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 	}
 
 	return alignedCPUs
+}
+
+func (p *staticPolicy) initializeMetrics(s state.State) {
+	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs(s)))
+}
+
+func (p *staticPolicy) updateMetricsOnAllocate(cset cpuset.CPUSet) {
+	ncpus := cset.Size()
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
+	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
+}
+
+func (p *staticPolicy) updateMetricsOnRelease(cset cpuset.CPUSet) {
+	ncpus := cset.Size()
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(-ncpus))
+	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(ncpus * 1000))
+}
+
+func countExclusiveCPUs(s state.State) int {
+	exclusiveCPUs := 0
+	for _, cpuAssign := range s.GetCPUAssignments() {
+		for _, cset := range cpuAssign {
+			exclusiveCPUs += cset.Size()
+		}
+	}
+	return exclusiveCPUs
 }
