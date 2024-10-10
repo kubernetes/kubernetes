@@ -45,6 +45,8 @@ var (
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	// ErrKillPodSandbox returned when runtime failed to stop pod's sandbox.
 	ErrKillPodSandbox = errors.New("KillPodSandboxError")
+	// ErrResizePodSandbox returned when runtime failed to resize pod's sandbox.
+	ErrResizePodSandbox = errors.New("ResizePodSandboxError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
@@ -68,6 +70,8 @@ const (
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	// KillPodSandbox action
 	KillPodSandbox SyncAction = "KillPodSandbox"
+	// ResizePodSandbox action
+	ResizePodSandbox SyncAction = "ResizePodSandbox"
 )
 
 // SyncResult is the result of sync action.
