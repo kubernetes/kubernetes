@@ -62,6 +62,8 @@ func init() {
 	flagOverrides := map[string]string{
 		// Override the default cAdvisor housekeeping interval.
 		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Override the default max cAdvisor housekeeping interval.
+		"max_housekeeping_interval": maxHousekeepingInterval.String(),
 		// Disable event storage by default.
 		"event_storage_event_limit": "default=0",
 		"event_storage_age_limit":   "default=0",
@@ -96,6 +98,15 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	}
 
 	duration := maxHousekeepingInterval
+	var err error
+	// If the max_housekeeping_interval value is set, use this setting.
+	if f := flag.Lookup("max_housekeeping_interval"); f != nil && f.Value.String() != maxHousekeepingInterval.String() {
+		duration, err = time.ParseDuration(f.Value.String())
+		if err != nil {
+			klog.ErrorS(err, "Expected max_housekeeping_interval setting", "max_housekeeping_interval", f.Value.String())
+			return nil, err
+		}
+	}
 	housekeepingConfig := manager.HousekeepingConfig{
 		Interval:     &duration,
 		AllowDynamic: ptr.To(allowDynamicHousekeeping),
