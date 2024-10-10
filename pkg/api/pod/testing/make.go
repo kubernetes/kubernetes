@@ -237,6 +237,12 @@ func SetObjectMeta(objectMeta metav1.ObjectMeta) Tweak {
 	}
 }
 
+func SetDNSConfig(dnsConfig *api.PodDNSConfig) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.DNSConfig = dnsConfig
+	}
+}
+
 func MakeContainer(name string, tweaks ...TweakContainer) api.Container {
 	cnr := api.Container{
 		Name: name, Image: "image", ImagePullPolicy: "IfNotPresent",
