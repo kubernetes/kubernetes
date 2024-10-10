@@ -57,13 +57,14 @@ pushd "${_kubetmp}" > /dev/null 2>&1
 
   # Recreate the vendor tree using the nice clean set we just downloaded
   hack/update-vendor.sh
+  hack/update-go-workspace.sh
 popd > /dev/null 2>&1
 
 ret=0
 
 pushd "${KUBE_ROOT}" > /dev/null 2>&1
   # Test for diffs in go.mod / go.sum / go.work
-  for file in $(git ls-files -cmo --exclude-standard -- ':!:vendor/*' ':(glob)**/go.mod' ':(glob)**/go.sum' ':(glob)**/go.work'); do
+  for file in $(git ls-files -cmo --exclude-standard -- ':!:vendor/*' ':(glob)**/go.mod' ':(glob)**/go.sum' ':(glob)**/go.work' ':(glob)**/go.work.sum'); do
     if ! _out="$(diff -Naupr "${file}" "${_kubetmp}/${file}")"; then
       echo "Your ${file} file is different:" >&2
       echo "${_out}" >&2
