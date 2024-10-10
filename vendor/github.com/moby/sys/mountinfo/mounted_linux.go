@@ -51,7 +51,7 @@ func mountedByOpenat2(path string) (bool, error) {
 		Resolve: unix.RESOLVE_NO_XDEV,
 	})
 	_ = unix.Close(dirfd)
-	switch err { //nolint:errorlint // unix errors are bare
+	switch err {
 	case nil: // definitely not a mount
 		_ = unix.Close(fd)
 		return false, nil
