@@ -22,11 +22,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-
-	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 // v1PodResourcesServer implements PodResourcesListerServer
@@ -60,6 +60,10 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	p.devicesProvider.UpdateAllocatedDevices()
 
 	for i, pod := range pods {
+		if podutil.IsPodTerminal(pod) {
+			continue
+		}
+
 		pRes := podresourcesv1.PodResources{
 			Name:       pod.Name,
 			Namespace:  pod.Namespace,
