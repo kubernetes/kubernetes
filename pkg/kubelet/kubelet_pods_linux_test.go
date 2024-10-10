@@ -245,6 +245,9 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
 			fhu := hostutil.NewFakeHostUtil(nil)
 			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
@@ -253,7 +256,7 @@ func TestMakeMounts(t *testing.T) {
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, nil)
+			mounts, _, err := kubelet.makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {
@@ -340,6 +343,10 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
 			fhu := hostutil.NewFakeHostUtil(nil)
 			fsp := &subpath.FakeSubpath{}
 			pod := testPod.DeepCopy()
@@ -351,7 +358,7 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 				tt.containerFn(container)
 			}
 
-			mounts, _, err := makeMounts(pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
+			mounts, _, err := kubelet.makeMounts(pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
