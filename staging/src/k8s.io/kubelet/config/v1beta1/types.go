@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	metricsapi "k8s.io/component-base/metrics/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
@@ -653,9 +654,15 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice
 	// if the next release hides additional metrics, rather than being surprised
 	// when they are permanently removed in the release after that.
+	// Deprecated: Use `metrics` (Metrics) instead.
 	// Default: ""
 	// +optional
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
+	// Metrics specifies the options of metrics.
+	// Refer k8s.io/component-base/metrics/api/ for more information.
+	// Default: nil
+	// +optional
+	Metrics metricsapi.MetricsConfiguration `json:"metrics,omitempty"`
 	// systemReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `systemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)

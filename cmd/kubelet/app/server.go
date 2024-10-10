@@ -633,9 +633,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.ErrorS(err, "Failed to register kubelet configuration with configz")
 	}
 
+	// Apply `ShowHiddenMetricsForVersion` separately for backward compatibility.
 	if len(s.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
 	}
+	s.Metrics.Apply()
 
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
