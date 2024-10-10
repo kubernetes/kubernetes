@@ -576,6 +576,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *cli
 		setupOpts.groupResource,
 		setupOpts.transformer,
 		setupOpts.leaseConfig,
+		defaultDecoder{},
 	)
 	ctx := context.Background()
 	return ctx, store, client
