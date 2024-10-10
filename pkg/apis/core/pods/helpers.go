@@ -54,6 +54,26 @@ func VisitContainersWithPath(podSpec *api.PodSpec, specPath *field.Path, visitor
 	return true
 }
 
+// VisitContainersAndSidecarContainersWithPath invokes the visitor function with a pointer to the spec
+// of containers and sidecar containers in the given pod spec and the field.Path to that container.
+// If visitor returns false, visiting is short-circuited. VisitContainersWithPath returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainersAndSidecarContainersWithPath(podSpec *api.PodSpec, specPath *field.Path, visitor ContainerVisitorWithPath) bool {
+	fldPath := specPath.Child("initContainers")
+	for i := range podSpec.InitContainers {
+		if !(podSpec.InitContainers[i].RestartPolicy != nil && *podSpec.InitContainers[i].RestartPolicy == api.ContainerRestartPolicyAlways) || !visitor(&podSpec.InitContainers[i], fldPath.Index(i)) {
+			return false
+		}
+	}
+	fldPath = specPath.Child("containers")
+	for i := range podSpec.Containers {
+		if !visitor(&podSpec.Containers[i], fldPath.Index(i)) {
+			return false
+		}
+	}
+	return true
+}
+
 // ConvertDownwardAPIFieldLabel converts the specified downward API field label
 // and its value in the pod of the specified version to the internal version,
 // and returns the converted label and value. This function returns an error if
