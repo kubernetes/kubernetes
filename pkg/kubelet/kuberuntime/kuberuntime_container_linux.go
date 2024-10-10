@@ -42,6 +42,7 @@ import (
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -100,7 +101,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory(), kubeapiqos.GetPodQOS(pod))
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -211,7 +212,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 }
 
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, podQos v1.PodQOSClass) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
 	var cpuShares int64
 
@@ -244,6 +245,10 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
 		resources.CpuPeriod = cpuPeriod
+
+		if isStaticCPUPolicyConditionSatisfied(m.containerManager.GetNodeConfig().CPUManagerPolicy, podQos, cpuRequest) {
+			resources.CpuQuota = int64(-1)
+		}
 	}
 
 	// runc requires cgroupv2 for unified mode
@@ -329,6 +334,10 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	}
 	return cStatusResources
 }
+
+// Note: this function variable is being added here so it would be possible to mock
+// the cpu manager policy for unit tests by assigning a new mocked function into it.
+var isStaticCPUPolicyConditionSatisfied = cpumanager.StaticCPUPolicyConditionsSatisfied
 
 // Note: this function variable is being added here so it would be possible to mock
 // the cgroup version for unit tests by assigning a new mocked function into it. Without it,
