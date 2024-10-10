@@ -130,6 +130,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 		{
@@ -261,6 +262,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                    ptr.To(false),
 				LocalStorageCapacityIsolation:   ptr.To(false),
 				PodLogsDir:                      "",
+				PodHousekeepingPeriod:           &metav1.Duration{Duration: 2 * time.Second},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       ptr.To(false),
@@ -363,6 +365,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(false),
 				LocalStorageCapacityIsolation: ptr.To(false),
 				PodLogsDir:                    DefaultPodLogsDir,
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 		{
@@ -516,6 +519,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    "/custom/path",
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       ptr.To(true),
@@ -666,6 +670,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    "/custom/path",
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 		{
@@ -759,6 +764,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 		{
@@ -852,6 +858,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 		{
@@ -945,6 +952,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				PodHousekeepingPeriod:         &metav1.Duration{Duration: 2 * time.Second},
 			},
 		},
 	}

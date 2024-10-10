@@ -120,6 +120,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = ptr.To(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
+			obj.PodHousekeepingPeriod = metav1.Duration{Duration: 2 * time.Second}
 		},
 	}
 }
