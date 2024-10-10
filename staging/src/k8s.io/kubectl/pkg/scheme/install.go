@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	kuberc "k8s.io/kubectl/pkg/config/install"
 )
 
 // Register all groups in the kubectl's registry, but no componentconfig group since it's not in k8s.io/api
@@ -80,4 +81,5 @@ func init() {
 	utilruntime.Must(Scheme.SetVersionPriority(rbacv1.SchemeGroupVersion, rbacv1beta1.SchemeGroupVersion, rbacv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(schedulingv1alpha1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(storagev1.SchemeGroupVersion, storagev1beta1.SchemeGroupVersion, storagev1alpha1.SchemeGroupVersion))
+	kuberc.Install(Scheme)
 }
