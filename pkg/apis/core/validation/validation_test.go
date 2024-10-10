@@ -8323,7 +8323,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest(&capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
@@ -8526,7 +8526,7 @@ func TestValidateContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest(&capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
@@ -9151,7 +9151,7 @@ func TestValidateContainers(t *testing.T) {
 
 func TestValidateInitContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest(&capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
@@ -9229,7 +9229,7 @@ func TestValidateInitContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest(&capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
@@ -14508,7 +14508,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 	// Some tests use Windows host pods as an example of fields that might
 	// conflict between an ephemeral container and the rest of the pod.
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest(&capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 	makeWindowsHostPod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
@@ -20996,7 +20996,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		capabilities.SetForTests(capabilities.Capabilities{
+		capabilities.ResetForTest(&capabilities.Capabilities{
 			AllowPrivileged: v.capAllowPriv,
 		})
 		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
@@ -23650,7 +23650,7 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 
-			capabilities.SetForTests(capabilities.Capabilities{
+			capabilities.ResetForTest(&capabilities.Capabilities{
 				AllowPrivileged: testCase.allowPrivileged,
 			})
 
