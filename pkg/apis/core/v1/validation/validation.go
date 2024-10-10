@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -124,6 +125,12 @@ func validateResourceName(value core.ResourceName, fldPath *field.Path) field.Er
 	return allErrs
 }
 
+var supportedLogStreamType = sets.New[v1.LogStreamType](
+	v1.LogStreamTypeStdout,
+	v1.LogStreamTypeStderr,
+	v1.LogStreamTypeAll,
+)
+
 // ValidatePodLogOptions checks if options that are set are at the correct
 // value. Any incorrect value will be returned to the ErrorList.
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
@@ -140,6 +147,13 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	case opts.Stream != nil:
+		if !supportedLogStreamType.Has(*opts.Stream) {
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("stream"), *opts.Stream, supportedLogStreamType.UnsortedList()))
+		}
+		if *opts.Stream != v1.LogStreamTypeAll && opts.TailLines != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "`tailLines` and specific `stream` are mutually exclusive for now"))
 		}
 	}
 	return allErrs

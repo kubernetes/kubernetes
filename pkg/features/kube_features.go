@@ -747,6 +747,13 @@ const (
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
+	// owner: @knight42
+	// kep: https://kep.k8s.io/3288
+	// alpha: v1.32
+	//
+	// Enables only stdout or stderr of the container to be retrievd
+	SplitStdoutAndStderr featuregate.Feature = "SplitStdoutAndStderr"
+
 	// owner: @mattcary
 	// alpha: v1.23
 	// beta: v1.27

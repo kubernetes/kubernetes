@@ -43,6 +43,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -21018,6 +21019,10 @@ func TestValidPodLogOptions(t *testing.T) {
 	negative := int64(-1)
 	zero := int64(0)
 	positive := int64(1)
+	stdoutStream := core.LogStreamTypeStdout
+	stderrStream := core.LogStreamTypeStderr
+	allStream := core.LogStreamTypeAll
+	invalidStream := core.LogStreamType("invalid")
 	tests := []struct {
 		opt  core.PodLogOptions
 		errs int
@@ -21035,12 +21040,45 @@ func TestValidPodLogOptions(t *testing.T) {
 		{core.PodLogOptions{SinceSeconds: &positive}, 0},
 		{core.PodLogOptions{SinceSeconds: &zero}, 1},
 		{core.PodLogOptions{SinceTime: &now}, 0},
+		{
+			opt: core.PodLogOptions{
+				Stream: &stdoutStream,
+			},
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream: &invalidStream,
+			},
+			errs: 1,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:    &stderrStream,
+				TailLines: &positive,
+			},
+			errs: 1,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:    &allStream,
+				TailLines: &positive,
+			},
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:     &stdoutStream,
+				LimitBytes: &positive,
+				SinceTime:  &now,
+			},
+		},
 	}
 	for i, test := range tests {
-		errs := ValidatePodLogOptions(&test.opt)
-		if test.errs != len(errs) {
-			t.Errorf("%d: Unexpected errors: %v", i, errs)
-		}
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			errs := ValidatePodLogOptions(&test.opt)
+			if test.errs != len(errs) {
+				t.Errorf("%d: Unexpected errors: %v", i, errs)
+			}
+		})
 	}
 }
 
