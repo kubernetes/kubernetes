@@ -262,7 +262,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 // Delete implements storage.Interface.Delete.
 func (s *store) Delete(
 	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
+	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	preparedKey, err := s.prepareKey(key)
 	if err != nil {
 		return err

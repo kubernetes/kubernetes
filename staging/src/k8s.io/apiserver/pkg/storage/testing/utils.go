@@ -89,7 +89,7 @@ func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interfa
 	key := computePodKey(obj)
 
 	// Setup store with the specified key and grab the output for returning.
-	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
+	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
