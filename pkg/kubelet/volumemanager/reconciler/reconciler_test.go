@@ -163,7 +163,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -269,7 +269,7 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 		pod,
 		migratedSpec,
 		migratedSpec.Name(),
-		"",  /* volumeGidValue */
+		"",  /* volumeGIDValue */
 		nil, /* SELinuxContexts */
 	)
 
@@ -361,7 +361,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	// Assert
@@ -441,7 +441,7 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -520,7 +520,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -623,7 +623,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -731,7 +731,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -844,7 +844,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	// Assert
@@ -942,7 +942,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -1067,7 +1067,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 
 	// Assert
 	if err != nil {
@@ -1349,7 +1349,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 			// Assert
 			if err != nil {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1370,7 +1370,10 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			// Simulate what DSOWP does
 			pvWithSize.Spec.Capacity[v1.ResourceStorage] = tc.newPVSize
 			volumeSpec = &volume.Spec{PersistentVolume: pvWithSize}
-			dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContexts */)
+			_, err = dsw.AddPodToVolume(podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContexts */)
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+			}
 
 			t.Logf("Changing size of the volume to %s", tc.newPVSize.String())
 			newSize := tc.newPVSize.DeepCopy()
@@ -1604,7 +1607,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := dsw.AddPodToVolume(
-					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 				// Assert
 				if err != nil {
 					t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1827,7 +1830,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := dsw.AddPodToVolume(
-					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 				// Assert
 				if err != nil {
 					t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -2166,7 +2169,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	volumeSpecCopy := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	if err != nil {
@@ -2193,7 +2196,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		klog.InfoS("UnmountDevice called")
 		var generatedVolumeNameCopy v1.UniqueVolumeName
 		generatedVolumeNameCopy, err = dsw.AddPodToVolume(
-			podName, pod, volumeSpecCopy, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxLabel */)
+			podName, pod, volumeSpecCopy, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxLabel */)
 		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeNameCopy})
 		return nil
 	}
