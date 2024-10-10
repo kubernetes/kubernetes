@@ -36,10 +36,8 @@ import (
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -446,15 +444,19 @@ func Test_getLocalDetectors(t *testing.T) {
 }
 
 func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
-	if len(cidrs) == 0 {
-		return &v1.Node{}
-	}
-	return &v1.Node{
-		Spec: v1.NodeSpec{
-			PodCIDR:  cidrs[0],
-			PodCIDRs: cidrs,
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "nodeName",
+			ResourceVersion: "1000",
 		},
 	}
+	if len(cidrs) > 0 {
+		node.Spec = v1.NodeSpec{
+			PodCIDR:  cidrs[0],
+			PodCIDRs: cidrs,
+		}
+	}
+	return node
 }
 
 func TestConfigChange(t *testing.T) {
@@ -537,40 +539,45 @@ detectLocalMode: "BridgeInterface"`)
 	}
 
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
-		file, tempDir, err := setUp()
-		if err != nil {
-			t.Fatalf("unexpected error when setting up environment: %v", err)
-		}
-
-		opt := NewOptions()
-		opt.ConfigFile = file.Name()
-		err = opt.Complete(new(pflag.FlagSet))
-		if err != nil {
-			t.Fatal(err)
-		}
-		opt.proxyServer = tc.proxyServer
-
-		errCh := make(chan error, 1)
-		go func() {
-			errCh <- opt.runLoop(ctx)
-		}()
-
-		if tc.append {
-			file.WriteString("append fake content")
-		}
-
-		select {
-		case err := <-errCh:
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			file, tempDir, err := setUp()
 			if err != nil {
-				if !strings.Contains(err.Error(), tc.expectedErr) {
-					t.Errorf("[%s] Expected error containing %v, got %v", tc.name, tc.expectedErr, err)
+				t.Fatalf("unexpected error when setting up environment: %v", err)
+			}
+
+			opt := NewOptions()
+			opt.ConfigFile = file.Name()
+			err = opt.Complete(new(pflag.FlagSet))
+			if err != nil {
+				t.Fatal(err)
+			}
+			opt.proxyServer = tc.proxyServer
+
+			errCh := make(chan error, 1)
+			go func() {
+				errCh <- opt.runLoop(ctx)
+			}()
+
+			if tc.append {
+				_, err = file.WriteString("append fake content")
+				if err != nil {
+					t.Fatal(err)
 				}
 			}
-		case <-time.After(10 * time.Second):
-			t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
-		}
-		tearDown(file, tempDir)
+
+			select {
+			case err := <-errCh:
+				if err != nil {
+					if !strings.Contains(err.Error(), tc.expectedErr) {
+						t.Errorf("[%s] Expected error containing %v, got %v", tc.name, tc.expectedErr, err)
+					}
+				}
+			case <-time.After(10 * time.Second):
+				t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
+			}
+			tearDown(file, tempDir)
+		})
 	}
 }
 
@@ -578,10 +585,13 @@ func Test_waitForPodCIDR(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
 	nodeName := "test-node"
+	now := metav1.Now()
+	// oldNode is being deleted and should be skipped
 	oldNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            nodeName,
-			ResourceVersion: "1000",
+			Name:              nodeName,
+			ResourceVersion:   "1000",
+			DeletionTimestamp: &now,
 		},
 		Spec: v1.NodeSpec{
 			PodCIDR:  "10.0.0.0/24",
@@ -593,28 +603,31 @@ func Test_waitForPodCIDR(t *testing.T) {
 			Name:            nodeName,
 			ResourceVersion: "1",
 		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "192.168.0.0/24",
+			PodCIDRs: []string{"192.168.0.0/24", "fd00:1:2::/64"},
+		},
 	}
-	updatedNode := node.DeepCopy()
-	updatedNode.Spec.PodCIDRs = expected
-	updatedNode.Spec.PodCIDR = expected[0]
 
-	// start with the new node
+	// start with a node that is being deleted
 	client := clientsetfake.NewSimpleClientset()
-	client.AddReactor("list", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &v1.NodeList{}
-		return true, obj, nil
-	})
-	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("nodes", clientgotesting.DefaultWatchReactor(fakeWatch, nil))
+	informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+	nodeStore := informer.Core().V1().Nodes().Informer().GetStore()
+	err := nodeStore.Add(oldNode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeLister := informer.Core().V1().Nodes().Lister()
 
 	go func() {
-		fakeWatch.Add(node)
-		// receive a delete event for the old node
-		fakeWatch.Delete(oldNode)
-		// set the PodCIDRs on the new node
-		fakeWatch.Modify(updatedNode)
+		// simulate a new Node is created
+		time.Sleep(1 * time.Second)
+		err := nodeStore.Add(node)
+		if err != nil {
+			t.Error(err)
+		}
 	}()
-	got, err := waitForPodCIDR(ctx, client, node.Name)
+	got, err := waitForPodCIDR(ctx, nodeLister, node.Name)
 	if err != nil {
 		t.Errorf("waitForPodCIDR() unexpected error %v", err)
 		return
@@ -653,21 +666,23 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
-			Min:        ptr.To(tc.min),
-			MaxPerCore: ptr.To(tc.maxPerCore),
-		}
-		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, cfg)
-		if e != nil {
-			if tc.err == "" {
-				t.Errorf("[%d] unexpected error: %v", i, e)
-			} else if !strings.Contains(e.Error(), tc.err) {
-				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
+		t.Run(fmt.Sprintf("test-case-%d", i), func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
+				Min:        ptr.To(tc.min),
+				MaxPerCore: ptr.To(tc.maxPerCore),
 			}
-		} else if x != tc.expected {
-			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
-		}
+			x, e := getConntrackMax(ctx, cfg)
+			if e != nil {
+				if tc.err == "" {
+					t.Errorf("[%d] unexpected error: %v", i, e)
+				} else if !strings.Contains(e.Error(), tc.err) {
+					t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
+				}
+			} else if x != tc.expected {
+				t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
+			}
+		})
 	}
 }
 
@@ -699,17 +714,26 @@ func TestProxyServer_platformSetup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			client := clientsetfake.NewSimpleClientset(tt.node)
+			client := clientsetfake.NewSimpleClientset()
+			informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+			nodeInformer := informer.Core().V1().Nodes()
+			nodeStore := nodeInformer.Informer().GetStore()
+			err := nodeStore.Add(tt.node)
+			if err != nil {
+				t.Fatal(err)
+			}
 			s := &ProxyServer{
 				Config:   tt.config,
 				Client:   client,
-				Hostname: "nodename",
+				Hostname: tt.node.Name,
 				NodeIPs: map[v1.IPFamily]net.IP{
 					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
 					v1.IPv6Protocol: net.IPv6zero,
 				},
+				NodeInformer: nodeInformer,
 			}
-			err := s.platformSetup(ctx)
+
+			err = s.platformSetup(ctx)
 			if err != nil {
 				t.Errorf("ProxyServer.createProxier() error = %v", err)
 				return
