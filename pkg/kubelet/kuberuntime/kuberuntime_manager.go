@@ -820,7 +820,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
-func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
+func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
 
 	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
@@ -1003,6 +1003,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			reason = reasonStartupProbe
 		} else if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
+			// Resize restart should be effective immediately and clear any accumulated backoff.
+			key := getStableKey(pod, &container)
+			backOff.Reset(key)
 			continue
 		} else {
 			// Keep the container.
@@ -1051,7 +1054,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
+	podContainerChanges := m.computePodActions(ctx, pod, podStatus, backOff)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)

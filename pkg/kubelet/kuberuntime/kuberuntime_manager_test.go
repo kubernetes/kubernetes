@@ -1191,7 +1191,8 @@ func TestComputePodActions(t *testing.T) {
 			test.mutateStatusFn(status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		actions := m.computePodActions(ctx, pod, status, backOff)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -1463,7 +1464,8 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 			test.mutateStatusFn(status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		actions := m.computePodActions(ctx, pod, status, backOff)
 		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
 		if !handleRestartableInitContainers {
 			// If sidecar containers are disabled or the pod does not have any
@@ -1869,7 +1871,8 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 			test.mutateStatusFn(pod, status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		actions := m.computePodActions(ctx, pod, status, backOff)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -2074,7 +2077,8 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 			test.mutateStatusFn(status)
 		}
 		ctx := context.Background()
-		actions := m.computePodActions(ctx, pod, status)
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		actions := m.computePodActions(ctx, pod, status, backOff)
 		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
 		if !handleRestartableInitContainers {
 			// If sidecar containers are disabled or the pod does not have any
@@ -2496,7 +2500,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			test.mutatePodFn(pod)
 		}
 		expectedActions := test.getExpectedPodActionsFn(pod, status)
-		actions := m.computePodActions(ctx, pod, status)
+		backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+		actions := m.computePodActions(ctx, pod, status, backOff)
 		verifyActions(t, expectedActions, &actions, desc)
 	}
 }
