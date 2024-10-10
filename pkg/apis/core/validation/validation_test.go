@@ -1486,7 +1486,7 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 	}
 }
 
-func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
+func TestValidatePersistentVolumeAttributesClassUpdate(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure           bool
 		enableVolumeAttributesClass bool
