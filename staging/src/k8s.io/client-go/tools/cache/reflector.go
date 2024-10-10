@@ -566,6 +566,18 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	}
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// There may be threads waiting for this resource to sync. If the resource wasn't found,
+			// then call sync with an empty list. This will unblock any clients waiting for the
+			// resource to sync, and is as accurate as possible. The server didn't have any of the
+			// requested resource.
+			newErr := r.syncWith([]runtime.Object{}, "")
+			if newErr != nil {
+				klog.Warningf("%s: failed to emergency sync reflector %v: %v",
+					r.name, r.typeDescription, newErr)
+			}
+		}
+
 		klog.Warningf("%s: failed to list %v: %v", r.name, r.typeDescription, err)
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}
