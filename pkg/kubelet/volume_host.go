@@ -91,7 +91,7 @@ func NewInitializedVolumePluginMgr(
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
 		return nil, fmt.Errorf(
-			"could not initialize volume plugins for KubeletVolumePluginMgr: %v",
+			"could not initialize volume plugins for KubeletVolumePluginMgr: %w",
 			err)
 	}
 
@@ -234,7 +234,7 @@ func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	node, err := kvh.kubelet.getNodeAnyWay()
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	return node.Status.Allocatable, nil
 }
@@ -276,7 +276,7 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSe
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	node, err := kvh.kubelet.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	return node.Labels, nil
 }
@@ -284,7 +284,7 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
 	node, err := kvh.kubelet.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	attachedVolumes := node.Status.VolumesAttached
 	result := map[v1.UniqueVolumeName]string{}
