@@ -66,7 +66,7 @@ type containerManagerImpl struct {
 
 type noopWindowsResourceAllocator struct{}
 
-func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (ra *noopWindowsResourceAllocator) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	return admission.GetPodAdmitResult(nil)
 }
 
@@ -192,7 +192,7 @@ func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, c
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
-	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
+	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(ctx, pod, container)
 	if err != nil {
 		return nil, err
 	} else if devOpts == nil {

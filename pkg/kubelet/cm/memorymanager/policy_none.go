@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -55,14 +57,14 @@ func (p *none) RemoveContainer(s state.State, podUID string, containerName strin
 // GetTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *none) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface
 // and is consulted to achieve NUMA aware resource alignment among this
 // and other resource controllers.
-func (p *none) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *none) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 

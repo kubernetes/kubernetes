@@ -74,9 +74,8 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		return result
 	}
 
-	var createPod = func(resourceName string, quantity int) *v1.Pod {
+	var createPodWithoutResources = func() *v1.Pod {
 		ginkgo.GinkgoHelper()
-		rl := v1.ResourceList{v1.ResourceName(resourceName): *resource.NewQuantity(int64(quantity), resource.DecimalSI)}
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "device-plugin-failures-test-" + string(uuid.NewUUID())},
 			Spec: v1.PodSpec{
@@ -85,13 +84,17 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 					Image:   busyboxImage,
 					Name:    "container-1",
 					Command: []string{"sh", "-c", fmt.Sprintf("env && sleep %s", sleepIntervalForever)},
-					Resources: v1.ResourceRequirements{
-						Limits:   rl,
-						Requests: rl,
-					},
 				}},
 			},
 		}
+		return pod
+	}
+
+	var createPod = func(resourceName string, quantity int) *v1.Pod {
+		ginkgo.GinkgoHelper()
+		rl := v1.ResourceList{v1.ResourceName(resourceName): *resource.NewQuantity(int64(quantity), resource.DecimalSI)}
+		pod := createPodWithoutResources()
+		pod.Spec.Containers[0].Resources.Limits = rl
 		return pod
 	}
 
@@ -351,5 +354,60 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 
 		// after the graceful period devices capacity will reset to zero
 		gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout+1*time.Minute, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: 0}))
+	})
+
+	ginkgo.It("will not block the podAdmission forever if Device Plugin is not returning in 30 seconds", func(ctx context.Context) {
+		// randomizing so tests can run in parallel
+		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
+		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		plugin := testdeviceplugin.NewDevicePlugin(func(name string) error {
+			if name == "Allocate" {
+				// sleep forever
+				select {}
+			}
+			return nil
+		})
+
+		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
+		defer plugin.Stop() // should stop even if registration failed
+		gomega.Expect(err).To(gomega.Succeed())
+
+		ginkgo.By("initial state: capacity and allocatable are set")
+		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: 1, Capacity: 1}))
+
+		// schedule a pod that requests the device
+		client := e2epod.NewPodClient(f)
+		pod := client.Create(ctx, createPod(resourceName, 1))
+
+		// pod should not be admitted
+		ginkgo.By("Waiting for the pod to fail with admission error as Allocate call should have been failed")
+
+		gomega.Eventually(ctx, func() (string, error) {
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			if pod.Status.Phase != v1.PodFailed {
+				return "", fmt.Errorf("pod is in non-failed phase: %s", pod.Status.Phase)
+			}
+
+			if pod.Status.Reason != "UnexpectedAdmissionError" {
+				return "", fmt.Errorf("pod failed with unexpected reason: %s", pod.Status.Reason)
+			}
+
+			return pod.Status.Message, nil
+
+		}, 1*time.Minute, f.Timeouts.Poll).Should(gomega.ContainSubstring("DeadlineExceeded")) // Actual message will be: message="Allocate failed due to rpc error: code = DeadlineExceeded desc = context deadline exceeded, which is unexpected"
+
+		ginkgo.By("Other pods scheduling should not be affected")
+		podNoR := client.Create(ctx, createPodWithoutResources())
+		gomega.Expect(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, podNoR)).To(gomega.Succeed())
+
+		// deleting pods
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		gomega.Expect(err).To(gomega.Succeed())
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podNoR.Name, metav1.DeleteOptions{})
+		gomega.Expect(err).To(gomega.Succeed())
 	})
 })
