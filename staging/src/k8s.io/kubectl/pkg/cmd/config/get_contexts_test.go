@@ -32,6 +32,7 @@ type getContextsTest struct {
 	names          []string
 	noHeader       bool
 	nameOnly       bool
+	jsonFormat     bool
 	expectedOut    string
 }
 
@@ -45,6 +46,7 @@ func TestGetContextsAll(t *testing.T) {
 		names:          []string{},
 		noHeader:       false,
 		nameOnly:       false,
+		jsonFormat: 	false,
 		expectedOut: `CURRENT   NAME             CLUSTER       AUTHINFO    NAMESPACE
 *         shaker-context   big-cluster   blue-user   saw-ns
 `,
@@ -62,6 +64,7 @@ func TestGetContextsAllNoHeader(t *testing.T) {
 		names:          []string{},
 		noHeader:       true,
 		nameOnly:       false,
+		jsonFormat: 	false,
 		expectedOut:    "*     shaker-context   big-cluster   blue-user   saw-ns\n",
 	}
 	test.run(t)
@@ -79,6 +82,7 @@ func TestGetContextsAllSorted(t *testing.T) {
 		names:          []string{},
 		noHeader:       false,
 		nameOnly:       false,
+		jsonFormat: 	false,
 		expectedOut: `CURRENT   NAME             CLUSTER       AUTHINFO    NAMESPACE
           abc              abc-cluster   blue-user   kube-system
 *         shaker-context   big-cluster   blue-user   saw-ns
@@ -97,6 +101,7 @@ func TestGetContextsAllName(t *testing.T) {
 		names:          []string{},
 		noHeader:       false,
 		nameOnly:       true,
+		jsonFormat: 	false,
 		expectedOut:    "shaker-context\n",
 	}
 	test.run(t)
@@ -112,6 +117,7 @@ func TestGetContextsAllNameNoHeader(t *testing.T) {
 		names:          []string{},
 		noHeader:       true,
 		nameOnly:       true,
+		jsonFormat: 	false,
 		expectedOut:    "shaker-context\n",
 	}
 	test.run(t)
@@ -123,6 +129,7 @@ func TestGetContextsAllNone(t *testing.T) {
 		names:          []string{},
 		noHeader:       true,
 		nameOnly:       false,
+		jsonFormat: 	false,
 		expectedOut:    "",
 	}
 	test.run(t)
@@ -139,7 +146,25 @@ func TestGetContextsSelectOneOfTwo(t *testing.T) {
 		names:          []string{"shaker-context"},
 		noHeader:       true,
 		nameOnly:       true,
+		jsonFormat: false,
 		expectedOut:    "shaker-context\n",
+	}
+	test.run(t)
+}
+
+func TestGetContextsPrintJson(t *testing.T) {
+	tconf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"abc":            {AuthInfo: "blue-user", Cluster: "abc-cluster", Namespace: "kube-system"}}}
+	test := getContextsTest{
+		startingConfig: tconf,
+		names:          []string{},
+		noHeader:       true,
+		nameOnly:       false,
+		jsonFormat: 	true,
+		expectedOut:    `[{"prefix":" ","name":"abc","cluster":"abc-cluster","authInfo":"blue-user","namespace":"kube-system"},{"prefix":" ","name":"shaker-context","cluster":"big-cluster","authInfo":"blue-user","namespace":"saw-ns"}]`+"\n",
 	}
 	test.run(t)
 }
@@ -163,6 +188,9 @@ func (test getContextsTest) run(t *testing.T) {
 		configAccess: pathOptions,
 	}
 	cmd := NewCmdConfigGetContexts(streams, options.configAccess)
+	if test.jsonFormat {
+		cmd.Flags().Set("output", "json")
+	}
 	if test.nameOnly {
 		cmd.Flags().Set("output", "name")
 	}
