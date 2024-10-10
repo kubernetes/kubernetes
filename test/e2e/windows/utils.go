@@ -38,20 +38,21 @@ import (
 // waits for a deployment to be created and the desired replicas
 // are updated and available, and no old pods are running.
 func waitForDeployment(getDeploymentFunc func() (*appsv1.Deployment, error), interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		deployment, err := getDeploymentFunc()
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				framework.Logf("deployment not found, continue waiting: %s", err)
-				return false, nil
-			}
+	return wait.PollUntilContextTimeout(context.Background(), interval, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			deployment, err := getDeploymentFunc()
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.Logf("deployment not found, continue waiting: %s", err)
+					return false, nil
+				}
 
-			framework.Logf("error while deploying, error %s", err)
-			return false, err
-		}
-		framework.Logf("deployment status %s", &deployment.Status)
-		return util.DeploymentComplete(deployment, &deployment.Status), nil
-	})
+				framework.Logf("error while deploying, error %s", err)
+				return false, err
+			}
+			framework.Logf("deployment status %s", &deployment.Status)
+			return util.DeploymentComplete(deployment, &deployment.Status), nil
+		})
 }
 
 // gets the container runtime and version for a node
