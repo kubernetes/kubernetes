@@ -29,7 +29,7 @@ type FakeSchedulingV1beta1 struct {
 }
 
 func (c *FakeSchedulingV1beta1) PriorityClasses() v1beta1.PriorityClassInterface {
-	return &FakePriorityClasses{c}
+	return newFakePriorityClasses(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

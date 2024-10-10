@@ -27,10 +27,7 @@ import (
 )
 
 func TestFakePodsGetLogs(t *testing.T) {
-	fp := FakePods{
-		Fake: &FakeCoreV1{Fake: &cgtesting.Fake{}},
-		ns:   "default",
-	}
+	fp := newFakePods(&FakeCoreV1{Fake: &cgtesting.Fake{}}, "default")
 	req := fp.GetLogs("foo", &corev1.PodLogOptions{})
 	body, err := req.Stream(context.Background())
 	if err != nil {

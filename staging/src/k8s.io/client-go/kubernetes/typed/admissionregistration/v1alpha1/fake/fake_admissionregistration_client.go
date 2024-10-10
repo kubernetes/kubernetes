@@ -29,11 +29,11 @@ type FakeAdmissionregistrationV1alpha1 struct {
 }
 
 func (c *FakeAdmissionregistrationV1alpha1) ValidatingAdmissionPolicies() v1alpha1.ValidatingAdmissionPolicyInterface {
-	return &FakeValidatingAdmissionPolicies{c}
+	return newFakeValidatingAdmissionPolicies(c)
 }
 
 func (c *FakeAdmissionregistrationV1alpha1) ValidatingAdmissionPolicyBindings() v1alpha1.ValidatingAdmissionPolicyBindingInterface {
-	return &FakeValidatingAdmissionPolicyBindings{c}
+	return newFakeValidatingAdmissionPolicyBindings(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

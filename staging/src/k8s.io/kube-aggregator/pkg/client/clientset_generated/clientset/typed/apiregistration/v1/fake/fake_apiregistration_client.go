@@ -29,7 +29,7 @@ type FakeApiregistrationV1 struct {
 }
 
 func (c *FakeApiregistrationV1) APIServices() v1.APIServiceInterface {
-	return &FakeAPIServices{c}
+	return newFakeAPIServices(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -29,7 +29,7 @@ type FakeSamplecontrollerV1alpha1 struct {
 }
 
 func (c *FakeSamplecontrollerV1alpha1) Foos(namespace string) v1alpha1.FooInterface {
-	return &FakeFoos{c, namespace}
+	return newFakeFoos(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

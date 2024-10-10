@@ -29,7 +29,7 @@ type FakeBatchV1beta1 struct {
 }
 
 func (c *FakeBatchV1beta1) CronJobs(namespace string) v1beta1.CronJobInterface {
-	return &FakeCronJobs{c, namespace}
+	return newFakeCronJobs(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

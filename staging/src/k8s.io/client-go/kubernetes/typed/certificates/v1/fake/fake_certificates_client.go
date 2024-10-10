@@ -29,7 +29,7 @@ type FakeCertificatesV1 struct {
 }
 
 func (c *FakeCertificatesV1) CertificateSigningRequests() v1.CertificateSigningRequestInterface {
-	return &FakeCertificateSigningRequests{c}
+	return newFakeCertificateSigningRequests(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

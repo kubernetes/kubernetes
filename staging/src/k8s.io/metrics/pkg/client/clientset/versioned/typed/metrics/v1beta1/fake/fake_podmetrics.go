@@ -19,63 +19,32 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
-// FakePodMetricses implements PodMetricsInterface
-type FakePodMetricses struct {
+// fakePodMetricses implements PodMetricsInterface
+type fakePodMetricses struct {
+	*gentype.FakeClientWithList[*v1beta1.PodMetrics, *v1beta1.PodMetricsList]
 	Fake *FakeMetricsV1beta1
-	ns   string
 }
 
-var podmetricsesResource = v1beta1.SchemeGroupVersion.WithResource("pods")
-
-var podmetricsesKind = v1beta1.SchemeGroupVersion.WithKind("PodMetrics")
-
-// Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
-func (c *FakePodMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodMetrics, err error) {
-	emptyResult := &v1beta1.PodMetrics{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(podmetricsesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakePodMetricses(fake *FakeMetricsV1beta1, namespace string) metricsv1beta1.PodMetricsInterface {
+	return &fakePodMetricses{
+		gentype.NewFakeClientWithList[*v1beta1.PodMetrics, *v1beta1.PodMetricsList](
+			fake.Fake,
+			namespace,
+			v1beta1.SchemeGroupVersion.WithResource("pods"),
+			v1beta1.SchemeGroupVersion.WithKind("PodMetrics"),
+			func() *v1beta1.PodMetrics { return &v1beta1.PodMetrics{} },
+			func() *v1beta1.PodMetricsList { return &v1beta1.PodMetricsList{} },
+			func(dst, src *v1beta1.PodMetricsList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta1.PodMetricsList) []*v1beta1.PodMetrics { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1beta1.PodMetricsList, items []*v1beta1.PodMetrics) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1beta1.PodMetrics), err
-}
-
-// List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
-func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodMetricsList, err error) {
-	emptyResult := &v1beta1.PodMetricsList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(podmetricsesResource, podmetricsesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.PodMetricsList{ListMeta: obj.(*v1beta1.PodMetricsList).ListMeta}
-	for _, item := range obj.(*v1beta1.PodMetricsList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested podMetricses.
-func (c *FakePodMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(podmetricsesResource, c.ns, opts))
-
 }

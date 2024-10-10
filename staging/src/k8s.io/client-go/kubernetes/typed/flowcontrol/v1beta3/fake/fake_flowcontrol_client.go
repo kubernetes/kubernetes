@@ -29,11 +29,11 @@ type FakeFlowcontrolV1beta3 struct {
 }
 
 func (c *FakeFlowcontrolV1beta3) FlowSchemas() v1beta3.FlowSchemaInterface {
-	return &FakeFlowSchemas{c}
+	return newFakeFlowSchemas(c)
 }
 
 func (c *FakeFlowcontrolV1beta3) PriorityLevelConfigurations() v1beta3.PriorityLevelConfigurationInterface {
-	return &FakePriorityLevelConfigurations{c}
+	return newFakePriorityLevelConfigurations(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

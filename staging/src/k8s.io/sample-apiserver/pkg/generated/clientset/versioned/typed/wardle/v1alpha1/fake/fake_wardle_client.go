@@ -29,11 +29,11 @@ type FakeWardleV1alpha1 struct {
 }
 
 func (c *FakeWardleV1alpha1) Fischers() v1alpha1.FischerInterface {
-	return &FakeFischers{c}
+	return newFakeFischers(c)
 }
 
 func (c *FakeWardleV1alpha1) Flunders(namespace string) v1alpha1.FlunderInterface {
-	return &FakeFlunders{c, namespace}
+	return newFakeFlunders(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

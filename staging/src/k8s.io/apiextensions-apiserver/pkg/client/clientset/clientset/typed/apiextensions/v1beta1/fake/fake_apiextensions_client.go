@@ -29,7 +29,7 @@ type FakeApiextensionsV1beta1 struct {
 }
 
 func (c *FakeApiextensionsV1beta1) CustomResourceDefinitions() v1beta1.CustomResourceDefinitionInterface {
-	return &FakeCustomResourceDefinitions{c}
+	return newFakeCustomResourceDefinitions(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

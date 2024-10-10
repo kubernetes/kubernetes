@@ -20,177 +20,46 @@ package fake
 
 import (
 	context "context"
-	json "encoding/json"
-	fmt "fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	gentype "k8s.io/client-go/gentype"
 	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
 	examplev1 "k8s.io/code-generator/examples/HyphenGroup/applyconfiguration/example/v1"
+	typedexamplev1 "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned/typed/example/v1"
 )
 
-// FakeClusterTestTypes implements ClusterTestTypeInterface
-type FakeClusterTestTypes struct {
+// fakeClusterTestTypes implements ClusterTestTypeInterface
+type fakeClusterTestTypes struct {
+	*gentype.FakeClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *examplev1.ClusterTestTypeApplyConfiguration]
 	Fake *FakeExampleGroupV1
 }
 
-var clustertesttypesResource = v1.SchemeGroupVersion.WithResource("clustertesttypes")
-
-var clustertesttypesKind = v1.SchemeGroupVersion.WithKind("ClusterTestType")
-
-// Get takes name of the clusterTestType, and returns the corresponding clusterTestType object, and an error if there is any.
-func (c *FakeClusterTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(clustertesttypesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeClusterTestTypes(fake *FakeExampleGroupV1) typedexamplev1.ClusterTestTypeInterface {
+	return &fakeClusterTestTypes{
+		gentype.NewFakeClientWithListAndApply[*v1.ClusterTestType, *v1.ClusterTestTypeList, *examplev1.ClusterTestTypeApplyConfiguration](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("clustertesttypes"),
+			v1.SchemeGroupVersion.WithKind("ClusterTestType"),
+			func() *v1.ClusterTestType { return &v1.ClusterTestType{} },
+			func() *v1.ClusterTestTypeList { return &v1.ClusterTestTypeList{} },
+			func(dst, src *v1.ClusterTestTypeList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ClusterTestTypeList) []*v1.ClusterTestType { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.ClusterTestTypeList, items []*v1.ClusterTestType) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// List takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
-func (c *FakeClusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
-	emptyResult := &v1.ClusterTestTypeList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(clustertesttypesResource, clustertesttypesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.ClusterTestTypeList{ListMeta: obj.(*v1.ClusterTestTypeList).ListMeta}
-	for _, item := range obj.(*v1.ClusterTestTypeList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested clusterTestTypes.
-func (c *FakeClusterTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(clustertesttypesResource, opts))
-}
-
-// Create takes the representation of a clusterTestType and creates it.  Returns the server's representation of the clusterTestType, and an error, if there is any.
-func (c *FakeClusterTestTypes) Create(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.CreateOptions) (result *v1.ClusterTestType, err error) {
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(clustertesttypesResource, clusterTestType, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// Update takes the representation of a clusterTestType and updates it. Returns the server's representation of the clusterTestType, and an error, if there is any.
-func (c *FakeClusterTestTypes) Update(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(clustertesttypesResource, clusterTestType, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clustertesttypesResource, "status", clusterTestType, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
-func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clustertesttypesResource, name, opts), &v1.ClusterTestType{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(clustertesttypesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.ClusterTestTypeList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched clusterTestType.
-func (c *FakeClusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error) {
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied clusterTestType.
-func (c *FakeClusterTestTypes) Apply(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
-	if clusterTestType == nil {
-		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterTestType)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterTestType.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType *examplev1.ClusterTestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterTestType, err error) {
-	if clusterTestType == nil {
-		return nil, fmt.Errorf("clusterTestType provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterTestType)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterTestType.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterTestType.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ClusterTestType{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ClusterTestType), err
 }
 
 // GetScale takes name of the clusterTestType, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetSubresourceActionWithOptions(clustertesttypesResource, "scale", clusterTestTypeName, options), emptyResult)
+		Invokes(testing.NewRootGetSubresourceActionWithOptions(c.Resource(), "scale", clusterTestTypeName, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -198,10 +67,10 @@ func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clustertesttypesResource, "scale", scale, opts), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(c.Resource(), "scale", scale, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

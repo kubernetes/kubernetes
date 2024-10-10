@@ -19,142 +19,35 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
-
 	v1alpha1 "k8s.io/api/coordination/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	coordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedcoordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
 )
 
-// FakeLeaseCandidates implements LeaseCandidateInterface
-type FakeLeaseCandidates struct {
+// fakeLeaseCandidates implements LeaseCandidateInterface
+type fakeLeaseCandidates struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.LeaseCandidate, *v1alpha1.LeaseCandidateList, *coordinationv1alpha1.LeaseCandidateApplyConfiguration]
 	Fake *FakeCoordinationV1alpha1
-	ns   string
 }
 
-var leasecandidatesResource = v1alpha1.SchemeGroupVersion.WithResource("leasecandidates")
-
-var leasecandidatesKind = v1alpha1.SchemeGroupVersion.WithKind("LeaseCandidate")
-
-// Get takes name of the leaseCandidate, and returns the corresponding leaseCandidate object, and an error if there is any.
-func (c *FakeLeaseCandidates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(leasecandidatesResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeLeaseCandidates(fake *FakeCoordinationV1alpha1, namespace string) typedcoordinationv1alpha1.LeaseCandidateInterface {
+	return &fakeLeaseCandidates{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.LeaseCandidate, *v1alpha1.LeaseCandidateList, *coordinationv1alpha1.LeaseCandidateApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("leasecandidates"),
+			v1alpha1.SchemeGroupVersion.WithKind("LeaseCandidate"),
+			func() *v1alpha1.LeaseCandidate { return &v1alpha1.LeaseCandidate{} },
+			func() *v1alpha1.LeaseCandidateList { return &v1alpha1.LeaseCandidateList{} },
+			func(dst, src *v1alpha1.LeaseCandidateList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.LeaseCandidateList) []*v1alpha1.LeaseCandidate {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.LeaseCandidateList, items []*v1alpha1.LeaseCandidate) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.LeaseCandidate), err
-}
-
-// List takes label and field selectors, and returns the list of LeaseCandidates that match those selectors.
-func (c *FakeLeaseCandidates) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.LeaseCandidateList, err error) {
-	emptyResult := &v1alpha1.LeaseCandidateList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(leasecandidatesResource, leasecandidatesKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.LeaseCandidateList{ListMeta: obj.(*v1alpha1.LeaseCandidateList).ListMeta}
-	for _, item := range obj.(*v1alpha1.LeaseCandidateList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested leaseCandidates.
-func (c *FakeLeaseCandidates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(leasecandidatesResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a leaseCandidate and creates it.  Returns the server's representation of the leaseCandidate, and an error, if there is any.
-func (c *FakeLeaseCandidates) Create(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.CreateOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(leasecandidatesResource, c.ns, leaseCandidate, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.LeaseCandidate), err
-}
-
-// Update takes the representation of a leaseCandidate and updates it. Returns the server's representation of the leaseCandidate, and an error, if there is any.
-func (c *FakeLeaseCandidates) Update(ctx context.Context, leaseCandidate *v1alpha1.LeaseCandidate, opts v1.UpdateOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(leasecandidatesResource, c.ns, leaseCandidate, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.LeaseCandidate), err
-}
-
-// Delete takes name of the leaseCandidate and deletes it. Returns an error if one occurs.
-func (c *FakeLeaseCandidates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(leasecandidatesResource, c.ns, name, opts), &v1alpha1.LeaseCandidate{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeLeaseCandidates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(leasecandidatesResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.LeaseCandidateList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched leaseCandidate.
-func (c *FakeLeaseCandidates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.LeaseCandidate, err error) {
-	emptyResult := &v1alpha1.LeaseCandidate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(leasecandidatesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.LeaseCandidate), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied leaseCandidate.
-func (c *FakeLeaseCandidates) Apply(ctx context.Context, leaseCandidate *coordinationv1alpha1.LeaseCandidateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.LeaseCandidate, err error) {
-	if leaseCandidate == nil {
-		return nil, fmt.Errorf("leaseCandidate provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(leaseCandidate)
-	if err != nil {
-		return nil, err
-	}
-	name := leaseCandidate.Name
-	if name == nil {
-		return nil, fmt.Errorf("leaseCandidate.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.LeaseCandidate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(leasecandidatesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.LeaseCandidate), err
 }
