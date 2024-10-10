@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
@@ -306,10 +307,9 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	// Track cluster state.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
-	classLister := informerFactory.Resource().V1alpha3().DeviceClasses().Lister()
-	sliceLister := informerFactory.Resource().V1alpha3().ResourceSlices().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	claimCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
+	draManager := dynamicresources.NewDraManager(claimCache, informerFactory)
 	claimLister := claimLister{cache: claimCache}
 	informerFactory.Start(tCtx.Done())
 	defer func() {
@@ -339,7 +339,7 @@ claims:
 			continue
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, claimLister, classLister, sliceLister)
+		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, claimLister, draManager.DeviceClasses(), draManager.ResourceSlices())
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

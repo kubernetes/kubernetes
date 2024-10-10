@@ -22,8 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 
@@ -32,13 +30,13 @@ import (
 //
 // Out-dated slices are silently ignored. Pools may be incomplete, which is
 // recorded in the result.
-func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceLister, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, sliceLister resourceSliceLister, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 
 	// TODO (future): use a custom lister interface and implement it with
 	// and indexer on the node name field. Then here we can ask for only
 	// slices with the right node name and those with no node name.
-	slices, err := sliceLister.List(labels.Everything())
+	slices, err := sliceLister.List()
 	if err != nil {
 		return nil, fmt.Errorf("list resource slices: %w", err)
 	}
