@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
@@ -76,8 +77,12 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(statusCode)
 	// Flush headers, if possible
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
+	if flusher, ok := w.(responsewriter.FlusherError); ok {
+		if err := flusher.FlushError(); err != nil {
+			// TODO: return a timeout error
+			utilruntime.HandleError(fmt.Errorf("error encountered while streaming results, FlushError returned error : %v", err))
+			return
+		}
 	}
 	writer := w.(io.Writer)
 	if flush {

@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
@@ -2042,7 +2043,7 @@ func TestWatch(t *testing.T) {
 					attempts++
 				}()
 
-				flusher, ok := w.(http.Flusher)
+				flusher, ok := w.(responsewriter.FlusherError)
 				if !ok {
 					panic("need flusher!")
 				}
@@ -2055,14 +2056,19 @@ func TestWatch(t *testing.T) {
 
 				w.Header().Set("Transfer-Encoding", "chunked")
 				w.WriteHeader(http.StatusOK)
-				flusher.Flush()
+				if err := flusher.FlushError(); err != nil {
+					t.Errorf("Expected no error from FlushError, but got %v", err)
+				}
 
 				encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
 				for _, item := range table {
 					if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 						panic(err)
 					}
-					flusher.Flush()
+					if err := flusher.FlushError(); err != nil {
+						t.Errorf("Expected no error from FlushError, but got %v", err)
+					}
+
 				}
 			}))
 			defer testServer.Close()
@@ -2106,7 +2112,7 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
+		flusher, ok := w.(responsewriter.FlusherError)
 		if !ok {
 			panic("need flusher!")
 		}
@@ -2115,7 +2121,9 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 		// manually set the content type here so we get the renegotiation behavior
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		flusher.Flush()
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("Expected no error from FlushError, but got %v", err)
+		}
 
 		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
 		for _, item := range table {
@@ -2166,7 +2174,7 @@ func TestWatchUnknownContentType(t *testing.T) {
 	}
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
+		flusher, ok := w.(responsewriter.FlusherError)
 		if !ok {
 			panic("need flusher!")
 		}
@@ -2175,14 +2183,19 @@ func TestWatchUnknownContentType(t *testing.T) {
 		// manually set the content type here so we get the renegotiation behavior
 		w.Header().Set("Content-Type", "foobar")
 		w.WriteHeader(http.StatusOK)
-		flusher.Flush()
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("Expected no error from FlushError, but got %v", err)
+		}
 
 		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
 		for _, item := range table {
 			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
 				panic(err)
 			}
-			flusher.Flush()
+			if err := flusher.FlushError(); err != nil {
+				t.Errorf("Expected no error from FlushError, but got %v", err)
+			}
+
 		}
 	}))
 	defer testServer.Close()
@@ -2198,14 +2211,16 @@ func TestStream(t *testing.T) {
 	expectedBody := "expected body"
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
+		flusher, ok := w.(responsewriter.FlusherError)
 		if !ok {
 			panic("need flusher!")
 		}
 		w.Header().Set("Transfer-Encoding", "chunked")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(expectedBody))
-		flusher.Flush()
+		if err := flusher.FlushError(); err != nil {
+			t.Errorf("Expected no error from FlushError, but got %v", err)
+		}
 	}))
 	defer testServer.Close()
 
