@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -26,18 +27,19 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/metrics/testutil"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	basemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeListener struct {
@@ -54,17 +56,17 @@ func (fake *fakeListener) hasPort(addr string) bool {
 	return fake.openPorts.Has(addr)
 }
 
-func (fake *fakeListener) Listen(addr string) (net.Listener, error) {
-	fake.openPorts.Insert(addr)
+func (fake *fakeListener) Listen(_ context.Context, addrs ...string) (net.Listener, error) {
+	fake.openPorts.Insert(addrs...)
 	return &fakeNetListener{
 		parent: fake,
-		addr:   addr,
+		addrs:  addrs,
 	}, nil
 }
 
 type fakeNetListener struct {
 	parent *fakeListener
-	addr   string
+	addrs  []string
 }
 
 type fakeAddr struct {
@@ -82,7 +84,7 @@ func (fake *fakeNetListener) Accept() (net.Conn, error) {
 }
 
 func (fake *fakeNetListener) Close() error {
-	fake.parent.openPorts.Delete(fake.addr)
+	fake.parent.openPorts.Delete(fake.addrs...)
 	return nil
 }
 
@@ -97,15 +99,13 @@ func newFakeHTTPServerFactory() *fakeHTTPServerFactory {
 	return &fakeHTTPServerFactory{}
 }
 
-func (fake *fakeHTTPServerFactory) New(addr string, handler http.Handler) httpServer {
+func (fake *fakeHTTPServerFactory) New(handler http.Handler) httpServer {
 	return &fakeHTTPServer{
-		addr:    addr,
 		handler: handler,
 	}
 }
 
 type fakeHTTPServer struct {
-	addr    string
 	handler http.Handler
 }
 
@@ -470,8 +470,12 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
+	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
@@ -505,8 +509,12 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
+	server := hs.httpFactory.New(livezHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,

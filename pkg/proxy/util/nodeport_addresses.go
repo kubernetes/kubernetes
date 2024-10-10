@@ -94,38 +94,7 @@ func (npa *NodePortAddresses) MatchAll() bool {
 // IPs are found, it returns an empty list.
 // NetworkInterfacer is injected for test purpose.
 func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error) {
-	addrs, err := nw.InterfaceAddrs()
-	if err != nil {
-		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
-	}
-
-	// Use a map to dedup matches
-	addresses := make(map[string]net.IP)
-	for _, cidr := range npa.cidrs {
-		for _, addr := range addrs {
-			var ip net.IP
-			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
-			switch v := addr.(type) {
-			case *net.IPAddr:
-				ip = v.IP
-			case *net.IPNet:
-				ip = v.IP
-			default:
-				continue
-			}
-
-			if cidr.Contains(ip) {
-				addresses[ip.String()] = ip
-			}
-		}
-	}
-
-	ips := make([]net.IP, 0, len(addresses))
-	for _, ip := range addresses {
-		ips = append(ips, ip)
-	}
-
-	return ips, nil
+	return FilterInterfaceAddrsByCIDRs(nw, npa.cidrs)
 }
 
 // ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
