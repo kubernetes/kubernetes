@@ -23,12 +23,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	_ "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var groups = []runtime.SchemeBuilder{
@@ -66,4 +69,11 @@ func TestCompatibility(t *testing.T) {
 	opts.Kinds = filteredKinds
 
 	opts.Run(t)
+}
+
+func TestRoundtripToUnstructured(t *testing.T) {
+	scheme := runtime.NewScheme()
+	install.Install(scheme)
+
+	roundtrip.RoundtripToUnstructured(t, scheme, fuzzer.Funcs, sets.New[schema.GroupVersionKind]())
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -24,7 +25,6 @@ import (
 	"strings"
 
 	fuzz "github.com/google/gofuzz"
-
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -87,6 +88,21 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			bytes, err := runtime.Encode(codec, obj)
 			if err != nil {
 				panic(fmt.Sprintf("Failed to encode object: %v", err))
+			}
+
+			if json.Valid(bytes) {
+				// RawExtension->JSON encodes struct fields in field index order while map[string]interface{}->JSON encodes
+				// struct fields (i.e. keys in the map) lexicographically. We have to sort the fields here to ensure the
+				// JSON in the (RawExtension->)JSON->map[string]interface{}->JSON round trip results in identical JSON.
+				var u any
+				err = kjson.Unmarshal(bytes, &u)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to encode object: %v", err))
+				}
+				bytes, err = kjson.Marshal(&u)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to encode object: %v", err))
+				}
 			}
 
 			// strip trailing newlines which do not survive roundtrips
