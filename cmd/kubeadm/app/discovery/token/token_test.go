@@ -263,13 +263,13 @@ users: null
 			}
 
 			// Retrieve validated configuration
-			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout)
+			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout, false, true)
 			if (err != nil) != test.expectedError {
 				t.Errorf("expected error %v, got %v, error: %v", test.expectedError, err != nil, err)
 			}
 
 			// Return if an error is expected
-			if test.expectedError {
+			if err != nil {
 				return
 			}
 

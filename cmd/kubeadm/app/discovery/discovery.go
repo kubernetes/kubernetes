@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
@@ -37,10 +38,10 @@ const TokenUser = "tls-bootstrap-token-user"
 
 // For returns a kubeconfig object that can be used for doing the TLS Bootstrap with the right credentials
 // Also, before returning anything, it makes sure it can trust the API Server
-func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
+func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// TODO: Print summary info about the CA certificate, along with the checksum signature
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
-	config, err := DiscoverValidatedKubeConfig(cfg)
+	config, err := DiscoverValidatedKubeConfig(client, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
 	}
@@ -71,7 +72,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
-func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
+func DiscoverValidatedKubeConfig(dryRunClient clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	timeout := cfg.Timeouts.Discovery.Duration
 	switch {
 	case cfg.Discovery.File != nil:
@@ -81,7 +82,7 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		}
 		return file.RetrieveValidatedConfigInfo(kubeConfigPath, timeout)
 	case cfg.Discovery.BootstrapToken != nil:
-		return token.RetrieveValidatedConfigInfo(&cfg.Discovery, timeout)
+		return token.RetrieveValidatedConfigInfo(dryRunClient, &cfg.Discovery, timeout)
 	default:
 		return nil, errors.New("couldn't find a valid discovery configuration")
 	}

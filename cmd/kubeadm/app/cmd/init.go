@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -349,10 +350,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if initOptions.dryRun || cfg.DryRun {
-		// the KUBEADM_INIT_DRYRUN_DIR environment variable allows overriding the dry-run temporary
-		// directory from the command line. This makes it possible to run "kubeadm init" integration
-		// tests without root.
-		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarInitDryRunDir, "kubeadm-init-dryrun", klog.Warningf); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
@@ -502,12 +500,16 @@ func (d *initData) OutputWriter() io.Writer {
 
 // getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
 func getDryRunClient(d *initData) (clientset.Interface, error) {
-	svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+	dryRun := apiclient.NewDryRun()
+	if err := dryRun.WithKubeConfigFile(d.KubeConfigPath()); err != nil {
+		return nil, err
 	}
-	dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
-	return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
+	dryRun.WithDefaultMarshalFunction().
+		WithWriter(os.Stdout).
+		PrependReactor(dryRun.GetNodeReactor()).
+		PrependReactor(dryRun.PatchNodeReactor())
+
+	return dryRun.FakeClient(), nil
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.

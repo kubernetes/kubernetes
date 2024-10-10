@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -204,8 +205,14 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 	if err != nil {
 		return []byte(""), errors.Wrap(err, "error when marshaling")
 	}
+
+	// Indent the proxy CM bytes with 4 spaces to comply with the location in the template.
 	var prefixBytes bytes.Buffer
-	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
+	scanner := bufio.NewScanner(bytes.NewReader(proxyBytes))
+	for scanner.Scan() {
+		fmt.Fprintf(&prefixBytes, "    %s\n", scanner.Text())
+	}
+
 	configMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
 		struct {
 			ControlPlaneEndpoint string

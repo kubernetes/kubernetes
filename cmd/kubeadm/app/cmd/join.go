@@ -45,6 +45,8 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -464,7 +466,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// if dry running, creates a temporary folder to save kubeadm generated files
 	dryRunDir := ""
 	if opt.dryRun || cfg.DryRun {
-		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-join-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarJoinDryRunDir, "kubeadm-join-dryrun", klog.Warningf); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
 		}
 	}
@@ -535,8 +537,19 @@ func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
 	if j.tlsBootstrapCfg != nil {
 		return j.tlsBootstrapCfg, nil
 	}
+
+	var (
+		client clientset.Interface
+		err    error
+	)
+	if j.dryRun {
+		client, err = j.Client()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not create a client for TLS bootstrap")
+		}
+	}
 	klog.V(1).Infoln("[preflight] Discovering cluster-info")
-	tlsBootstrapCfg, err := discovery.For(j.cfg)
+	tlsBootstrapCfg, err := discovery.For(client, j.cfg)
 	j.tlsBootstrapCfg = tlsBootstrapCfg
 	return tlsBootstrapCfg, err
 }
@@ -550,19 +563,58 @@ func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
 		return nil, err
 	}
 	klog.V(1).Infoln("[preflight] Fetching init configuration")
-	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, j.tlsBootstrapCfg)
+	var client clientset.Interface
+	if j.dryRun {
+		var err error
+		client, err = j.Client()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get dry-run client for fetching InitConfiguration")
+		}
+	}
+	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, client, j.tlsBootstrapCfg)
 	j.initCfg = initCfg
 	return initCfg, err
 }
 
 // Client returns the Client for accessing the cluster with the identity defined in admin.conf.
 func (j *joinData) Client() (clientset.Interface, error) {
-	if j.client != nil {
+	pathAdmin := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
+
+	if j.dryRun {
+		dryRun := apiclient.NewDryRun()
+		// For the dynamic dry-run client use this kubeconfig only if it exists.
+		// That would happen presumably after TLS bootstrap.
+		if _, err := os.Stat(pathAdmin); err == nil {
+			if err := dryRun.WithKubeConfigFile(pathAdmin); err != nil {
+				return nil, err
+			}
+		} else if j.tlsBootstrapCfg != nil {
+			if err := dryRun.WithKubeConfig(j.tlsBootstrapCfg); err != nil {
+				return nil, err
+			}
+		} else if j.cfg.Discovery.BootstrapToken != nil {
+			insecureConfig := token.BuildInsecureBootstrapKubeConfig(j.cfg.Discovery.BootstrapToken.APIServerEndpoint)
+			resetConfig, err := clientcmd.NewDefaultClientConfig(*insecureConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+			}
+			if err := dryRun.WithRestConfig(resetConfig); err != nil {
+				return nil, err
+			}
+		}
+
+		dryRun.WithDefaultMarshalFunction().
+			WithWriter(os.Stdout).
+			AppendReactor(dryRun.GetClusterInfoReactor()).
+			AppendReactor(dryRun.GetKubeadmConfigReactor()).
+			AppendReactor(dryRun.GetKubeProxyConfigReactor()).
+			AppendReactor(dryRun.GetKubeletConfigReactor())
+
+		j.client = dryRun.FakeClient()
 		return j.client, nil
 	}
-	path := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
 
-	client, err := kubeconfigutil.ClientSetFromFile(path)
+	client, err := kubeconfigutil.ClientSetFromFile(pathAdmin)
 	if err != nil {
 		return nil, errors.Wrap(err, "[preflight] couldn't create Kubernetes client")
 	}
@@ -593,10 +645,18 @@ func (j *joinData) PatchesDir() string {
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
-func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
-	// Retrieves the kubeadm configuration
+func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, client clientset.Interface, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+	var err error
+
 	klog.V(1).Infoln("[preflight] Retrieving KubeConfig objects")
-	initConfiguration, err := fetchInitConfiguration(tlsBootstrapCfg)
+	if client == nil {
+		// creates a client to access the cluster using the bootstrap token identity
+		client, err = kubeconfigutil.ToClientSet(tlsBootstrapCfg)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to access the cluster")
+		}
+	}
+	initConfiguration, err := fetchInitConfiguration(client)
 	if err != nil {
 		return nil, err
 	}
@@ -618,15 +678,8 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 }
 
 // fetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap
-func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
-	// creates a client to access the cluster using the bootstrap token identity
-	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to access the cluster")
-	}
-
-	// Fetches the init configuration
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, "preflight", true, false)
+func fetchInitConfiguration(client clientset.Interface) (*kubeadmapi.InitConfiguration, error) {
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", true, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
