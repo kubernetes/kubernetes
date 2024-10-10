@@ -199,7 +199,7 @@ function run-checks {
     else
       echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
       ret=1
-      FAILED_TESTS+=("${base}/${t}")
+      FAILED_TESTS+=("${PWD}/${t}")
     fi
   done
 }
@@ -229,15 +229,18 @@ if ${QUICK} ; then
   echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
+shopt -s globstar
 export API_KNOWN_VIOLATIONS_DIR="${KUBE_ROOT}"/api/api-rules
 ret=0
-modules=() # Pacify shellcheck
-kube::util::read-array modules < <(go list -f '{{.Dir}}' -m)
-for module in "${modules[@]}"; do
-  base=${module%/go.mod}
-  if [ -d "$base/hack" ]; then
-    kube::util::run-in "$base" run-checks "hack/verify-*.sh" bash
-    kube::util::run-in "$base" run-checks "hack/verify-*.py" python3
+# Modules are discovered by looking for go.mod rather than asking go
+# to ensure that modules that aren't part of the workspace and/or are
+# not dependencies are checked too.
+# . and staging are listed explicitly here to avoid _output
+for module in ./go.mod ./staging/**/go.mod; do
+  module="${module%/go.mod}"
+  if [ -d "$module/hack" ]; then
+    kube::util::run-in "$module" run-checks "hack/verify-*.sh" bash
+    kube::util::run-in "$module" run-checks "hack/verify-*.py" python3
   fi
 done
 missing-target-checks
