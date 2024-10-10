@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -31,7 +32,7 @@ func isRequired(pod *v1.Pod) bool {
 		return true
 	}
 
-	inUse := !podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(c *v1.Container, _ podutil.ContainerType) bool {
+	inUse := !podutil.VisitContainers(&pod.Spec, resource.AllContainers, func(c *v1.Container, _ resource.ContainerType) bool {
 		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil &&
 			c.SecurityContext.AppArmorProfile.Type != v1.AppArmorProfileTypeUnconfined {
 			return false // is in use; short-circuit

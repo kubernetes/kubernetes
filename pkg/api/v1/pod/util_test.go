@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-helpers/resource"
 )
 
 func TestFindPort(t *testing.T) {
@@ -200,18 +201,18 @@ func TestFindPort(t *testing.T) {
 }
 
 func TestVisitContainers(t *testing.T) {
-	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
+	setAllFeatureEnabledContainersDuringTest := resource.ContainerType(0)
 	testCases := []struct {
 		desc           string
 		spec           *v1.PodSpec
 		wantContainers []string
-		mask           ContainerType
+		mask           resource.ContainerType
 	}{
 		{
 			desc:           "empty podspec",
 			spec:           &v1.PodSpec{},
 			wantContainers: []string{},
-			mask:           AllContainers,
+			mask:           resource.AllContainers,
 		},
 		{
 			desc: "regular containers",
@@ -230,7 +231,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"c1", "c2"},
-			mask:           Containers,
+			mask:           resource.Containers,
 		},
 		{
 			desc: "init containers",
@@ -249,7 +250,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2"},
-			mask:           InitContainers,
+			mask:           resource.InitContainers,
 		},
 		{
 			desc: "ephemeral containers",
@@ -268,7 +269,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"e1", "e2"},
-			mask:           EphemeralContainers,
+			mask:           resource.EphemeralContainers,
 		},
 		{
 			desc: "all container types",
@@ -287,7 +288,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			mask:           AllContainers,
+			mask:           resource.AllContainers,
 		},
 		{
 			desc: "all feature enabled container types",
@@ -325,18 +326,18 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			mask:           AllContainers,
+			mask:           resource.AllContainers,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			if tc.mask == setAllFeatureEnabledContainersDuringTest {
-				tc.mask = AllFeatureEnabledContainers()
+				tc.mask = resource.AllFeatureEnabledContainers()
 			}
 
 			gotContainers := []string{}
-			VisitContainers(tc.spec, tc.mask, func(c *v1.Container, containerType ContainerType) bool {
+			VisitContainers(tc.spec, tc.mask, func(c *v1.Container, containerType resource.ContainerType) bool {
 				gotContainers = append(gotContainers, c.Name)
 				if c.SecurityContext != nil {
 					c.SecurityContext = nil
