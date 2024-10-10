@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,6 +72,9 @@ type ExplainOptions struct {
 	APIVersion string
 	Recursive  bool
 
+	// Flags hold the parsed CLI flags.
+	Flags *pflag.FlagSet
+
 	args []string
 
 	Mapper        meta.RESTMapper
@@ -107,11 +111,14 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
+	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. When false print all fields with their desciprion recursively. Otherwise, print the available fields with their description.")
 	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
 	// Only enable --output as a valid flag if the feature is enabled
 	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
+
+	// To check if field is changed by cmd.
+	o.Flags = cmd.Flags()
 
 	return cmd
 }
@@ -186,6 +193,15 @@ func (o *ExplainOptions) Run() error {
 			}
 			fullySpecifiedGVR.Group = apiVersion.Group
 			fullySpecifiedGVR.Version = apiVersion.Version
+		}
+
+		// Use recursive flag to decide which template to render
+		if o.Flags.Changed("recursive") && !o.Recursive {
+			// Use default long format template
+			o.Recursive = true
+		} else if o.Recursive {
+			// Use short format template
+			o.OutputFormat = "plaintext_short"
 		}
 
 		return openapiv3explain.PrintModelDescription(
