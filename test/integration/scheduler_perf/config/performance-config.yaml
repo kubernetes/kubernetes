@@ -688,48 +688,103 @@
 #      initPods: 20000
 #      measurePods: 5000
 
-- name: Unschedulable
+# Measure the time it takes to schedule default measurePods after scheduling 20% of high priority Pods that trigger preemption.
+# The measurePods are expected to be scheduled after scheduler handled the higher priority Pods. It's expected that running the apiserver updates asynchronously https://github.com/kubernetes/kubernetes/issues/126858 (once fixed), should significantly speed up this test.
+- name: PreemptionBlocking
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
   - opcode: createPods
     countParam: $initPods
-    podTemplatePath: config/templates/pod-large-cpu.yaml
+    podTemplatePath: config/templates/pod-low-priority.yaml
+    # Collect metrics from all createPods ops.
+  - opcode: startCollectingMetrics
+    name: preemptionBlockingMetric
+    namespaces: [blocking, measure]
+  - opcode: createPods
+    countParam: $blockingPods
+    podTemplatePath: config/templates/pod-high-priority.yaml
     skipWaitToCompletion: true
+    namespace: blocking
+  - opcode: createPods
+    countParam: $measurePods
+    namespace: measure
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 5Nodes
+    labels: [integration-test, performance, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      blockingPods: 1
+      measurePods: 4
+  - name: 500Nodes
+    labels: [performance, short]
+    threshold: 18  # TODO Adjust the threshold
+    params:
+      initNodes: 500
+      initPods: 2000
+      blockingPods: 100
+      measurePods: 400
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 20000
+      blockingPods: 1000
+      measurePods: 4000
+
+
+# Measure the time it takes to schedule default measurePods after scheduling 20% of high priority Pods that becomes unschedulable due to the resource constraints.
+# The measurePods are expected to be scheduled after scheduler handled the higher priority Pods. It's expected that running the apiserver updates asynchronously https://github.com/kubernetes/kubernetes/issues/126858 (once fixed), should significantly speed up this test.
+- name: UnschedulableBlocking
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  # Collect metrics from all createPods ops.
+  - opcode: startCollectingMetrics
+    name: preemptionBlockingMetric
+    namespaces: [blocking, measure]
+  - opcode: createPods
+    countParam: $blockingPods
+    podTemplatePath: config/templates/pod-high-priority-large-cpu.yaml
+    skipWaitToCompletion: true
+    namespace: blocking
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/templates/pod-default.yaml
-    collectMetrics: true
+    namespace: measure
+  - opcode: stopCollectingMetrics
   workloads:
   - name: 5Nodes/2InitPods
     labels: [integration-test, performance, short]
     params:
       initNodes: 5
-      initPods: 2
+      blockingPods: 2
       measurePods: 10
   - name: 500Nodes/200InitPods
     labels: [performance, short]
     params:
       initNodes: 500
-      initPods: 200
+      blockingPods: 200
       measurePods: 1000
   - name: 5000Nodes/200InitPods
     labels: [performance, short]
     params:
       initNodes: 5000
-      initPods: 200
+      blockingPods: 200
       measurePods: 5000
   - name: 5000Nodes/200InitPods/10000Pods
     labels: [performance]
     threshold: 300
     params:
       initNodes: 5000
-      initPods: 200
+      blockingPods: 200
       measurePods: 10000
   - name: 5000Nodes/2000InitPods
     params:
       initNodes: 5000
-      initPods: 2000
+      blockingPods: 2000
       measurePods: 5000
 
 - name: SchedulingWithMixedChurn
