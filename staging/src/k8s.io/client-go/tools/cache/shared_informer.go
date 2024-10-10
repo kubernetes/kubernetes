@@ -278,6 +278,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		name:                            options.Name,
 	}
 }
 
@@ -293,6 +294,9 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// Name for the queue. If unnamed, the metrics will not be registered.
+	Name string
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -392,6 +396,8 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandler
 
 	transform TransformFunc
+
+	name string
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -468,14 +474,17 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		options := DeltaFIFOOptions{
 			KnownObjects:          s.indexer,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           s.transform,
-		})
+		}
+		if s.name != "" {
+			options.Name = fmt.Sprintf("informer_%s_queue", s.name)
+		}
 
 		cfg := &Config{
-			Queue:             fifo,
+			Queue:             NewDeltaFIFOWithOptions(options),
 			ListerWatcher:     s.listerWatcher,
 			ObjectType:        s.objectType,
 			ObjectDescription: s.objectDescription,
