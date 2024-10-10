@@ -419,7 +419,7 @@ func (c *containerLogManager) compressLog(log string) error {
 	}
 	defer r.Close()
 	tmpLog := log + tmpSuffix
-	f, err := c.osInterface.OpenFile(tmpLog, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := c.osInterface.OpenFile(tmpLog, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary log %q: %v", tmpLog, err)
 	}
