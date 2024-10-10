@@ -428,6 +428,8 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(int(job.Status.Succeeded)),
+		"status.active":     strconv.Itoa(int(job.Status.Active)),
+		"status.failed":     strconv.Itoa(int(job.Status.Failed)),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
