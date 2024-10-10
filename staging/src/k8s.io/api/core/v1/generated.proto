@@ -4039,6 +4039,16 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional AppArmorProfile appArmorProfile = 11;
+
+  // seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.
+  // It has no effect on nodes that do not support SELinux or to volumes does not support SELinux.
+  // Valid values are "MountOption" and "Recursive". If not specified, "MountOption" is used.
+  // It affects only in-tree iSCSI and FibreChannel volumes, and CSI volumes that announce "SELinuxMount: true" in their CSIDriver instance.
+  // It affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +featureGate=SELinuxChangePolicy
+  // +optional
+  optional string seLinuxChangePolicy = 13;
 }
 
 // Describes the class of pods that should avoid this node.
