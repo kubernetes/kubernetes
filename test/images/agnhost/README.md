@@ -246,7 +246,21 @@ Usage:
 ### liveness
 
 Starts a simple server that is alive for 10 seconds, then reports unhealthy for the rest
-of its (hopefully) short existence.
+of its (hopefully) short existence. `/healthz` provides this simple behavior.
+
+Failures can be emulated by passing parameters to the following URLs:
+- `/sleep-headers` - Sleep before sending a header.
+- `/disconnect-headers` - Disconnect before sending a header.
+- `/sleep-body` - Sleep after sending a body.
+- `/disconnect-body` - Disconnect after sending a body.
+- `/slow-response` - Sending a body with intervals.
+
+For emulating failures, these parameters can be used:
+- `code` - The status code. The default value is `500`.
+- `time` - Duration (in seconds) to sleep. The default value is `0`.
+- `size` - Size (in KB) of the response body. The default value is `0`.
+- `interval` - Interval (in seconds) between sending 1KB chunk at `/slow-response`. The
+  default value is `0`.
 
 Usage:
 

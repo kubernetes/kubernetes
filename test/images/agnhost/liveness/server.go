@@ -22,8 +22,10 @@ package liveness
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,9 +35,79 @@ import (
 var CmdLiveness = &cobra.Command{
 	Use:   "liveness",
 	Short: "Starts a server that is alive for 10 seconds",
-	Long:  "A simple server that is alive for 10 seconds, then reports unhealthy for the rest of its (hopefully) short existence",
-	Args:  cobra.MaximumNArgs(0),
-	Run:   main,
+	Long: "A simple server that is alive for 10 seconds, then reports unhealthy for the rest of its (hopefully) short existence. " +
+		"Failures can be emulated by passing parameters to specific URLs.",
+	Args: cobra.MaximumNArgs(0),
+	Run:  main,
+}
+
+func flush(w http.ResponseWriter) {
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func forciblyDisconnect(w http.ResponseWriter) {
+	if c, _, err := w.(http.Hijacker).Hijack(); err == nil {
+		_ = c.Close()
+	} else {
+		_, _ = w.Write([]byte(fmt.Sprintf("Forcible disconnection failed: %v", err)))
+	}
+}
+
+func writeBody(w http.ResponseWriter, size, interval int) {
+	for kb := 0; kb < size; kb++ {
+		if interval > 0 {
+			flush(w)
+			time.Sleep(time.Duration(interval) * time.Second)
+		}
+		for b := 0; b < 1024; b += 16 {
+			_, _ = w.Write([]byte(fmt.Sprintf("%16x", rand.Uint64())))
+		}
+	}
+}
+
+type params struct {
+	statusCode    int
+	sleepSec      int
+	bodySize      int
+	writeInterval int
+}
+
+func parseIntParam(r *http.Request, name string, defaultVal int) (int, error) {
+	if param := r.URL.Query().Get(name); param == "" {
+		return defaultVal, nil
+	} else if intVal, err := strconv.Atoi(param); err != nil {
+		return defaultVal, err
+	} else {
+		return intVal, nil
+	}
+}
+
+func parseParams(r *http.Request) (*params, error) {
+	params := &params{}
+	if val, err := parseIntParam(r, "code", 500); err != nil {
+		return nil, fmt.Errorf("parameter 'code' is invalid: %w", err)
+	} else {
+		params.statusCode = val
+	}
+	if val, err := parseIntParam(r, "time", 0); err != nil {
+		return nil, fmt.Errorf("parameter 'time' is invalid: %w", err)
+	} else {
+		params.sleepSec = val
+	}
+	if val, err := parseIntParam(r, "size", 0); err != nil {
+		return nil, fmt.Errorf("parameter 'size' is invalid: %w", err)
+	} else {
+		params.bodySize = val
+	}
+	if val, err := parseIntParam(r, "interval", 0); err != nil {
+		return nil, fmt.Errorf("parameter 'interval' is invalid: %w", err)
+	} else {
+		params.writeInterval = val
+	}
+
+	return params, nil
 }
 
 func main(cmd *cobra.Command, args []string) {
@@ -62,6 +134,60 @@ func main(cmd *cobra.Command, args []string) {
 			return
 		}
 		http.Redirect(w, r, loc, http.StatusFound)
+	})
+	http.HandleFunc("/sleep-headers", func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseParams(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		if params.sleepSec > 0 {
+			time.Sleep(time.Duration(params.sleepSec) * time.Second)
+		}
+
+		w.WriteHeader(params.statusCode)
+		_, _ = w.Write([]byte(fmt.Sprintf("Slept for %d secs\n", params.sleepSec)))
+		writeBody(w, params.bodySize, 0)
+	})
+	http.HandleFunc("/disconnect-headers", func(w http.ResponseWriter, r *http.Request) {
+		forciblyDisconnect(w)
+	})
+	http.HandleFunc("/sleep-body", func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseParams(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+
+		w.WriteHeader(params.statusCode)
+		writeBody(w, params.bodySize, params.writeInterval)
+
+		_, _ = w.Write([]byte(fmt.Sprintf("Sleeping for %d secs\n", params.sleepSec)))
+		if params.sleepSec > 0 {
+			flush(w)
+			time.Sleep(time.Duration(params.sleepSec) * time.Second)
+		}
+		_, _ = w.Write([]byte(fmt.Sprintf("Slept for %d secs\n", params.sleepSec)))
+	})
+	http.HandleFunc("/disconnect-body", func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseParams(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+
+		w.WriteHeader(params.statusCode)
+		writeBody(w, params.bodySize, 0)
+
+		_, _ = w.Write([]byte("Disconnecting\n"))
+		flush(w)
+		forciblyDisconnect(w)
+	})
+	http.HandleFunc("/slow-response", func(w http.ResponseWriter, r *http.Request) {
+		params, err := parseParams(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+
+		w.WriteHeader(params.statusCode)
+		writeBody(w, params.bodySize, params.writeInterval)
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
