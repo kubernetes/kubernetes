@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -284,6 +285,7 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   chain[0].Subject.CommonName,
+			UID:    parseUIDFromCert(chain[0]),
 			Groups: chain[0].Subject.Organization,
 			Extra: map[string][]string{
 				user.CredentialIDKey: {id},
@@ -291,3 +293,20 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 		},
 	}, true, nil
 })
+
+// https://datatracker.ietf.org/doc/html/rfc4519#section-2.39
+// http://www.alvestrand.no/objectid/0.9.2342.19200300.100.1.1.html
+var uidOID = asn1.ObjectIdentifier([]int{0, 9, 2342, 19200300, 100, 1, 1})
+
+// Go's crypto/x509 library doesn't explicitly serialize UID to a named field, so
+// we read it off the asn1 array.
+func parseUIDFromCert(cert *x509.Certificate) string {
+	for _, name := range cert.Subject.Names {
+		if name.Type.Equal(uidOID) {
+			if s, ok := name.Value.(string); ok && len(s) > 0 {
+				return s
+			}
+		}
+	}
+	return ""
+}
