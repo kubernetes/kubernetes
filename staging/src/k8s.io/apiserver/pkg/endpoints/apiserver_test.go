@@ -237,7 +237,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
@@ -3311,7 +3310,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
