@@ -52,9 +52,9 @@ type wrappedStorageVersionManager struct {
 	completed      <-chan struct{}
 }
 
-func (w *wrappedStorageVersionManager) UpdateStorageVersions(loopbackClientConfig *rest.Config, serverID string) {
+func (w *wrappedStorageVersionManager) UpdateStorageVersions(ctx context.Context, loopbackClientConfig *rest.Config, serverID string) {
 	<-w.startUpdateSV
-	w.Manager.UpdateStorageVersions(loopbackClientConfig, serverID)
+	w.Manager.UpdateStorageVersions(ctx, loopbackClientConfig, serverID)
 	close(w.updateFinished)
 	<-w.finishUpdateSV
 }
