@@ -135,3 +135,47 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 func buildKubeletArgs(opts kubeletFlagsOpts) []kubeadmapi.Arg {
 	return buildKubeletArgsCommon(opts)
 }
+
+// ReadKubeletDynamicEnvFile reads the kubelet dynamic environment flags file a slice of strings.
+func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
+	data, err := os.ReadFile(kubeletEnvFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Trim any surrounding whitespace.
+	content := strings.TrimSpace(string(data))
+
+	// Check if the content starts with the expected kubelet environment variable prefix.
+	const prefix = constants.KubeletEnvFileVariableName + "="
+	if !strings.HasPrefix(content, prefix) {
+		return nil, errors.Errorf("the file %q does not contain the  expected prefix %q", kubeletEnvFilePath, prefix)
+	}
+
+	// Trim the prefix and the surrounding double quotes.
+	flags := strings.TrimPrefix(content, prefix)
+	flags = strings.Trim(flags, `"`)
+
+	// Split the flags string by whitespace to get individual arguments.
+	trimmedFlags := strings.Fields(flags)
+	if len(trimmedFlags) == 0 {
+		return nil, errors.Errorf("no flags found in file %q", kubeletEnvFilePath)
+	}
+
+	var updatedFlags []string
+	for i := 0; i < len(trimmedFlags); i++ {
+		flag := trimmedFlags[i]
+		if strings.Contains(flag, "=") {
+			// If the flag contains '=', add it directly.
+			updatedFlags = append(updatedFlags, flag)
+		} else if i+1 < len(trimmedFlags) {
+			// If no '=' is found, combine the flag with the next item as its value.
+			combinedFlag := flag + "=" + trimmedFlags[i+1]
+			updatedFlags = append(updatedFlags, combinedFlag)
+			// Skip the next item as it has been used as the value.
+			i++
+		}
+	}
+
+	return updatedFlags, nil
+}
