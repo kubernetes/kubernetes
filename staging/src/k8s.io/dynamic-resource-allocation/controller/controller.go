@@ -197,7 +197,7 @@ func New(
 	// cache and after an update made by the controller returns a more
 	// recent copy until the informer catches up.
 	claimInformerCache := claimInformer.Informer().GetIndexer()
-	claimCache := cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache, 60*time.Second,
+	claimCache := cache.NewIntegerResourceVersionMutationCache(ctx, claimInformerCache, claimInformerCache, 60*time.Second,
 		false /* only cache updated claims that exist in the informer cache */)
 
 	ctrl := &controller{
