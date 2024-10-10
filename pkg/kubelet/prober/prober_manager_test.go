@@ -554,6 +554,138 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 	}
 }
 
+func TestKubeletRestartUpdatePodStatus(t *testing.T) {
+	m := newTestManager()
+
+	falseValue := false
+	trueValue := true
+
+	testCases := []struct {
+		desc            string
+		podStatus       v1.PodStatus
+		expectedReady   map[string]bool
+		expectedStarted map[string]bool
+	}{
+		{
+			desc: "containers running and ready",
+			podStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{{
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
+				}},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "c1",
+						ContainerID: "test://c1",
+						Started:     &trueValue,
+						Ready:       trueValue,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.NewTime(metav1.Now().Add(-1 * time.Minute)),
+							},
+						},
+					},
+					{
+						Name:        "c2",
+						ContainerID: "test://c2",
+						Started:     &trueValue,
+						Ready:       trueValue,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.NewTime(metav1.Now().Add(-1 * time.Minute)),
+							},
+						},
+					},
+				},
+			},
+			expectedReady: map[string]bool{
+				"c1": trueValue,
+				"c2": trueValue,
+			},
+			expectedStarted: map[string]bool{
+				"c1": trueValue,
+				"c2": trueValue,
+			},
+		},
+		{
+			desc: "one container not started",
+			podStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "c1",
+						ContainerID: "test://c1",
+						Started:     &falseValue,
+						Ready:       falseValue,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.NewTime(metav1.Now().Add(-1 * time.Minute)),
+							},
+						},
+					},
+					{
+						Name:        "c2",
+						ContainerID: "test://c2",
+						Started:     &trueValue,
+						Ready:       trueValue,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{
+								StartedAt: metav1.NewTime(metav1.Now().Add(-1 * time.Minute)),
+							},
+						},
+					},
+				},
+			},
+			expectedReady: map[string]bool{
+				"c1": falseValue,
+				"c2": falseValue,
+			},
+			expectedStarted: map[string]bool{
+				"c1": falseValue,
+				"c2": trueValue,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			startupPod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: testPodUID,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "c1", StartupProbe: defaultProbe},
+						{Name: "c2", ReadinessProbe: defaultProbe},
+					},
+				},
+			}
+			startupPod.Status = tc.podStatus
+
+			m.UpdatePodStatus(&startupPod, &tc.podStatus)
+
+			for _, c := range tc.podStatus.ContainerStatuses {
+				expectedReady, ok := tc.expectedReady[c.Name]
+				if !ok {
+					t.Fatalf("Missing expectedReady value for container: %v", c.Name)
+				}
+				if expectedReady != c.Ready {
+					t.Errorf("Expected container %v to be Ready=%v, got Ready=%v", c.Name, expectedReady, c.Ready)
+				}
+
+				expectedStarted, ok := tc.expectedStarted[c.Name]
+				if !ok {
+					t.Fatalf("Missing expectedStarted value for container: %v", c.Name)
+				}
+				if expectedStarted != *c.Started {
+					t.Errorf("Expected container %v to be Started=%v, got Started=%v", c.Name, expectedStarted, *c.Started)
+				}
+			}
+		})
+	}
+}
+
 func (m *manager) extractedReadinessHandling() {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
