@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/klog/v2"
 )
 
@@ -518,15 +519,49 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	}
 }
 
-func TestResponseWriterDecorator(t *testing.T) {
-	decorator := &baseTimeoutWriter{
-		w: &responsewriter.FakeResponseWriter{},
-	}
-	var w http.ResponseWriter = decorator
+func TestTimeoutResponseWriterDecoratorConstruction(t *testing.T) {
+	inner := &responsewritertesting.FakeResponseWriter{}
+	middle := &baseTimeoutWriter{w: inner}
+	outer := responsewriter.WrapForHTTP1Or2(middle)
 
-	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
-		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	// FakeResponseWriter does not implement http.Flusher, FlusherError,
+	// http.CloseNotifier, or http.Hijacker; so WrapForHTTP1Or2 is not
+	// expected to return an outer object.
+	if outer != middle {
+		t.Errorf("did not expect a new outer object, but got %v", outer)
 	}
+
+	decorator, ok := outer.(responsewriter.UserProvidedDecorator)
+	if !ok {
+		t.Fatal("expected the middle to implement UserProvidedDecorator")
+	}
+	if want, got := inner, decorator.Unwrap(); want != got {
+		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
+	}
+}
+
+func TestTimeoutResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(verifier http.Handler) http.Handler {
+		return WithTimeout(
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				verifier.ServeHTTP(w, req)
+			}),
+			func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+				return req, false, func() {}, nil
+			})
+	})
+}
+
+func TestTimeoutResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithHTTPServer(t, func(verifier http.Handler) http.Handler {
+		return WithTimeout(
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				verifier.ServeHTTP(w, req)
+			}),
+			func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+				return req, false, func() {}, nil
+			})
+	})
 }
 
 func isStackTraceLoggedByRuntime(message string) bool {
