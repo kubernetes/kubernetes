@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -73,6 +74,7 @@ type Config struct {
 // based on the authorizationMode or an error.
 // stopCh is used to shut down config reload goroutines when the server is shutting down.
 func (config Config) New(ctx context.Context, serverID string) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+	logger := klog.FromContext(ctx)
 	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
@@ -111,7 +113,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 
 		case authzconfig.AuthorizerType(modes.ModeABAC):
 			var err error
-			r.abacAuthorizer, err = abac.NewFromFile(config.PolicyFile)
+			r.abacAuthorizer, err = abac.NewFromFile(logger, config.PolicyFile)
 			if err != nil {
 				return nil, nil, err
 			}

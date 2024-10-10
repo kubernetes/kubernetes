@@ -27,6 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
@@ -57,7 +59,8 @@ func TestTwoLineFile(t *testing.T) {
 
 // Test the file that we will point users at as an example.
 func TestExampleFile(t *testing.T) {
-	_, err := NewFromFile("./example_policy_file.jsonl")
+	logger, _ := ktesting.NewTestContext(t)
+	_, err := NewFromFile(logger, "./example_policy_file.jsonl")
 	if err != nil {
 		t.Errorf("unable to read policy file: %v", err)
 	}
@@ -818,6 +821,7 @@ func TestSubjectMatches(t *testing.T) {
 }
 
 func newWithContents(t *testing.T, contents string) (PolicyList, error) {
+	logger, _ := ktesting.NewTestContext(t)
 	f, err := ioutil.TempFile("", "abac_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)
@@ -829,7 +833,7 @@ func newWithContents(t *testing.T, contents string) (PolicyList, error) {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
 
-	pl, err := NewFromFile(f.Name())
+	pl, err := NewFromFile(logger, f.Name())
 	return pl, err
 }
 
