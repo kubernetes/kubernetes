@@ -1688,21 +1688,15 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 		nodeStrategy = cno.UniqueNodeLabelStrategy
 	}
 
+	nodeTemplate := framework.StaticNodeTemplate(makeBaseNode(prefix))
 	if cno.NodeTemplatePath != nil {
-		node, err := getNodeSpecFromFile(cno.NodeTemplatePath)
-		if err != nil {
-			return nil, err
-		}
-		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
-			clientset,
-			[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
-			node,
-		), nil
+		nodeTemplate = nodeTemplateFromFile(*cno.NodeTemplatePath)
 	}
+
 	return framework.NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
-		prefix,
+		nodeTemplate,
 	), nil
 }
 
@@ -2089,9 +2083,11 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
-func getNodeSpecFromFile(path *string) (*v1.Node, error) {
+type nodeTemplateFromFile string
+
+func (f nodeTemplateFromFile) GetNodeTemplate(index, count int) (*v1.Node, error) {
 	nodeSpec := &v1.Node{}
-	if err := getSpecFromFile(path, nodeSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, nodeSpec); err != nil {
 		return nil, fmt.Errorf("parsing Node: %w", err)
 	}
 	return nodeSpec, nil
