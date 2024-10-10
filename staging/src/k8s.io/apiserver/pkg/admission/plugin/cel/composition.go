@@ -39,12 +39,19 @@ const VariablesTypeName = "kubernetes.variables"
 type CompositedCompiler struct {
 	Compiler
 	FilterCompiler
+	EvaluatorCompiler
 
 	CompositionEnv *CompositionEnv
 }
 
 type CompositedFilter struct {
 	Filter
+
+	compositionEnv *CompositionEnv
+}
+
+type CompositedEvaluator struct {
+	Evaluator
 
 	compositionEnv *CompositionEnv
 }
@@ -64,11 +71,13 @@ func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompi
 		CompiledVariables: map[string]CompilationResult{},
 	}
 	compiler := NewCompiler(context.EnvSet)
-	filterCompiler := NewFilterCompiler(context.EnvSet)
+	filterCompiler := &filterCompiler{compiler}
+	evaluatorCompiler := &evaluatorCompiler{compiler}
 	return &CompositedCompiler{
-		Compiler:       compiler,
-		FilterCompiler: filterCompiler,
-		CompositionEnv: context,
+		Compiler:          compiler,
+		FilterCompiler:    filterCompiler,
+		EvaluatorCompiler: evaluatorCompiler,
+		CompositionEnv:    context,
 	}
 }
 
@@ -89,6 +98,14 @@ func (c *CompositedCompiler) Compile(expressions []ExpressionAccessor, optionalD
 	filter := c.FilterCompiler.Compile(expressions, optionalDecls, envType)
 	return &CompositedFilter{
 		Filter:         filter,
+		compositionEnv: c.CompositionEnv,
+	}
+}
+
+func (c *CompositedCompiler) CompileEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Evaluator {
+	evaluator := c.EvaluatorCompiler.CompileEvaluator(expression, optionalDecls, envType)
+	return &CompositedEvaluator{
+		Evaluator:      evaluator,
 		compositionEnv: c.CompositionEnv,
 	}
 }
