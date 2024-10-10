@@ -441,7 +441,7 @@ func TestSyncLoopAbort(t *testing.T) {
 	close(ch)
 
 	// sanity check (also prevent this test from hanging in the next step)
-	ok := kubelet.syncLoopIteration(ctx, ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1))
+	ok := kubelet.syncLoopIteration(ctx, ch, kubelet, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent, 1), make(chan time.Time))
 	require.False(t, ok, "Expected syncLoopIteration to return !ok since update chan was closed")
 
 	// this should terminate immediately; if it hangs then the syncLoopIteration isn't aborting properly
@@ -2715,13 +2715,21 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt.pod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
+		err := kubelet.statusManager.SetPodAllocation(tt.pod)
+		require.NoError(t, err, "SetPodAllocation() for initializing failed")
+		err = kubelet.statusManager.SetPodResizeStatus(tt.pod.UID, "")
+		require.NoError(t, err, "SetPodResizeStatus() for initializing failed")
 		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
-		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
-		kubelet.handlePodResourcesResize(tt.pod)
-		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
-		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
-		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
-		assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
+
+		resizeStatus := kubelet.handlePodResourcesResize(tt.pod)
+		alloc, found := kubelet.statusManager.GetContainerResourceAllocation(string(tt.pod.UID), tt.pod.Spec.Containers[0].Name)
+		assert.True(t, found)
+		assert.Equal(t, tt.expectedAllocations, alloc)
+		savedResizeStatus, found := kubelet.statusManager.GetPodResizeStatus(string(tt.pod.UID))
+		assert.True(t, found)
+		assert.Equal(t, resizeStatus, savedResizeStatus)
+		assert.Equal(t, tt.expectedResize, resizeStatus)
 		testKubelet.fakeKubeClient.ClearActions()
 	}
 }
