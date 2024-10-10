@@ -110,6 +110,9 @@ type TestServerInstanceOptions struct {
 	EmulationVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
+
+	// EtcdOptionsTestContextValueInjection allows for tests to override settings that no longer have external end user config.
+	EtcdOptionsTestContextValueInjection func(context.Context) context.Context
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -208,6 +211,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
+	s.Etcd.TestContextValueInjection = instanceOptions.EtcdOptionsTestContextValueInjection
 	if instanceOptions.RequestTimeout > 0 {
 		s.GenericServerRunOptions.RequestTimeout = instanceOptions.RequestTimeout
 	}
