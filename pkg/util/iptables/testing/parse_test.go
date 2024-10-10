@@ -20,7 +20,6 @@ limitations under the License.
 package testing
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,6 +27,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -226,15 +226,6 @@ func TestParseRule(t *testing.T) {
 	}
 }
 
-// Helper for TestParseIPTablesDump. Obviously it should not be used in TestParseRule...
-func mustParseRule(rule string) *Rule {
-	parsed, err := ParseRule(rule, false)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse test case rule %q: %v", rule, err))
-	}
-	return parsed
-}
-
 func TestParseIPTablesDump(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -284,14 +275,14 @@ func TestParseIPTablesDump(t *testing.T) {
 					}, {
 						Name: iptables.Chain("KUBE-FORWARD"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`),
-							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`),
-							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-NODEPORTS"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`),
+							ktesting.Must(ParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`, false)),
 						},
 					}},
 				}, {
@@ -299,34 +290,34 @@ func TestParseIPTablesDump(t *testing.T) {
 					Chains: []Chain{{
 						Name: iptables.Chain("KUBE-SERVICES"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O`),
-							mustParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`),
+							ktesting.Must(ParseRule(`-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-NODEPORTS"),
 					}, {
 						Name: iptables.Chain("KUBE-POSTROUTING"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN`),
-							mustParseRule(`-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000`),
-							mustParseRule(`-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE`),
+							ktesting.Must(ParseRule(`-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-MARK-MASQ"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000`),
+							ktesting.Must(ParseRule(`-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-SVC-XPGD46QRK7WJZT7O"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`),
-							mustParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ`),
+							ktesting.Must(ParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 10.20.30.41 --dport 80 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment ns1/svc1:p80 -j KUBE-SEP-SXIVWICOYRO3J4NJ`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-SEP-SXIVWICOYRO3J4NJ"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ`),
-							mustParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80`),
+							ktesting.Must(ParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -s 10.180.0.1 -j KUBE-MARK-MASQ`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-SEP-SXIVWICOYRO3J4NJ -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.1:80`, false)),
 						},
 					}},
 				}},
@@ -350,7 +341,7 @@ func TestParseIPTablesDump(t *testing.T) {
 					Chains: []Chain{{
 						Name: iptables.Chain("KUBE-SERVICES"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`),
+							ktesting.Must(ParseRule(`-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS`, false)),
 						},
 					}, {
 						Name:    iptables.Chain("KUBE-SVC-XPGD46QRK7WJZT7O"),
@@ -391,14 +382,14 @@ func TestParseIPTablesDump(t *testing.T) {
 					}, {
 						Name: iptables.Chain("KUBE-FORWARD"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`),
-							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`),
-							mustParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT`, false)),
+							ktesting.Must(ParseRule(`-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`, false)),
 						},
 					}, {
 						Name: iptables.Chain("KUBE-NODEPORTS"),
 						Rules: []*Rule{
-							mustParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`),
+							ktesting.Must(ParseRule(`-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT`, false)),
 						},
 					}},
 				}},

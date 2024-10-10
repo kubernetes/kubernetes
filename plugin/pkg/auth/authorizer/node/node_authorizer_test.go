@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
@@ -388,7 +389,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		{
 			name:   "allowed filtered list ResourceSlices",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName==node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -405,7 +406,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		{
 			name:   "allowed filtered watch ResourceSlices",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName==node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -468,12 +469,12 @@ func TestNodeAuthorizer(t *testing.T) {
 		// list pods
 		{
 			name:   "list related pods",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName=node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName=node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "list related pods - alternate selector",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: "", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName==node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -496,12 +497,12 @@ func TestNodeAuthorizer(t *testing.T) {
 		// watch pods
 		{
 			name:   "watch related pods",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName=node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName=node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "watch related pods",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: "", FieldSelectorRequirements: ktesting.Must(fields.ParseSelector("spec.nodeName==node0")).Requirements()},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -888,14 +889,6 @@ type sampleDataOpts struct {
 	uniqueResourceClaimTemplatesWithClaimPerPod int
 
 	nodeResourceSlicesPerNode int
-}
-
-func mustParseFields(s string) fields.Requirements {
-	selector, err := fields.ParseSelector(s)
-	if err != nil {
-		panic(err)
-	}
-	return selector.Requirements()
 }
 
 func BenchmarkPopulationAllocation(b *testing.B) {

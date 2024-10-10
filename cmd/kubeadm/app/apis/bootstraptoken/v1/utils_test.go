@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMarshalJSON(t *testing.T) {
@@ -369,13 +370,13 @@ func TestEncodeTokenSecretData(t *testing.T) {
 			&BootstrapToken{
 				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				TTL: &metav1.Duration{
-					Duration: mustParseDuration("2h", t),
+					Duration: ktesting.Must(time.ParseDuration("2h")),
 				},
 			},
 			map[string][]byte{
 				"token-id":     []byte("abcdef"),
 				"token-secret": []byte("abcdef0123456789"),
-				"expiration":   []byte(refTime.Add(mustParseDuration("2h", t)).Format(time.RFC3339)),
+				"expiration":   []byte(refTime.Add(ktesting.Must(time.ParseDuration("2h"))).Format(time.RFC3339)),
 			},
 		},
 		{
@@ -397,7 +398,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 			&BootstrapToken{
 				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				TTL: &metav1.Duration{
-					Duration: mustParseDuration("2h", t),
+					Duration: ktesting.Must(time.ParseDuration("2h")),
 				},
 				Expires: &metav1.Time{
 					Time: refTime,
@@ -440,7 +441,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 				TTL: &metav1.Duration{
-					Duration: mustParseDuration("2h", t),
+					Duration: ktesting.Must(time.ParseDuration("2h")),
 				},
 				Expires: &metav1.Time{
 					Time: refTime,
@@ -471,14 +472,6 @@ func TestEncodeTokenSecretData(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustParseDuration(durationStr string, t *testing.T) time.Duration {
-	d, err := time.ParseDuration(durationStr)
-	if err != nil {
-		t.Fatalf("couldn't parse duration %q: %v", durationStr, err)
-	}
-	return d
 }
 
 func TestBootstrapTokenFromSecret(t *testing.T) {

@@ -42,6 +42,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test_buildClientCertificateManager validates that we can build a local client cert
@@ -226,14 +227,6 @@ func getCSR(req *http.Request) (*certapi.CertificateSigningRequest, error) {
 	return csr, nil
 }
 
-func mustMarshal(obj interface{}) []byte {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
-	return data
-}
-
 type csrSimulator struct {
 	t *testing.T
 
@@ -289,7 +282,7 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		csr.UID = types.UID("1")
 		csr.ResourceVersion = "1"
-		data := mustMarshal(csr)
+		data := ktesting.Must(json.Marshal(csr))
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 
@@ -322,14 +315,14 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		csr := s.csr.DeepCopy()
 
-		data := mustMarshal(&certapi.CertificateSigningRequestList{
+		data := ktesting.Must(json.Marshal(&certapi.CertificateSigningRequestList{
 			ListMeta: metav1.ListMeta{
 				ResourceVersion: "2",
 			},
 			Items: []certapi.CertificateSigningRequest{
 				*csr,
 			},
-		})
+		}))
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 
@@ -339,12 +332,12 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		csr := s.csr.DeepCopy()
 
-		data := mustMarshal(&metav1.WatchEvent{
+		data := ktesting.Must(json.Marshal(&metav1.WatchEvent{
 			Type: "ADDED",
 			Object: runtime.RawExtension{
-				Raw: mustMarshal(csr),
+				Raw: ktesting.Must(json.Marshal(csr)),
 			},
-		})
+		}))
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 

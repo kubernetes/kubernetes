@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type fakeAuthorizer struct {
@@ -273,10 +274,7 @@ func TestCreate(t *testing.T) {
 }
 
 func mustParse(s string) labels.Requirements {
-	selector, err := labels.Parse(s)
-	if err != nil {
-		panic(err)
-	}
+	selector := ktesting.Must(labels.Parse(s))
 	reqs, _ := selector.Requirements()
 	return reqs
 }
