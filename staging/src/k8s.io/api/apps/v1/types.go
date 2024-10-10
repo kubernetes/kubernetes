@@ -107,7 +107,7 @@ const (
 	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
 	// tracking and ordered rolling restarts are disabled. Pods are recreated
 	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
+	// operation is performed with this strategy, specification version indicated
 	// by the StatefulSet's currentRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
