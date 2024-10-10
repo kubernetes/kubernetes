@@ -23,17 +23,16 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
-
-// The REST storage registers resource kinds also without the corresponding
-// feature gate because it might be useful to provide access to these resources
-// while their feature is off to allow cleaning them up.
 
 type RESTStorageProvider struct{}
 
@@ -60,37 +59,53 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "deviceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "deviceclasses", resourcev1alpha3.SchemeGroupVersion.WithResource("deviceClass"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = deviceclassStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = deviceclassStorage
 	}
 
-	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceclaims", resourcev1alpha3.SchemeGroupVersion.WithResource("resourceclaims"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceClaimStorage
+			storage[resource+"/status"] = resourceClaimStatusStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceClaimStorage
-		storage[resource+"/status"] = resourceClaimStatusStorage
 	}
 
-	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceclaimtemplates", resourcev1alpha3.SchemeGroupVersion.WithResource("resourceclaimtemplates"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceClaimTemplateStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceClaimTemplateStorage
 	}
 
-	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceslices", resourcev1alpha3.SchemeGroupVersion.WithResource("resourceslices"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceSliceStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceSliceStorage
 	}
 
 	return storage, nil
@@ -99,37 +114,53 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "deviceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "deviceclasses", resourcev1beta1.SchemeGroupVersion.WithResource("deviceclasses"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = deviceclassStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = deviceclassStorage
 	}
 
-	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceclaims", resourcev1beta1.SchemeGroupVersion.WithResource("resourceclaims"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceClaimStorage
+			storage[resource+"/status"] = resourceClaimStatusStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceClaimStorage
-		storage[resource+"/status"] = resourceClaimStatusStorage
 	}
 
-	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceclaimtemplates", resourcev1beta1.SchemeGroupVersion.WithResource("resourceclaimtemplates"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceClaimTemplateStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceClaimTemplateStorage
 	}
 
-	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
-		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
+	if resource, gvr, feature := "resourceslices", resourcev1beta1.SchemeGroupVersion.WithResource("resourceslices"), features.DynamicResourceAllocation; apiResourceConfigSource.ResourceEnabled(gvr) {
+		if utilfeature.DefaultFeatureGate.Enabled(feature) {
+			resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = resourceSliceStorage
+		} else {
+			klog.Warningf("%s is disabled because the %s feature is disabled", gvr, feature)
 		}
-		storage[resource] = resourceSliceStorage
 	}
 
 	return storage, nil
