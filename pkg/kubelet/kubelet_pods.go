@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -461,8 +463,13 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 			return err
 		}
 	} else {
+		isIPv6, err := util.IsIPv6Supported()
+		if err != nil {
+			return err
+		}
+
 		// if Pod is not using host network, create a managed hosts file with Pod IP and other information.
-		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
+		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases, isIPv6)
 	}
 
 	hostsFilePerm := os.FileMode(0644)
@@ -487,15 +494,19 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 
 // managedHostsFileContent generates the content of the managed etc hosts based on Pod IPs and other
 // information.
-func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
+func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, isIPv6 bool) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString(managedHostsHeader)
-	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
-	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
-	buffer.WriteString("fe00::0\tip6-localnet\n")
-	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
-	buffer.WriteString("fe00::1\tip6-allnodes\n")
-	buffer.WriteString("fe00::2\tip6-allrouters\n")
+	buffer.WriteString("127.0.0.1\tlocalhost\n") // ipv4 localhost
+
+	if isIPv6 {
+		buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
+		buffer.WriteString("fe00::0\tip6-localnet\n")
+		buffer.WriteString("fe00::0\tip6-mcastprefix\n")
+		buffer.WriteString("fe00::1\tip6-allnodes\n")
+		buffer.WriteString("fe00::2\tip6-allrouters\n")
+	}
+
 	if len(hostDomainName) > 0 {
 		// host entry generated for all IPs in podIPs
 		// podIPs field is populated for clusters even
