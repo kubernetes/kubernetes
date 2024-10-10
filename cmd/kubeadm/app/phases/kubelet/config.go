@@ -17,10 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -293,4 +295,37 @@ func applyKubeletConfigPatchFromFile(kubeletBytes []byte, patchFilePath string, 
 	}
 
 	return kubeletBytes, nil
+}
+
+// ReadKubeadmFlags reads the --container-runtime-endpoint from the kubeadm-flags.env file.
+func ReadKubeadmFlags(envFilePath string, output io.Writer) (string, error) {
+	file, err := os.Open(envFilePath)
+	if err != nil {
+		return "", fmt.Errorf("could not open kubeadm flags file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "KUBELET_KUBEADM_ARGS=") {
+			fmt.Fprintf(output, "[info] Reading line: %s\n", line)
+			args := strings.TrimPrefix(line, "KUBELET_KUBEADM_ARGS=")
+			args = strings.Trim(args, `"`)
+			for _, arg := range strings.Split(args, " ") {
+				if strings.HasPrefix(arg, "--container-runtime-endpoint=") {
+					fmt.Fprintf(output, "[info] Found container-runtime-endpoint: %s\n", arg)
+					return strings.TrimPrefix(arg, "--container-runtime-endpoint="), nil
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading kubeadm flags file: %w", err)
+	}
+
+	return "", fmt.Errorf("container-runtime-endpoint not found")
 }

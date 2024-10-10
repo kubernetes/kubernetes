@@ -35,6 +35,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -122,6 +123,18 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	}
 
 	errs := []error{}
+
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		containerRuntimeEndpoint, err := kubeletphase.ReadKubeadmFlags(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName), out)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error reading kubeadm flags file"))
+		}
+
+		if err := kubeletphase.WriteInstanceConfigToDisk(containerRuntimeEndpoint, kubeletDir); err != nil {
+			errs = append(errs, errors.Wrap(err, "error writing instance kubelet configuration to disk"))
+		}
+	}
+
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
