@@ -19,6 +19,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -38,6 +39,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -701,6 +703,11 @@ func (b *throttledLogger) Infof(message string, args ...interface{}) {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
+	w, _, e := r.watchInternal(ctx)
+	return w, e
+}
+
+func (r *Request) watchInternal(ctx context.Context) (watch.Interface, runtime.Decoder, error) {
 	if r.body == nil {
 		logBody(ctx, 2, "Request Body", r.bodyBytes)
 	}
@@ -708,7 +715,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	// We specifically don't want to rate limit watches, so we
 	// don't use r.rateLimiter here.
 	if r.err != nil {
-		return nil, r.err
+		return nil, nil, r.err
 	}
 
 	client := r.c.Client
@@ -728,12 +735,12 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	url := r.URL().String()
 	for {
 		if err := retry.Before(ctx, r); err != nil {
-			return nil, retry.WrapPreviousError(err)
+			return nil, nil, retry.WrapPreviousError(err)
 		}
 
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		resp, err := client.Do(req)
@@ -761,14 +768,14 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}()
 		if done {
 			if isErrRetryableFunc(req, err) {
-				return watch.NewEmptyWatch(), nil
+				return watch.NewEmptyWatch(), nil, nil
 			}
 			if err == nil {
 				// if the server sent us an HTTP Response object,
 				// we need to return the error object from that.
 				err = transformErr
 			}
-			return nil, retry.WrapPreviousError(err)
+			return nil, nil, retry.WrapPreviousError(err)
 		}
 	}
 }
@@ -786,27 +793,109 @@ type WatchListResult struct {
 	// the end of the stream.
 	initialEventsEndBookmarkRV string
 
-	// gv represents the API version
-	// it is used to construct the final list response
-	// normally this information is filled by the server
-	gv schema.GroupVersion
+	// negotiatedObjectDecoder knows how to decode
+	// the initialEventsListBlueprint
+	negotiatedObjectDecoder runtime.Decoder
+
+	// base64EncodedInitialEventsListBlueprint contains an empty,
+	// versioned list encoded in the requested format
+	// (e.g., protobuf, JSON, CBOR) and stored as a base64-encoded string
+	base64EncodedInitialEventsListBlueprint string
 }
 
 func (r WatchListResult) Into(obj runtime.Object) error {
-	if r.err != nil {
-		return r.err
+	if obj == nil {
+		return fmt.Errorf("object pointer can not be nil")
 	}
 
-	listPtr, err := meta.GetItemsPtr(obj)
-	if err != nil {
-		return err
+	_, err := r.decode(obj)
+	return err
+}
+
+func (r WatchListResult) Decode() (runtime.Object, error) {
+	return r.decode(nil)
+}
+
+func (r WatchListResult) decode(into runtime.Object) (runtime.Object, error) {
+	if r.err != nil {
+		return nil, r.err
 	}
-	listVal, err := conversion.EnforcePtr(listPtr)
+
+	encodedInitialEventsListBlueprint, err := base64.StdEncoding.DecodeString(r.base64EncodedInitialEventsListBlueprint)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	out, gvk, err := r.negotiatedObjectDecoder.Decode(encodedInitialEventsListBlueprint, nil, into)
+	if err != nil {
+		return nil, err
+	}
+
+	if into == nil {
+		into = out
+	} else if out != into {
+		return nil, fmt.Errorf("unable to decode %s into %v", gvk, reflect.TypeOf(into))
+	}
+
+	listMeta, err := meta.CommonAccessor(into)
+	if err != nil {
+		return nil, err
+	}
+	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
+
+	if table.IsTable(into) {
+		return r.mergeTableRows(into)
+	}
+
+	if meta.IsListType(into) {
+		return r.mergeListItems(into)
+	}
+
+	return nil, fmt.Errorf("unable to decode %s, either list or table", gvk)
+}
+
+func (r WatchListResult) mergeTableRows(obj runtime.Object) (runtime.Object, error) {
+	var totalRows []any
+
+	for i, item := range r.items {
+		if i == 0 {
+			col, err := table.GetColumnDefinitions(item)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := table.SetColumnDefinitions(obj, col); err != nil {
+				return nil, err
+			}
+		}
+
+		if err := table.EachTableRow(item, func(row any) error {
+			totalRows = append(totalRows, row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := table.SetTableRows(obj, totalRows); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (r WatchListResult) mergeListItems(obj runtime.Object) (runtime.Object, error) {
+	listItemsPtr, err := meta.GetItemsPtr(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	listVal, err := conversion.EnforcePtr(listItemsPtr)
+	if err != nil {
+		return nil, err
 	}
 	if listVal.Kind() != reflect.Slice {
-		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+		return nil, fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
 	if len(r.items) == 0 {
@@ -815,27 +904,13 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		listVal.Set(reflect.MakeSlice(listVal.Type(), len(r.items), len(r.items)))
 		for i, o := range r.items {
 			if listVal.Type().Elem() != reflect.TypeOf(o).Elem() {
-				return fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
+				return nil, fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
 			}
-			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
+			listVal.Index(i).Set(reflect.ValueOf(r.items[i]).Elem())
 		}
 	}
 
-	listMeta, err := meta.ListAccessor(obj)
-	if err != nil {
-		return err
-	}
-	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
-
-	typeMeta, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return err
-	}
-	version := r.gv.String()
-	typeMeta.SetAPIVersion(version)
-	typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
-
-	return nil
+	return obj, nil
 }
 
 // WatchList establishes a stream to get a consistent snapshot of data
@@ -857,16 +932,16 @@ func (r *Request) WatchList(ctx context.Context) WatchListResult {
 	//  Most users use the generated client, which handles the proper setting of parameters.
 	//  We don't have validation for other methods (e.g., the Watch)
 	//  thus, for symmetry, we haven't added additional checks for the WatchList method.
-	w, err := r.Watch(ctx)
+	w, d, err := r.watchInternal(ctx)
 	if err != nil {
 		return WatchListResult{err: err}
 	}
-	return r.handleWatchList(ctx, w)
+	return r.handleWatchList(ctx, w, d)
 }
 
 // handleWatchList holds the actual logic for easier unit testing.
 // Note that this function will close the passed watch.
-func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchListResult {
+func (r *Request) handleWatchList(ctx context.Context, w watch.Interface, negotiatedObjectDecoder runtime.Decoder) WatchListResult {
 	defer w.Stop()
 	var lastKey string
 	var items []runtime.Object
@@ -899,11 +974,20 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 				items = append(items, event.Object)
 				lastKey = key
 			case watch.Bookmark:
-				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+				initialEventsAnnotation, base64EncodedInitialEventsListBlueprint, err := hasInitialEventsAnnotation(event.Object)
+				if err != nil {
+					return WatchListResult{err: err}
+				}
+
+				if initialEventsAnnotation {
+					if len(base64EncodedInitialEventsListBlueprint) == 0 {
+						return WatchListResult{err: fmt.Errorf("%q annotation is missing content", metav1.InitialEventsListBlueprintAnnotationKey)}
+					}
 					return WatchListResult{
-						items:                      items,
-						initialEventsEndBookmarkRV: meta.GetResourceVersion(),
-						gv:                         r.c.content.GroupVersion,
+						items:                                   items,
+						initialEventsEndBookmarkRV:              meta.GetResourceVersion(),
+						negotiatedObjectDecoder:                 negotiatedObjectDecoder,
+						base64EncodedInitialEventsListBlueprint: base64EncodedInitialEventsListBlueprint,
 					}
 				}
 			default:
@@ -913,7 +997,7 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 	}
 }
 
-func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error) {
+func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, runtime.Decoder, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
@@ -921,7 +1005,7 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error)
 	}
 	objectDecoder, streamingSerializer, framer, err := r.c.content.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	handleWarnings(resp.Header, r.warningHandler)
@@ -934,7 +1018,7 @@ func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error)
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
-	), nil
+	), objectDecoder, nil
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
@@ -1638,4 +1722,43 @@ func objectKeyFromMeta(objMeta metav1.Object) string {
 		return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
 	}
 	return objMeta.GetName()
+}
+
+func hasInitialEventsAnnotation(object runtime.Object) (bool, string, error) {
+	if !table.IsTable(object) {
+		meta, err := meta.Accessor(object)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to parse metadata from object: %#v", object)
+		}
+
+		if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+			return true, meta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey], nil
+		}
+
+		return false, "", nil
+	}
+
+	var (
+		isInitialEvent bool
+		blueprint      string
+	)
+	err := table.EachTableRowObject(object, func(row runtime.Object) error {
+		if isInitialEvent {
+			return nil
+		}
+
+		meta, err := meta.Accessor(row)
+		if err != nil {
+			return fmt.Errorf("failed to parse metadata from object: %#v", object)
+		}
+
+		if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+			isInitialEvent = true
+			blueprint = meta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey]
+		}
+
+		return nil
+	})
+
+	return isInitialEvent, blueprint, err
 }

@@ -19,6 +19,7 @@ package dynamic
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,11 +34,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
@@ -50,6 +53,16 @@ func getListJSON(version, kind string, items ...[]byte) []byte {
 	json := fmt.Sprintf(`{"apiVersion": %q, "kind": %q, "items": [%s]}`,
 		version, kind, bytes.Join(items, []byte(",")))
 	return []byte(json)
+}
+
+func getEmptyObject(version, kind string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": version,
+			"kind":       kind,
+			"items":      nil,
+		},
+	}
 }
 
 func getObject(version, kind, name string) *unstructured.Unstructured {
@@ -183,7 +196,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("10")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:              "true",
+						metav1.InitialEventsListBlueprintAnnotationKey: encodeObjectToBase64String(getEmptyObject("gtest/vTest", "rTestList"), t),
+					})
 					return obj
 				}()},
 			},
@@ -195,8 +211,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "10",
 					},
@@ -215,7 +231,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("39")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:              "true",
+						metav1.InitialEventsListBlueprintAnnotationKey: encodeObjectToBase64String(getEmptyObject("gtest/vTest", "rTestList"), t),
+					})
 					return obj
 				}()},
 			},
@@ -227,8 +246,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "39",
 					},
@@ -960,4 +979,24 @@ func TestInvalidSegments(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
 		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
 	}
+}
+
+func newJSONSerializer() runtime.Serializer {
+	return runtimejson.NewSerializerWithOptions(
+		runtimejson.DefaultMetaFactory,
+		clientgoscheme.Scheme,
+		clientgoscheme.Scheme,
+		runtimejson.SerializerOptions{},
+	)
+}
+
+func encodeObjectToBase64String(obj runtime.Object, t *testing.T) string {
+	e := newJSONSerializer()
+
+	var buf bytes.Buffer
+	err := e.Encode(obj, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
