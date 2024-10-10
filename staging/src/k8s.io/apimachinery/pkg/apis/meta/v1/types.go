@@ -560,6 +560,23 @@ type DeleteOptions struct {
 	// +optional
 	// +listType=atomic
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+
+	// IgnoreStoreReadErrorWithClusterBreakingPotential, if set to true will
+	// make an attempt to perform the normal deletion flow, but if either of
+	// the below occurs:
+	// a) the data (associated with the resource being deleted) retrieved
+	// from the storage failed to transform properly (eg. decryption failure)
+	// b) the data (associated with the resource being deleted) failed to
+	// decode properly (eg. corrupt data)
+	// it will disregard these errors, bypass the finalzer constraints,
+	// deletion hook(s) and go ahead with the deletion flow.
+	// WARNING: This will break the cluster if the resource has dependencies
+	// Use only if you REALLY know what you are doing.
+	// WARNING: Vendor(s) will most likely consider using this option to be
+	// in violation of the support of their product.
+	// The default value is false, and the user must opt in to enable it.
+	// +optional
+	IgnoreStoreReadErrorWithClusterBreakingPotential *bool `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty" protobuf:"varint,6,opt,name=ignoreStoreReadErrorWithClusterBreakingPotential"`
 }
 
 const (
@@ -915,6 +932,22 @@ const (
 	//   "retryAfterSeconds" int32 - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
+
+	// StatusReasonStoreReadError means that the server encountered an error while
+	// retrieving resources from the backend object store.
+	// This may be due to backend database error, or because processing of the read
+	// resource failed.
+	// Details:
+	//   "kind" string - the kind attribute of the resource being acted on.
+	//   "name" string - the prefix where the reading error(s) occurred
+	//   "causes" []StatusCause
+	//      - (optional):
+	//        - "type" CauseType - CauseTypeUnexpectedServerResponse
+	//        - "message" string - the error message from the store backend
+	//        - "field" string - the full path with the key of the resource that failed reading
+	//
+	// Status code 500
+	StatusReasonStoreReadError StatusReason = "StorageReadError"
 
 	// StatusReasonTimeout means that the request could not be completed within the given time.
 	// Clients can get this response only when they specified a timeout param in the request,

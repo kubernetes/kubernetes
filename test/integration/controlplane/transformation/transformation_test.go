@@ -78,24 +78,26 @@ type unSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Con
 
 type transformTest struct {
 	ktesting.TContext
-	storageConfig     *storagebackend.Config
-	configDir         string
-	transformerConfig string
-	kubeAPIServer     kubeapiservertesting.TestServer
-	restClient        *kubernetes.Clientset
-	ns                *corev1.Namespace
-	secret            *corev1.Secret
+	storageConfig           *storagebackend.Config
+	configDir               string
+	transformerConfig       string
+	kubeAPIServer           kubeapiservertesting.TestServer
+	restClient              *kubernetes.Clientset
+	ns                      *corev1.Namespace
+	secret                  *corev1.Secret
+	corruptObjDeleteEnabled bool
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config, corruptObjDeleteEnabled bool) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
 	}
 	e := transformTest{
-		TContext:          tCtx,
-		transformerConfig: transformerConfigYAML,
-		storageConfig:     storageConfig,
+		TContext:                tCtx,
+		transformerConfig:       transformerConfigYAML,
+		storageConfig:           storageConfig,
+		corruptObjDeleteEnabled: corruptObjDeleteEnabled,
 	}
 
 	var err error
@@ -276,14 +278,19 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 }
 
 func (e *transformTest) getEncryptionOptions(reload bool) []string {
+	var options []string
 	if e.transformerConfig != "" {
-		return []string{
+		options = append(options, []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount"}
+			"--disable-admission-plugins", "ServiceAccount"}...)
+	}
+	if e.corruptObjDeleteEnabled {
+		options = append(options, []string{
+			"--authorization-mode=RBAC"}...)
 	}
 
-	return nil
+	return options
 }
 
 func (e *transformTest) createEncryptionConfig() (

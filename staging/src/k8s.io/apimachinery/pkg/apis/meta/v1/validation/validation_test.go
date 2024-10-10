@@ -21,9 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateLabels(t *testing.T) {
@@ -130,6 +134,62 @@ func TestInvalidDryRun(t *testing.T) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestValidateDeleteOptions(t *testing.T) {
+	tests := []struct {
+		name           string
+		opts           metav1.DeleteOptions
+		expectedErrors field.ErrorList
+	}{
+		{
+			name: "ignoreStoreReadErrorWithClusterBreakingPotential is not set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: nil,
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "ignoreStoreReadErrorWithClusterBreakingPotential is set to false",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "ignoreStoreReadErrorWithClusterBreakingPotential and dryRun cannot be both set",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				DryRun: []string{"All"},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), ptr.To[bool](true), "ignoreStoreReadErrorWithClusterBreakingPotential and dryRun cannot be both set"),
+			},
+		},
+		{
+			name: "ignoreStoreReadErrorWithClusterBreakingPotential is set to true, other options are ignored",
+			opts: metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				GracePeriodSeconds: ptr.To[int64](1),
+				Preconditions: &metav1.Preconditions{
+					ResourceVersion: ptr.To[string]("1234"),
+				},
+				PropagationPolicy: ptr.To[metav1.DeletionPropagation](metav1.DeletePropagationBackground),
+			},
+			expectedErrors: field.ErrorList{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errGot := ValidateDeleteOptions(&test.opts)
+			if !cmp.Equal(test.expectedErrors, errGot) {
+				t.Errorf("expected error: %v, diff: %s", test.expectedErrors, cmp.Diff(test.expectedErrors, errGot))
+			}
+		})
+	}
 }
 
 func TestValidPatchOptions(t *testing.T) {

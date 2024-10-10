@@ -139,11 +139,11 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 	}
 	objMeta, err := meta.Accessor(obj)
 	if err != nil {
-		return NewInternalErrorf(
-			"can't enforce preconditions %v on un-introspectable object %v, got error: %v",
-			*p,
-			obj,
-			err)
+		return NewInternalError(
+			fmt.Errorf("can't enforce preconditions %v on un-introspectable object %v, got error: %w",
+				*p,
+				obj,
+				err))
 	}
 	if p.UID != nil && *p.UID != objMeta.GetUID() {
 		err := fmt.Sprintf(
@@ -264,6 +264,18 @@ type Interface interface {
 	RequestWatchProgress(ctx context.Context) error
 }
 
+// Decoder is used by the storage implementation to decode transformed
+// data from the storage into an object
+type Decoder interface {
+	// Decode decodes value of bytes into object. It will also
+	// set the object resource version to rev.
+	// On success, objPtr would be set to the object.
+	Decode(codec runtime.Codec, versioner Versioner, value []byte, objPtr runtime.Object, rev int64) error
+
+	// DecodeListItem decodes bytes value in array into object.
+	DecodeListItem(ctx context.Context, data []byte, rev uint64, codec runtime.Codec, versioner Versioner, newItemFunc func() runtime.Object) (runtime.Object, error)
+}
+
 // GetOptions provides the options that may be provided for storage get operations.
 type GetOptions struct {
 	// IgnoreNotFound determines what is returned if the requested object is not found. If
@@ -313,8 +325,26 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+
+	// AggregateCorruptObjFn, if provided, will be invoked so the error(s)
+	// incurred during the list operation can be aggregated.
+	// The default is nil, and and maintains backward compatibility, which is
+	// the list operation will abort and return the first error it encounters.
+	// - key: identifies the object in the storage
+	// - err: the error that occurred while retrieving the given object
+	// from the storage
+	// - done: if true, the list operation will abort,
+	// otherwise, it will continue
+	AggregateCorruptObjFn func(key string, err error) (done bool)
 }
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
+	// IgnoreStoreReadError, if enabled, will ignore store read error
+	// such as transformation or decode failure and go ahead with the
+	// deletion of the object.
+	// NOTE: for normal deletion flow it should always be false, it may be
+	// enabled by the caller only to facilitate unsafe deletion of corrupt
+	// object which otherwise can not be deleted using the normal flow
+	IgnoreStoreReadError bool
 }

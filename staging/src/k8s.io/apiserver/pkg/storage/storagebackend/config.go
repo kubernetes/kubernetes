@@ -90,6 +90,22 @@ type Config struct {
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+
+	// AllowUnsafeCorruptObjectDeletion, if enabled, will make an attempt to
+	// perform the normal deletion flow, but if either of the below occurs:
+	// a) the data (associated with the resource being deleted) retrieved
+	// from the storage failed to transform properly (eg. decryption failure)
+	// b) the data (associated with the resource being deleted) failed to
+	// decode properly (eg. corrupt data)
+	// it will disregard these errors, bypass the finalzer constraints,
+	// deletion hook(s) and go ahead with the deletion flow.
+	//
+	// WARNING: This will break the cluster if the resource has dependencies
+	// Use only if you REALLY know what you are doing.
+	// WARNING: Vendor(s) will most likely consider using this option to be
+	// in violation of the support of their product.
+	// The default value is false, and the user must opt in to enable it.
+	AllowUnsafeCorruptObjectDeletion bool
 }
 
 // ConfigForResource is a Config specialized to a particular `schema.GroupResource`
