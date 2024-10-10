@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -54,9 +55,10 @@ const (
 	podScopeTopology          = "pod"
 	containerScopeTopology    = "container"
 
-	minNumaNodes     = 2
-	minCoreCount     = 4
-	minSriovResource = 7 // This is the min number of SRIOV VFs needed on the system under test.
+	minNumaNodes                  = 2
+	minNumaNodesPreferClosestNUMA = 4
+	minCoreCount                  = 4
+	minSriovResource              = 7 // This is the min number of SRIOV VFs needed on the system under test.
 )
 
 // Helper for makeTopologyManagerPod().
@@ -97,6 +99,46 @@ func detectThreadPerCore() int {
 	framework.ExpectNoError(err)
 
 	return threadCount
+}
+
+// for now we only look for pairs of nodes with minimum distance, we also assume that distance table is symmetric.
+func getMinRemoteDistanceForNode(nodeToDistances map[int][]int) int {
+	var minDistance int = 99
+	for myID, distances := range nodeToDistances {
+		if len(distances) == 0 {
+			continue
+		}
+		for nodeID, distance := range distances {
+			// it'll always equal 10, which means local access.
+			if myID == nodeID {
+				continue
+			}
+			if distance < minDistance {
+				minDistance = distance
+			}
+		}
+	}
+
+	return minDistance
+}
+
+func detectNUMADistances(numaNodes int) map[int][]int {
+	nodeToDistances := make(map[int][]int)
+	for i := 0; i < numaNodes; i++ {
+		outData, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/node/node%d/distance", i)).Output()
+		framework.ExpectNoError(err)
+
+		nodeToDistances[i] = make([]int, 0, numaNodes)
+
+		for _, distance := range strings.Split(strings.TrimSpace(string(outData)), " ") {
+			distanceValue, err := strconv.Atoi(strings.TrimSpace(distance))
+			framework.ExpectNoError(err)
+
+			nodeToDistances[i] = append(nodeToDistances[i], distanceValue)
+		}
+	}
+
+	return nodeToDistances
 }
 
 func makeContainers(ctnCmd string, ctnAttributes []tmCtnAttribute) (ctns []v1.Container) {
@@ -862,6 +904,68 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 	}
 }
 
+func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
+	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
+
+	podMap := make(map[string]*v1.Pod)
+	for podID := 0; podID < 2; podID++ {
+		numCores := 0
+		for nodeNum := 0 + 2*podID; nodeNum <= 1+2*podID; nodeNum++ {
+			cpus, err := getCPUsPerNUMANode(nodeNum)
+			framework.ExpectNoError(err)
+			// subtract one to accommodate reservedCPUs. It'll only work if more than 2 cpus per NUMA node.
+			cpusPerNUMA := len(cpus)
+			if cpusPerNUMA < 3 {
+				e2eskipper.Skipf("Less than 2 cpus per NUMA node on this system. Skipping test.")
+			}
+			numCores += cpusPerNUMA - 1
+		}
+		coresReq := fmt.Sprintf("%dm", numCores*1000)
+		ctnAttrs := []tmCtnAttribute{
+			{
+				ctnName:    "ps-container-0",
+				cpuRequest: coresReq,
+				cpuLimit:   coresReq,
+			},
+		}
+		podName := fmt.Sprintf("gu-pod-%d", podID)
+		framework.Logf("creating pod %s attrs %v", podName, nil)
+		pod := makeTopologyManagerTestPod(podName, ctnAttrs, nil)
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+		framework.Logf("created pod %s", podName)
+		podMap[podName] = pod
+	}
+
+	for _, pod := range podMap {
+		for _, cnt := range pod.Spec.Containers {
+			ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			framework.Logf("got pod logs: %v", logs)
+			podEnv, err := makeEnvMap(logs)
+			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, &cnt, podEnv, numaNodes)
+			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			numaUsed := sets.New[int]()
+			for _, numa := range CPUToNUMANode {
+				numaUsed.Insert(numa)
+			}
+
+			numaList := numaUsed.UnsortedList()
+			gomega.Expect(numaList).To(gomega.HaveLen(2))
+
+			distance := getMinRemoteDistanceForNode(distances)
+			gomega.Expect(distance).To(gomega.Equal(distances[numaList[0]][numaList[1]]))
+		}
+	}
+
+	deletePodsAsync(ctx, f, podMap)
+}
+
 func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]string) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var err error
@@ -939,6 +1043,39 @@ func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]
 	})
 }
 
+func runPreferClosestNUMATests(f *framework.Framework) {
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var err error
+
+	ginkgo.It("run the Topology Manager prefer-closest-numa policy option test suite", func(ctx context.Context) {
+		numaNodes := detectNUMANodes()
+		if numaNodes < minNumaNodesPreferClosestNUMA {
+			e2eskipper.Skipf("this test is intended to be run on at least 4 NUMA node system")
+		}
+
+		numaDistances := detectNUMADistances(numaNodes)
+
+		oldCfg, err = getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+
+		policy := topologymanager.PolicyBestEffort
+		scope := containerScopeTopology
+		options := map[string]string{topologymanager.PreferClosestNUMANodes: "true"}
+
+		newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, options, &v1.ConfigMap{}, numaNodes)
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		runPreferClosestNUMATestSuite(ctx, f, numaNodes, numaDistances)
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if oldCfg != nil {
+			// restore kubelet config
+			updateKubeletConfig(ctx, f, oldCfg, true)
+		}
+	})
+}
+
 func hostPrecheck() (int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// any SRIOV device. A more proper check will be done in runTopologyManagerPositiveTest
@@ -972,5 +1109,8 @@ var _ = SIGDescribe("Topology Manager", framework.WithSerial(), feature.Topology
 		// most basic verification that the changed setting is not breaking stuff.
 		doubleDefaultMaxAllowableNUMANodes := strconv.Itoa(8 * 2)
 		runTopologyManagerTests(f, map[string]string{topologymanager.MaxAllowableNUMANodes: doubleDefaultMaxAllowableNUMANodes})
+	})
+	ginkgo.Context("With kubeconfig's prefer-closes-numa-nodes topologyOptions enabled run the Topology Manager tests", ginkgo.Label("PreferClosestNUMANodes"), func() {
+		runPreferClosestNUMATests(f)
 	})
 })
