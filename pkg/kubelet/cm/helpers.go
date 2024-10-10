@@ -18,8 +18,9 @@ package cm
 
 import (
 	"context"
+	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -62,12 +63,23 @@ func buildContainerMapAndRunningSetFromRuntime(ctx context.Context, runtimeServi
 	runningSet := sets.New[string]()
 	containerMap := containermap.NewContainerMap()
 	containerList, _ := runtimeService.ListContainers(ctx, nil)
+	sort.SliceStable(containerList, func(i, j int) bool {
+		return containerList[i].CreatedAt < containerList[j].CreatedAt
+	})
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
 			klog.InfoS("No PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
 			continue
 		}
 		podUID := podSandboxMap[c.PodSandboxId]
+		exist, err := containerMap.GetContainerID(podUID, c.Metadata.Name)
+		if err == nil {
+			// ContainerMap key is containerId, value is podUID&containerName.
+			// GetContainerID will iterator key-value pair, compare with value.
+			// We need delete the same value to avoid get unexpected containerID.
+			containerMap.RemoveByContainerID(exist)
+			klog.V(4).InfoS("Remove duplicated entry from containerMap", "podUID", podUID, "containerName", c.Metadata.Name, "containerId", c.Id, "existContainerId", exist)
+		}
 		containerMap.Add(podUID, c.Metadata.Name, c.Id)
 		if c.State == runtimeapi.ContainerState_CONTAINER_RUNNING {
 			klog.V(4).InfoS("Container reported running", "podSandboxId", c.PodSandboxId, "podUID", podUID, "containerName", c.Metadata.Name, "containerId", c.Id)
