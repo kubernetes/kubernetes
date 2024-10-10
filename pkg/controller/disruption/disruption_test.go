@@ -179,6 +179,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 		fakeDiscovery,
 		fakeClock,
 		stalePodDisruptionTimeout,
+		"disruption-controller",
 	)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady

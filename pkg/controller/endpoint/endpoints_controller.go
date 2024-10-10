@@ -71,11 +71,12 @@ const (
 
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration, controllerName string) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	e := &Controller{
+		name:   controllerName,
 		client: client,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
@@ -122,6 +123,7 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 
 // Controller manages selector-based service endpoints.
 type Controller struct {
+	name             string
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -179,10 +181,10 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	defer e.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting endpoint controller")
-	defer logger.Info("Shutting down endpoint controller")
+	logger.Info("Starting", "controller", e.name)
+	defer logger.Info("Shutting down controller", e.name)
 
-	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSync(e.name, ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 

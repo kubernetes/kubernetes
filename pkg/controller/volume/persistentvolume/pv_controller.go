@@ -141,6 +141,7 @@ type CSIMigratedPluginManager interface {
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
+	name               string
 	volumeLister       corelisters.PersistentVolumeLister
 	volumeListerSynced cache.InformerSynced
 	claimLister        corelisters.PersistentVolumeClaimLister

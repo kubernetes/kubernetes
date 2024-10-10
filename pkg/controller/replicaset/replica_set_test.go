@@ -71,6 +71,7 @@ func testNewReplicaSetControllerFromClient(tb testing.TB, client clientset.Inter
 		informers.Core().V1().Pods(),
 		client,
 		burstReplicas,
+		"replicaset-controller",
 	)
 
 	ret.podListerSynced = alwaysReady
@@ -635,6 +636,7 @@ func TestWatchControllers(t *testing.T) {
 		informers.Core().V1().Pods(),
 		client,
 		BurstReplicas,
+		"replicaset-controller",
 	)
 	informers.Start(stopCh)
 	informers.WaitForCacheSync(stopCh)
@@ -1202,6 +1204,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		f.Core().V1().Pods(),
 		client,
 		100,
+		"replicaset-controller",
 	)
 	f.Start(stopCh)
 	f.WaitForCacheSync(stopCh)

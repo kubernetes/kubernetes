@@ -104,7 +104,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	close(alwaysStarted)
 	logger, tCtx := ktesting.NewTestContext(t)
 	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted, "garbage-collector-controller")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted, "garbage-collector-controller")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -909,7 +909,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted, "garbage-collector-controller")
 	if err != nil {
 		t.Fatal(err)
 	}

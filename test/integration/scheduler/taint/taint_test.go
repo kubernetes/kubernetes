@@ -92,6 +92,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
+		"node-lifecycle-controller",
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)

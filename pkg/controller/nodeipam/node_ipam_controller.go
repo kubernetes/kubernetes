@@ -19,6 +19,8 @@ package nodeipam
 import (
 	"context"
 	"fmt"
+	"net"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,7 +32,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"net"
 )
 
 // ipamController is an interface abstracting an interface for
@@ -43,6 +44,7 @@ type ipamController interface {
 type Controller struct {
 	allocatorType ipam.CIDRAllocatorType
 
+	name                 string
 	cloud                cloudprovider.Interface
 	clusterCIDRs         []*net.IPNet
 	serviceCIDR          *net.IPNet
@@ -71,7 +73,8 @@ func NewNodeIpamController(
 	serviceCIDR *net.IPNet,
 	secondaryServiceCIDR *net.IPNet,
 	nodeCIDRMaskSizes []int,
-	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
+	allocatorType ipam.CIDRAllocatorType,
+	controllerName string) (*Controller, error) {
 
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
@@ -92,6 +95,7 @@ func NewNodeIpamController(
 	}
 
 	ic := &Controller{
+		name:                 controllerName,
 		cloud:                cloud,
 		kubeClient:           kubeClient,
 		eventBroadcaster:     record.NewBroadcaster(record.WithContext(ctx)),
@@ -138,10 +142,12 @@ func (nc *Controller) Run(ctx context.Context) {
 	nc.eventBroadcaster.StartStructuredLogging(3)
 	nc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: nc.kubeClient.CoreV1().Events("")})
 	defer nc.eventBroadcaster.Shutdown()
-	klog.FromContext(ctx).Info("Starting ipam controller")
-	defer klog.FromContext(ctx).Info("Shutting down ipam controller")
 
-	if !cache.WaitForNamedCacheSync("node", ctx.Done(), nc.nodeInformerSynced) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting", "controller", nc.name)
+	defer logger.Info("Shutting down controller", "controller", nc.name)
+
+	if !cache.WaitForNamedCacheSync(nc.name, ctx.Done(), nc.nodeInformerSynced) {
 		return
 	}
 

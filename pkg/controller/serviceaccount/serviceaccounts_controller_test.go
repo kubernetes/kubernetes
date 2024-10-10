@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -166,6 +166,7 @@ func TestServiceAccountCreation(t *testing.T) {
 			nsInformer,
 			client,
 			options,
+			"serviceaccount-controller",
 		)
 		if err != nil {
 			t.Fatalf("error creating ServiceAccounts controller: %v", err)

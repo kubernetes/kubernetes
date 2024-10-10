@@ -66,6 +66,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 		informerFactory.Networking().V1beta1().ServiceCIDRs(),
 		informerFactory.Networking().V1beta1().IPAddresses(),
 		client,
+		"service-cidr-controller",
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
@@ -168,6 +169,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		informerFactory.Networking().V1beta1().ServiceCIDRs(),
 		informerFactory.Networking().V1beta1().IPAddresses(),
 		client,
+		"service-cidr-controller",
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())

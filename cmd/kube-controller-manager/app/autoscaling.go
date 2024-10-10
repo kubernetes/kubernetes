@@ -60,10 +60,10 @@ func startHorizontalPodAutoscalerControllerWithRESTClient(ctx context.Context, c
 		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
 		external_metrics.NewForConfigOrDie(clientConfig),
 	)
-	return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient)
+	return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient, controllerName)
 }
 
-func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
+func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient, controllerName string) (controller.Interface, bool, error) {
 
 	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
@@ -90,6 +90,7 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
+		controllerName,
 	).Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
 	return nil, true, nil
 }

@@ -78,6 +78,7 @@ const (
 type updater func(context.Context, *policy.PodDisruptionBudget) error
 
 type DisruptionController struct {
+	name       string
 	kubeClient clientset.Interface
 	mapper     apimeta.RESTMapper
 
@@ -141,6 +142,7 @@ func NewDisruptionController(
 	restMapper apimeta.RESTMapper,
 	scaleNamespacer scaleclient.ScalesGetter,
 	discoveryClient discovery.DiscoveryInterface,
+	controllerName string,
 ) *DisruptionController {
 	return NewDisruptionControllerInternal(
 		ctx,
@@ -155,7 +157,8 @@ func NewDisruptionController(
 		scaleNamespacer,
 		discoveryClient,
 		clock.RealClock{},
-		stalePodDisruptionTimeout)
+		stalePodDisruptionTimeout,
+		controllerName)
 }
 
 // NewDisruptionControllerInternal allows to set a clock and
@@ -174,6 +177,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 	discoveryClient discovery.DiscoveryInterface,
 	clock clock.WithTicker,
 	stalePodDisruptionTimeout time.Duration,
+	controllerName string,
 ) *DisruptionController {
 	logger := klog.FromContext(ctx)
 	dc := &DisruptionController{
@@ -203,7 +207,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		broadcaster:               record.NewBroadcaster(record.WithContext(ctx)),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
+	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -252,6 +256,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 	dc.discoveryClient = discoveryClient
 
 	dc.clock = clock
+	dc.name = controllerName
 
 	return dc
 }
@@ -460,10 +465,10 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	defer dc.recheckQueue.ShutDown()
 	defer dc.stalePodDisruptionQueue.ShutDown()
 
-	logger.Info("Starting disruption controller")
-	defer logger.Info("Shutting down disruption controller")
+	logger.Info("Starting", "controller", dc.name)
+	defer logger.Info("Shutting down controller", "controller", dc.name)
 
-	if !cache.WaitForNamedCacheSync("disruption", ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSync(dc.name, ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 

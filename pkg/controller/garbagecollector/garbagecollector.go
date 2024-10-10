@@ -62,6 +62,7 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
+	name           string
 	restMapper     meta.ResettableRESTMapper
 	metadataClient metadata.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
@@ -88,9 +89,10 @@ func NewGarbageCollector(
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
+	controllerName string,
 ) (*GarbageCollector, error) {
 	graphBuilder := NewDependencyGraphBuilder(ctx, metadataClient, mapper, ignoredResources, sharedInformers, informersStarted)
-	return NewComposedGarbageCollector(ctx, kubeClient, metadataClient, mapper, graphBuilder)
+	return NewComposedGarbageCollector(ctx, kubeClient, metadataClient, mapper, graphBuilder, controllerName)
 }
 
 func NewComposedGarbageCollector(
@@ -99,10 +101,12 @@ func NewComposedGarbageCollector(
 	metadataClient metadata.Interface,
 	mapper meta.ResettableRESTMapper,
 	graphBuilder *GraphBuilder,
+	controllerName string,
 ) (*GarbageCollector, error) {
 	attemptToDelete, attemptToOrphan, absentOwnerCache := graphBuilder.GetGraphResources()
 
 	gc := &GarbageCollector{
+		name:                   controllerName,
 		metadataClient:         metadataClient,
 		restMapper:             mapper,
 		attemptToDelete:        attemptToDelete,
@@ -141,12 +145,12 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 	defer gc.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "controller", "garbagecollector")
-	defer logger.Info("Shutting down controller", "controller", "garbagecollector")
+	logger.Info("Starting controller", "controller", gc.name)
+	defer logger.Info("Shutting down controller", "controller", gc.name)
 
 	go gc.dependencyGraphBuilder.Run(ctx)
 
-	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
+	if !cache.WaitForNamedCacheSync(gc.name, waitForStopOrTimeout(ctx.Done(), initialSyncTimeout), func() bool {
 		return gc.dependencyGraphBuilder.IsSynced(logger)
 	}) {
 		logger.Info("Garbage collector: not all resource monitors could be synced, proceeding anyways")

@@ -82,6 +82,7 @@ var (
 // Controller ensures that all Job objects have corresponding pods to
 // run their configured workload.
 type Controller struct {
+	name       string
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
@@ -162,26 +163,27 @@ type orphanPodKey struct {
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*Controller, error) {
-	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{})
+func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, controllerName string) (*Controller, error) {
+	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{}, controllerName)
 }
 
-func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
+func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker, controllerName string) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 
 	jm := &Controller{
+		name:       controllerName,
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		},
 		expectations:          controller.NewControllerExpectations(),
 		finalizerExpectations: newUIDTrackingExpectations(),
 		queue:                 workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
 		orphanQueue:           workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{Name: "job_orphan_pod", Clock: clock}),
 		broadcaster:           eventBroadcaster,
-		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName}),
 		clock:                 clock,
 		podBackoffStore:       newBackoffStore(),
 	}
@@ -240,10 +242,10 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	defer jm.queue.ShutDown()
 	defer jm.orphanQueue.ShutDown()
 
-	logger.Info("Starting job controller")
-	defer logger.Info("Shutting down job controller")
+	logger.Info("Starting", "controller", jm.name)
+	defer logger.Info("Shutting down controller", "controller", jm.name)
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSync(jm.name, ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 

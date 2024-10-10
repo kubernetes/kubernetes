@@ -43,6 +43,7 @@ func startServiceCIDRsController(ctx context.Context, controllerContext Controll
 		controllerContext.InformerFactory.Networking().V1beta1().ServiceCIDRs(),
 		controllerContext.InformerFactory.Networking().V1beta1().IPAddresses(),
 		controllerContext.ClientBuilder.ClientOrDie("service-cidrs-controller"),
+		controllerName,
 	).Run(ctx, 5)
 	// TODO use component config
 	return nil, true, nil

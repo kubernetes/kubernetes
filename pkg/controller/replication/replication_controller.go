@@ -50,7 +50,7 @@ type ReplicationManager struct {
 }
 
 // NewReplicationManager configures a replication manager with the specified event recorder
-func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int, controllerName string) *ReplicationManager {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	return &ReplicationManager{
@@ -63,6 +63,7 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 				Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"}),
 			}},
 			eventBroadcaster,
+			controllerName,
 		),
 	}
 }

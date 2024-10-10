@@ -72,6 +72,8 @@ type CSINameTranslator interface {
 // Deprecated: This controller is deprecated and for now exists for the sole purpose of adding
 // necessary annotations if necessary, so as volume can be expanded externally in the control-plane
 type expandController struct {
+	// name is the name of the controller
+	name string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -104,9 +106,11 @@ func NewExpandController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
-	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
+	csiMigratedPluginManager csimigration.PluginManager,
+	controllerName string) (ExpandController, error) {
 
 	expc := &expandController{
+		name:       controllerName,
 		kubeClient: kubeClient,
 		pvcLister:  pvcInformer.Lister(),
 		pvcsSynced: pvcInformer.Informer().HasSynced,
@@ -125,7 +129,7 @@ func NewExpandController(
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
+	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	expc.operationGenerator = operationexecutor.NewOperationGenerator(
@@ -326,10 +330,10 @@ func (expc *expandController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting expand controller")
-	defer logger.Info("Shutting down expand controller")
+	logger.Info("Starting", "controller", expc.name)
+	defer logger.Info("Shutting down controller", "controller", expc.name)
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
+	if !cache.WaitForNamedCacheSync(expc.name, ctx.Done(), expc.pvcsSynced) {
 		return
 	}
 

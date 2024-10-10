@@ -102,6 +102,7 @@ func (m *pvcProcessingStore) flushNextPVCsByNamespace() ([]pvcData, string) {
 }
 
 type Controller struct {
+	name   string
 	client clientset.Interface
 
 	pvcLister       corelisters.PersistentVolumeClaimLister
@@ -116,8 +117,9 @@ type Controller struct {
 }
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
+func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, controllerName string) (*Controller, error) {
 	e := &Controller{
+		name:   controllerName,
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
@@ -165,10 +167,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer c.pvcProcessingStore.namespaceQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting PVC protection controller")
-	defer logger.Info("Shutting down PVC protection controller")
+	logger.Info("Starting", "controller", c.name)
+	defer logger.Info("Shutting down controller", "controller", c.name)
 
-	if !cache.WaitForNamedCacheSync("PVC protection", ctx.Done(), c.pvcListerSynced, c.podListerSynced) {
+	if !cache.WaitForNamedCacheSync(c.name, ctx.Done(), c.pvcListerSynced, c.podListerSynced) {
 		return
 	}
 
