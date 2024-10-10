@@ -675,19 +675,20 @@ func IsDeviceMountableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.Vo
 func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, error) {
 	var paths []string
 	var lastErr error
-	err := wait.PollImmediate(10*time.Millisecond, time.Minute, func() (bool, error) {
-		var err error
-		paths, err = mounter.GetMountRefs(mountPath)
-		if io.IsInconsistentReadError(err) {
-			lastErr = err
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			var err error
+			paths, err = mounter.GetMountRefs(mountPath)
+			if io.IsInconsistentReadError(err) {
+				lastErr = err
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+	if wait.Interrupted(err) {
 		return nil, lastErr
 	}
 	return paths, err
