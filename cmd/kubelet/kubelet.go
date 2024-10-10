@@ -28,11 +28,13 @@ import (
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubelet/app"
 )
 
 func main() {
-	command := app.NewKubeletCommand()
+	logger := klog.Background()
+	command := app.NewKubeletCommand(logger)
 	code := cli.Run(command)
 	os.Exit(code)
 }

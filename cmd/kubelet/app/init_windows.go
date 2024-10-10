@@ -73,13 +73,13 @@ func createWindowsJobObject(pc uint32) (windows.Handle, error) {
 	return job, nil
 }
 
-func initForOS(windowsService bool, windowsPriorityClass string) error {
+func initForOS(logger klog.Logger, windowsService bool, windowsPriorityClass string) error {
 	priority := getPriorityValue(windowsPriorityClass)
 	if priority == 0 {
 		return fmt.Errorf("unknown priority class %s, valid ones are available at "+
 			"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities", windowsPriorityClass)
 	}
-	klog.InfoS("Creating a Windows job object and adding kubelet process to it", "windowsPriorityClass", windowsPriorityClass)
+	logger.Info("Creating a Windows job object and adding kubelet process to it", "windowsPriorityClass", windowsPriorityClass)
 	job, err := createWindowsJobObject(priority)
 	if err != nil {
 		return err

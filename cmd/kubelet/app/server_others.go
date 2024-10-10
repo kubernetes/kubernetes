@@ -22,9 +22,11 @@ package app
 import (
 	"fmt"
 	"os"
+
+	"k8s.io/klog/v2"
 )
 
-func checkPermissions() error {
+func checkPermissions(logger klog.Logger) error {
 	if uid := os.Getuid(); uid != 0 {
 		return fmt.Errorf("kubelet needs to run as uid `0`. It is being run as %d", uid)
 	}
