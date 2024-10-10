@@ -2773,6 +2773,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeFailed, "Resize pod %s failed: %v", klog.KObj(pod), err)
 		klog.ErrorS(err, "getNodeAnyway function failed")
 		return false, nil, ""
 	}
@@ -2783,6 +2784,10 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	memRequests := resource.GetResourceRequest(podCopy, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
 		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", podCopy.Name)
+		kl.recorder.Eventf(podCopy, v1.EventTypeWarning, events.ResizeInfeasible,
+			"Resize is not feasible as request exceeds allocatable node resources. Over capacity resources: CPU=%d, Memory=%d",
+			cpuRequests-cpuAvailable, memRequests-memAvailable,
+		)
 		return false, podCopy, v1.PodResizeStatusInfeasible
 	}
 
@@ -2798,6 +2803,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, podCopy); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", podCopy.Name, "reason", failReason, "message", failMessage)
+		kl.recorder.Eventf(podCopy, v1.EventTypeWarning, events.ResizeDeferred, "Resize cannot be accommodated: %s", failReason)
 		return false, podCopy, v1.PodResizeStatusDeferred
 	}
 
@@ -2809,6 +2815,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 			}
 		}
 	}
+	kl.recorder.Eventf(podCopy, v1.EventTypeNormal, events.ResizeInProgress, "Resize is accepted")
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
@@ -2849,6 +2856,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
+			kl.recorder.Eventf(updatedPod, v1.EventTypeWarning, events.ResizeFailed, "Resize pod %s failed: %v", klog.KObj(updatedPod), err)
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(updatedPod))
 			return pod
 		}
@@ -2856,6 +2864,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
 		if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
+			kl.recorder.Eventf(updatedPod, v1.EventTypeWarning, events.ResizeFailed, "Resize pod %s failed: %v", klog.KObj(updatedPod), err)
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
 			return pod
@@ -2864,6 +2873,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	}
 	kl.podManager.UpdatePod(updatedPod)
 	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
+	kl.recorder.Eventf(updatedPod, v1.EventTypeNormal, events.ResizeCompleted, "Pod %v resized", klog.KObj(updatedPod))
 	return updatedPod
 }
 
