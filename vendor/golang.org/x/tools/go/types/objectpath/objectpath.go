@@ -228,7 +228,7 @@ func (enc *Encoder) For(obj types.Object) (Path, error) {
 	//    Reject obviously non-viable cases.
 	switch obj := obj.(type) {
 	case *types.TypeName:
-		if _, ok := aliases.Unalias(obj.Type()).(*types.TypeParam); !ok {
+		if _, ok := types.Unalias(obj.Type()).(*types.TypeParam); !ok {
 			// With the exception of type parameters, only package-level type names
 			// have a path.
 			return "", fmt.Errorf("no path for %v", obj)
@@ -280,7 +280,7 @@ func (enc *Encoder) For(obj types.Object) (Path, error) {
 		path = append(path, opType)
 
 		T := o.Type()
-		if alias, ok := T.(*aliases.Alias); ok {
+		if alias, ok := T.(*types.Alias); ok {
 			if r := findTypeParam(obj, aliases.TypeParams(alias), path, opTypeParam, nil); r != nil {
 				return Path(r), nil
 			}
@@ -320,7 +320,7 @@ func (enc *Encoder) For(obj types.Object) (Path, error) {
 		}
 
 		// Inspect declared methods of defined types.
-		if T, ok := aliases.Unalias(o.Type()).(*types.Named); ok {
+		if T, ok := types.Unalias(o.Type()).(*types.Named); ok {
 			path = append(path, opType)
 			// The method index here is always with respect
 			// to the underlying go/types data structures,
@@ -449,8 +449,8 @@ func (enc *Encoder) concreteMethod(meth *types.Func) (Path, bool) {
 // nil, it will be allocated as necessary.
 func find(obj types.Object, T types.Type, path []byte, seen map[*types.TypeName]bool) []byte {
 	switch T := T.(type) {
-	case *aliases.Alias:
-		return find(obj, aliases.Unalias(T), path, seen)
+	case *types.Alias:
+		return find(obj, types.Unalias(T), path, seen)
 	case *types.Basic, *types.Named:
 		// Named types belonging to pkg were handled already,
 		// so T must belong to another package. No path.
@@ -626,7 +626,7 @@ func Object(pkg *types.Package, p Path) (types.Object, error) {
 
 		// Inv: t != nil, obj == nil
 
-		t = aliases.Unalias(t)
+		t = types.Unalias(t)
 		switch code {
 		case opElem:
 			hasElem, ok := t.(hasElem) // Pointer, Slice, Array, Chan, Map
@@ -664,7 +664,7 @@ func Object(pkg *types.Package, p Path) (types.Object, error) {
 			t = named.Underlying()
 
 		case opRhs:
-			if alias, ok := t.(*aliases.Alias); ok {
+			if alias, ok := t.(*types.Alias); ok {
 				t = aliases.Rhs(alias)
 			} else if false && aliases.Enabled() {
 				// The Enabled check is too expensive, so for now we
