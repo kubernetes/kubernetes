@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -383,6 +384,102 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 			})
 		}
+	})
+
+	ginkgo.Describe("Delete termination message log files when container is removed", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			// this test case needs SSH
+			e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		})
+
+		ginkgo.It("termination message log files should be deleted when container is removed", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+
+			podName := "pod-termination-log-should-be-removed" + string(uuid.NewUUID())
+			containerName := "test-removed"
+			image := imageutils.GetE2EImage(imageutils.BusyBox)
+			podTemplate := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Containers: []v1.Container{
+						{
+							Name:  containerName,
+							Image: image,
+							Command: []string{
+								"/bin/sh", "-c", "exit 1",
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return c.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})
+			})
+
+			ginkgo.By("submitting the pod to kubernetes")
+			commonPod, err := c.CoreV1().Pods(ns).Create(ctx, podTemplate, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, commonPod.Name, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("check the pod's restart count")
+			var createdPod *v1.Pod
+			eachPoll, timeout := 20*time.Second, 10*time.Minute
+			err = wait.PollUntilContextTimeout(ctx, eachPoll, timeout, true, func(ctx context.Context) (bool, error) {
+				createdPod, err = c.CoreV1().Pods(ns).Get(ctx, commonPod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				containerStatus := e2epod.FindContainerStatusInPod(createdPod, containerName)
+				if containerStatus == nil {
+					framework.ExpectNoError(fmt.Errorf("%s container doesn't exist in %s pod", containerName, podName))
+				}
+				// wait for container restarts 5 times
+				// backoff time: 10s, 20s, 40s, 1m20s, 2m40s, 5m
+				if containerStatus != nil && containerStatus.RestartCount >= 5 {
+					framework.Logf("%s container's restart count %d has been greater than 5", containerName, containerStatus.RestartCount)
+					return true, nil
+				}
+				return false, nil // retry
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("check the number of termination message log files")
+			nodeIP, err := getHostExternalAddress(ctx, c, createdPod)
+			framework.ExpectNoError(err)
+
+			terminationLogDir := filepath.Join(framework.TestContext.KubeletRootDir, "pods", string(createdPod.UID), "containers", containerName)
+			cmd := fmt.Sprintf("sudo ls %s | wc -l", terminationLogDir)
+
+			var fileCount int
+			err = wait.PollUntilContextTimeout(ctx, eachPoll, timeout, true, func(ctx context.Context) (bool, error) {
+				result, err := e2essh.NodeExec(ctx, nodeIP, cmd, framework.TestContext.Provider)
+				framework.ExpectNoError(err)
+				e2essh.LogResult(result)
+				ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
+				if !ok { // keep trying
+					return false, nil
+				}
+
+				tidyOut := strings.ReplaceAll(strings.ReplaceAll(result.Stdout, " ", ""), "\n", "")
+				fileCount, err = strconv.Atoi(tidyOut)
+				if err != nil {
+					framework.ExpectNoError(fmt.Errorf("failed to convert string %s to integer, err: %w", result.Stdout, err))
+				}
+				return true, nil
+			})
+			framework.ExpectNoError(err)
+
+			framework.Logf("the number of %s container's termination message log files is %d", containerName, fileCount)
+			// 3: current container used + containersToKeep(default value: 1) container used + to be removed container used(maybe non-existent)
+			if fileCount > 3 {
+				framework.ExpectNoError(fmt.Errorf("kubelet cannot delete termination message log files when container is removed"))
+			}
+		})
 	})
 
 	// Test host cleanup when disrupting the volume environment.
