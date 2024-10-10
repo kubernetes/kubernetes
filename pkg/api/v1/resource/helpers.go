@@ -18,6 +18,7 @@ package resource
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -225,6 +226,13 @@ func maxResourceList(list, newList v1.ResourceList) {
 			list[name] = quantity.DeepCopy()
 		}
 	}
+}
+
+// EqualResourceList compares two ResourceList maps for equality.
+func EqualResourceList(list1, list2 v1.ResourceList) bool {
+	return maps.EqualFunc(list1, list2, func(val1, val2 resource.Quantity) bool {
+		return val1.Equal(val2)
+	})
 }
 
 // max returns the result of max(a, b) for each named resource and is only used if we can't
