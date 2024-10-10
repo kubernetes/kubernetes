@@ -178,7 +178,12 @@ probeLoop:
 		case <-w.stopCh:
 			break probeLoop
 		case <-probeTicker.C:
+			// continue
 		case <-w.manualTriggerCh:
+			// Updating the periodic timer to run the probe again at intervals of probeTickerPeriod
+			// starting from the moment a manual run occurs.
+			probeTicker.Reset(probeTickerPeriod)
+			klog.V(4).InfoS("Triggerd Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
 		}
 	}
