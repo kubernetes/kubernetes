@@ -27,6 +27,7 @@ import (
 // Counter is our internal representation for our wrapping struct around prometheus
 // counters. Counter implements both kubeCollector and CounterMetric.
 type Counter struct {
+	ctx context.Context
 	CounterMetric
 	*CounterOpts
 	lazyMetric
@@ -35,6 +36,9 @@ type Counter struct {
 
 // The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
 var _ Metric = &Counter{}
+
+// All supported exemplar metric types implement the metricWithExemplar interface.
+var _ metricWithExemplar = &Counter{}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -93,9 +97,23 @@ func (c *Counter) initializeDeprecatedMetric() {
 	c.initializeMetric()
 }
 
-// WithContext allows the normal Counter metric to pass in context. The context is no-op now.
+// WithContext allows the normal Counter metric to pass in context.
 func (c *Counter) WithContext(ctx context.Context) CounterMetric {
+	c.ctx = ctx
 	return c.CounterMetric
+}
+
+// withExemplar initializes the exemplarMetric object and sets the exemplar value.
+func (c *Counter) withExemplar(v float64) {
+	(&exemplarMetric{c}).withExemplar(v)
+}
+
+func (c *Counter) Add(v float64) {
+	c.withExemplar(v)
+}
+
+func (c *Counter) Inc() {
+	c.withExemplar(1)
 }
 
 // CounterVec is the internal representation of our wrapping struct around prometheus
