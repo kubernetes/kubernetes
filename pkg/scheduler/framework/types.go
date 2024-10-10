@@ -32,7 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/apimachinery/pkg/api/resource"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -930,40 +930,24 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 }
 
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
-	var non0InitCPU, non0InitMem int64
-	var non0CPU, non0Mem int64
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		ContainerFn: func(requests v1.ResourceList, containerType podutil.ContainerType) {
-			non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&requests)
-			switch containerType {
-			case podutil.Containers:
-				non0CPU += non0CPUReq
-				non0Mem += non0MemReq
-			case podutil.InitContainers:
-				non0InitCPU = max(non0InitCPU, non0CPUReq)
-				non0InitMem = max(non0InitMem, non0MemReq)
-			}
+	})
+
+	non0Requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		NonMissingContainerRequests: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
 		},
 	})
 
-	non0CPU = max(non0CPU, non0InitCPU)
-	non0Mem = max(non0Mem, non0InitMem)
+	non0CPU := non0Requests[v1.ResourceCPU]
+	non0Mem := non0Requests[v1.ResourceMemory]
 
-	// If Overhead is being utilized, add to the non-zero cpu/memory tracking for the pod. It has already been added
-	// into ScalarResources since it is part of requests
-	if pod.Spec.Overhead != nil {
-		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
-			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
-		}
-
-		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
-			non0Mem += pod.Spec.Overhead.Memory().Value()
-		}
-	}
 	var res Resource
 	res.Add(requests)
-	return res, non0CPU, non0Mem
+	return res, non0CPU.MilliValue(), non0Mem.Value()
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.

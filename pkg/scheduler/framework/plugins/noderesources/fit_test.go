@@ -675,19 +675,29 @@ func TestRestartableInitContainers(t *testing.T) {
 			},
 		}
 	}
-	newPodWithRestartableInitContainers := func() *v1.Pod {
+	newPodWithRestartableInitContainers := func(request, sidecarRequest *v1.ResourceList) *v1.Pod {
 		restartPolicyAlways := v1.ContainerRestartPolicyAlways
+
+		container := v1.Container{Name: "regular"}
+		if request != nil {
+			container.Resources = v1.ResourceRequirements{
+				Requests: *request,
+			}
+		}
+
+		sidecarContainer := v1.Container{
+			Name:          "restartable-init",
+			RestartPolicy: &restartPolicyAlways,
+		}
+		if sidecarRequest != nil {
+			sidecarContainer.Resources = v1.ResourceRequirements{
+				Requests: *sidecarRequest,
+			}
+		}
 		return &v1.Pod{
 			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{Name: "regular"},
-				},
-				InitContainers: []v1.Container{
-					{
-						Name:          "restartable-init",
-						RestartPolicy: &restartPolicyAlways,
-					},
-				},
+				Containers:     []v1.Container{container},
+				InitContainers: []v1.Container{sidecarContainer},
 			},
 		}
 	}
@@ -697,6 +707,7 @@ func TestRestartableInitContainers(t *testing.T) {
 		pod                     *v1.Pod
 		enableSidecarContainers bool
 		wantPreFilterStatus     *framework.Status
+		wantFilterStatus        *framework.Status
 	}{
 		{
 			name: "allow pod without restartable init containers if sidecar containers is disabled",
@@ -704,7 +715,7 @@ func TestRestartableInitContainers(t *testing.T) {
 		},
 		{
 			name:                "not allow pod with restartable init containers if sidecar containers is disabled",
-			pod:                 newPodWithRestartableInitContainers(),
+			pod:                 newPodWithRestartableInitContainers(nil, nil),
 			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
 		},
 		{
@@ -715,7 +726,24 @@ func TestRestartableInitContainers(t *testing.T) {
 		{
 			name:                    "allow pod with restartable init containers if sidecar containers is enabled",
 			enableSidecarContainers: true,
-			pod:                     newPodWithRestartableInitContainers(),
+			pod:                     newPodWithRestartableInitContainers(nil, nil),
+		},
+		{
+			name:                    "allow pod if the total requested resources do not exceed the node's allocatable resources",
+			enableSidecarContainers: true,
+			pod: newPodWithRestartableInitContainers(
+				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
+				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
+			),
+		},
+		{
+			name:                    "not allow pod if the total requested resources do exceed the node's allocatable resources",
+			enableSidecarContainers: true,
+			pod: newPodWithRestartableInitContainers(
+				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
+				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(2, resource.DecimalSI)},
+			),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, "Insufficient cpu"),
 		},
 	}
 
@@ -724,7 +752,7 @@ func TestRestartableInitContainers(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(0, 0, 1, 0, 0, 0)}}
+			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(2, 0, 1, 0, 0, 0)}}
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
@@ -735,15 +763,15 @@ func TestRestartableInitContainers(t *testing.T) {
 			cycleState := framework.NewCycleState()
 			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
-				t.Error("status does not match (-expected +actual):\n", diff)
+				t.Error("prefilter status does not match (-expected +actual):\n", diff)
 			}
 			if !preFilterStatus.IsSuccess() {
 				return
 			}
 
 			filterStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, nodeInfo)
-			if !filterStatus.IsSuccess() {
-				t.Error("status does not match (-expected +actual):\n- Success\n +\n", filterStatus.Code())
+			if diff := cmp.Diff(test.wantFilterStatus, filterStatus); diff != "" {
+				t.Error("filter status does not match (-expected +actual):\n", diff)
 			}
 		})
 	}
@@ -931,6 +959,52 @@ func TestFitScore(t *testing.T) {
 				},
 			},
 			runPreScore: false,
+		},
+		{
+			name: "test case for ScoringStrategy MostAllocated with sidecar container",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+					SidecarReq(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 67}, {Name: "node2", Score: 45}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.MostAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: true,
+		},
+		{
+			name: "test case for ScoringStrategy LeastAllocated with sidecar container",
+			requestedPod: st.MakePod().
+				Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000"}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Node("node1").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).
+					SidecarReq(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+				st.MakePod().Node("node2").Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj(),
+			},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 55}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
+			runPreScore: true,
 		},
 	}
 
