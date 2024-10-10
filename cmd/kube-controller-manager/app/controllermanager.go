@@ -22,6 +22,7 @@ package app
 import (
 	"context"
 	"fmt"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"math/rand"
 	"net/http"
 	"os"
@@ -152,7 +153,7 @@ controller, and serviceaccounts controller.`,
 			// add feature enablement metrics
 			fg := s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
-			return Run(context.Background(), c.Complete())
+			return Run(cmd.Context(), c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -163,7 +164,7 @@ controller, and serviceaccounts controller.`,
 			return nil
 		},
 	}
-
+	cmd.SetContext(genericapiserver.SetupSignalContext())
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
