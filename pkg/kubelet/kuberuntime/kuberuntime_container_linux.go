@@ -175,11 +175,6 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
-	}
-
 	if kubelettypes.IsCriticalPod(pod) {
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 		return
