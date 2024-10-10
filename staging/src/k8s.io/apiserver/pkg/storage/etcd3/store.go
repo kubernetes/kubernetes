@@ -179,7 +179,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return storage.NewInternalError(err.Error())
+		return storage.NewInternalError(err)
 	}
 
 	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
@@ -225,7 +225,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(preparedKey))
 	if err != nil {
 		span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
-		return storage.NewInternalError(err.Error())
+		return storage.NewInternalError(err)
 	}
 	span.AddEvent("TransformToStorage succeeded")
 
@@ -508,7 +508,7 @@ func (s *store) GuaranteedUpdate(
 		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
 		if err != nil {
 			span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
-			return storage.NewInternalError(err.Error())
+			return storage.NewInternalError(err)
 		}
 		span.AddEvent("TransformToStorage succeeded")
 
@@ -768,7 +768,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+				return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
 			}
 
 			// Check if the request has already timed out before decode object
@@ -933,7 +933,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 
 		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
 		if err != nil {
-			return nil, storage.NewInternalError(err.Error())
+			return nil, storage.NewInternalError(err)
 		}
 
 		state.data = data
