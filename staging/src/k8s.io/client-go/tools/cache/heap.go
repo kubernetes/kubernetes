@@ -60,7 +60,7 @@ type heapData struct {
 }
 
 var (
-	_ = heap.Interface(&heapData{}) // heapData is a standard heap
+	_ heap.Interface = (*heapData)(nil) // heapData is a standard heap
 )
 
 // Less compares two objects and returns true if the first one should go
