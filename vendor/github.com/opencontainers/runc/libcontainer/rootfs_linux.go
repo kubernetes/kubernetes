@@ -801,54 +801,33 @@ func mknodDevice(dest string, node *devices.Device) error {
 	return os.Chown(dest, int(node.Uid), int(node.Gid))
 }
 
-// Get the parent mount point of directory passed in as argument. Also return
-// optional fields.
-func getParentMount(rootfs string) (string, string, error) {
-	mi, err := mountinfo.GetMounts(mountinfo.ParentsFilter(rootfs))
-	if err != nil {
-		return "", "", err
-	}
-	if len(mi) < 1 {
-		return "", "", fmt.Errorf("could not find parent mount of %s", rootfs)
-	}
-
-	// find the longest mount point
-	var idx, maxlen int
-	for i := range mi {
-		if len(mi[i].Mountpoint) > maxlen {
-			maxlen = len(mi[i].Mountpoint)
-			idx = i
+// rootfsParentMountPrivate ensures rootfs parent mount is private.
+// This is needed for two reasons:
+//   - pivot_root() will fail if parent mount is shared;
+//   - when we bind mount rootfs, if its parent is not private, the new mount
+//     will propagate (leak!) to parent namespace and we don't want that.
+func rootfsParentMountPrivate(path string) error {
+	var err error
+	// Assuming path is absolute and clean (this is checked in
+	// libcontainer/validate). Any error other than EINVAL means we failed,
+	// and EINVAL means this is not a mount point, so traverse up until we
+	// find one.
+	for {
+		err = unix.Mount("", path, "", unix.MS_PRIVATE, "")
+		if err == nil {
+			return nil
 		}
-	}
-	return mi[idx].Mountpoint, mi[idx].Optional, nil
-}
-
-// Make parent mount private if it was shared
-func rootfsParentMountPrivate(rootfs string) error {
-	sharedMount := false
-
-	parentMount, optionalOpts, err := getParentMount(rootfs)
-	if err != nil {
-		return err
-	}
-
-	optsSplit := strings.Split(optionalOpts, " ")
-	for _, opt := range optsSplit {
-		if strings.HasPrefix(opt, "shared:") {
-			sharedMount = true
+		if err != unix.EINVAL || path == "/" { //nolint:errorlint // unix errors are bare
 			break
 		}
+		path = filepath.Dir(path)
 	}
-
-	// Make parent mount PRIVATE if it was shared. It is needed for two
-	// reasons. First of all pivot_root() will fail if parent mount is
-	// shared. Secondly when we bind mount rootfs it will propagate to
-	// parent namespace and we don't want that to happen.
-	if sharedMount {
-		return mount("", parentMount, "", "", unix.MS_PRIVATE, "")
+	return &mountError{
+		op:     "remount-private",
+		target: path,
+		flags:  unix.MS_PRIVATE,
+		err:    err,
 	}
-
-	return nil
 }
 
 func prepareRoot(config *configs.Config) error {
@@ -860,9 +839,6 @@ func prepareRoot(config *configs.Config) error {
 		return err
 	}
 
-	// Make parent mount private to make sure following bind mount does
-	// not propagate in other namespaces. Also it will help with kernel
-	// check pass in pivot_root. (IS_SHARED(new_mnt->mnt_parent))
 	if err := rootfsParentMountPrivate(config.Rootfs); err != nil {
 		return err
 	}
