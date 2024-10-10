@@ -413,7 +413,11 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 
 func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 	pods := params.pods
-	err := wait.PollUntilContextTimeout(params.ctx, params.interval, params.timeout, true, func(ctx context.Context) (done bool, err error) {
+	ctx := params.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	err := wait.PollUntilContextTimeout(ctx, params.interval, params.timeout, true, func(ctx context.Context) (done bool, err error) {
 		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
 			p, err := params.getPodFn(pod.Namespace, pod.Name)
@@ -442,10 +446,7 @@ func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 		pods = pendingPods
 		return len(pods) == 0, nil
 	})
-	if err != nil {
-		return pods, err
-	}
-	return pods, nil
+	return pods, err
 }
 
 // Since Helper does not have a constructor, we can't enforce Helper.Ctx != nil
