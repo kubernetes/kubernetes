@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	ktest "k8s.io/client-go/testing"
 )
@@ -101,7 +100,7 @@ func TestDeletePods(t *testing.T) {
 			timeout:           3 * time.Second,
 			expectPendingPods: true,
 			expectError:       true,
-			expectedError:     &wait.ErrWaitTimeout,
+			expectedError:     &context.DeadlineExceeded,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
@@ -117,7 +116,7 @@ func TestDeletePods(t *testing.T) {
 			ctxTimeoutEarly:   true,
 			expectPendingPods: true,
 			expectError:       true,
-			expectedError:     &wait.ErrWaitTimeout,
+			expectedError:     &context.Canceled,
 			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
