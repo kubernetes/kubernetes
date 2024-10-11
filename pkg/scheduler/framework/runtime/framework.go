@@ -905,7 +905,7 @@ func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.Filter
 
 // RunPostFilterPlugins runs the set of configured PostFilter plugins until the first
 // Success, Error or UnschedulableAndUnresolvable is met; otherwise continues to execute all plugins.
-func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (_ *framework.PostFilterResult, status *framework.Status) {
+func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (result *framework.PostFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -918,7 +918,6 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 	}
 
 	// `result` records the last meaningful(non-noop) PostFilterResult.
-	var result *framework.PostFilterResult
 	var reasons []string
 	var rejectorPlugin string
 	for _, pl := range f.postFilterPlugins {
@@ -927,19 +926,22 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
-		if s.IsSuccess() {
-			return r, s
-		} else if s.Code() == framework.UnschedulableAndUnresolvable {
-			return r, s.WithPlugin(pl.Name())
-		} else if !s.IsRejected() {
-			// Any status other than Success, Unschedulable or UnschedulableAndUnresolvable is Error.
-			return nil, framework.AsStatus(s.AsError()).WithPlugin(pl.Name())
-		} else if r != nil && r.Mode() != framework.ModeNoop {
-			result = r
+		result, status = f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
+		if status.IsSuccess() {
+			return
+		} else if status.Code() == framework.UnschedulableAndUnresolvable {
+			status.WithPlugin(pl.Name())
+			return
+		} else if !status.IsRejected() {
+			// Any status other than Success, Unschedulable, UnschedulableAndUnresolvable or Pending is Error.
+			status = framework.AsStatus(status.AsError()).WithPlugin(pl.Name())
+			return
+		} else if result != nil && result.Mode() != framework.ModeNoop {
+		} else {
+			result = nil
 		}
 
-		reasons = append(reasons, s.Reasons()...)
+		reasons = append(reasons, status.Reasons()...)
 		// Record the first failed plugin unless we proved that
 		// the latter is more relevant.
 		if len(rejectorPlugin) == 0 {
