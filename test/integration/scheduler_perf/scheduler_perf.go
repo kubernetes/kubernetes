@@ -1688,12 +1688,12 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 		nodeStrategy = cno.UniqueNodeLabelStrategy
 	}
 
-	nodeTemplate := framework.StaticNodeTemplate(makeBaseNode(prefix))
+	nodeTemplate := StaticNodeTemplate(makeBaseNode(prefix))
 	if cno.NodeTemplatePath != nil {
 		nodeTemplate = nodeTemplateFromFile(*cno.NodeTemplatePath)
 	}
 
-	return framework.NewIntegrationTestNodePreparer(
+	return NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
 		nodeTemplate,

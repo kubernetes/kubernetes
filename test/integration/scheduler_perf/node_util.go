@@ -14,32 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package benchmark
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
-	retries = 5
+	// createNodeRetries defines number of retries when creating nodes.
+	createNodeRetries = 5
+
+	// pollingInterval defines how often to poll when waiting for nodes to be created.
+	pollingInterval = 2 * time.Second
+
+	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
+	// transient failures from failing tests.
+	singleCallTimeout = 5 * time.Minute
 )
 
 // NodeTemplate is responsible for creating a v1.Node instance that is ready
 // to be sent to the API server.
 type NodeTemplate interface {
 	// GetNodeTemplate returns a node template for one out of many different nodes.
-	// Nodes with numbers in the range [index, index+count-1] will be created
-	// based on what GetNodeTemplate returns. It gets called multiple times
-	// with a fixed index and increasing count parameters. This number can,
-	// but doesn't have to be, used to modify parts of the node spec like
+	// It gets called multiple times with an increasing index and a fixed count parameters.
+	// This number can, but doesn't have to be, used to modify parts of the node spec like
 	// for example a named reference to some other object.
 	GetNodeTemplate(index, count int) (*v1.Node, error)
 }
@@ -87,7 +95,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 		if err != nil {
 			return fmt.Errorf("failed to get node template: %w", err)
 		}
-		for retry := 0; retry < retries; retry++ {
+		for retry := 0; retry < createNodeRetries; retry++ {
 			// Create nodes with the usual kubernetes.io/hostname label.
 			// For that we need to know the name in advance, if we want to
 			// do it in one request.
@@ -111,7 +119,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 		}
 	}
 
-	nodes, err := waitListAllNodes(p.client)
+	nodes, err := waitListAllNodes(ctx, p.client)
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
@@ -130,7 +138,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 func (p *IntegrationTestNodePreparer) CleanupNodes(ctx context.Context) error {
 	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
 	// IntegrationTestNodePreparer to make this more intuitive.
-	nodes, err := waitListAllNodes(p.client)
+	nodes, err := waitListAllNodes(ctx, p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
@@ -142,4 +150,20 @@ func (p *IntegrationTestNodePreparer) CleanupNodes(ctx context.Context) error {
 		}
 	}
 	return errRet
+}
+
+// waitListAllNodes is a wrapper around listing nodes supporting retries.
+func waitListAllNodes(ctx context.Context, c clientset.Interface) (*v1.NodeList, error) {
+	var nodes *v1.NodeList
+	var err error
+	if wait.PollUntilContextTimeout(ctx, pollingInterval, singleCallTimeout, true, func(ctx context.Context) (bool, error) {
+		nodes, err = c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}) != nil {
+		return nodes, err
+	}
+	return nodes, nil
 }
