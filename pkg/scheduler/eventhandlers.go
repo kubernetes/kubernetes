@@ -532,7 +532,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceSlice:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceSlices().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1beta1().ResourceSlices().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceSlice),
 				); err != nil {
 					return err
@@ -541,7 +541,7 @@ func addAllEventHandlers(
 			}
 		case framework.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1beta1().DeviceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.DeviceClass),
 				); err != nil {
 					return err

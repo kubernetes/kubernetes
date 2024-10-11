@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -89,7 +89,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 
 func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
 	var slice draapi.ResourceSlice
-	if err := draapi.Convert_v1alpha3_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
+	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
 		return fmt.Errorf("convert ResourceSlice: %w", err)
 	}
 

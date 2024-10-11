@@ -411,8 +411,8 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 		utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1alpha3().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1alpha3().ResourceClaimTemplates())
+		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaimTemplates())
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start resource claim controller: %v", err)
 	}

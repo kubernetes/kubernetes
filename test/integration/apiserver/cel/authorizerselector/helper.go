@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -163,15 +163,15 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 		{
 			name: "ResourceClaim",
 			createObject: func() error {
-				obj := &resourcev1alpha3.ResourceClaim{
+				obj := &resourceapi.ResourceClaim{
 					ObjectMeta: metav1.ObjectMeta{Name: "test"},
-					Spec: resourcev1alpha3.ResourceClaimSpec{
-						Devices: resourcev1alpha3.DeviceClaim{
-							Requests: []resourcev1alpha3.DeviceRequest{{
+					Spec: resourceapi.ResourceClaimSpec{
+						Devices: resourceapi.DeviceClaim{
+							Requests: []resourceapi.DeviceRequest{{
 								Name:            "req-0",
 								DeviceClassName: "example-class",
-								Selectors: []resourcev1alpha3.DeviceSelector{{
-									CEL: &resourcev1alpha3.CELDeviceSelector{
+								Selectors: []resourceapi.DeviceSelector{{
+									CEL: &resourceapi.CELDeviceSelector{
 										Expression: boolFieldSelectorExpression,
 									},
 								}},
@@ -179,7 +179,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 						},
 					},
 				}
-				_, err := c.ResourceV1alpha3().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
+				_, err := c.ResourceV1beta1().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
 			// authorizer is not available to resource APIs

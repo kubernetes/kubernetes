@@ -31,8 +31,7 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/api/resource"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -82,7 +81,7 @@ type Device struct {
 	// string attribute.
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resource.Quantity
+	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -211,12 +210,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	}
 
 	capacity := make(map[string]any)
-	for name, quantity := range input.Capacity {
+	for name, cap := range input.Capacity {
 		domain, id := parseQualifiedName(name, input.Driver)
 		if capacity[domain] == nil {
 			capacity[domain] = make(map[string]apiservercel.Quantity)
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Quantity}
 	}
 
 	variables := map[string]any{
