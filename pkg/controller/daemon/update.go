@@ -99,6 +99,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 						allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
 					}
 					allowedReplacementPods = append(allowedReplacementPods, oldPod.Name)
+					numUnavailable++
 				case numUnavailable >= maxUnavailable:
 					// no point considering any other candidates
 					continue
