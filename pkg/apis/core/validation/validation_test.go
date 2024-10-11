@@ -5802,14 +5802,14 @@ func TestValidatePorts(t *testing.T) {
 		{Name: "do-re-me", ContainerPort: 84, Protocol: "SCTP"},
 		{ContainerPort: 85, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainerPorts(successCase, field.NewPath("field"), sets.Set[string]{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	nonCanonicalCase := []core.ContainerPort{
 		{ContainerPort: 80, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(nonCanonicalCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainerPorts(nonCanonicalCase, field.NewPath("field"), sets.Set[string]{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -5874,7 +5874,7 @@ func TestValidatePorts(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := validateContainerPorts(v.P, field.NewPath("field"))
+		errs := validateContainerPorts(v.P, field.NewPath("field"), sets.Set[string]{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -7875,17 +7875,17 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	} {
 		var PodRestartPolicy core.RestartPolicy
 		PodRestartPolicy = "Never"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "Always"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "OnFailure"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -8210,19 +8210,19 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 
 			PodRestartPolicy = "Never"
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "Always"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "OnFailure"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8522,7 +8522,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8576,6 +8576,16 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[1].ports[0].hostPort"}},
+	}, {
+		title: "containers name port not unique",
+		line:  line(),
+		containers: []core.Container{
+			{Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, Protocol: "TCP", Name: "a"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, Protocol: "TCP", Name: "a"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		},
+		expectedErrors: field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[1].ports[0].name"}},
 	}, {
 		"invalid env var name",
 		line(),
@@ -9136,7 +9146,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9225,7 +9235,7 @@ func TestValidateInitContainers(t *testing.T) {
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9604,7 +9614,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace, sets.Set[string]{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -10240,6 +10250,16 @@ func TestValidatePodSpec(t *testing.T) {
 				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 			))),
 		),
+		"disallowed same port name between init containers": *podtest.MakePod("",
+			podtest.SetInitContainers(podtest.MakeContainer("initctr1", podtest.SetContainerPorts(
+				core.ContainerPort{Name: "port1", ContainerPort: 2600, Protocol: "TCP"})),
+				podtest.MakeContainer("initctr2", podtest.SetContainerPorts(
+					core.ContainerPort{Name: "port1", ContainerPort: 2601, Protocol: "TCP"})))),
+		"disallowed same port name between init and app containers": *podtest.MakePod("",
+			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerPorts(
+				core.ContainerPort{Name: "port1", ContainerPort: 2600, Protocol: "TCP"}))),
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerPorts(
+				core.ContainerPort{Name: "port1", ContainerPort: 2601, Protocol: "TCP"})))),
 	}
 	for k, v := range failureCases {
 		opts := PodValidationOptions{
