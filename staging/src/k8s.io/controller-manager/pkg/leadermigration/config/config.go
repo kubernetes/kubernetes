@@ -25,7 +25,7 @@ import (
 	util "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	internal "k8s.io/controller-manager/config"
-	"k8s.io/controller-manager/config/v1"
+	v1 "k8s.io/controller-manager/config/v1"
 	"k8s.io/controller-manager/config/v1alpha1"
 	"k8s.io/controller-manager/config/v1beta1"
 )
@@ -63,7 +63,7 @@ func ReadLeaderMigrationConfiguration(configFilePath string) (*internal.LeaderMi
 	if err != nil {
 		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %w", configFilePath, err)
 	}
-	config, gvk, err := serializer.NewCodecFactory(cfgScheme).UniversalDecoder().Decode(data, nil, nil)
+	config, gvk, err := serializer.NewCodecFactory(cfgScheme, serializer.EnableStrict).UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
