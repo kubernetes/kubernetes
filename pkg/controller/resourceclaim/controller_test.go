@@ -39,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/utils/pointer"
 )
 
 var (
@@ -78,25 +77,6 @@ var (
 		})
 		return pod
 	}()
-
-	podSchedulingContext = resourceapi.PodSchedulingContext{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testPodName,
-			Namespace: testNamespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					Name:       testPodName,
-					UID:        testPodUID,
-					Controller: pointer.Bool(true),
-				},
-			},
-		},
-		Spec: resourceapi.PodSchedulingContextSpec{
-			SelectedNode: nodeName,
-		},
-	}
 )
 
 func init() {
@@ -105,18 +85,17 @@ func init() {
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name                          string
-		key                           string
-		claims                        []*resourceapi.ResourceClaim
-		claimsInCache                 []*resourceapi.ResourceClaim
-		pods                          []*v1.Pod
-		podsLater                     []*v1.Pod
-		templates                     []*resourceapi.ResourceClaimTemplate
-		expectedClaims                []resourceapi.ResourceClaim
-		expectedPodSchedulingContexts []resourceapi.PodSchedulingContext
-		expectedStatuses              map[string][]v1.PodResourceClaimStatus
-		expectedError                 bool
-		expectedMetrics               expectedMetrics
+		name             string
+		key              string
+		claims           []*resourceapi.ResourceClaim
+		claimsInCache    []*resourceapi.ResourceClaim
+		pods             []*v1.Pod
+		podsLater        []*v1.Pod
+		templates        []*resourceapi.ResourceClaimTemplate
+		expectedClaims   []resourceapi.ResourceClaim
+		expectedStatuses map[string][]v1.PodResourceClaimStatus
+		expectedError    bool
+		expectedMetrics  expectedMetrics
 	}{
 		{
 			name:           "create",
@@ -268,18 +247,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:   "clear-reserved",
-			pods:   []*v1.Pod{},
-			key:    claimKey(testClaimReserved),
-			claims: []*resourceapi.ResourceClaim{testClaimReserved},
-			expectedClaims: func() []resourceapi.ResourceClaim {
-				claim := testClaimAllocated.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return []resourceapi.ResourceClaim{*claim}
-			}(),
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
 			name:   "clear-reserved-structured",
 			pods:   []*v1.Pod{},
 			key:    claimKey(testClaimReserved),
@@ -356,7 +323,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: func() []resourceapi.ResourceClaim {
 				claims := []resourceapi.ResourceClaim{*testClaimAllocated.DeepCopy()}
 				claims[0].OwnerReferences = nil
-				claims[0].Status.DeallocationRequested = true
 				return claims
 			}(),
 			expectedMetrics: expectedMetrics{0, 0},
@@ -380,21 +346,6 @@ func TestSyncHandler(t *testing.T) {
 			claims:          []*resourceapi.ResourceClaim{testClaimReserved},
 			expectedClaims:  nil,
 			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
-			name:           "trigger-allocation",
-			pods:           []*v1.Pod{testPodWithNodeName},
-			key:            podKey(testPodWithNodeName),
-			templates:      []*resourceapi.ResourceClaimTemplate{template},
-			claims:         []*resourceapi.ResourceClaim{generatedTestClaim},
-			expectedClaims: []resourceapi.ResourceClaim{*generatedTestClaim},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithNodeName.Name: {
-					{Name: testPodWithNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
-				},
-			},
-			expectedPodSchedulingContexts: []resourceapi.PodSchedulingContext{podSchedulingContext},
-			expectedMetrics:               expectedMetrics{0, 0},
 		},
 		{
 			name:           "add-reserved",
@@ -438,11 +389,10 @@ func TestSyncHandler(t *testing.T) {
 			setupMetrics()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 
-			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, podSchedulingInformer, claimInformer, templateInformer)
+			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -499,12 +449,6 @@ func TestSyncHandler(t *testing.T) {
 				actualStatuses[pod.Name] = pod.Status.ResourceClaimStatuses
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
-
-			scheduling, err := fakeKubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
-			if err != nil {
-				t.Fatalf("unexpected error while listing claims: %v", err)
-			}
-			assert.Equal(t, normalizeScheduling(tc.expectedPodSchedulingContexts), normalizeScheduling(scheduling.Items))
 
 			expectMetrics(t, tc.expectedMetrics)
 		})
@@ -625,14 +569,6 @@ func normalizeClaims(claims []resourceapi.ResourceClaim) []resourceapi.ResourceC
 		}
 	}
 	return claims
-}
-
-func normalizeScheduling(scheduling []resourceapi.PodSchedulingContext) []resourceapi.PodSchedulingContext {
-	sort.Slice(scheduling, func(i, j int) bool {
-		return scheduling[i].Namespace < scheduling[j].Namespace ||
-			scheduling[i].Name < scheduling[j].Name
-	})
-	return scheduling
 }
 
 func createTestClient(objects ...runtime.Object) *fake.Clientset {

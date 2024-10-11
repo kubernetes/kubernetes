@@ -525,15 +525,6 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case framework.PodSchedulingContext:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				handlerRegistration = resourceClaimCache.AddEventHandler(

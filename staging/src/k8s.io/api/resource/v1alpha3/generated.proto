@@ -42,22 +42,6 @@ message AllocationResult {
   //
   // +optional
   optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 3;
-
-  // Controller is the name of the DRA driver which handled the
-  // allocation. That driver is also responsible for deallocating the
-  // claim. It is empty when the claim can be deallocated without
-  // involving a driver.
-  //
-  // A driver may allocate devices provided by other drivers, so this
-  // driver name here can be different from the driver names listed for
-  // the results.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional string controller = 4;
 }
 
 // BasicDevice defines one device instance.
@@ -309,22 +293,6 @@ message DeviceClassSpec {
   // +optional
   // +listType=atomic
   repeated DeviceClassConfiguration config = 2;
-
-  // Only nodes matching the selector will be considered by the scheduler
-  // when trying to find a Node that fits a Pod when that Pod uses
-  // a claim that has not been allocated yet *and* that claim
-  // gets allocated through a control plane controller. It is ignored
-  // when the claim does not use a control plane controller
-  // for allocation.
-  //
-  // Setting this field is optional. If unset, all Nodes are candidates.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional .k8s.io.api.core.v1.NodeSelector suitableNodes = 3;
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -516,69 +484,6 @@ message OpaqueDeviceConfiguration {
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
 }
 
-// PodSchedulingContext objects hold information that is needed to schedule
-// a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
-// mode.
-//
-// This is an alpha type and requires enabling the DRAControlPlaneController
-// feature gate.
-message PodSchedulingContext {
-  // Standard object metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Spec describes where resources for the Pod are needed.
-  optional PodSchedulingContextSpec spec = 2;
-
-  // Status describes where resources for the Pod can be allocated.
-  //
-  // +optional
-  optional PodSchedulingContextStatus status = 3;
-}
-
-// PodSchedulingContextList is a collection of Pod scheduling objects.
-message PodSchedulingContextList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of PodSchedulingContext objects.
-  repeated PodSchedulingContext items = 2;
-}
-
-// PodSchedulingContextSpec describes where resources for the Pod are needed.
-message PodSchedulingContextSpec {
-  // SelectedNode is the node for which allocation of ResourceClaims that
-  // are referenced by the Pod and that use "WaitForFirstConsumer"
-  // allocation is to be attempted.
-  //
-  // +optional
-  optional string selectedNode = 1;
-
-  // PotentialNodes lists nodes where the Pod might be able to run.
-  //
-  // The size of this field is limited to 128. This is large enough for
-  // many clusters. Larger clusters may need more attempts to find a node
-  // that suits all pending resources. This may get increased in the
-  // future, but not reduced.
-  //
-  // +optional
-  // +listType=atomic
-  repeated string potentialNodes = 2;
-}
-
-// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
-message PodSchedulingContextStatus {
-  // ResourceClaims describes resource availability for each
-  // pod.spec.resourceClaim entry where the corresponding ResourceClaim
-  // uses "WaitForFirstConsumer" allocation mode.
-  //
-  // +listType=map
-  // +listMapKey=name
-  // +optional
-  repeated ResourceClaimSchedulingStatus resourceClaims = 1;
-}
-
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
 // with specific properties, this is how that request is expressed. The status
@@ -634,46 +539,12 @@ message ResourceClaimList {
   repeated ResourceClaim items = 2;
 }
 
-// ResourceClaimSchedulingStatus contains information about one particular
-// ResourceClaim with "WaitForFirstConsumer" allocation mode.
-message ResourceClaimSchedulingStatus {
-  // Name matches the pod.spec.resourceClaims[*].Name field.
-  //
-  // +required
-  optional string name = 1;
-
-  // UnsuitableNodes lists nodes that the ResourceClaim cannot be
-  // allocated for.
-  //
-  // The size of this field is limited to 128, the same as for
-  // PodSchedulingSpec.PotentialNodes. This may get increased in the
-  // future, but not reduced.
-  //
-  // +optional
-  // +listType=atomic
-  repeated string unsuitableNodes = 2;
-}
-
 // ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.
 message ResourceClaimSpec {
   // Devices defines how to request devices.
   //
   // +optional
   optional DeviceClaim devices = 1;
-
-  // Controller is the name of the DRA driver that is meant
-  // to handle allocation of this claim. If empty, allocation is handled
-  // by the scheduler while scheduling a pod.
-  //
-  // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional string controller = 2;
 }
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
@@ -710,20 +581,6 @@ message ResourceClaimStatus {
   // +patchStrategy=merge
   // +patchMergeKey=uid
   repeated ResourceClaimConsumerReference reservedFor = 2;
-
-  // Indicates that a claim is to be deallocated. While this is set,
-  // no new consumers may be added to ReservedFor.
-  //
-  // This is only used if the claim needs to be deallocated by a DRA driver.
-  // That driver then must deallocate this claim and reset the field
-  // together with clearing the Allocation field.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional bool deallocationRequested = 3;
 }
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.

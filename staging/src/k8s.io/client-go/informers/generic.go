@@ -374,8 +374,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithResource("deviceclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().DeviceClasses().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("podschedulingcontexts"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().PodSchedulingContexts().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaims"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaims().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaimtemplates"):

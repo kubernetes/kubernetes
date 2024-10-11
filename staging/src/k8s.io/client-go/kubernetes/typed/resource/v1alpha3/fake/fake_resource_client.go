@@ -32,10 +32,6 @@ func (c *FakeResourceV1alpha3) DeviceClasses() v1alpha3.DeviceClassInterface {
 	return &FakeDeviceClasses{c}
 }
 
-func (c *FakeResourceV1alpha3) PodSchedulingContexts(namespace string) v1alpha3.PodSchedulingContextInterface {
-	return &FakePodSchedulingContexts{c, namespace}
-}
-
 func (c *FakeResourceV1alpha3) ResourceClaims(namespace string) v1alpha3.ResourceClaimInterface {
 	return &FakeResourceClaims{c, namespace}
 }

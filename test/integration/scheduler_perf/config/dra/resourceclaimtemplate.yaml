@@ -4,7 +4,6 @@ metadata:
   name: test-claim-template
 spec:
   spec:
-    controller: test-driver.cdi.k8s.io
     devices:
       requests:
       - name: req-0

@@ -130,10 +130,9 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	schedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), clientSet, podInformer, schedulingInformer, claimInformer, claimTemplateInformer)
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), clientSet, podInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}

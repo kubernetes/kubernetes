@@ -23,52 +23,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var obj = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
 		Namespace: "default",
-	},
-}
-
-var objWithStatus = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Status: resource.ResourceClaimStatus{
-		Allocation: &resource.AllocationResult{},
-	},
-}
-
-var objWithGatedFields = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Spec: resource.ResourceClaimSpec{
-		Controller: "dra.example.com",
-	},
-}
-
-var objWithGatedStatusFields = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Spec: resource.ResourceClaimSpec{
-		Controller: "dra.example.com",
-	},
-	Status: resource.ResourceClaimStatus{
-		Allocation: &resource.AllocationResult{
-			Controller: "dra.example.com",
-		},
-		DeallocationRequested: true,
 	},
 }
 
@@ -85,10 +46,9 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		obj                    *resource.ResourceClaim
-		controlPlaneController bool
-		expectValidationError  bool
-		expectObj              *resource.ResourceClaim
+		obj                   *resource.ResourceClaim
+		expectValidationError bool
+		expectObj             *resource.ResourceClaim
 	}{
 		"simple": {
 			obj:       obj,
@@ -102,22 +62,10 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
-		"drop-fields": {
-			obj:                    objWithGatedFields,
-			controlPlaneController: false,
-			expectObj:              obj,
-		},
-		"keep-fields": {
-			obj:                    objWithGatedFields,
-			controlPlaneController: true,
-			expectObj:              objWithGatedFields,
-		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tc.controlPlaneController)
-
 			obj := tc.obj.DeepCopy()
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
@@ -141,11 +89,10 @@ func TestStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                 *resource.ResourceClaim
-		newObj                 *resource.ResourceClaim
-		controlPlaneController bool
-		expectValidationError  bool
-		expectObj              *resource.ResourceClaim
+		oldObj                *resource.ResourceClaim
+		newObj                *resource.ResourceClaim
+		expectValidationError bool
+		expectObj             *resource.ResourceClaim
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -161,29 +108,10 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
-		"drop-fields": {
-			oldObj:                 obj,
-			newObj:                 objWithGatedFields,
-			controlPlaneController: false,
-			expectObj:              obj,
-		},
-		"keep-fields": {
-			oldObj:                 obj,
-			newObj:                 objWithGatedFields,
-			controlPlaneController: true,
-			expectValidationError:  true, // Spec is immutable.
-		},
-		"keep-existing-fields": {
-			oldObj:                 objWithGatedFields,
-			newObj:                 objWithGatedFields,
-			controlPlaneController: false,
-			expectObj:              objWithGatedFields,
-		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tc.controlPlaneController)
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
@@ -213,11 +141,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                 *resource.ResourceClaim
-		newObj                 *resource.ResourceClaim
-		controlPlaneController bool
-		expectValidationError  bool
-		expectObj              *resource.ResourceClaim
+		oldObj                *resource.ResourceClaim
+		newObj                *resource.ResourceClaim
+		expectValidationError bool
+		expectObj             *resource.ResourceClaim
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -245,51 +172,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			}(),
 			expectObj: obj,
 		},
-		"drop-fields": {
-			oldObj:                 obj,
-			newObj:                 objWithGatedStatusFields,
-			controlPlaneController: false,
-			expectObj:              objWithStatus,
-		},
-		"keep-fields": {
-			oldObj:                 obj,
-			newObj:                 objWithGatedStatusFields,
-			controlPlaneController: true,
-			expectObj: func() *resource.ResourceClaim {
-				expectObj := objWithGatedStatusFields.DeepCopy()
-				// Spec remains unchanged.
-				expectObj.Spec = obj.Spec
-				return expectObj
-			}(),
-		},
-		"keep-fields-because-of-spec": {
-			oldObj:                 objWithGatedFields,
-			newObj:                 objWithGatedStatusFields,
-			controlPlaneController: false,
-			expectObj:              objWithGatedStatusFields,
-		},
-		// Normally a claim without a controller in the spec shouldn't
-		// have one in the status either, but it's not invalid and thus
-		// let's test this.
-		"keep-fields-because-of-status": {
-			oldObj: func() *resource.ResourceClaim {
-				oldObj := objWithGatedStatusFields.DeepCopy()
-				oldObj.Spec.Controller = ""
-				return oldObj
-			}(),
-			newObj:                 objWithGatedStatusFields,
-			controlPlaneController: false,
-			expectObj: func() *resource.ResourceClaim {
-				oldObj := objWithGatedStatusFields.DeepCopy()
-				oldObj.Spec.Controller = ""
-				return oldObj
-			}(),
-		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tc.controlPlaneController)
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"

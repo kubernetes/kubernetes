@@ -195,14 +195,6 @@ const (
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
 	// owner: @pohly
-	// kep: http://kep.k8s.io/3063
-	//
-	// Enables support for resources with custom parameters and a lifecycle
-	// that is independent of a Pod. Resource allocation is done by a DRA driver's
-	// "control plane controller" in cooperation with the scheduler.
-	DRAControlPlaneController featuregate.Feature = "DRAControlPlaneController"
-
-	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
 	// Enables support for resources with custom parameters and a lifecycle

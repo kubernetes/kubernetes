@@ -91,9 +91,6 @@ func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.Resourc
 func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateDeviceClaim(&spec.Devices, fldPath.Child("devices"), stored)...)
-	if spec.Controller != "" {
-		allErrs = append(allErrs, validateDriverName(spec.Controller, fldPath.Child("controller"))...)
-	}
 	return allErrs
 }
 
@@ -268,7 +265,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		} else {
 			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
 			// but not added.
-			if claimDeleted || status.DeallocationRequested {
+			if claimDeleted {
 				oldSet := sets.New(oldStatus.ReservedFor...)
 				newSet := sets.New(status.ReservedFor...)
 				newItems := newSet.Difference(oldSet)
@@ -282,30 +279,6 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	// Updates to a populated status.Allocation are not allowed
 	if oldStatus.Allocation != nil && status.Allocation != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
-	}
-
-	if !oldStatus.DeallocationRequested &&
-		status.DeallocationRequested &&
-		len(status.ReservedFor) > 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set"))
-	}
-
-	if status.Allocation == nil &&
-		status.DeallocationRequested {
-		// Either one or the other field was modified incorrectly.
-		// For the sake of simplicity this only reports the invalid
-		// end result.
-		allErrs = append(allErrs, field.Forbidden(fldPath, "`allocation` must be set when `deallocationRequested` is set"))
-	}
-
-	// Once deallocation has been requested, that request cannot be removed
-	// anymore because the deallocation may already have started. The field
-	// can only get reset by the driver together with removing the
-	// allocation.
-	if oldStatus.DeallocationRequested &&
-		!status.DeallocationRequested &&
-		status.Allocation != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may not be cleared when `allocation` is set"))
 	}
 
 	return allErrs
@@ -334,9 +307,6 @@ func validateAllocationResult(allocation *resource.AllocationResult, fldPath *fi
 	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames)...)
 	if allocation.NodeSelector != nil {
 		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, fldPath.Child("nodeSelector"))...)
-	}
-	if allocation.Controller != "" {
-		allErrs = append(allErrs, validateDriverName(allocation.Controller, fldPath.Child("controller"))...)
 	}
 	return allErrs
 }
@@ -416,63 +386,11 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 		},
 		fldPath.Child("selectors"))...)
 	allErrs = append(allErrs, validateSlice(spec.Config, resource.DeviceConfigMaxSize, validateDeviceClassConfiguration, fldPath.Child("config"))...)
-	if spec.SuitableNodes != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.SuitableNodes, field.NewPath("suitableNodes"))...)
-	}
 	return allErrs
 }
 
 func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
 	return validateDeviceConfiguration(config.DeviceConfiguration, fldPath)
-}
-
-// ValidatePodSchedulingContext validates a PodSchedulingContext.
-func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&schedulingCtx.ObjectMeta, true, corevalidation.ValidatePodName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingSpec(&schedulingCtx.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, stringKey, fldPath.Child("potentialNodes"))
-	return allErrs
-}
-
-// ValidatePodSchedulingContextUpdate tests if an update to PodSchedulingContext is valid.
-func ValidatePodSchedulingContextUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodSchedulingContexts(schedulingCtx)...)
-	return allErrs
-}
-
-// ValidatePodSchedulingContextStatusUpdate tests if an update to the status of a PodSchedulingContext is valid.
-func ValidatePodSchedulingContextStatusUpdate(schedulingCtx, oldSchedulingCtx *resource.PodSchedulingContext) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMetaUpdate(&schedulingCtx.ObjectMeta, &oldSchedulingCtx.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodSchedulingStatus(&schedulingCtx.Status, field.NewPath("status"))...)
-	return allErrs
-}
-
-func validatePodSchedulingStatus(status *resource.PodSchedulingContextStatus, fldPath *field.Path) field.ErrorList {
-	return validatePodSchedulingClaims(status.ResourceClaims, fldPath.Child("claims"))
-}
-
-func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	names := sets.NewString()
-	for i, claimStatus := range claimStatuses {
-		allErrs = append(allErrs, validatePodSchedulingClaim(claimStatus, fldPath.Index(i))...)
-		if names.Has(claimStatus.Name) {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), claimStatus.Name))
-		} else {
-			names.Insert(claimStatus.Name)
-		}
-	}
-	return allErrs
-}
-
-func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, stringKey, fldPath.Child("unsuitableNodes"))
-	return allErrs
 }
 
 // ValidateResourceClaimTemplate validates a ResourceClaimTemplate.

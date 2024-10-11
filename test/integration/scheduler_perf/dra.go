@@ -17,7 +17,6 @@ limitations under the License.
 package benchmark
 
 import (
-	"context"
 	"fmt"
 	"math/rand/v2"
 	"path/filepath"
@@ -34,9 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -134,11 +131,6 @@ type createResourceDriverOp struct {
 	MaxClaimsPerNodeParam string
 	// Nodes matching this glob pattern have resources managed by the driver.
 	Nodes string
-	// StructuredParameters is true if the controller that is built into the scheduler
-	// is used and the control-plane controller is not needed.
-	// Because we don't run the kubelet plugin, ResourceSlices must
-	// get created for all nodes.
-	StructuredParameters bool
 }
 
 var _ realOp = &createResourceDriverOp{}
@@ -176,13 +168,7 @@ func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
 func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
-	// Start the controller side of the DRA test driver such that it simulates
-	// per-node resources.
-	resources := draapp.Resources{
-		DriverName:     op.DriverName,
-		NodeLocal:      true,
-		MaxAllocations: op.MaxClaimsPerNode,
-	}
+	var driverNodes []string
 
 	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 	if err != nil {
@@ -194,42 +180,21 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 			tCtx.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
 		}
 		if match {
-			resources.Nodes = append(resources.Nodes, node.Name)
+			driverNodes = append(driverNodes, node.Name)
 		}
 	}
 
-	if op.StructuredParameters {
-		for _, nodeName := range resources.Nodes {
-			slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-			_, err := tCtx.Client().ResourceV1alpha3().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-			tCtx.ExpectNoError(err, "create node resource slice")
-		}
-		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-			err := tCtx.Client().ResourceV1alpha3().ResourceSlices().DeleteCollection(tCtx,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
-			)
-			tCtx.ExpectNoError(err, "delete node resource slices")
-		})
-		// No need for the controller.
-		return
+	for _, nodeName := range driverNodes {
+		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
+		_, err := tCtx.Client().ResourceV1alpha3().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create node resource slice")
 	}
-
-	controller := draapp.NewController(tCtx.Client(), resources)
-	ctx, cancel := context.WithCancel(tCtx)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), op.DriverName))
-		controller.Run(ctx, 5 /* workers */)
-	}()
-	tCtx.Cleanup(func() {
-		tCtx.Logf("stopping resource driver %q", op.DriverName)
-		// We must cancel before waiting.
-		cancel()
-		wg.Wait()
-		tCtx.Logf("stopped resource driver %q", op.DriverName)
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		err := tCtx.Client().ResourceV1alpha3().ResourceSlices().DeleteCollection(tCtx,
+			metav1.DeleteOptions{},
+			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
+		)
+		tCtx.ExpectNoError(err, "delete node resource slices")
 	})
 }
 
