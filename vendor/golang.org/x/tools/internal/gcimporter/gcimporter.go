@@ -232,14 +232,19 @@ func Import(packages map[string]*types.Package, path, srcDir string, lookup func
 		// Select appropriate importer.
 		if len(data) > 0 {
 			switch data[0] {
-			case 'v', 'c', 'd': // binary, till go1.10
+			case 'v', 'c', 'd':
+				// binary: emitted by cmd/compile till go1.10; obsolete.
 				return nil, fmt.Errorf("binary (%c) import format is no longer supported", data[0])
 
-			case 'i': // indexed, till go1.19
+			case 'i':
+				// indexed: emitted by cmd/compile till go1.19;
+				// now used only for serializing go/types.
+				// See https://github.com/golang/go/issues/69491.
 				_, pkg, err := IImportData(fset, packages, data[1:], id)
 				return pkg, err
 
-			case 'u': // unified, from go1.20
+			case 'u':
+				// unified: emitted by cmd/compile since go1.20.
 				_, pkg, err := UImportData(fset, packages, data[1:size], id)
 				return pkg, err
 
