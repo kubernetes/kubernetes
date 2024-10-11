@@ -27,7 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -365,7 +365,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 			}
 

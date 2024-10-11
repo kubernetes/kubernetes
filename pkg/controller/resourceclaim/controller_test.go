@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -390,8 +390,8 @@ func TestSyncHandler(t *testing.T) {
 			setupMetrics()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
-			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
+			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 
 			ec, err := NewController(klog.FromContext(ctx), tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
@@ -429,7 +429,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected success")
 			}
 
-			claims, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := fakeKubeClient.ResourceV1beta1().ResourceClaims("").List(ctx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
