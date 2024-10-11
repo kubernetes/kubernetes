@@ -183,7 +183,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	ExecProbeTimeout: {
-		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
+		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.34
 	},
 
 	genericfeatures.AdmissionWebhookMatchConditions: {

@@ -400,6 +400,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.20"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.32"
 - name: GracefulNodeShutdown
   versionedSpecs:
   - default: false

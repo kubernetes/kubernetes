@@ -263,7 +263,7 @@ const (
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
 	// may depend on old behavior where exec probe timeouts were ignored.
-	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
+	// Locked to default, will remove after v1.34
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
 	// owner: @bobbypage
