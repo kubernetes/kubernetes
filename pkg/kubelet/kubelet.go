@@ -118,6 +118,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -957,6 +958,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
+	klet.healthChecker, err = watchdog.NewHealthChecker(klet)
+	if err != nil {
+		return nil, fmt.Errorf("create health checker: %w", err)
+	}
+
 	return klet, nil
 }
 
@@ -1344,6 +1350,9 @@ type Kubelet struct {
 
 	// Track node startup latencies
 	nodeStartupLatencyTracker util.NodeStartupLatencyTracker
+
+	// Health check kubelet
+	healthChecker watchdog.HealthChecker
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1698,8 +1707,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.eventedPleg.Start()
 	}
 
-	if err := kl.startHealthCheck(); err != nil {
-		klog.V(2).InfoS("failed to start health check", "error", err)
+	if kl.healthChecker != nil {
+		kl.healthChecker.Start()
 	}
 
 	kl.syncLoop(ctx, updates, kl)
