@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"os"
 	"reflect"
 	"testing"
 
@@ -134,6 +135,75 @@ func TestConstrainLabelMap(t *testing.T) {
 			allowList.ConstrainLabelMap(test.inputLabelMap)
 			if !reflect.DeepEqual(test.inputLabelMap, test.outputLabelMap) {
 				t.Errorf("Got %v, expected %v", test.inputLabelMap, test.outputLabelMap)
+			}
+		})
+	}
+}
+
+func TestSetLabelAllowListFromManifest(t *testing.T) {
+	tests := []struct {
+		name                       string
+		manifest                   string
+		manifestExist              bool
+		expectlabelValueAllowLists map[string]*MetricLabelAllowList
+	}{
+		{
+			name:          "successfully parse manifest",
+			manifestExist: true,
+			manifest: `metric1,label1: v1,v2
+metric2,label2: v3`,
+			expectlabelValueAllowLists: map[string]*MetricLabelAllowList{
+				"metric1": {
+					labelToAllowList: map[string]sets.String{
+						"label1": sets.NewString("v1", "v2"),
+					},
+				},
+				"metric2": {
+					labelToAllowList: map[string]sets.String{
+						"label2": sets.NewString("v3"),
+					},
+				},
+			},
+		},
+		{
+			name:                       "failed to read manifest file",
+			manifestExist:              false,
+			expectlabelValueAllowLists: map[string]*MetricLabelAllowList{},
+		},
+		{
+			name:          "failed to parse manifest",
+			manifestExist: true,
+			manifest: `allow-list:
+- metric1,label1:v1
+- metric2,label2:v2,v3`,
+			expectlabelValueAllowLists: map[string]*MetricLabelAllowList{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
+			manifestFilePath := "/non-existent-file.yaml"
+			if tc.manifestExist {
+				tempFile, err := os.CreateTemp("", "allow-list-test")
+				if err != nil {
+					t.Fatalf("failed to create temp file: %v", err)
+				}
+				defer func() {
+					if err := os.Remove(tempFile.Name()); err != nil {
+						t.Errorf("failed to remove temp file: %v", err)
+					}
+				}()
+
+				if _, err := tempFile.WriteString(tc.manifest); err != nil {
+					t.Fatalf("failed to write to temp file: %v", err)
+				}
+				manifestFilePath = tempFile.Name()
+			}
+
+			SetLabelAllowListFromManifest(manifestFilePath)
+			if !reflect.DeepEqual(labelValueAllowLists, tc.expectlabelValueAllowLists) {
+				t.Errorf("labelValueAllowLists = %+v, want %+v", labelValueAllowLists, tc.expectlabelValueAllowLists)
 			}
 		})
 	}

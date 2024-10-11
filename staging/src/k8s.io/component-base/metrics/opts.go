@@ -363,8 +363,6 @@ func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
 }
 
 func SetLabelAllowListFromManifest(manifest string) {
-	allowListLock.Lock()
-	defer allowListLock.Unlock()
 	allowListMapping := make(map[string]string)
 	data, err := os.ReadFile(filepath.Clean(manifest))
 	if err != nil {
