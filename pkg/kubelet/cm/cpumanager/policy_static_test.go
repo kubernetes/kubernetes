@@ -939,52 +939,77 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 type staticPolicyTestWithResvList struct {
-	description     string
-	topo            *topology.CPUTopology
-	numReservedCPUs int
-	reserved        cpuset.CPUSet
-	stAssignments   state.ContainerCPUAssignments
-	stDefaultCPUSet cpuset.CPUSet
-	pod             *v1.Pod
-	expErr          error
-	expNewErr       error
-	expCPUAlloc     bool
-	expCSet         cpuset.CPUSet
+	description      string
+	topo             *topology.CPUTopology
+	numReservedCPUs  int
+	reserved         cpuset.CPUSet
+	cpuPolicyOptions map[string]string
+	stAssignments    state.ContainerCPUAssignments
+	stDefaultCPUSet  cpuset.CPUSet
+	pod              *v1.Pod
+	expErr           error
+	expNewErr        error
+	expCPUAlloc      bool
+	expCSet          cpuset.CPUSet
 }
 
 func TestStaticPolicyStartWithResvList(t *testing.T) {
 	testCases := []staticPolicyTestWithResvList{
 		{
-			description:     "empty cpuset",
-			topo:            topoDualSocketHT,
-			numReservedCPUs: 2,
-			reserved:        cpuset.New(0, 1),
-			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(),
-			expCSet:         cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			description:      "empty cpuset",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(),
+			expCSet:          cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
-			description:     "reserved cores 0 & 1 are not present in available cpuset",
-			topo:            topoDualSocketHT,
-			numReservedCPUs: 2,
-			reserved:        cpuset.New(0, 1),
-			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(2, 3, 4, 5),
-			expErr:          fmt.Errorf("not all reserved cpus: \"0-1\" are present in defaultCpuSet: \"2-5\""),
+			description:      "empty cpuset with StrictCPUReservationOption enabled",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(),
+			expCSet:          cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
-			description:     "inconsistency between numReservedCPUs and reserved",
-			topo:            topoDualSocketHT,
-			numReservedCPUs: 1,
-			reserved:        cpuset.New(0, 1),
-			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-			expNewErr:       fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of 0-1 did not equal 1)"),
+			description:      "reserved cores 0 & 1 are not present in available cpuset",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(2, 3, 4, 5),
+			expErr:           fmt.Errorf("not all reserved cpus: \"0-1\" are present in defaultCpuSet: \"2-5\""),
+		},
+		{
+			description:      "reserved cores 0 & 1 are present in available cpuset with StrictCPUReservationOption enabled",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  2,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(0, 1, 2, 3, 4, 5),
+			expErr:           fmt.Errorf("some of strictly reserved cpus: \"0-1\" are present in defaultCpuSet: \"0-5\""),
+		},
+		{
+			description:      "inconsistency between numReservedCPUs and reserved",
+			topo:             topoDualSocketHT,
+			numReservedCPUs:  1,
+			reserved:         cpuset.New(0, 1),
+			cpuPolicyOptions: map[string]string{},
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expNewErr:        fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of 0-1 did not equal 1)"),
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
