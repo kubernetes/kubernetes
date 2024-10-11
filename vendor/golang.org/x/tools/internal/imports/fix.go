@@ -131,7 +131,7 @@ func parseOtherFiles(ctx context.Context, fset *token.FileSet, srcDir, filename 
 			continue
 		}
 
-		f, err := parser.ParseFile(fset, filepath.Join(srcDir, fi.Name()), nil, 0)
+		f, err := parser.ParseFile(fset, filepath.Join(srcDir, fi.Name()), nil, parser.SkipObjectResolution)
 		if err != nil {
 			continue
 		}
@@ -1620,6 +1620,7 @@ func loadExportsFromFiles(ctx context.Context, env *ProcessEnv, dir string, incl
 		}
 
 		fullFile := filepath.Join(dir, fi.Name())
+		// Legacy ast.Object resolution is needed here.
 		f, err := parser.ParseFile(fset, fullFile, nil, 0)
 		if err != nil {
 			env.logf("error parsing %v: %v", fullFile, err)

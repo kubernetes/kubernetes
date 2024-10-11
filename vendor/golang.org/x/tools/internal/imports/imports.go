@@ -86,7 +86,7 @@ func ApplyFixes(fixes []*ImportFix, filename string, src []byte, opt *Options, e
 	// Don't use parse() -- we don't care about fragments or statement lists
 	// here, and we need to work with unparseable files.
 	fileSet := token.NewFileSet()
-	parserMode := parser.Mode(0)
+	parserMode := parser.SkipObjectResolution
 	if opt.Comments {
 		parserMode |= parser.ParseComments
 	}
@@ -165,7 +165,7 @@ func formatFile(fset *token.FileSet, file *ast.File, src []byte, adjust func(ori
 // parse parses src, which was read from filename,
 // as a Go source file or statement list.
 func parse(fset *token.FileSet, filename string, src []byte, opt *Options) (*ast.File, func(orig, src []byte) []byte, error) {
-	parserMode := parser.Mode(0)
+	var parserMode parser.Mode // legacy ast.Object resolution is required here
 	if opt.Comments {
 		parserMode |= parser.ParseComments
 	}

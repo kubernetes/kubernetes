@@ -46,10 +46,10 @@ import (
 //
 // Unfortunately there are a number of open bugs related to
 // interactions among the LoadMode bits:
-// - https://github.com/golang/go/issues/56633
-// - https://github.com/golang/go/issues/56677
-// - https://github.com/golang/go/issues/58726
-// - https://github.com/golang/go/issues/63517
+//   - https://github.com/golang/go/issues/56633
+//   - https://github.com/golang/go/issues/56677
+//   - https://github.com/golang/go/issues/58726
+//   - https://github.com/golang/go/issues/63517
 type LoadMode int
 
 const (
@@ -103,25 +103,37 @@ const (
 
 	// NeedEmbedPatterns adds EmbedPatterns.
 	NeedEmbedPatterns
+
+	// Be sure to update loadmode_string.go when adding new items!
 )
 
 const (
+	// LoadFiles loads the name and file names for the initial packages.
+	//
 	// Deprecated: LoadFiles exists for historical compatibility
 	// and should not be used. Please directly specify the needed fields using the Need values.
 	LoadFiles = NeedName | NeedFiles | NeedCompiledGoFiles
 
+	// LoadImports loads the name, file names, and import mapping for the initial packages.
+	//
 	// Deprecated: LoadImports exists for historical compatibility
 	// and should not be used. Please directly specify the needed fields using the Need values.
 	LoadImports = LoadFiles | NeedImports
 
+	// LoadTypes loads exported type information for the initial packages.
+	//
 	// Deprecated: LoadTypes exists for historical compatibility
 	// and should not be used. Please directly specify the needed fields using the Need values.
 	LoadTypes = LoadImports | NeedTypes | NeedTypesSizes
 
+	// LoadSyntax loads typed syntax for the initial packages.
+	//
 	// Deprecated: LoadSyntax exists for historical compatibility
 	// and should not be used. Please directly specify the needed fields using the Need values.
 	LoadSyntax = LoadTypes | NeedSyntax | NeedTypesInfo
 
+	// LoadAllSyntax loads typed syntax for the initial packages and all dependencies.
+	//
 	// Deprecated: LoadAllSyntax exists for historical compatibility
 	// and should not be used. Please directly specify the needed fields using the Need values.
 	LoadAllSyntax = LoadSyntax | NeedDeps
@@ -236,14 +248,13 @@ type Config struct {
 
 // Load loads and returns the Go packages named by the given patterns.
 //
-// Config specifies loading options;
-// nil behaves the same as an empty Config.
+// The cfg parameter specifies loading options; nil behaves the same as an empty [Config].
 //
 // The [Config.Mode] field is a set of bits that determine what kinds
 // of information should be computed and returned. Modes that require
 // more information tend to be slower. See [LoadMode] for details
 // and important caveats. Its zero value is equivalent to
-// NeedName | NeedFiles | NeedCompiledGoFiles.
+// [NeedName] | [NeedFiles] | [NeedCompiledGoFiles].
 //
 // Each call to Load returns a new set of [Package] instances.
 // The Packages and their Imports form a directed acyclic graph.
@@ -260,7 +271,7 @@ type Config struct {
 // Errors associated with a particular package are recorded in the
 // corresponding Package's Errors list, and do not cause Load to
 // return an error. Clients may need to handle such errors before
-// proceeding with further analysis. The PrintErrors function is
+// proceeding with further analysis. The [PrintErrors] function is
 // provided for convenient display of all errors.
 func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 	ld := newLoader(cfg)
@@ -763,6 +774,7 @@ func newLoader(cfg *Config) *loader {
 		// because we load source if export data is missing.
 		if ld.ParseFile == nil {
 			ld.ParseFile = func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
+				// We implicitly promise to keep doing ast.Object resolution. :(
 				const mode = parser.AllErrors | parser.ParseComments
 				return parser.ParseFile(fset, filename, src, mode)
 			}

@@ -73,6 +73,15 @@ func (in *Inspector) Preorder(types []ast.Node, f func(ast.Node)) {
 	// check, Preorder is almost twice as fast as Nodes. The two
 	// features seem to contribute similar slowdowns (~1.4x each).
 
+	// This function is equivalent to the PreorderSeq call below,
+	// but to avoid the additional dynamic call (which adds 13-35%
+	// to the benchmarks), we expand it out.
+	//
+	// in.PreorderSeq(types...)(func(n ast.Node) bool {
+	// 	f(n)
+	// 	return true
+	// })
+
 	mask := maskOf(types)
 	for i := 0; i < len(in.events); {
 		ev := in.events[i]

@@ -510,8 +510,8 @@ userAuthLoop:
 			if err := s.transport.writePacket(Marshal(discMsg)); err != nil {
 				return nil, err
 			}
-
-			return nil, discMsg
+			authErrs = append(authErrs, discMsg)
+			return nil, &ServerAuthError{Errors: authErrs}
 		}
 
 		var userAuthReq userAuthRequestMsg

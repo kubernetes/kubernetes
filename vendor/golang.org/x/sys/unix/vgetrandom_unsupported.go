@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build go1.20
-// +build go1.20
+//go:build !linux || !go1.24
 
-package versions
+package unix
 
-func init() {
-	if Compare(toolchain, Go1_20) < 0 {
-		toolchain = Go1_20
-	}
+func vgetrandom(p []byte, flags uint32) (ret int, supported bool) {
+	return -1, false
 }

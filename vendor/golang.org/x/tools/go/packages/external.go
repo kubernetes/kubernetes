@@ -82,7 +82,7 @@ type DriverResponse struct {
 type driver func(cfg *Config, patterns ...string) (*DriverResponse, error)
 
 // findExternalDriver returns the file path of a tool that supplies
-// the build system package structure, or "" if not found."
+// the build system package structure, or "" if not found.
 // If GOPACKAGESDRIVER is set in the environment findExternalTool returns its
 // value, otherwise it searches for a binary named gopackagesdriver on the PATH.
 func findExternalDriver(cfg *Config) driver {
