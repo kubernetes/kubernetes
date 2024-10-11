@@ -815,7 +815,8 @@ func TestHandlePortConflicts(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	_, ctx := ktesting.NewTestContext(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -858,7 +859,8 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	_, ctx := ktesting.NewTestContext(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -900,7 +902,8 @@ func TestHandleNodeSelector(t *testing.T) {
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
 
-	kl.HandlePodAdditions(pods)
+	_, ctx := ktesting.NewTestContext(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -964,7 +967,8 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 
 			pod := podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: test.podSelector})
 
-			kl.HandlePodAdditions([]*v1.Pod{pod})
+			_, ctx := ktesting.NewTestContext(t)
+			kl.HandlePodAdditions(ctx, []*v1.Pod{pod})
 
 			// Check pod status stored in the status map.
 			checkPodStatus(t, kl, pod, test.podStatus)
@@ -1019,7 +1023,9 @@ func TestHandleMemExceeded(t *testing.T) {
 		pods[1].UID: true,
 	}
 
-	kl.HandlePodAdditions(pods)
+	_, ctx := ktesting.NewTestContext(t)
+
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
@@ -1151,7 +1157,8 @@ func TestHandlePluginResources(t *testing.T) {
 	missingPod := podWithUIDNameNsSpec("3", "missingpod", "foo", missingPodSpec)
 	failedPod := podWithUIDNameNsSpec("4", "failedpod", "foo", failedPodSpec)
 
-	kl.HandlePodAdditions([]*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
+	_, ctx := ktesting.NewTestContext(t)
+	kl.HandlePodAdditions(ctx, []*v1.Pod{fittingPod, emptyPod, missingPod, failedPod})
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
@@ -1173,7 +1180,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	podToTest := pods[1]
 	// Run once to populate the status map.
-	kl.HandlePodAdditions(pods)
+	kl.HandlePodAdditions(ctx, pods)
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); !found {
 		t.Fatalf("expected to have status cached for pod2")
 	}
@@ -2330,7 +2337,7 @@ type testPodAdmitHandler struct {
 }
 
 // Admit rejects all pods in the podsToReject list with a matching UID.
-func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (a *testPodAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	for _, podToReject := range a.podsToReject {
 		if podToReject.UID == attrs.Pod.UID {
 			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}
@@ -2377,7 +2384,8 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 
 	kl.admitHandlers.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
 
-	kl.HandlePodAdditions(pods)
+	_, ctx := ktesting.NewTestContext(t)
+	kl.HandlePodAdditions(ctx, pods)
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
@@ -2558,7 +2566,8 @@ func TestPodResourceAllocationReset(t *testing.T) {
 				t.Fatalf("failed to set pod allocation: %v", err)
 			}
 		}
-		kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
+		_, ctx := ktesting.NewTestContext(t)
+		kubelet.HandlePodAdditions(ctx, []*v1.Pod{tc.pod})
 
 		allocatedResources, found := kubelet.statusManager.GetContainerResourceAllocation(string(tc.pod.UID), tc.pod.Spec.Containers[0].Name)
 		if !found {
@@ -2717,7 +2726,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	for _, tt := range tests {
 		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
 		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
-		kubelet.handlePodResourcesResize(tt.pod)
+		_, ctx := ktesting.NewTestContext(t)
+		kubelet.handlePodResourcesResize(ctx, tt.pod)
 		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
 		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
 		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)

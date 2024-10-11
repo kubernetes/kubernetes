@@ -74,7 +74,7 @@ func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.
 	admitted := []*v1.Pod{}
 	for _, pod := range pods {
 		// Check if we can admit the pod.
-		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
+		if ok, reason, message := kl.canAdmitPod(ctx, admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
 			results = append(results, RunPodResult{pod, nil})
 			continue

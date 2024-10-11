@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -41,7 +43,7 @@ func (m *fakeManager) Policy() Policy {
 	return NewPolicyNone()
 }
 
-func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
 	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
@@ -60,12 +62,12 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	klog.InfoS("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	klog.InfoS("Get Pod Topology Hints", "pod", klog.KObj(pod))
 	return map[string][]topologymanager.TopologyHint{}
 }
