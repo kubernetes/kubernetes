@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/klog/v2/ktesting"
@@ -32,7 +32,7 @@ func TestCompile(t *testing.T) {
 		expression         string
 		driver             string
 		attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-		capacity           map[resourceapi.QualifiedName]resource.Quantity
+		capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 		expectCompileError string
 		expectMatchError   string
 		expectMatch        bool
@@ -129,13 +129,13 @@ func TestCompile(t *testing.T) {
 		},
 		"quantity": {
 			expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
+			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: resource.MustParse("1Mi")}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"check-positive": {
 			expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
+			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: resource.MustParse("1Mi")}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
@@ -162,8 +162,8 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				"string":  {StringValue: ptr.To("fish")},
 				"version": {VersionValue: ptr.To("1.0.0")},
 			},
-			capacity: map[resourceapi.QualifiedName]resource.Quantity{
-				"quantity": resource.MustParse("1Mi"),
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"quantity": {Quantity: resource.MustParse("1Mi")},
 			},
 			driver:      "dra.example.com",
 			expectMatch: true,
