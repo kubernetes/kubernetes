@@ -247,19 +247,15 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
 	tmpCPUSets := []cpuset.CPUSet{}
-	tmpAllCPUs := p.topology.CPUDetails.CPUs()
 	for pod := range tmpAssignments {
 		for _, cset := range tmpAssignments[pod] {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
-	if p.options.StrictCPUReservation {
-		tmpAllCPUs = tmpAllCPUs.Difference(p.reservedCPUs)
-	}
-	if !totalKnownCPUs.Equals(tmpAllCPUs) {
+	if !totalKnownCPUs.Equals(allCPUs) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			tmpAllCPUs.String(), totalKnownCPUs.String())
+			allCPUs.String(), totalKnownCPUs.String())
 
 	}
 
