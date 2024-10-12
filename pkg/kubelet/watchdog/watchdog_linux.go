@@ -30,10 +30,40 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// WatchdogClient defines the interface for interacting with the systemd watchdog.
+type WatchdogClient interface {
+	SdWatchdogEnabled(unsetEnvironment bool) (time.Duration, error)
+	SdNotify(unsetEnvironment bool) (bool, error)
+}
+
+// DefaultWatchdogClient implements the WatchdogClient interface using the actual systemd daemon functions.
+type DefaultWatchdogClient struct{}
+
+var _ WatchdogClient = &DefaultWatchdogClient{}
+
+func (d *DefaultWatchdogClient) SdWatchdogEnabled(unsetEnvironment bool) (time.Duration, error) {
+	return daemon.SdWatchdogEnabled(unsetEnvironment)
+}
+
+func (d *DefaultWatchdogClient) SdNotify(unsetEnvironment bool) (bool, error) {
+	return daemon.SdNotify(unsetEnvironment, daemon.SdNotifyWatchdog)
+}
+
+// Option defines optional parameters for initializing the healthChecker
+// structure.
+type Option func(*healthChecker)
+
+func WithWatchdogClient(watchdog WatchdogClient) Option {
+	return func(hc *healthChecker) {
+		hc.watchdog = watchdog
+	}
+}
+
 type healthChecker struct {
 	checkers     []healthz.HealthChecker
 	retryBackoff wait.Backoff
 	interval     time.Duration
+	watchdog     WatchdogClient
 }
 
 var _ HealthChecker = &healthChecker{}
@@ -41,9 +71,30 @@ var _ HealthChecker = &healthChecker{}
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(syncLoop syncLoopHealthChecker) (HealthChecker, error) {
+func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+	// The health checks performed by checkers are the same as those for "/healthz".
+	checkers := []healthz.HealthChecker{
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
+	}
+	retryBackoff := wait.Backoff{
+		Duration: time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Steps:    2,
+	}
+	hc := &healthChecker{
+		checkers:     checkers,
+		retryBackoff: retryBackoff,
+		watchdog:     &DefaultWatchdogClient{},
+	}
+	for _, o := range opts {
+		o(hc)
+	}
+
 	// get watchdog information
-	watchdogVal, err := daemon.SdWatchdogEnabled(false)
+	watchdogVal, err := hc.watchdog.SdWatchdogEnabled(false)
 	if err != nil {
 		// Failed to get watchdog configuration information.
 		// This occurs when we want to start the watchdog but the configuration is incorrect,
@@ -54,26 +105,9 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker) (HealthChecker, error) {
 		klog.InfoS("Systemd watchdog is not enabled")
 		return nil, nil
 	}
+	hc.interval = watchdogVal / 2
 
-	// The health checks performed by checkers are the same as those for "/healthz".
-	checkers := []healthz.HealthChecker{
-		healthz.PingHealthz,
-		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
-	}
-
-	retryBackoff := wait.Backoff{
-		Duration: time.Second,
-		Factor:   2.0,
-		Jitter:   0.1,
-		Steps:    2,
-	}
-
-	return &healthChecker{
-		checkers:     checkers,
-		retryBackoff: retryBackoff,
-		interval:     watchdogVal / 2,
-	}, nil
+	return hc, nil
 }
 
 func (hc *healthChecker) Start() {
@@ -86,7 +120,7 @@ func (hc *healthChecker) Start() {
 		}
 
 		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
-			ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
+			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
 				klog.V(2).InfoS("Operation failed, retrying", "error", err)
 				return false, nil
