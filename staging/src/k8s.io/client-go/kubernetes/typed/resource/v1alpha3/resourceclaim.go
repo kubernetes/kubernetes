@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
+	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type ResourceClaimsGetter interface {
 
 // ResourceClaimInterface has methods to work with ResourceClaim resources.
 type ResourceClaimInterface interface {
-	Create(ctx context.Context, resourceClaim *v1alpha3.ResourceClaim, opts v1.CreateOptions) (*v1alpha3.ResourceClaim, error)
-	Update(ctx context.Context, resourceClaim *v1alpha3.ResourceClaim, opts v1.UpdateOptions) (*v1alpha3.ResourceClaim, error)
+	Create(ctx context.Context, resourceClaim *resourcev1alpha3.ResourceClaim, opts v1.CreateOptions) (*resourcev1alpha3.ResourceClaim, error)
+	Update(ctx context.Context, resourceClaim *resourcev1alpha3.ResourceClaim, opts v1.UpdateOptions) (*resourcev1alpha3.ResourceClaim, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, resourceClaim *v1alpha3.ResourceClaim, opts v1.UpdateOptions) (*v1alpha3.ResourceClaim, error)
+	UpdateStatus(ctx context.Context, resourceClaim *resourcev1alpha3.ResourceClaim, opts v1.UpdateOptions) (*resourcev1alpha3.ResourceClaim, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha3.ResourceClaim, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha3.ResourceClaimList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1alpha3.ResourceClaim, error)
+	List(ctx context.Context, opts v1.ListOptions) (*resourcev1alpha3.ResourceClaimList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha3.ResourceClaim, err error)
-	Apply(ctx context.Context, resourceClaim *resourcev1alpha3.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha3.ResourceClaim, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *resourcev1alpha3.ResourceClaim, err error)
+	Apply(ctx context.Context, resourceClaim *applyconfigurationsresourcev1alpha3.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.ResourceClaim, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, resourceClaim *resourcev1alpha3.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha3.ResourceClaim, err error)
+	ApplyStatus(ctx context.Context, resourceClaim *applyconfigurationsresourcev1alpha3.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.ResourceClaim, err error)
 	ResourceClaimExpansion
 }
 
 // resourceClaims implements ResourceClaimInterface
 type resourceClaims struct {
-	*gentype.ClientWithListAndApply[*v1alpha3.ResourceClaim, *v1alpha3.ResourceClaimList, *resourcev1alpha3.ResourceClaimApplyConfiguration]
+	*gentype.ClientWithListAndApply[*resourcev1alpha3.ResourceClaim, *resourcev1alpha3.ResourceClaimList, *applyconfigurationsresourcev1alpha3.ResourceClaimApplyConfiguration]
 }
 
 // newResourceClaims returns a ResourceClaims
 func newResourceClaims(c *ResourceV1alpha3Client, namespace string) *resourceClaims {
 	return &resourceClaims{
-		gentype.NewClientWithListAndApply[*v1alpha3.ResourceClaim, *v1alpha3.ResourceClaimList, *resourcev1alpha3.ResourceClaimApplyConfiguration](
+		gentype.NewClientWithListAndApply[*resourcev1alpha3.ResourceClaim, *resourcev1alpha3.ResourceClaimList, *applyconfigurationsresourcev1alpha3.ResourceClaimApplyConfiguration](
 			"resourceclaims",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha3.ResourceClaim { return &v1alpha3.ResourceClaim{} },
-			func() *v1alpha3.ResourceClaimList { return &v1alpha3.ResourceClaimList{} }),
+			func() *resourcev1alpha3.ResourceClaim { return &resourcev1alpha3.ResourceClaim{} },
+			func() *resourcev1alpha3.ResourceClaimList { return &resourcev1alpha3.ResourceClaimList{} }),
 	}
 }

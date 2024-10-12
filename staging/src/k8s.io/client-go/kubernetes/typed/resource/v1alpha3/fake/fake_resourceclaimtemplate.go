@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	"context"
+	context "context"
 	json "encoding/json"
-	"fmt"
+	fmt "fmt"
 
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

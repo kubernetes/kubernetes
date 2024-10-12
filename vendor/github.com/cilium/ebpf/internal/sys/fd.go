@@ -17,9 +17,37 @@ type FD struct {
 }
 
 func newFD(value int) *FD {
+	if onLeakFD != nil {
+		// Attempt to store the caller's stack for the given fd value.
+		// Panic if fds contains an existing stack for the fd.
+		old, exist := fds.LoadOrStore(value, callersFrames())
+		if exist {
+			f := old.(*runtime.Frames)
+			panic(fmt.Sprintf("found existing stack for fd %d:\n%s", value, FormatFrames(f)))
+		}
+	}
+
 	fd := &FD{value}
-	runtime.SetFinalizer(fd, (*FD).Close)
+	runtime.SetFinalizer(fd, (*FD).finalize)
 	return fd
+}
+
+// finalize is set as the FD's runtime finalizer and
+// sends a leak trace before calling FD.Close().
+func (fd *FD) finalize() {
+	if fd.raw < 0 {
+		return
+	}
+
+	// Invoke the fd leak callback. Calls LoadAndDelete to guarantee the callback
+	// is invoked at most once for one sys.FD allocation, runtime.Frames can only
+	// be unwound once.
+	f, ok := fds.LoadAndDelete(fd.Int())
+	if ok && onLeakFD != nil {
+		onLeakFD(f.(*runtime.Frames))
+	}
+
+	_ = fd.Close()
 }
 
 // NewFD wraps a raw fd with a finalizer.
@@ -64,15 +92,16 @@ func (fd *FD) Close() error {
 		return nil
 	}
 
-	value := int(fd.raw)
-	fd.raw = -1
-
-	fd.Forget()
-	return unix.Close(value)
+	return unix.Close(fd.disown())
 }
 
-func (fd *FD) Forget() {
+func (fd *FD) disown() int {
+	value := int(fd.raw)
+	fds.Delete(int(value))
+	fd.raw = -1
+
 	runtime.SetFinalizer(fd, nil)
+	return value
 }
 
 func (fd *FD) Dup() (*FD, error) {
@@ -90,7 +119,15 @@ func (fd *FD) Dup() (*FD, error) {
 	return newFD(dup), nil
 }
 
+// File takes ownership of FD and turns it into an [*os.File].
+//
+// You must not use the FD after the call returns.
+//
+// Returns nil if the FD is not valid.
 func (fd *FD) File(name string) *os.File {
-	fd.Forget()
-	return os.NewFile(uintptr(fd.raw), name)
+	if fd.raw < 0 {
+		return nil
+	}
+
+	return os.NewFile(uintptr(fd.disown()), name)
 }

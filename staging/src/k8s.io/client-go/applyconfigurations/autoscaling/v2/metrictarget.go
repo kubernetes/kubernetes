@@ -19,17 +19,17 @@ limitations under the License.
 package v2
 
 import (
-	v2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // MetricTargetApplyConfiguration represents a declarative configuration of the MetricTarget type for use
 // with apply.
 type MetricTargetApplyConfiguration struct {
-	Type               *v2.MetricTargetType `json:"type,omitempty"`
-	Value              *resource.Quantity   `json:"value,omitempty"`
-	AverageValue       *resource.Quantity   `json:"averageValue,omitempty"`
-	AverageUtilization *int32               `json:"averageUtilization,omitempty"`
+	Type               *autoscalingv2.MetricTargetType `json:"type,omitempty"`
+	Value              *resource.Quantity              `json:"value,omitempty"`
+	AverageValue       *resource.Quantity              `json:"averageValue,omitempty"`
+	AverageUtilization *int32                          `json:"averageUtilization,omitempty"`
 }
 
 // MetricTargetApplyConfiguration constructs a declarative configuration of the MetricTarget type for use with
@@ -41,7 +41,7 @@ func MetricTarget() *MetricTargetApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *MetricTargetApplyConfiguration) WithType(value v2.MetricTargetType) *MetricTargetApplyConfiguration {
+func (b *MetricTargetApplyConfiguration) WithType(value autoscalingv2.MetricTargetType) *MetricTargetApplyConfiguration {
 	b.Type = &value
 	return b
 }

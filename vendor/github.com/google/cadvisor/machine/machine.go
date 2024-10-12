@@ -21,8 +21,6 @@ import (
 	"path"
 	"regexp"
 
-	// s390/s390x changes
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -223,10 +221,6 @@ func GetMachineSwapCapacity() (uint64, error) {
 
 // GetTopology returns CPU topology reading information from sysfs
 func GetTopology(sysFs sysfs.SysFs) ([]info.Node, int, error) {
-	// s390/s390x changes
-	if isSystemZ() {
-		return nil, getNumCores(), nil
-	}
 	return sysinfo.GetNodesInfo(sysFs)
 }
 
@@ -289,16 +283,4 @@ func isRiscv64() bool {
 // mips64 changes
 func isMips64() bool {
 	return strings.Contains(machineArch, "mips64")
-}
-
-// s390/s390x changes
-func getNumCores() int {
-	maxProcs := runtime.GOMAXPROCS(0)
-	numCPU := runtime.NumCPU()
-
-	if maxProcs < numCPU {
-		return maxProcs
-	}
-
-	return numCPU
 }

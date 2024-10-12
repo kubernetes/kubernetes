@@ -932,6 +932,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(PodStartTotalDuration)
 		legacyregistry.MustRegister(ImagePullDuration)
+		legacyregistry.MustRegister(ImageGarbageCollectedTotal)
 		legacyregistry.MustRegister(NodeStartupPreKubeletDuration)
 		legacyregistry.MustRegister(NodeStartupPreRegistrationDuration)
 		legacyregistry.MustRegister(NodeStartupRegistrationDuration)

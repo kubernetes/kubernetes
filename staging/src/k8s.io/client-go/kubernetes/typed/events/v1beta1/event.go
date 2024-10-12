@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/events/v1beta1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	eventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
+	applyconfigurationseventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (*v1beta1.Event, error)
-	Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (*v1beta1.Event, error)
+	Create(ctx context.Context, event *eventsv1beta1.Event, opts v1.CreateOptions) (*eventsv1beta1.Event, error)
+	Update(ctx context.Context, event *eventsv1beta1.Event, opts v1.UpdateOptions) (*eventsv1beta1.Event, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Event, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EventList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*eventsv1beta1.Event, error)
+	List(ctx context.Context, opts v1.ListOptions) (*eventsv1beta1.EventList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error)
-	Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Event, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *eventsv1beta1.Event, err error)
+	Apply(ctx context.Context, event *applyconfigurationseventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *eventsv1beta1.Event, err error)
 	EventExpansion
 }
 
 // events implements EventInterface
 type events struct {
-	*gentype.ClientWithListAndApply[*v1beta1.Event, *v1beta1.EventList, *eventsv1beta1.EventApplyConfiguration]
+	*gentype.ClientWithListAndApply[*eventsv1beta1.Event, *eventsv1beta1.EventList, *applyconfigurationseventsv1beta1.EventApplyConfiguration]
 }
 
 // newEvents returns a Events
 func newEvents(c *EventsV1beta1Client, namespace string) *events {
 	return &events{
-		gentype.NewClientWithListAndApply[*v1beta1.Event, *v1beta1.EventList, *eventsv1beta1.EventApplyConfiguration](
+		gentype.NewClientWithListAndApply[*eventsv1beta1.Event, *eventsv1beta1.EventList, *applyconfigurationseventsv1beta1.EventApplyConfiguration](
 			"events",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.Event { return &v1beta1.Event{} },
-			func() *v1beta1.EventList { return &v1beta1.EventList{} }),
+			func() *eventsv1beta1.Event { return &eventsv1beta1.Event{} },
+			func() *eventsv1beta1.EventList { return &eventsv1beta1.EventList{} }),
 	}
 }

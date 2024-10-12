@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,13 +50,13 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -287,9 +288,7 @@ func TestFailureHandler(t *testing.T) {
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
-			if err := queue.Add(logger, testPod); err != nil {
-				t.Fatalf("Add failed: %v", err)
-			}
+			queue.Add(logger, testPod)
 
 			if _, err := queue.Pop(logger); err != nil {
 				t.Fatalf("Pop failed: %v", err)
@@ -786,6 +785,7 @@ func Test_UnionedGVKs(t *testing.T) {
 		plugins                         schedulerapi.PluginSet
 		want                            map[framework.GVK]framework.ActionType
 		enableInPlacePodVerticalScaling bool
+		enableSchedulerQueueingHints    bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -868,13 +868,13 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[framework.GVK]framework.ActionType{},
 		},
 		{
-			name:    "plugins with default profile (InPlacePodVerticalScaling: disabled)",
+			name:    "plugins with default profile (No feature gate enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
-				framework.Node:                  framework.All,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.All - framework.Delete,
+				framework.CSIDriver:             framework.Update,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,
 				framework.PersistentVolume:      framework.All - framework.Delete,
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
@@ -886,9 +886,9 @@ func Test_UnionedGVKs(t *testing.T) {
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
-				framework.Node:                  framework.All,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.All - framework.Delete,
+				framework.CSIDriver:             framework.Update,
 				framework.CSIStorageCapacity:    framework.All - framework.Delete,
 				framework.PersistentVolume:      framework.All - framework.Delete,
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
@@ -896,10 +896,27 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			enableInPlacePodVerticalScaling: true,
 		},
+		{
+			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[framework.GVK]framework.ActionType{
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
+				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
+				framework.CSINode:               framework.All - framework.Delete,
+				framework.CSIDriver:             framework.Update,
+				framework.CSIStorageCapacity:    framework.All - framework.Delete,
+				framework.PersistentVolume:      framework.All - framework.Delete,
+				framework.PersistentVolumeClaim: framework.All - framework.Delete,
+				framework.StorageClass:          framework.All - framework.Delete,
+			},
+			enableInPlacePodVerticalScaling: true,
+			enableSchedulerQueueingHints:    true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.enableSchedulerQueueingHints)
 
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)

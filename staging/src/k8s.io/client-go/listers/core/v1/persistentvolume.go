@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PersistentVolumeLister helps list PersistentVolumes.
@@ -30,19 +30,19 @@ import (
 type PersistentVolumeLister interface {
 	// List lists all PersistentVolumes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PersistentVolume, err error)
+	List(selector labels.Selector) (ret []*corev1.PersistentVolume, err error)
 	// Get retrieves the PersistentVolume from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PersistentVolume, error)
+	Get(name string) (*corev1.PersistentVolume, error)
 	PersistentVolumeListerExpansion
 }
 
 // persistentVolumeLister implements the PersistentVolumeLister interface.
 type persistentVolumeLister struct {
-	listers.ResourceIndexer[*v1.PersistentVolume]
+	listers.ResourceIndexer[*corev1.PersistentVolume]
 }
 
 // NewPersistentVolumeLister returns a new PersistentVolumeLister.
 func NewPersistentVolumeLister(indexer cache.Indexer) PersistentVolumeLister {
-	return &persistentVolumeLister{listers.New[*v1.PersistentVolume](indexer, v1.Resource("persistentvolume"))}
+	return &persistentVolumeLister{listers.New[*corev1.PersistentVolume](indexer, corev1.Resource("persistentvolume"))}
 }

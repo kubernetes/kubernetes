@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -5378,19 +5379,14 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 		}, {
-			name: "feature disabled",
+			name: "no volume source",
 			vol: core.Volume{
-				Name: "image-volume",
-				VolumeSource: core.VolumeSource{
-					Image: &core.ImageVolumeSource{
-						Reference:  "quay.io/my/artifact:v1",
-						PullPolicy: "IfNotPresent",
-					},
-				},
+				Name:         "volume",
+				VolumeSource: core.VolumeSource{},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: false},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype:  field.ErrorTypeRequired,
 				field:  "field[0]",
@@ -5407,7 +5403,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "name",
@@ -5423,7 +5419,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: true},
+			opts: PodValidationOptions{ResourceIsPod: true},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "image.reference",
@@ -5439,7 +5435,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: false},
+			opts: PodValidationOptions{ResourceIsPod: false},
 		}, {
 			name: "image volume with wrong pullPolicy",
 			vol: core.Volume{
@@ -5451,7 +5447,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeNotSupported,
 				field: "image.pullPolicy",
@@ -7066,7 +7062,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		}}}},
 		{Name: "image-volume", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
-	opts := PodValidationOptions{AllowImageVolumeSource: true}
+	opts := PodValidationOptions{}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), opts)
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
@@ -23731,7 +23727,7 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Profile %s should be valid", test.profile)
 		} else {
-			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+			assert.Errorf(t, err, "Profile %s should not be valid", test.profile)
 		}
 	}
 }
@@ -24048,14 +24044,12 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	testCases := []struct {
 		name          string
 		ipModeEnabled bool
-		nonLBAllowed  bool
 		tweakLBStatus func(s *core.LoadBalancerStatus)
 		tweakSvcSpec  func(s *core.ServiceSpec)
 		numErrs       int
 	}{
 		{
-			name:         "type is not LB",
-			nonLBAllowed: false,
+			name: "type is not LB",
 			tweakSvcSpec: func(s *core.ServiceSpec) {
 				s.Type = core.ServiceTypeClusterIP
 			},
@@ -24065,18 +24059,6 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				}}
 			},
 			numErrs: 1,
-		}, {
-			name:         "type is not LB. back-compat",
-			nonLBAllowed: true,
-			tweakSvcSpec: func(s *core.ServiceSpec) {
-				s.Type = core.ServiceTypeClusterIP
-			},
-			tweakLBStatus: func(s *core.LoadBalancerStatus) {
-				s.Ingress = []core.LoadBalancerIngress{{
-					IP: "1.2.3.4",
-				}}
-			},
-			numErrs: 0,
 		}, {
 			name:          "valid vip ipMode",
 			ipModeEnabled: true,
@@ -24138,8 +24120,10 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
@@ -24203,6 +24187,172 @@ func TestValidateSleepAction(t *testing.T) {
 				if tc.expectErr[0].Error() != errs[0].Error() {
 					t.Errorf("Unexpected error(s): %v", errs)
 				}
+			}
+		})
+	}
+}
+
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		dnsConfig      *core.PodDNSConfig
+	}{
+		{
+			name:           "beginswith underscore, contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+		{
+			name:           "begins with underscore, contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
 	}

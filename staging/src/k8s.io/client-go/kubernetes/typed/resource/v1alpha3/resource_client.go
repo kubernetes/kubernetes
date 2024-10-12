@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
-	"k8s.io/client-go/kubernetes/scheme"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -105,7 +105,7 @@ func New(c rest.Interface) *ResourceV1alpha3Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha3.SchemeGroupVersion
+	gv := resourcev1alpha3.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

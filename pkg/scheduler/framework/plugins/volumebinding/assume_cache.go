@@ -19,10 +19,9 @@ package volumebinding
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 

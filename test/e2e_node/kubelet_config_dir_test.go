@@ -59,7 +59,7 @@ var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			configDir := framework.TestContext.KubeletConfigDropinDir
 
@@ -101,7 +101,7 @@ clusterDNS:
 - 192.168.1.5
 - 192.168.1.8
 port: 8080
-cpuManagerReconcilePeriod: 0s
+cpuManagerReconcilePeriod: 1s
 systemReserved:
   memory: 2Gi
 authorization:
@@ -132,7 +132,7 @@ featureGates:
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			mergedConfig, err := getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)
@@ -145,7 +145,7 @@ featureGates:
 			}
 			initialConfig.ClusterDNS = []string{"192.168.1.1", "192.168.1.5", "192.168.1.8"} // overridden by slice in second file.
 			// This value was explicitly set in the drop-in, make sure it is retained
-			initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: time.Duration(0)}
+			initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: time.Second}
 			// Meanwhile, this value was not explicitly set, but could have been overridden by a "default" of 0 for the type.
 			// Ensure the true default persists.
 			initialConfig.CPUCFSQuotaPeriod = metav1.Duration{Duration: time.Duration(100000000)}

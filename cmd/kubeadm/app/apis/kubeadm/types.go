@@ -338,7 +338,7 @@ type JoinConfiguration struct {
 	NodeRegistration NodeRegistrationOptions
 
 	// CACertPath is the path to the SSL certificate authority used to
-	// secure comunications between node and control-plane.
+	// secure communications between node and control-plane.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
 	CACertPath string
 

@@ -70,7 +70,7 @@ func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttribute
 	return admission.GetPodAdmitResult(nil)
 }
 
-func (cm *containerManagerImpl) Start(node *v1.Node,
+func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	activePods ActivePodsFunc,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
@@ -88,7 +88,6 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
-	ctx := context.Background()
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	// Starts device manager.
@@ -189,7 +188,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }
 
-func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
+func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
@@ -275,11 +274,11 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 	return nil
 }
 
-func (cm *containerManagerImpl) PrepareDynamicResources(pod *v1.Pod) error {
+func (cm *containerManagerImpl) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
-func (cm *containerManagerImpl) UnprepareDynamicResources(*v1.Pod) error {
+func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 

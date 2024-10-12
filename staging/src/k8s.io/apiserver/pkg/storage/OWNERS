@@ -10,7 +10,6 @@ reviewers:
   - caesarxuchao
   - mikedanese
   - liggitt
-  - ncdc
   - ingvagabund
   - enj
   - stevekuznetsov
@@ -19,3 +18,5 @@ emeritus_approvers:
   - xiang90
   - timothysc
   - lavalamp
+emeritus_reviewers:
+  - ncdc

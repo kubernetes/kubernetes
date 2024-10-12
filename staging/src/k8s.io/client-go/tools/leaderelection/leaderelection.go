@@ -277,16 +277,13 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wait.Until(func() {
-		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
-		defer timeoutCancel()
-		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, le.config.RetryPeriod, le.config.RenewDeadline, true, func(ctx context.Context) (done bool, err error) {
 			if !le.config.Coordinated {
-				return le.tryAcquireOrRenew(timeoutCtx), nil
+				return le.tryAcquireOrRenew(ctx), nil
 			} else {
-				return le.tryCoordinatedRenew(timeoutCtx), nil
+				return le.tryCoordinatedRenew(ctx), nil
 			}
-		}, timeoutCtx.Done())
-
+		})
 		le.maybeReportTransition()
 		desc := le.config.Lock.Describe()
 		if err == nil {
@@ -426,7 +423,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 			le.setObservedRecord(&leaderElectionRecord)
 			return true
 		}
-		klog.Errorf("Failed to update lock optimitically: %v, falling back to slow path", err)
+		klog.Errorf("Failed to update lock optimistically: %v, falling back to slow path", err)
 	}
 
 	// 2. obtain or create the ElectionRecord

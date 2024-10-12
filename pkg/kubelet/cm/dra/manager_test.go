@@ -38,9 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -117,7 +119,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -132,7 +134,10 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 
 	teardown := func() {
 		close(stopCh)
-		os.RemoveAll(socketName)
+		if err := os.Remove(socketName); err != nil {
+			logger := klog.FromContext(ctx)
+			logger.Error(err, "failed to remove socket file", "path", socketName)
+		}
 	}
 
 	l, err := net.Listen("unix", socketName)
@@ -158,11 +163,16 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 
 	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
 
-	go func() {
-		go s.Serve(l)
+	go func(ctx context.Context) {
+		go func() {
+			if err := s.Serve(l); err != nil {
+				logger := klog.FromContext(ctx)
+				logger.Error(err, "failed to serve gRPC")
+			}
+		}()
 		<-stopCh
 		s.GracefulStop()
-	}()
+	}(ctx)
 
 	return fakeDRAServerInfo{
 		server:     fakeDRADriverGRPCServer,
@@ -195,7 +205,7 @@ func TestNewManagerImpl(t *testing.T) {
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
 		})
@@ -354,7 +364,7 @@ func TestGetResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -538,6 +548,7 @@ func TestPrepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to newClaimInfoCache, err:%v", err)
@@ -549,11 +560,11 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			if test.claim != nil {
-				if _, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Create(context.Background(), test.claim, metav1.CreateOptions{}); err != nil {
+				if _, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create ResourceClaim %s: %+v", test.claim.Name, err)
 				}
 				defer func() {
-					require.NoError(t, fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Delete(context.Background(), test.claim.Name, metav1.DeleteOptions{}))
+					require.NoError(t, fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
 				}()
 			}
 
@@ -563,7 +574,7 @@ func TestPrepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -579,19 +590,19 @@ func TestPrepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			err = manager.PrepareResources(test.pod)
+			err = manager.PrepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
 
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -688,6 +699,7 @@ func TestUnprepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
@@ -699,7 +711,7 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(test.wantTimeout, pluginClientTimeout, nil, test.resp)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -720,19 +732,19 @@ func TestUnprepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			err = manager.UnprepareResources(test.pod)
+			err = manager.UnprepareResources(tCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
 
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return // PrepareResources returned an error so stopping the test case here
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
 				return // resource skipped so no need to continue
@@ -851,12 +863,12 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			if test.expectedErrMsg != "" {
 				assert.Error(t, err)
 				if err != nil {
-					assert.Contains(t, err.Error(), test.expectedErrMsg)
+					assert.ErrorContains(t, err, test.expectedErrMsg)
 				}
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Len(t, claimInfos, 1)
 			assert.Equal(t, test.expectedClaimName, claimInfos[0].ClaimInfoState.ClaimName)
 		})
@@ -866,8 +878,10 @@ func TestGetContainerClaimInfos(t *testing.T) {
 // TestParallelPrepareUnprepareResources calls PrepareResources and UnprepareResources APIs in parallel
 // to detect possible data races
 func TestParallelPrepareUnprepareResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Setup and register fake DRA driver
-	draServerInfo, err := setupFakeDRADriverGRPCServer(false, nil, nil, nil)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -934,17 +948,17 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 			}
 			claim := genTestClaim(claimName, driverName, deviceName, string(podUID))
 
-			if _, err = fakeKubeClient.ResourceV1alpha3().ResourceClaims(pod.Namespace).Create(context.Background(), claim, metav1.CreateOptions{}); err != nil {
+			if _, err = fakeKubeClient.ResourceV1alpha3().ResourceClaims(pod.Namespace).Create(tCtx, claim, metav1.CreateOptions{}); err != nil {
 				t.Errorf("failed to create ResourceClaim %s: %+v", claim.Name, err)
 				return
 			}
 
-			if err = manager.PrepareResources(pod); err != nil {
+			if err = manager.PrepareResources(tCtx, pod); err != nil {
 				t.Errorf("pod: %s: PrepareResources failed: %+v", pod.Name, err)
 				return
 			}
 
-			if err = manager.UnprepareResources(pod); err != nil {
+			if err = manager.UnprepareResources(tCtx, pod); err != nil {
 				t.Errorf("pod: %s: UnprepareResources failed: %+v", pod.Name, err)
 				return
 			}

@@ -2943,9 +2943,6 @@ EOF
     sed -i -e "s@{{ metrics_server_memory_per_node }}@${metrics_server_memory_per_node}@g" "${metrics_server_yaml}"
     sed -i -e "s@{{ metrics_server_min_cluster_size }}@${metrics_server_min_cluster_size}@g" "${metrics_server_yaml}"
   fi
-  if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
-  fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
@@ -3214,7 +3211,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.3
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.4
     command:
     - /bin/sh
     args:

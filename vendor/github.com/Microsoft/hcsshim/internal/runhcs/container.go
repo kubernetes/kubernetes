@@ -1,3 +1,5 @@
+//go:build windows
+
 package runhcs
 
 import (
@@ -5,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"time"
@@ -40,7 +41,7 @@ type ContainerState struct {
 // returned success or error. If error converts that to an error and returns. If
 // `p` is not nill will issue a `Kill` and `Wait` for exit.
 func GetErrorFromPipe(pipe io.Reader, p *os.Process) error {
-	serr, err := ioutil.ReadAll(pipe)
+	serr, err := io.ReadAll(pipe)
 	if err != nil {
 		return err
 	}

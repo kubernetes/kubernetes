@@ -411,7 +411,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+			if pod.Spec.TerminationGracePeriodSeconds != nil && !utilfeature.DefaultFeatureGate.Enabled(features.AllowOverwriteTerminationGracePeriodSeconds) {
+				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+			}
 		}
+
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		condition := &v1.PodCondition{
 			Type:    v1.DisruptionTarget,

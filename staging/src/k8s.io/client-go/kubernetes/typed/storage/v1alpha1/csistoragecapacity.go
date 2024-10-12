@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
+	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type CSIStorageCapacitiesGetter interface {
 
 // CSIStorageCapacityInterface has methods to work with CSIStorageCapacity resources.
 type CSIStorageCapacityInterface interface {
-	Create(ctx context.Context, cSIStorageCapacity *v1alpha1.CSIStorageCapacity, opts v1.CreateOptions) (*v1alpha1.CSIStorageCapacity, error)
-	Update(ctx context.Context, cSIStorageCapacity *v1alpha1.CSIStorageCapacity, opts v1.UpdateOptions) (*v1alpha1.CSIStorageCapacity, error)
+	Create(ctx context.Context, cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, opts v1.CreateOptions) (*storagev1alpha1.CSIStorageCapacity, error)
+	Update(ctx context.Context, cSIStorageCapacity *storagev1alpha1.CSIStorageCapacity, opts v1.UpdateOptions) (*storagev1alpha1.CSIStorageCapacity, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.CSIStorageCapacity, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.CSIStorageCapacityList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1alpha1.CSIStorageCapacity, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagev1alpha1.CSIStorageCapacityList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CSIStorageCapacity, err error)
-	Apply(ctx context.Context, cSIStorageCapacity *storagev1alpha1.CSIStorageCapacityApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.CSIStorageCapacity, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1alpha1.CSIStorageCapacity, err error)
+	Apply(ctx context.Context, cSIStorageCapacity *applyconfigurationsstoragev1alpha1.CSIStorageCapacityApplyConfiguration, opts v1.ApplyOptions) (result *storagev1alpha1.CSIStorageCapacity, err error)
 	CSIStorageCapacityExpansion
 }
 
 // cSIStorageCapacities implements CSIStorageCapacityInterface
 type cSIStorageCapacities struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.CSIStorageCapacity, *v1alpha1.CSIStorageCapacityList, *storagev1alpha1.CSIStorageCapacityApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagev1alpha1.CSIStorageCapacity, *storagev1alpha1.CSIStorageCapacityList, *applyconfigurationsstoragev1alpha1.CSIStorageCapacityApplyConfiguration]
 }
 
 // newCSIStorageCapacities returns a CSIStorageCapacities
 func newCSIStorageCapacities(c *StorageV1alpha1Client, namespace string) *cSIStorageCapacities {
 	return &cSIStorageCapacities{
-		gentype.NewClientWithListAndApply[*v1alpha1.CSIStorageCapacity, *v1alpha1.CSIStorageCapacityList, *storagev1alpha1.CSIStorageCapacityApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagev1alpha1.CSIStorageCapacity, *storagev1alpha1.CSIStorageCapacityList, *applyconfigurationsstoragev1alpha1.CSIStorageCapacityApplyConfiguration](
 			"csistoragecapacities",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha1.CSIStorageCapacity { return &v1alpha1.CSIStorageCapacity{} },
-			func() *v1alpha1.CSIStorageCapacityList { return &v1alpha1.CSIStorageCapacityList{} }),
+			func() *storagev1alpha1.CSIStorageCapacity { return &storagev1alpha1.CSIStorageCapacity{} },
+			func() *storagev1alpha1.CSIStorageCapacityList { return &storagev1alpha1.CSIStorageCapacityList{} }),
 	}
 }

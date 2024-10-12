@@ -19,13 +19,13 @@ limitations under the License.
 package v2
 
 import (
-	"context"
+	context "context"
 
-	v2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	autoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
+	applyconfigurationsautoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type HorizontalPodAutoscalersGetter interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	Create(ctx context.Context, horizontalPodAutoscaler *v2.HorizontalPodAutoscaler, opts v1.CreateOptions) (*v2.HorizontalPodAutoscaler, error)
-	Update(ctx context.Context, horizontalPodAutoscaler *v2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*v2.HorizontalPodAutoscaler, error)
+	Create(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscaler, opts v1.CreateOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
+	Update(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*v2.HorizontalPodAutoscaler, error)
+	UpdateStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.HorizontalPodAutoscaler, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2.HorizontalPodAutoscalerList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*autoscalingv2.HorizontalPodAutoscaler, error)
+	List(ctx context.Context, opts v1.ListOptions) (*autoscalingv2.HorizontalPodAutoscalerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.HorizontalPodAutoscaler, err error)
-	Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2.HorizontalPodAutoscaler, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *autoscalingv2.HorizontalPodAutoscaler, err error)
+	Apply(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *autoscalingv2.HorizontalPodAutoscaler, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2.HorizontalPodAutoscaler, err error)
+	ApplyStatus(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *autoscalingv2.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	*gentype.ClientWithListAndApply[*v2.HorizontalPodAutoscaler, *v2.HorizontalPodAutoscalerList, *autoscalingv2.HorizontalPodAutoscalerApplyConfiguration]
+	*gentype.ClientWithListAndApply[*autoscalingv2.HorizontalPodAutoscaler, *autoscalingv2.HorizontalPodAutoscalerList, *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration]
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
 func newHorizontalPodAutoscalers(c *AutoscalingV2Client, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
-		gentype.NewClientWithListAndApply[*v2.HorizontalPodAutoscaler, *v2.HorizontalPodAutoscalerList, *autoscalingv2.HorizontalPodAutoscalerApplyConfiguration](
+		gentype.NewClientWithListAndApply[*autoscalingv2.HorizontalPodAutoscaler, *autoscalingv2.HorizontalPodAutoscalerList, *applyconfigurationsautoscalingv2.HorizontalPodAutoscalerApplyConfiguration](
 			"horizontalpodautoscalers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v2.HorizontalPodAutoscaler { return &v2.HorizontalPodAutoscaler{} },
-			func() *v2.HorizontalPodAutoscalerList { return &v2.HorizontalPodAutoscalerList{} }),
+			func() *autoscalingv2.HorizontalPodAutoscaler { return &autoscalingv2.HorizontalPodAutoscaler{} },
+			func() *autoscalingv2.HorizontalPodAutoscalerList { return &autoscalingv2.HorizontalPodAutoscalerList{} }),
 	}
 }

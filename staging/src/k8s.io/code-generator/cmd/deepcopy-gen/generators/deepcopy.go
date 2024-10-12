@@ -222,7 +222,7 @@ func NewGenDeepCopy(outputFilename, targetPackage string, boundingDirs []string,
 		boundingDirs:  boundingDirs,
 		allTypes:      allTypes,
 		registerTypes: registerTypes,
-		imports:       generator.NewImportTracker(),
+		imports:       generator.NewImportTrackerForPackage(targetPackage),
 		typesForInit:  make([]*types.Type, 0),
 	}
 }
@@ -277,8 +277,8 @@ func deepCopyMethod(t *types.Type) (*types.Signature, error) {
 		return nil, fmt.Errorf("type %v: invalid DeepCopy signature, expected exactly one result", t)
 	}
 
-	ptrResult := f.Signature.Results[0].Kind == types.Pointer && f.Signature.Results[0].Elem.Name == t.Name
-	nonPtrResult := f.Signature.Results[0].Name == t.Name
+	ptrResult := f.Signature.Results[0].Type.Kind == types.Pointer && f.Signature.Results[0].Type.Elem.Name == t.Name
+	nonPtrResult := f.Signature.Results[0].Type.Name == t.Name
 
 	if !ptrResult && !nonPtrResult {
 		return nil, fmt.Errorf("type %v: invalid DeepCopy signature, expected to return %s or *%s", t, t.Name.Name, t.Name.Name)
@@ -329,7 +329,7 @@ func deepCopyIntoMethod(t *types.Type) (*types.Signature, error) {
 		return nil, fmt.Errorf("type %v: invalid DeepCopy signature, expected no result type", t)
 	}
 
-	ptrParam := f.Signature.Parameters[0].Kind == types.Pointer && f.Signature.Parameters[0].Elem.Name == t.Name
+	ptrParam := f.Signature.Parameters[0].Type.Kind == types.Pointer && f.Signature.Parameters[0].Type.Elem.Name == t.Name
 
 	if !ptrParam {
 		return nil, fmt.Errorf("type %v: invalid DeepCopy signature, expected parameter of type *%s", t, t.Name.Name)
@@ -696,7 +696,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 		leftPointer := ut.Elem.Kind == types.Pointer
 		rightPointer := !isReference(ut.Elem)
 		if dc != nil {
-			rightPointer = dc.Results[0].Kind == types.Pointer
+			rightPointer = dc.Results[0].Type.Kind == types.Pointer
 		}
 		if leftPointer == rightPointer {
 			sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
@@ -812,7 +812,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			leftPointer := ft.Kind == types.Pointer
 			rightPointer := !isReference(ft)
 			if dc != nil {
-				rightPointer = dc.Results[0].Kind == types.Pointer
+				rightPointer = dc.Results[0].Type.Kind == types.Pointer
 			}
 			if leftPointer == rightPointer {
 				sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
@@ -866,7 +866,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	case dc != nil || dci != nil:
 		rightPointer := !isReference(ut.Elem)
 		if dc != nil {
-			rightPointer = dc.Results[0].Kind == types.Pointer
+			rightPointer = dc.Results[0].Type.Kind == types.Pointer
 		}
 		if rightPointer {
 			sw.Do("*out = (*in).DeepCopy()\n", nil)

@@ -242,6 +242,12 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthenticator = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthenticator"))
 
+	// Owner: sig-auth
+	// Marks tests that require a conforming implementation of
+	// Node claims for serviceaccounts. Typically this means that the
+	// ServiceAccountTokenNodeBindingValidation feature must be enabled.
+	ServiceAccountTokenNodeBindingValidation = framework.WithFeature(framework.ValidFeatures.Add("ServiceAccountTokenNodeBindingValidation"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthorizer = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
 
@@ -282,6 +288,10 @@ var (
 	// RelaxedEnvironmentVariableValidation used when we verify whether the pod can consume all printable ASCII characters as environment variable names,
 	// and whether the pod can consume configmap/secret that key starts with a number.
 	RelaxedEnvironmentVariableValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedEnvironmentVariableValidation"))
+
+	// Owner: sig-network
+	// Marks tests of KEP-4427 that require the `RelaxedDNSSearchValidation` feature gate
+	RelaxedDNSSearchValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedDNSSearchValidation"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Recreate = framework.WithFeature(framework.ValidFeatures.Add("Recreate"))
@@ -392,8 +402,25 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	VolumeSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
 
+	// Owner: sig-storage
+	// Volume group snapshot tests
+	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("volumegroupsnapshot"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	VolumeSourceXFS = framework.WithFeature(framework.ValidFeatures.Add("VolumeSourceXFS"))
+
+	// Ownerd by SIG Storage
+	// kep: https://kep.k8s.io/1432
+	// test-infra jobs:
+	// - pull-kubernetes-e2e-storage-kind-alpha-features (need manual trigger)
+	// - ci-kubernetes-e2e-storage-kind-alpha-features
+	// When this label is added to a test, it means that the cluster must be created
+	// with the feature-gate "CSIVolumeHealth=true".
+	//
+	// Once the feature is stable, this label should be removed and these tests will
+	// be run by default on any cluster. The test-infra job also should be updated to
+	// not focus on this feature anymore.
+	CSIVolumeHealth = framework.WithFeature(framework.ValidFeatures.Add("CSIVolumeHealth"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Vsphere = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))

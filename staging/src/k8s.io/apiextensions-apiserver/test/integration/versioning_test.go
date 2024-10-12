@@ -124,7 +124,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 				return false, nil
 			}
 
-			assert.Contains(t, err.Error(), "apiVersion")
+			assert.ErrorContains(t, err, "apiVersion")
 			return true, nil
 		})
 		assert.NoError(t, err)

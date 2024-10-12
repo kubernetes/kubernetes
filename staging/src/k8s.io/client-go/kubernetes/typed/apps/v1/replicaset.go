@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	json "encoding/json"
-	"fmt"
+	fmt "fmt"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -42,19 +42,19 @@ type ReplicaSetsGetter interface {
 
 // ReplicaSetInterface has methods to work with ReplicaSet resources.
 type ReplicaSetInterface interface {
-	Create(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.CreateOptions) (*v1.ReplicaSet, error)
-	Update(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.UpdateOptions) (*v1.ReplicaSet, error)
+	Create(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts metav1.CreateOptions) (*appsv1.ReplicaSet, error)
+	Update(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts metav1.UpdateOptions) (*appsv1.ReplicaSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.UpdateOptions) (*v1.ReplicaSet, error)
+	UpdateStatus(ctx context.Context, replicaSet *appsv1.ReplicaSet, opts metav1.UpdateOptions) (*appsv1.ReplicaSet, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ReplicaSet, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ReplicaSetList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*appsv1.ReplicaSet, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*appsv1.ReplicaSetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicaSet, err error)
-	Apply(ctx context.Context, replicaSet *appsv1.ReplicaSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicaSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *appsv1.ReplicaSet, err error)
+	Apply(ctx context.Context, replicaSet *applyconfigurationsappsv1.ReplicaSetApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.ReplicaSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, replicaSet *appsv1.ReplicaSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicaSet, err error)
+	ApplyStatus(ctx context.Context, replicaSet *applyconfigurationsappsv1.ReplicaSetApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.ReplicaSet, err error)
 	GetScale(ctx context.Context, replicaSetName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, replicaSetName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 	ApplyScale(ctx context.Context, replicaSetName string, scale *applyconfigurationsautoscalingv1.ScaleApplyConfiguration, opts metav1.ApplyOptions) (*autoscalingv1.Scale, error)
@@ -64,19 +64,19 @@ type ReplicaSetInterface interface {
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	*gentype.ClientWithListAndApply[*v1.ReplicaSet, *v1.ReplicaSetList, *appsv1.ReplicaSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1.ReplicaSet, *appsv1.ReplicaSetList, *applyconfigurationsappsv1.ReplicaSetApplyConfiguration]
 }
 
 // newReplicaSets returns a ReplicaSets
 func newReplicaSets(c *AppsV1Client, namespace string) *replicaSets {
 	return &replicaSets{
-		gentype.NewClientWithListAndApply[*v1.ReplicaSet, *v1.ReplicaSetList, *appsv1.ReplicaSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1.ReplicaSet, *appsv1.ReplicaSetList, *applyconfigurationsappsv1.ReplicaSetApplyConfiguration](
 			"replicasets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ReplicaSet { return &v1.ReplicaSet{} },
-			func() *v1.ReplicaSetList { return &v1.ReplicaSetList{} }),
+			func() *appsv1.ReplicaSet { return &appsv1.ReplicaSet{} },
+			func() *appsv1.ReplicaSetList { return &appsv1.ReplicaSetList{} }),
 	}
 }
 

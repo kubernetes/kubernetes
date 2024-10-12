@@ -78,7 +78,6 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -150,7 +149,9 @@ func TestRoundTripExternalTypes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	for _, builder := range groups {
-		require.NoError(t, builder.AddToScheme(scheme))
+		if err := builder.AddToScheme(scheme); err != nil {
+			t.Fatalf("unexpected error adding to scheme: %v", err)
+		}
 	}
 	seed := rand.Int63()
 	// I'm only using the generic fuzzer funcs, but at some point in time we might need to
@@ -163,7 +164,9 @@ func TestRoundTripExternalTypes(t *testing.T) {
 func TestCompatibility(t *testing.T) {
 	scheme := runtime.NewScheme()
 	for _, builder := range groups {
-		require.NoError(t, builder.AddToScheme(scheme))
+		if err := builder.AddToScheme(scheme); err != nil {
+			t.Fatalf("unexpected error adding to scheme: %v", err)
+		}
 	}
 	roundtrip.NewCompatibilityTestOptions(scheme).Complete(t).Run(t)
 }

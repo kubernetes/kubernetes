@@ -311,11 +311,10 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.AuthenticationConfigFile, "authentication-config", o.AuthenticationConfigFile, ""+
 		"File with Authentication Configuration to configure the JWT Token authenticator or the anonymous authenticator. "+
-		"Note: This feature is in Alpha since v1.29."+
-		"--feature-gate=StructuredAuthenticationConfiguration=true needs to be set for enabling this feature."+
-		"This feature is mutually exclusive with the oidc-* flags."+
-		"To configure anonymous authenticator you need to enable --feature-gate=AnonymousAuthConfigurableEndpoints."+
-		"When you configure anonymous authenticator in the authentication config you cannot use the --anonymous-auth flag.")
+		"Requires the StructuredAuthenticationConfiguration feature gate. "+
+		"Also requires the feature gate AnonymousAuthConfigurableEndpoints to configure the anonymous authenticator in the config file. "+
+		"This flag is mutually exclusive with the --oidc-* flags if the file configures the JWT Token authenticator. "+
+		"This flag is mutually exclusive with --anonymous-auth if the file configures the Anonymous authenticator.")
 
 	fs.StringSliceVar(&o.APIAudiences, "api-audiences", o.APIAudiences, ""+
 		"Identifiers of the API. The service account token authenticator will validate that "+

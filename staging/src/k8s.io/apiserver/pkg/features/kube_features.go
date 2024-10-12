@@ -18,6 +18,7 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
@@ -55,6 +56,7 @@ const (
 	// owner: @vinayakankugoyal
 	// kep: https://kep.k8s.io/4633
 	// alpha: v1.31
+	// beta: v1.32
 	//
 	// Allows us to enable anonymous auth for only certain apiserver endpoints.
 	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
@@ -89,7 +91,7 @@ const (
 	APIServerTracing featuregate.Feature = "APIServerTracing"
 
 	// owner: @linxiulei
-	// beta: v1.30
+	// alpha: v1.30
 	//
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
@@ -105,16 +107,6 @@ const (
 	// beta: v1.31
 	// Enables concurrent watch object decoding to avoid starving watch cache when conversion webhook is installed.
 	ConcurrentWatchObjectDecode featuregate.Feature = "ConcurrentWatchObjectDecode"
-
-	// owner: @cici37 @jpbetz
-	// kep: http://kep.k8s.io/3488
-	// alpha: v1.26
-	// beta: v1.28
-	// stable: v1.30
-	//
-	// Note: the feature gate can be removed in 1.32
-	// Enables expression validation in Admission Control
-	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
@@ -136,23 +128,6 @@ const (
 	//
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
-
-	// owner: @aramase
-	// kep: https://kep.k8s.io/3299
-	// alpha: v1.25
-	// beta: v1.27
-	// stable: v1.29
-	//
-	// Enables KMS v2 API for encryption at rest.
-	KMSv2 featuregate.Feature = "KMSv2"
-
-	// owner: @enj
-	// kep: https://kep.k8s.io/3299
-	// beta: v1.28
-	// stable: v1.29
-	//
-	// Enables the use of derived encryption keys with KMS v2.
-	KMSv2KDF featuregate.Feature = "KMSv2KDF"
 
 	// owner: @alexzielenski, @cici37, @jiahuif
 	// kep: https://kep.k8s.io/3962
@@ -193,22 +168,6 @@ const (
 	// This prevents watch cache from being starved by other watches.
 	SeparateCacheWatchRPC featuregate.Feature = "SeparateCacheWatchRPC"
 
-	// owner: @apelisse, @lavalamp
-	// alpha: v1.14
-	// beta: v1.16
-	// stable: v1.22
-	//
-	// Server-side apply. Merging happens on the server.
-	ServerSideApply featuregate.Feature = "ServerSideApply"
-
-	// owner: @kevindelgado
-	// kep: https://kep.k8s.io/2885
-	// alpha: v1.23
-	// beta: v1.24
-	//
-	// Enables server-side field validation.
-	ServerSideFieldValidation featuregate.Feature = "ServerSideFieldValidation"
-
 	// owner: @enj
 	// beta: v1.29
 	//
@@ -229,6 +188,8 @@ const (
 
 	// owner: @jpbetz
 	// alpha: v1.30
+	// beta: v1.31
+	// ga: v1.32
 	// Resource create requests using generateName are retried automatically by the apiserver
 	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
 	RetryGenerateName featuregate.Feature = "RetryGenerateName"
@@ -301,13 +262,6 @@ const (
 	// Used to prevent https://github.com/kubernetes/kubernetes/issues/123072 until etcd fixes the issue.
 	WatchFromStorageWithoutResourceVersion featuregate.Feature = "WatchFromStorageWithoutResourceVersion"
 
-	// owner: @vinaykul
-	// kep: http://kep.k8s.io/1287
-	// alpha: v1.27
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @p0lyn0mial
 	// alpha: v1.27
 	//
@@ -340,89 +294,167 @@ func init() {
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
+//
+// Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
+// when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	// Example:
-	// EmulationVersion: {
-	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-	// },
+	AdmissionWebhookMatchConditions: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	AggregatedDiscoveryEndpoint: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	AnonymousAuthConfigurableEndpoints: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	APIListChunking: {
+		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.9"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	APIResponseCompression: {
+		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	APIServerIdentity: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	APIServerTracing: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	APIServingWithRoutine: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	AuthorizeWithSelectors: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ConcurrentWatchObjectDecode: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	ConsistentListFromCache: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CoordinatedLeaderElection: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	EfficientWatchResumption: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.21"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	KMSv1: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	MutatingAdmissionPolicy: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	OpenAPIEnums: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RemainingItemCount: {
+		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	ResilientWatchCacheInitialization: {
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RetryGenerateName: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+	},
+
+	SeparateCacheWatchRPC: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StorageVersionAPI: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	StorageVersionHash: {
+		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StrictCostEnforcementForVAP: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	StrictCostEnforcementForWebhooks: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	StructuredAuthenticationConfiguration: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StructuredAuthorizationConfiguration: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	UnauthenticatedHTTP2DOSMitigation: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WatchBookmark: {
+		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.17"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	WatchCacheInitializationPostStartHook: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	WatchFromStorageWithoutResourceVersion: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	WatchList: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ZeroLimitedNominalConcurrencyShares: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
 }
 
-// defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-
-	AnonymousAuthConfigurableEndpoints: {Default: false, PreRelease: featuregate.Alpha},
-
-	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
-
-	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
-
-	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
-
-	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
-
-	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
-
-	APIServingWithRoutine: {Default: false, PreRelease: featuregate.Alpha},
-
-	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
-
-	ConcurrentWatchObjectDecode: {Default: false, PreRelease: featuregate.Beta},
-
-	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
-
-	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
-
-	KMSv2: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	KMSv2KDF: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
-	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
-
-	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	ResilientWatchCacheInitialization: {Default: true, PreRelease: featuregate.Beta},
-
-	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
-
-	SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
-
-	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
-
-	StorageVersionAPI: {Default: false, PreRelease: featuregate.Alpha},
-
-	StorageVersionHash: {Default: true, PreRelease: featuregate.Beta},
-
-	StrictCostEnforcementForVAP: {Default: false, PreRelease: featuregate.Beta},
-
-	StrictCostEnforcementForWebhooks: {Default: false, PreRelease: featuregate.Beta},
-
-	StructuredAuthenticationConfiguration: {Default: true, PreRelease: featuregate.Beta},
-
-	StructuredAuthorizationConfiguration: {Default: true, PreRelease: featuregate.Beta},
-
-	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
-
-	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	WatchCacheInitializationPostStartHook: {Default: false, PreRelease: featuregate.Beta},
-
-	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
-
-	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
-
-	WatchList: {Default: false, PreRelease: featuregate.Alpha},
-
-	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
-
-	ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-}
+// defaultKubernetesFeatureGates consists of legacy unversioned Kubernetes-specific feature keys.
+// Please do not add to this struct and use defaultVersionedKubernetesFeatureGates instead.
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -44,10 +45,11 @@ var _ framework.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer parallelize.Parallelizer
-	args         config.InterPodAffinityArgs
-	sharedLister framework.SharedLister
-	nsLister     listersv1.NamespaceLister
+	parallelizer              parallelize.Parallelizer
+	args                      config.InterPodAffinityArgs
+	sharedLister              framework.SharedLister
+	nsLister                  listersv1.NamespaceLister
+	enableSchedulingQueueHint bool
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -58,6 +60,15 @@ func (pl *InterPodAffinity) Name() string {
 // EventsToRegister returns the possible events that may make a failed Pod
 // schedulable
 func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint event:
+	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	if pl.enableSchedulingQueueHint {
+		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeTaint event.
+		nodeActionType = framework.Add | framework.UpdateNodeLabel
+	}
 	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
@@ -66,22 +77,13 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]framework.Clu
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
-		//
-		// A note about UpdateNodeTaint event:
-		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
-		// As a common problematic scenario,
-		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
-		// In such cases, this plugin may miss some events that actually make pods schedulable.
-		// As a workaround, we add UpdateNodeTaint event to catch the case.
-		// We can remove UpdateNodeTaint when we remove the preCheck feature.
-		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add | framework.UpdatePodLabel | framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}
@@ -93,10 +95,11 @@ func New(_ context.Context, plArgs runtime.Object, h framework.Handle) (framewor
 		return nil, err
 	}
 	pl := &InterPodAffinity{
-		parallelizer: h.Parallelizer(),
-		args:         args,
-		sharedLister: h.SnapshotSharedLister(),
-		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+		parallelizer:              h.Parallelizer(),
+		args:                      args,
+		sharedLister:              h.SnapshotSharedLister(),
+		nsLister:                  h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}
 
 	return pl, nil

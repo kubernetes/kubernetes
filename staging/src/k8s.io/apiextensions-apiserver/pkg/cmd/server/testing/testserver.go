@@ -124,7 +124,11 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
+
+	// Configure the effective version.
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+
 	utilversion.DefaultComponentGlobalsRegistry.Reset()
 	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -237,7 +238,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		info := doTokenReview(t, cs, treq, false)
 		// we are not testing the credential-id feature, so delete this value from the returned extra info map
 		if info.Extra != nil {
-			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+			delete(info.Extra, user.CredentialIDKey)
 		}
 		if len(info.Extra) > 0 {
 			t.Fatalf("expected Extra to be empty but got: %#v", info.Extra)
@@ -309,7 +310,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		info := doTokenReview(t, cs, treq, false)
 		// we are not testing the credential-id feature, so delete this value from the returned extra info map
-		delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+		delete(info.Extra, user.CredentialIDKey)
 		if len(info.Extra) != 2 {
 			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
 		}
@@ -405,7 +406,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 			info := doTokenReview(t, cs, treq, false)
 			// we are not testing the credential-id feature, so delete this value from the returned extra info map
-			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+			delete(info.Extra, user.CredentialIDKey)
 			if len(info.Extra) != len(expectedExtraValues) {
 				t.Fatalf("expected Extra have length of %d but was length %d: %#v", len(expectedExtraValues), len(info.Extra), info.Extra)
 			}

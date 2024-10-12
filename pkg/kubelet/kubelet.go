@@ -386,7 +386,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+	if !cloudprovider.IsExternal(cloudProvider) && len(cloudProvider) != 0 {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
 		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
 	}
@@ -738,7 +738,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			RelistPeriod:    eventedPlegRelistPeriod,
 			RelistThreshold: eventedPlegRelistThreshold,
 		}
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
+		klet.pleg = pleg.NewGenericPLEG(logger, klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
 		// In case Evented PLEG has to fall back on Generic PLEG due to an error,
 		// Evented PLEG should be able to reset the Generic PLEG relisting duration
 		// to the default value.
@@ -746,7 +746,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			RelistPeriod:    genericPlegRelistPeriod,
 			RelistThreshold: genericPlegRelistThreshold,
 		}
-		klet.eventedPleg, err = pleg.NewEventedPLEG(klet.containerRuntime, klet.runtimeService, eventChannel,
+		klet.eventedPleg, err = pleg.NewEventedPLEG(logger, klet.containerRuntime, klet.runtimeService, eventChannel,
 			klet.podCache, klet.pleg, eventedPlegMaxStreamRetries, eventedRelistDuration, clock.RealClock{})
 		if err != nil {
 			return nil, err
@@ -756,7 +756,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			RelistPeriod:    genericPlegRelistPeriod,
 			RelistThreshold: genericPlegRelistThreshold,
 		}
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
+		klet.pleg = pleg.NewGenericPLEG(logger, klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
 	}
 
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
@@ -931,6 +931,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
 		Logger:                           logger,
 		ProbeManager:                     klet.probeManager,
+		VolumeManager:                    klet.volumeManager,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
 		GetPodsFunc:                      klet.GetActivePods,
@@ -1561,7 +1562,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		os.Exit(1)
 	}
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
+	if err := kl.containerManager.Start(context.TODO(), node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.ErrorS(err, "Failed to start ContainerManager")
 		os.Exit(1)
@@ -1645,10 +1646,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		os.Exit(1)
 	}
 
-	kl.warnCgroupV1Usage()
+	if err := kl.cgroupVersionCheck(); err != nil {
+		klog.V(2).InfoS("Warning: cgroup check", "error", err)
+	}
 
 	// Start volume manager
-	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
+	go kl.volumeManager.Run(ctx, kl.sourcesReady)
 
 	if kl.kubeClient != nil {
 		// Start two go-routines to update the status.
@@ -2075,7 +2078,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	// and BEFORE the pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if err := kl.UnprepareDynamicResources(pod); err != nil {
+		if err := kl.UnprepareDynamicResources(ctx, pod); err != nil {
 			return err
 		}
 	}
@@ -2465,7 +2468,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		ready := update.Result == proberesults.Success
 		kl.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
 
-		status := ""
+		status := "not ready"
 		if ready {
 			status = "ready"
 		}
@@ -2567,7 +2570,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// shutting it down. If the pod hasn't started yet, we know that when
 		// the pod worker is invoked it will also avoid setting up the pod, so
 		// we simply avoid doing any work.
-		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+		// We also do not try to admit the pod that is already in terminated state.
+		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
 			activePods := kl.filterOutInactivePods(existingPods)
@@ -3057,21 +3061,12 @@ func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 
 // PrepareDynamicResources calls the container Manager PrepareDynamicResources API
 // This method implements the RuntimeHelper interface
-func (kl *Kubelet) PrepareDynamicResources(pod *v1.Pod) error {
-	return kl.containerManager.PrepareDynamicResources(pod)
+func (kl *Kubelet) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+	return kl.containerManager.PrepareDynamicResources(ctx, pod)
 }
 
 // UnprepareDynamicResources calls the container Manager UnprepareDynamicResources API
 // This method implements the RuntimeHelper interface
-func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
-	return kl.containerManager.UnprepareDynamicResources(pod)
-}
-
-func (kl *Kubelet) warnCgroupV1Usage() {
-	cgroupVersion := kl.containerManager.GetNodeConfig().CgroupVersion
-	if cgroupVersion == 1 {
-		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.CgroupV1, cm.CgroupV1MaintenanceModeWarning)
-		klog.V(2).InfoS("Warning: cgroup v1", "message", cm.CgroupV1MaintenanceModeWarning)
-	}
-	metrics.CgroupVersion.Set(float64(cgroupVersion))
+func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
+	return kl.containerManager.UnprepareDynamicResources(ctx, pod)
 }

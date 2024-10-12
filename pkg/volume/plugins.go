@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -61,6 +62,8 @@ const (
 	ProbeAddOrUpdate ProbeOperation = 1 << iota
 	ProbeRemove
 )
+
+var ErrNoPluiginMatched = errors.New("no volume plugin matched")
 
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
@@ -624,6 +627,7 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
+	pm.refreshProbedPlugins()
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
@@ -640,7 +644,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 	}
 
-	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
 			match = plugin
@@ -649,7 +652,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	}
 
 	if len(matchedPluginNames) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+		return nil, ErrNoPluiginMatched
 	}
 	if len(matchedPluginNames) > 1 {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
@@ -660,6 +663,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 // FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
+	pm.refreshProbedPlugins()
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
@@ -668,7 +672,6 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		match = v
 	}
 
-	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
 		if match != nil {
 			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
@@ -691,6 +694,12 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 		klog.ErrorS(err, "Error dynamically probing plugins")
 	}
 
+	if len(events) == 0 {
+		return
+	}
+
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 	// because the probe function can return a list of valid plugins
 	// even when an error is present we still must add the plugins
 	// or they will be skipped because each event only fires once
@@ -863,6 +872,9 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 			klog.V(4).InfoS("FindExpandablePluginBySpec -> returning noopExpandableVolumePluginInstance", "specName", spec.Name())
 			return &noopExpandableVolumePluginInstance{spec}, nil
 		}
+		if errors.Is(err, ErrNoPluiginMatched) {
+			return nil, nil
+		}
 		klog.V(4).InfoS("FindExpandablePluginBySpec -> err", "specName", spec.Name(), "err", err)
 		return nil, err
 	}
@@ -984,7 +996,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
-					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.3",
+					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.4",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && find /scrub -mindepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{

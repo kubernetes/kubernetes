@@ -60,7 +60,7 @@ func TestLazyMapType(t *testing.T) {
 		evalCounter++
 		v, err := compileAndRun(env, activation, `{"a": "a"}`)
 		if err != nil {
-			return types.NewErr(err.Error())
+			return types.NewErr("%s", err.Error())
 		}
 		return v
 	})
@@ -142,8 +142,7 @@ func buildTestEnv() (*cel.Env, *apiservercel.DeclType, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	// TODO: change to NewExpressions after 1.28
-	env, err := envSet.Env(environment.StoredExpressions)
+	env, err := envSet.Env(environment.NewExpressions)
 	return env, variablesType, err
 }
 

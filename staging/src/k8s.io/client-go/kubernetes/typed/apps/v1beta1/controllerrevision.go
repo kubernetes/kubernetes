@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
+	applyconfigurationsappsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,32 @@ type ControllerRevisionsGetter interface {
 
 // ControllerRevisionInterface has methods to work with ControllerRevision resources.
 type ControllerRevisionInterface interface {
-	Create(ctx context.Context, controllerRevision *v1beta1.ControllerRevision, opts v1.CreateOptions) (*v1beta1.ControllerRevision, error)
-	Update(ctx context.Context, controllerRevision *v1beta1.ControllerRevision, opts v1.UpdateOptions) (*v1beta1.ControllerRevision, error)
+	Create(ctx context.Context, controllerRevision *appsv1beta1.ControllerRevision, opts v1.CreateOptions) (*appsv1beta1.ControllerRevision, error)
+	Update(ctx context.Context, controllerRevision *appsv1beta1.ControllerRevision, opts v1.UpdateOptions) (*appsv1beta1.ControllerRevision, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ControllerRevision, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ControllerRevisionList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta1.ControllerRevision, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta1.ControllerRevisionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ControllerRevision, err error)
-	Apply(ctx context.Context, controllerRevision *appsv1beta1.ControllerRevisionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ControllerRevision, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta1.ControllerRevision, err error)
+	Apply(ctx context.Context, controllerRevision *applyconfigurationsappsv1beta1.ControllerRevisionApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta1.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
 // controllerRevisions implements ControllerRevisionInterface
 type controllerRevisions struct {
-	*gentype.ClientWithListAndApply[*v1beta1.ControllerRevision, *v1beta1.ControllerRevisionList, *appsv1beta1.ControllerRevisionApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta1.ControllerRevision, *appsv1beta1.ControllerRevisionList, *applyconfigurationsappsv1beta1.ControllerRevisionApplyConfiguration]
 }
 
 // newControllerRevisions returns a ControllerRevisions
 func newControllerRevisions(c *AppsV1beta1Client, namespace string) *controllerRevisions {
 	return &controllerRevisions{
-		gentype.NewClientWithListAndApply[*v1beta1.ControllerRevision, *v1beta1.ControllerRevisionList, *appsv1beta1.ControllerRevisionApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta1.ControllerRevision, *appsv1beta1.ControllerRevisionList, *applyconfigurationsappsv1beta1.ControllerRevisionApplyConfiguration](
 			"controllerrevisions",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.ControllerRevision { return &v1beta1.ControllerRevision{} },
-			func() *v1beta1.ControllerRevisionList { return &v1beta1.ControllerRevisionList{} }),
+			func() *appsv1beta1.ControllerRevision { return &appsv1beta1.ControllerRevision{} },
+			func() *appsv1beta1.ControllerRevisionList { return &appsv1beta1.ControllerRevisionList{} }),
 	}
 }

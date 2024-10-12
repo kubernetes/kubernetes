@@ -75,6 +75,8 @@ func Test_getSafeSysctlAllowlist(t *testing.T) {
 				"net.ipv4.tcp_fin_timeout",
 				"net.ipv4.tcp_keepalive_intvl",
 				"net.ipv4.tcp_keepalive_probes",
+				"net.ipv4.tcp_rmem",
+				"net.ipv4.tcp_wmem",
 			},
 		},
 	}

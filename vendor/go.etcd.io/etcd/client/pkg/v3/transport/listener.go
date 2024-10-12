@@ -180,11 +180,22 @@ type TLSInfo struct {
 	parseFunc func([]byte, []byte) (tls.Certificate, error)
 
 	// AllowedCN is a CN which must be provided by a client.
+	//
+	// Deprecated: use AllowedCNs instead.
 	AllowedCN string
 
 	// AllowedHostname is an IP address or hostname that must match the TLS
 	// certificate provided by a client.
+	//
+	// Deprecated: use AllowedHostnames instead.
 	AllowedHostname string
+
+	// AllowedCNs is a list of acceptable CNs which must be provided by a client.
+	AllowedCNs []string
+
+	// AllowedHostnames is a list of acceptable IP addresses or hostnames that must match the
+	// TLS certificate provided by a client.
+	AllowedHostnames []string
 
 	// Logger logs TLS errors.
 	// If nil, all logs are discarded.
@@ -407,17 +418,50 @@ func (info TLSInfo) baseConfig() (*tls.Config, error) {
 	// Client certificates may be verified by either an exact match on the CN,
 	// or a more general check of the CN and SANs.
 	var verifyCertificate func(*x509.Certificate) bool
+
+	if info.AllowedCN != "" && len(info.AllowedCNs) > 0 {
+		return nil, fmt.Errorf("AllowedCN and AllowedCNs are mutually exclusive (cn=%q, cns=%q)", info.AllowedCN, info.AllowedCNs)
+	}
+	if info.AllowedHostname != "" && len(info.AllowedHostnames) > 0 {
+		return nil, fmt.Errorf("AllowedHostname and AllowedHostnames are mutually exclusive (hostname=%q, hostnames=%q)", info.AllowedHostname, info.AllowedHostnames)
+	}
+	if info.AllowedCN != "" && info.AllowedHostname != "" {
+		return nil, fmt.Errorf("AllowedCN and AllowedHostname are mutually exclusive (cn=%q, hostname=%q)", info.AllowedCN, info.AllowedHostname)
+	}
+	if len(info.AllowedCNs) > 0 && len(info.AllowedHostnames) > 0 {
+		return nil, fmt.Errorf("AllowedCNs and AllowedHostnames are mutually exclusive (cns=%q, hostnames=%q)", info.AllowedCNs, info.AllowedHostnames)
+	}
+
 	if info.AllowedCN != "" {
-		if info.AllowedHostname != "" {
-			return nil, fmt.Errorf("AllowedCN and AllowedHostname are mutually exclusive (cn=%q, hostname=%q)", info.AllowedCN, info.AllowedHostname)
-		}
+		info.Logger.Warn("AllowedCN is deprecated, use AllowedCNs instead")
 		verifyCertificate = func(cert *x509.Certificate) bool {
 			return info.AllowedCN == cert.Subject.CommonName
 		}
 	}
 	if info.AllowedHostname != "" {
+		info.Logger.Warn("AllowedHostname is deprecated, use AllowedHostnames instead")
 		verifyCertificate = func(cert *x509.Certificate) bool {
 			return cert.VerifyHostname(info.AllowedHostname) == nil
+		}
+	}
+	if len(info.AllowedCNs) > 0 {
+		verifyCertificate = func(cert *x509.Certificate) bool {
+			for _, allowedCN := range info.AllowedCNs {
+				if allowedCN == cert.Subject.CommonName {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	if len(info.AllowedHostnames) > 0 {
+		verifyCertificate = func(cert *x509.Certificate) bool {
+			for _, allowedHostname := range info.AllowedHostnames {
+				if cert.VerifyHostname(allowedHostname) == nil {
+					return true
+				}
+			}
+			return false
 		}
 	}
 	if verifyCertificate != nil {

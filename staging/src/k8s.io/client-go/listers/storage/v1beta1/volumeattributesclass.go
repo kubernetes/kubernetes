@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // VolumeAttributesClassLister helps list VolumeAttributesClasses.
@@ -30,19 +30,19 @@ import (
 type VolumeAttributesClassLister interface {
 	// List lists all VolumeAttributesClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.VolumeAttributesClass, err error)
+	List(selector labels.Selector) (ret []*storagev1beta1.VolumeAttributesClass, err error)
 	// Get retrieves the VolumeAttributesClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.VolumeAttributesClass, error)
+	Get(name string) (*storagev1beta1.VolumeAttributesClass, error)
 	VolumeAttributesClassListerExpansion
 }
 
 // volumeAttributesClassLister implements the VolumeAttributesClassLister interface.
 type volumeAttributesClassLister struct {
-	listers.ResourceIndexer[*v1beta1.VolumeAttributesClass]
+	listers.ResourceIndexer[*storagev1beta1.VolumeAttributesClass]
 }
 
 // NewVolumeAttributesClassLister returns a new VolumeAttributesClassLister.
 func NewVolumeAttributesClassLister(indexer cache.Indexer) VolumeAttributesClassLister {
-	return &volumeAttributesClassLister{listers.New[*v1beta1.VolumeAttributesClass](indexer, v1beta1.Resource("volumeattributesclass"))}
+	return &volumeAttributesClassLister{listers.New[*storagev1beta1.VolumeAttributesClass](indexer, storagev1beta1.Resource("volumeattributesclass"))}
 }

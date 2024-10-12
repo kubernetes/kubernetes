@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -60,9 +62,11 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metricsutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -120,7 +124,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	assert.Len(t, gc.dependencyGraphBuilder.monitors, 1)
 
-	go gc.Run(tCtx, 1)
+	go gc.Run(tCtx, 1, 5*time.Second)
 
 	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
@@ -814,7 +818,8 @@ func TestGetDeletableResources(t *testing.T) {
 }
 
 // TestGarbageCollectorSync ensures that a discovery client error
-// will not cause the garbage collector to block infinitely.
+// or an informer sync error will not cause the garbage collector
+// to block infinitely.
 func TestGarbageCollectorSync(t *testing.T) {
 	serverResources := []*metav1.APIResourceList{
 		{
@@ -845,7 +850,6 @@ func TestGarbageCollectorSync(t *testing.T) {
 		PreferredResources: serverResources,
 		Error:              nil,
 		Lock:               sync.Mutex{},
-		InterfaceUsedCount: 0,
 	}
 
 	testHandler := &fakeActionHandler{
@@ -864,7 +868,24 @@ func TestGarbageCollectorSync(t *testing.T) {
 			},
 		},
 	}
-	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+
+	testHandler2 := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/secrets": {
+				200,
+				[]byte("{}"),
+			},
+		},
+	}
+	var secretSyncOK atomic.Bool
+	var alternativeTestHandler = func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/v1/secrets" && secretSyncOK.Load() {
+			testHandler2.ServeHTTP(response, request)
+			return
+		}
+		testHandler.ServeHTTP(response, request)
+	}
+	srv, clientConfig := testServerAndClientConfig(alternativeTestHandler)
 	defer srv.Close()
 	clientConfig.ContentConfig.NegotiatedSerializer = nil
 	client, err := kubernetes.NewForConfig(clientConfig)
@@ -884,7 +905,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
@@ -893,7 +914,8 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go gc.Run(tCtx, 1)
+	syncPeriod := 200 * time.Millisecond
+	go gc.Run(tCtx, 1, syncPeriod)
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -908,14 +930,14 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(tCtx, fakeDiscoveryClient, 200*time.Millisecond)
+	go gc.Sync(tCtx, fakeDiscoveryClient, syncPeriod)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
-		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 	assertMonitors(t, gc, "pods", "deployments")
 
@@ -930,7 +952,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// Remove the error from being returned and see if the garbage collector sync is still working
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
@@ -946,7 +968,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// Put the resources back to normal and ensure garbage collector sync recovers
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
@@ -963,12 +985,33 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	err = expectSyncNotBlocked(fakeDiscoveryClient)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
 	// Unsyncable monitor removed
 	assertMonitors(t, gc, "pods", "deployments")
+
+	// Simulate initial not-synced informer which will be synced at the end.
+	metrics.GarbageCollectorResourcesSyncError.Reset()
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
+	time.Sleep(1 * time.Second)
+	assertMonitors(t, gc, "pods", "secrets")
+	if gc.IsSynced(logger) {
+		t.Fatal("cache from garbage collector should not be synced")
+	}
+	val, _ := metricsutil.GetCounterMetricValue(metrics.GarbageCollectorResourcesSyncError)
+	if val < 1 {
+		t.Fatalf("expect sync error metric > 0")
+	}
+
+	// The informer is synced now.
+	secretSyncOK.Store(true)
+	if err := wait.PollUntilContextTimeout(tCtx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		return gc.IsSynced(logger), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
@@ -983,27 +1026,15 @@ func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
 	}
 }
 
-func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *sync.RWMutex) error {
+func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources) error {
 	before := fakeDiscoveryClient.getInterfaceUsedCount()
 	t := 1 * time.Second
 	time.Sleep(t)
 	after := fakeDiscoveryClient.getInterfaceUsedCount()
 	if before == after {
-		return fmt.Errorf("discoveryClient.ServerPreferredResources() called %d times over %v", after-before, t)
+		return fmt.Errorf("discoveryClient.ServerPreferredResources() not called over %v", t)
 	}
-
-	workerLockAcquired := make(chan struct{})
-	go func() {
-		workerLock.Lock()
-		defer workerLock.Unlock()
-		close(workerLockAcquired)
-	}()
-	select {
-	case <-workerLockAcquired:
-		return nil
-	case <-time.After(t):
-		return fmt.Errorf("workerLock blocked for at least %v", t)
-	}
+	return nil
 }
 
 type fakeServerResources struct {

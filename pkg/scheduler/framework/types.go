@@ -32,7 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/apimachinery/pkg/api/resource"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -56,6 +56,7 @@ const (
 	// for better performance in requeueing.
 	UpdateNodeAllocatable
 	UpdateNodeLabel
+	// UpdateNodeTaint is an update for node's taints or node.Spec.Unschedulable.
 	UpdateNodeTaint
 	UpdateNodeCondition
 	UpdateNodeAnnotation
@@ -68,6 +69,14 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
+	// UpdatePodTolerations is an addition for pod's tolerations.
+	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
+	UpdatePodTolerations
+	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
+	UpdatePodSchedulingGatesEliminated
+	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
+	// Depends on the DynamicResourceAllocation feature gate.
+	UpdatePodGeneratedResourceClaim
 
 	// updatePodOther is a update for pod's other fields.
 	// It's used only for the internal event handling, and thus unexported.
@@ -76,7 +85,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | updatePodOther
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodTolerations | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
@@ -125,6 +134,7 @@ const (
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
+	ResourceSlice         GVK = "ResourceSlice"
 	DeviceClass           GVK = "DeviceClass"
 
 	// WildCard is a special GVK to match all resources.
@@ -139,7 +149,7 @@ const (
 
 type ClusterEventWithHint struct {
 	Event ClusterEvent
-	// QueueingHintFn is executed for the plugin rejected by this plugin when the above Event happens,
+	// QueueingHintFn is executed for the Pod rejected by this plugin when the above Event happens,
 	// and filters out events to reduce useless retry of Pod's scheduling.
 	// It's an optional field. If not set,
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
@@ -231,15 +241,19 @@ type QueuedPodInfo struct {
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
 	// Number of schedule attempts before successfully scheduled.
-	// It's used to record the # attempts metric.
+	// It's used to record the # attempts metric and calculate the backoff time this Pod is obliged to get before retrying.
 	Attempts int
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
 	InitialAttemptTimestamp *time.Time
-	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status.
-	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, PreBind or Permit (WaitOnPermit).
+	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
+	// at specific extension points: PreFilter, Filter, Reserve, Permit (WaitOnPermit), or PreBind.
+	// If Pods are rejected at other extension points,
+	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
+	// and retried soon after a backoff period.
+	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
 	UnschedulablePlugins sets.Set[string]
 	// PendingPlugins records the plugin names that the Pod failed with Pending status.
 	PendingPlugins sets.Set[string]
@@ -255,6 +269,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		Attempts:                pqi.Attempts,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
+		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		Gated:                   pqi.Gated,
 	}
 }
@@ -356,12 +371,10 @@ const ExtenderName = "Extender"
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
-	// NodeToStatusMap records the status of each retriable node (status Unschedulable)
+	// NodeToStatus records the status of nodes and generic status for absent ones.
 	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
 	// Nodes that pass PreFilter/Filter plugins are not included in this map.
-	// While this map may contain UnschedulableAndUnresolvable statuses, the absence of
-	// a node should be interpreted as UnschedulableAndUnresolvable.
-	NodeToStatusMap NodeToStatusMap
+	NodeToStatus *NodeToStatus
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
 	// UnschedulablePlugins are plugins that returns Pending.
@@ -421,9 +434,15 @@ func (f *FitError) Error() string {
 		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
 		// Otherwise, we will have duplicated reasons in the error message.
 		reasons := make(map[string]int)
-		for _, status := range f.Diagnosis.NodeToStatusMap {
+		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *Status) {
 			for _, reason := range status.Reasons() {
 				reasons[reason]++
+			}
+		})
+		if f.Diagnosis.NodeToStatus.Len() < f.NumAllNodes {
+			// Adding predefined reasons for nodes that are absent in NodeToStatusMap
+			for _, reason := range f.Diagnosis.NodeToStatus.AbsentNodesStatus().Reasons() {
+				reasons[reason] += f.NumAllNodes - f.Diagnosis.NodeToStatus.Len()
 			}
 		}
 
@@ -911,40 +930,24 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 }
 
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
-	var non0InitCPU, non0InitMem int64
-	var non0CPU, non0Mem int64
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		ContainerFn: func(requests v1.ResourceList, containerType podutil.ContainerType) {
-			non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&requests)
-			switch containerType {
-			case podutil.Containers:
-				non0CPU += non0CPUReq
-				non0Mem += non0MemReq
-			case podutil.InitContainers:
-				non0InitCPU = max(non0InitCPU, non0CPUReq)
-				non0InitMem = max(non0InitMem, non0MemReq)
-			}
+	})
+
+	non0Requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		NonMissingContainerRequests: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
 		},
 	})
 
-	non0CPU = max(non0CPU, non0InitCPU)
-	non0Mem = max(non0Mem, non0InitMem)
+	non0CPU := non0Requests[v1.ResourceCPU]
+	non0Mem := non0Requests[v1.ResourceMemory]
 
-	// If Overhead is being utilized, add to the non-zero cpu/memory tracking for the pod. It has already been added
-	// into ScalarResources since it is part of requests
-	if pod.Spec.Overhead != nil {
-		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
-			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
-		}
-
-		if _, found := pod.Spec.Overhead[v1.ResourceMemory]; found {
-			non0Mem += pod.Spec.Overhead.Memory().Value()
-		}
-	}
 	var res Resource
 	res.Add(requests)
-	return res, non0CPU, non0Mem
+	return res, non0CPU.MilliValue(), non0Mem.Value()
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.

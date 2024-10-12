@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/authentication/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,10 +30,10 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.TokenRequest{}, func(obj interface{}) { SetObjectDefaults_TokenRequest(obj.(*v1.TokenRequest)) })
+	scheme.AddTypeDefaultingFunc(&authenticationv1.TokenRequest{}, func(obj interface{}) { SetObjectDefaults_TokenRequest(obj.(*authenticationv1.TokenRequest)) })
 	return nil
 }
 
-func SetObjectDefaults_TokenRequest(in *v1.TokenRequest) {
+func SetObjectDefaults_TokenRequest(in *authenticationv1.TokenRequest) {
 	SetDefaults_TokenRequestSpec(&in.Spec)
 }

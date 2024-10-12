@@ -536,7 +536,7 @@ func createSRIOVPodOrFail(ctx context.Context, f *framework.Framework) *v1.Pod {
 	return dpPod
 }
 
-// waitForSRIOVResources waits until enough SRIOV resources are avaailable, expecting to complete within the timeout.
+// waitForSRIOVResources waits until enough SRIOV resources are available, expecting to complete within the timeout.
 // if exits successfully, updates the sriovData with the resources which were found.
 func waitForSRIOVResources(ctx context.Context, f *framework.Framework, sd *sriovData) {
 	sriovResourceName := ""
@@ -546,7 +546,7 @@ func waitForSRIOVResources(ctx context.Context, f *framework.Framework, sd *srio
 		node := getLocalNode(ctx, f)
 		sriovResourceName, sriovResourceAmount = findSRIOVResource(node)
 		return sriovResourceAmount > minSriovResource
-	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected SRIOV resources to be available within the timout"))
 
 	sd.resourceName = sriovResourceName
 	sd.resourceAmount = sriovResourceAmount

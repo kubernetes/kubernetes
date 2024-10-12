@@ -139,14 +139,16 @@ func checkDaemonPodStateOnNodes(ctx context.Context, c clientset.Interface, ds *
 	return len(nodesToPodCount) == len(nodeNames), nil
 }
 
+// CheckDaemonStatus returns an error if not all desired pods are scheduled or
+// not all of them are ready.
 func CheckDaemonStatus(ctx context.Context, f *framework.Framework, dsName string) error {
 	ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(ctx, dsName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
-	if desired != scheduled && desired != ready {
-		return fmt.Errorf("error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
+	if desired == scheduled && scheduled == ready {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
 }

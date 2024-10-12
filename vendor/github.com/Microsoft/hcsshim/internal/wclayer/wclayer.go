@@ -1,11 +1,10 @@
-// Package wclayer provides bindings to HCS's legacy layer management API and
-// provides a higher level interface around these calls for container layer
-// management.
+//go:build windows
+
 package wclayer
 
 import "github.com/Microsoft/go-winio/pkg/guid"
 
-//go:generate go run ../../mksyscall_windows.go -output zsyscall_windows.go wclayer.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go wclayer.go
 
 //sys activateLayer(info *driverInfo, id string) (hr error) = vmcompute.ActivateLayer?
 //sys copyLayer(info *driverInfo, srcId string, dstId string, descriptors []WC_LAYER_DESCRIPTOR) (hr error) = vmcompute.CopyLayer?

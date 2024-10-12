@@ -881,7 +881,7 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			svc := tc.updateSvc(service)
 			labels, updated := setEndpointSliceLabels(logger, tc.epSlice, &svc, controllerName)
-			assert.EqualValues(t, updated, tc.expectedUpdate)
+			assert.EqualValues(t, tc.expectedUpdate, updated)
 			assert.EqualValues(t, tc.expectedLabels, labels)
 		})
 	}

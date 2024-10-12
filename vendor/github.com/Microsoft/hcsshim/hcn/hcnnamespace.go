@@ -1,7 +1,10 @@
+//go:build windows
+
 package hcn
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"syscall"
 
@@ -27,7 +30,7 @@ type NamespaceResourceContainer struct {
 type NamespaceResourceType string
 
 var (
-	// NamespaceResourceTypeContainer are contianers associated with a Namespace.
+	// NamespaceResourceTypeContainer are containers associated with a Namespace.
 	NamespaceResourceTypeContainer NamespaceResourceType = "Container"
 	// NamespaceResourceTypeEndpoint are endpoints associated with a Namespace.
 	NamespaceResourceTypeEndpoint NamespaceResourceType = "Endpoint"
@@ -70,14 +73,14 @@ type ModifyNamespaceSettingRequest struct {
 	Settings     json.RawMessage       `json:",omitempty"`
 }
 
-func getNamespace(namespaceGuid guid.GUID, query string) (*HostComputeNamespace, error) {
+func getNamespace(namespaceGUID guid.GUID, query string) (*HostComputeNamespace, error) {
 	// Open namespace.
 	var (
 		namespaceHandle  hcnNamespace
 		resultBuffer     *uint16
 		propertiesBuffer *uint16
 	)
-	hr := hcnOpenNamespace(&namespaceGuid, &namespaceHandle, &resultBuffer)
+	hr := hcnOpenNamespace(&namespaceGUID, &namespaceHandle, &resultBuffer)
 	if err := checkForErrors("hcnOpenNamespace", hr, resultBuffer); err != nil {
 		return nil, err
 	}
@@ -118,8 +121,8 @@ func enumerateNamespaces(query string) ([]HostComputeNamespace, error) {
 	}
 
 	var outputNamespaces []HostComputeNamespace
-	for _, namespaceGuid := range namespaceIds {
-		namespace, err := getNamespace(namespaceGuid, query)
+	for _, namespaceGUID := range namespaceIds {
+		namespace, err := getNamespace(namespaceGUID, query)
 		if err != nil {
 			return nil, err
 		}
@@ -135,8 +138,8 @@ func createNamespace(settings string) (*HostComputeNamespace, error) {
 		resultBuffer     *uint16
 		propertiesBuffer *uint16
 	)
-	namespaceGuid := guid.GUID{}
-	hr := hcnCreateNamespace(&namespaceGuid, settings, &namespaceHandle, &resultBuffer)
+	namespaceGUID := guid.GUID{}
+	hr := hcnCreateNamespace(&namespaceGUID, settings, &namespaceHandle, &resultBuffer)
 	if err := checkForErrors("hcnCreateNamespace", hr, resultBuffer); err != nil {
 		return nil, err
 	}
@@ -164,8 +167,8 @@ func createNamespace(settings string) (*HostComputeNamespace, error) {
 	return &outputNamespace, nil
 }
 
-func modifyNamespace(namespaceId string, settings string) (*HostComputeNamespace, error) {
-	namespaceGuid, err := guid.FromString(namespaceId)
+func modifyNamespace(namespaceID string, settings string) (*HostComputeNamespace, error) {
+	namespaceGUID, err := guid.FromString(namespaceID)
 	if err != nil {
 		return nil, errInvalidNamespaceID
 	}
@@ -175,7 +178,7 @@ func modifyNamespace(namespaceId string, settings string) (*HostComputeNamespace
 		resultBuffer     *uint16
 		propertiesBuffer *uint16
 	)
-	hr := hcnOpenNamespace(&namespaceGuid, &namespaceHandle, &resultBuffer)
+	hr := hcnOpenNamespace(&namespaceGUID, &namespaceHandle, &resultBuffer)
 	if err := checkForErrors("hcnOpenNamespace", hr, resultBuffer); err != nil {
 		return nil, err
 	}
@@ -208,13 +211,13 @@ func modifyNamespace(namespaceId string, settings string) (*HostComputeNamespace
 	return &outputNamespace, nil
 }
 
-func deleteNamespace(namespaceId string) error {
-	namespaceGuid, err := guid.FromString(namespaceId)
+func deleteNamespace(namespaceID string) error {
+	namespaceGUID, err := guid.FromString(namespaceID)
 	if err != nil {
 		return errInvalidNamespaceID
 	}
 	var resultBuffer *uint16
-	hr := hcnDeleteNamespace(&namespaceGuid, &resultBuffer)
+	hr := hcnDeleteNamespace(&namespaceGUID, &resultBuffer)
 	if err := checkForErrors("hcnDeleteNamespace", hr, resultBuffer); err != nil {
 		return err
 	}
@@ -233,12 +236,12 @@ func ListNamespaces() ([]HostComputeNamespace, error) {
 
 // ListNamespacesQuery makes a call to query the list of available namespaces.
 func ListNamespacesQuery(query HostComputeQuery) ([]HostComputeNamespace, error) {
-	queryJson, err := json.Marshal(query)
+	queryJSON, err := json.Marshal(query)
 	if err != nil {
 		return nil, err
 	}
 
-	namespaces, err := enumerateNamespaces(string(queryJson))
+	namespaces, err := enumerateNamespaces(string(queryJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -246,9 +249,9 @@ func ListNamespacesQuery(query HostComputeQuery) ([]HostComputeNamespace, error)
 }
 
 // GetNamespaceByID returns the Namespace specified by Id.
-func GetNamespaceByID(namespaceId string) (*HostComputeNamespace, error) {
+func GetNamespaceByID(namespaceID string) (*HostComputeNamespace, error) {
 	hcnQuery := defaultQuery()
-	mapA := map[string]string{"ID": namespaceId}
+	mapA := map[string]string{"ID": namespaceID}
 	filter, err := json.Marshal(mapA)
 	if err != nil {
 		return nil, err
@@ -260,15 +263,15 @@ func GetNamespaceByID(namespaceId string) (*HostComputeNamespace, error) {
 		return nil, err
 	}
 	if len(namespaces) == 0 {
-		return nil, NamespaceNotFoundError{NamespaceID: namespaceId}
+		return nil, NamespaceNotFoundError{NamespaceID: namespaceID}
 	}
 
 	return &namespaces[0], err
 }
 
 // GetNamespaceEndpointIds returns the endpoints of the Namespace specified by Id.
-func GetNamespaceEndpointIds(namespaceId string) ([]string, error) {
-	namespace, err := GetNamespaceByID(namespaceId)
+func GetNamespaceEndpointIds(namespaceID string) ([]string, error) {
+	namespace, err := GetNamespaceByID(namespaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -286,19 +289,19 @@ func GetNamespaceEndpointIds(namespaceId string) ([]string, error) {
 }
 
 // GetNamespaceContainerIds returns the containers of the Namespace specified by Id.
-func GetNamespaceContainerIds(namespaceId string) ([]string, error) {
-	namespace, err := GetNamespaceByID(namespaceId)
+func GetNamespaceContainerIds(namespaceID string) ([]string, error) {
+	namespace, err := GetNamespaceByID(namespaceID)
 	if err != nil {
 		return nil, err
 	}
 	var containerIds []string
 	for _, resource := range namespace.Resources {
 		if resource.Type == "Container" {
-			var contaienrResource NamespaceResourceContainer
-			if err := json.Unmarshal([]byte(resource.Data), &contaienrResource); err != nil {
+			var containerResource NamespaceResourceContainer
+			if err := json.Unmarshal([]byte(resource.Data), &containerResource); err != nil {
 				return nil, err
 			}
-			containerIds = append(containerIds, contaienrResource.Id)
+			containerIds = append(containerIds, containerResource.Id)
 		}
 	}
 	return containerIds, nil
@@ -375,8 +378,9 @@ func (namespace *HostComputeNamespace) Sync() error {
 	}
 	shimPath := runhcs.VMPipePath(cfg.HostUniqueID)
 	if err := runhcs.IssueVMRequest(shimPath, &req); err != nil {
-		// The shim is likey gone. Simply ignore the sync as if it didn't exist.
-		if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ERROR_FILE_NOT_FOUND {
+		// The shim is likely gone. Simply ignore the sync as if it didn't exist.
+		var perr *os.PathError
+		if errors.As(err, &perr) && errors.Is(perr.Err, syscall.ERROR_FILE_NOT_FOUND) {
 			// Remove the reg key there is no point to try again
 			_ = cfg.Remove()
 			return nil
@@ -394,15 +398,15 @@ func (namespace *HostComputeNamespace) Sync() error {
 }
 
 // ModifyNamespaceSettings updates the Endpoints/Containers of a Namespace.
-func ModifyNamespaceSettings(namespaceId string, request *ModifyNamespaceSettingRequest) error {
-	logrus.Debugf("hcn::HostComputeNamespace::ModifyNamespaceSettings id=%s", namespaceId)
+func ModifyNamespaceSettings(namespaceID string, request *ModifyNamespaceSettingRequest) error {
+	logrus.Debugf("hcn::HostComputeNamespace::ModifyNamespaceSettings id=%s", namespaceID)
 
 	namespaceSettings, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
 
-	_, err = modifyNamespace(namespaceId, string(namespaceSettings))
+	_, err = modifyNamespace(namespaceID, string(namespaceSettings))
 	if err != nil {
 		return err
 	}
@@ -410,37 +414,37 @@ func ModifyNamespaceSettings(namespaceId string, request *ModifyNamespaceSetting
 }
 
 // AddNamespaceEndpoint adds an endpoint to a Namespace.
-func AddNamespaceEndpoint(namespaceId string, endpointId string) error {
-	logrus.Debugf("hcn::HostComputeEndpoint::AddNamespaceEndpoint id=%s", endpointId)
+func AddNamespaceEndpoint(namespaceID string, endpointID string) error {
+	logrus.Debugf("hcn::HostComputeEndpoint::AddNamespaceEndpoint id=%s", endpointID)
 
-	mapA := map[string]string{"EndpointId": endpointId}
-	settingsJson, err := json.Marshal(mapA)
+	mapA := map[string]string{"EndpointId": endpointID}
+	settingsJSON, err := json.Marshal(mapA)
 	if err != nil {
 		return err
 	}
 	requestMessage := &ModifyNamespaceSettingRequest{
 		ResourceType: NamespaceResourceTypeEndpoint,
 		RequestType:  RequestTypeAdd,
-		Settings:     settingsJson,
+		Settings:     settingsJSON,
 	}
 
-	return ModifyNamespaceSettings(namespaceId, requestMessage)
+	return ModifyNamespaceSettings(namespaceID, requestMessage)
 }
 
 // RemoveNamespaceEndpoint removes an endpoint from a Namespace.
-func RemoveNamespaceEndpoint(namespaceId string, endpointId string) error {
-	logrus.Debugf("hcn::HostComputeNamespace::RemoveNamespaceEndpoint id=%s", endpointId)
+func RemoveNamespaceEndpoint(namespaceID string, endpointID string) error {
+	logrus.Debugf("hcn::HostComputeNamespace::RemoveNamespaceEndpoint id=%s", endpointID)
 
-	mapA := map[string]string{"EndpointId": endpointId}
-	settingsJson, err := json.Marshal(mapA)
+	mapA := map[string]string{"EndpointId": endpointID}
+	settingsJSON, err := json.Marshal(mapA)
 	if err != nil {
 		return err
 	}
 	requestMessage := &ModifyNamespaceSettingRequest{
 		ResourceType: NamespaceResourceTypeEndpoint,
 		RequestType:  RequestTypeRemove,
-		Settings:     settingsJson,
+		Settings:     settingsJSON,
 	}
 
-	return ModifyNamespaceSettings(namespaceId, requestMessage)
+	return ModifyNamespaceSettings(namespaceID, requestMessage)
 }

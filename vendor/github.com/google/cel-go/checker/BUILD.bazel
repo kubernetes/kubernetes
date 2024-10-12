@@ -16,7 +16,6 @@ go_library(
         "options.go",
         "printer.go",
         "scopes.go",
-        "standard.go",
         "types.go",
     ],
     importpath = "github.com/google/cel-go/checker",

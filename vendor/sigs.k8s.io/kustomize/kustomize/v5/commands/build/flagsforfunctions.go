@@ -30,7 +30,4 @@ func AddFunctionAlphaEnablementFlags(set *pflag.FlagSet) {
 		&theFlags.fnOptions.EnableExec, "enable-exec", false,
 		"enable support for exec functions (raw executables); "+
 			"do not use for untrusted configs! (Alpha)")
-	set.BoolVar(
-		&theFlags.fnOptions.EnableStar, "enable-star", false,
-		"enable support for starlark functions. (Alpha)")
 }

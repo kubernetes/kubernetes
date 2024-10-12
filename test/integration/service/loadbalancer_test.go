@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/util/version"
 	"testing"
 	"time"
 
@@ -707,8 +708,13 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
+			var testServerOptions *kubeapiservertesting.TestServerInstanceOptions
+			if !tc.ipModeEnabled {
+				testServerOptions = &kubeapiservertesting.TestServerInstanceOptions{EmulationVersion: "1.31"}
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, testServerOptions, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client, err := clientset.NewForConfig(server.ClientConfig)

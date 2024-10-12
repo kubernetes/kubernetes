@@ -165,6 +165,12 @@ func SetDNSPolicy(policy api.DNSPolicy) Tweak {
 	}
 }
 
+func SetDNSConfig(config *api.PodDNSConfig) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.DNSConfig = config
+	}
+}
+
 func SetRestartPolicy(policy api.RestartPolicy) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.RestartPolicy = policy

@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
-	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
+	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	applyconfigurationcrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
 	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -38,32 +38,32 @@ type ExamplesGetter interface {
 
 // ExampleInterface has methods to work with Example resources.
 type ExampleInterface interface {
-	Create(ctx context.Context, example *v1.Example, opts metav1.CreateOptions) (*v1.Example, error)
-	Update(ctx context.Context, example *v1.Example, opts metav1.UpdateOptions) (*v1.Example, error)
+	Create(ctx context.Context, example *crv1.Example, opts metav1.CreateOptions) (*crv1.Example, error)
+	Update(ctx context.Context, example *crv1.Example, opts metav1.UpdateOptions) (*crv1.Example, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Example, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ExampleList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*crv1.Example, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*crv1.ExampleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error)
-	Apply(ctx context.Context, example *crv1.ExampleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Example, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *crv1.Example, err error)
+	Apply(ctx context.Context, example *applyconfigurationcrv1.ExampleApplyConfiguration, opts metav1.ApplyOptions) (result *crv1.Example, err error)
 	ExampleExpansion
 }
 
 // examples implements ExampleInterface
 type examples struct {
-	*gentype.ClientWithListAndApply[*v1.Example, *v1.ExampleList, *crv1.ExampleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*crv1.Example, *crv1.ExampleList, *applyconfigurationcrv1.ExampleApplyConfiguration]
 }
 
 // newExamples returns a Examples
 func newExamples(c *CrV1Client, namespace string) *examples {
 	return &examples{
-		gentype.NewClientWithListAndApply[*v1.Example, *v1.ExampleList, *crv1.ExampleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*crv1.Example, *crv1.ExampleList, *applyconfigurationcrv1.ExampleApplyConfiguration](
 			"examples",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Example { return &v1.Example{} },
-			func() *v1.ExampleList { return &v1.ExampleList{} }),
+			func() *crv1.Example { return &crv1.Example{} },
+			func() *crv1.ExampleList { return &crv1.ExampleList{} }),
 	}
 }

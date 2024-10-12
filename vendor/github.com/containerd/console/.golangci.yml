@@ -1,16 +1,16 @@
 linters:
   enable:
-    - structcheck
-    - varcheck
-    - staticcheck
-    - unconvert
     - gofmt
     - goimports
-    - golint
     - ineffassign
-    - vet
-    - unused
     - misspell
+    - revive
+    - staticcheck
+    - structcheck
+    - unconvert
+    - unused
+    - varcheck
+    - vet
   disable:
     - errcheck
 

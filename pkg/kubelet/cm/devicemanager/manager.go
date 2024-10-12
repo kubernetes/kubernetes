@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,7 +158,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
-		update:                make(chan resourceupdates.Update),
+		update:                make(chan resourceupdates.Update, 100),
 	}
 
 	server, err := plugin.NewServer(socketPath, manager, manager)
@@ -203,12 +204,15 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 		if filePath == m.checkpointFile() {
 			continue
 		}
-		stat, err := os.Stat(filePath)
+		// TODO: Until the bug - https://github.com/golang/go/issues/33357 is fixed, os.stat wouldn't return the
+		// right mode(socket) on windows. Hence deleting the file, without checking whether
+		// its a socket, on windows.
+		stat, err := os.Lstat(filePath)
 		if err != nil {
 			klog.ErrorS(err, "Failed to stat file", "path", filePath)
 			continue
 		}
-		if stat.IsDir() || stat.Mode()&os.ModeSocket == 0 {
+		if stat.IsDir() {
 			continue
 		}
 		err = os.RemoveAll(filePath)
@@ -277,16 +281,20 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 			// compare with old device's health and send update to the channel if needed
+			updatePodUIDFn := func(deviceID string) {
+				podUID, _ := m.podDevices.getPodAndContainerForDevice(deviceID)
+				if podUID != "" {
+					podsToUpdate.Insert(podUID)
+				}
+			}
 			if oldDev, ok := oldDevices[dev.ID]; ok {
 				if oldDev.Health != dev.Health {
-					podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-					podsToUpdate.Insert(podUID)
+					updatePodUIDFn(dev.ID)
 				}
 			} else {
 				// if this is a new device, it might have existed before and disappeared for a while
 				// but still be assigned to a Pod. In this case, we need to send an update to the channel
-				podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-				podsToUpdate.Insert(podUID)
+				updatePodUIDFn(dev.ID)
 			}
 		}
 
@@ -302,8 +310,10 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 		if len(podsToUpdate) > 0 {
-			m.update <- resourceupdates.Update{
-				PodUIDs: podsToUpdate.UnsortedList(),
+			select {
+			case m.update <- resourceupdates.Update{PodUIDs: podsToUpdate.UnsortedList()}:
+			default:
+				klog.ErrorS(goerrors.New("device update channel is full"), "discard pods info", "podsToUpdate", podsToUpdate.UnsortedList())
 			}
 		}
 	}

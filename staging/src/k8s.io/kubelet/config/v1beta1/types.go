@@ -527,9 +527,6 @@ type KubeletConfiguration struct {
 	// evictionMaxPodGracePeriod is the maximum allowed grace period (in seconds) to use
 	// when terminating pods in response to a soft eviction threshold being met. This value
 	// effectively caps the Pod's terminationGracePeriodSeconds value during soft evictions.
-	// Note: Due to issue #64530, the behavior has a bug where this value currently just
-	// overrides the grace period during soft eviction, which can increase the grace
-	// period from what is set on the Pod. This bug will be fixed in a future release.
 	// Default: 0
 	// +optional
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`

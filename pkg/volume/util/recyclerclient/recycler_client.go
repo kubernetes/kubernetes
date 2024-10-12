@@ -18,11 +18,12 @@ package recyclerclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
@@ -72,7 +73,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	// Start the pod
 	_, err = recyclerClient.CreatePod(pod)
 	if err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
 			if deleteErr != nil {
 				return fmt.Errorf("failed to delete old recycler pod %s/%s: %s", pod.Namespace, pod.Name, deleteErr)
@@ -89,7 +90,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	klog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
 	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
 	if deleteErr != nil {
-		klog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, deleteErr)
 	}
 
 	// Returning recycler error is preferred, the pod will be deleted again on
@@ -128,7 +129,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 				}
 				if pod.Status.Phase == v1.PodFailed {
 					if pod.Status.Message != "" {
-						return fmt.Errorf(pod.Status.Message)
+						return errors.New(pod.Status.Message)
 					}
 					return fmt.Errorf("pod failed, pod.Status.Message unknown")
 				}

@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ReplicationControllerApplyConfiguration represents a declarative configuration of the ReplicationController type for use
 // with apply.
 type ReplicationControllerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicationController constructs a declarative configuration of the ReplicationController type for use with
@@ -58,18 +58,18 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationController(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "")
 }
 
 // ExtractReplicationControllerStatus is the same as ExtractReplicationController except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractReplicationControllerStatus(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+func ExtractReplicationControllerStatus(replicationController *corev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	return extractReplicationController(replicationController, fieldManager, "status")
 }
 
-func extractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
+func extractReplicationController(replicationController *corev1.ReplicationController, fieldManager string, subresource string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b, subresource)
 	if err != nil {
@@ -87,7 +87,7 @@ func extractReplicationController(replicationController *apicorev1.ReplicationCo
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithKind(value string) *ReplicationControllerApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -95,7 +95,7 @@ func (b *ReplicationControllerApplyConfiguration) WithKind(value string) *Replic
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithAPIVersion(value string) *ReplicationControllerApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -104,7 +104,7 @@ func (b *ReplicationControllerApplyConfiguration) WithAPIVersion(value string) *
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithName(value string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -113,7 +113,7 @@ func (b *ReplicationControllerApplyConfiguration) WithName(value string) *Replic
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithGenerateName(value string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -122,7 +122,7 @@ func (b *ReplicationControllerApplyConfiguration) WithGenerateName(value string)
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithNamespace(value string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -131,7 +131,7 @@ func (b *ReplicationControllerApplyConfiguration) WithNamespace(value string) *R
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithUID(value types.UID) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -140,7 +140,7 @@ func (b *ReplicationControllerApplyConfiguration) WithUID(value types.UID) *Repl
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithResourceVersion(value string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -149,25 +149,25 @@ func (b *ReplicationControllerApplyConfiguration) WithResourceVersion(value stri
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithGeneration(value int64) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ReplicationControllerApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ReplicationControllerApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -176,7 +176,7 @@ func (b *ReplicationControllerApplyConfiguration) WithDeletionTimestamp(value me
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ReplicationControllerApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -186,11 +186,11 @@ func (b *ReplicationControllerApplyConfiguration) WithDeletionGracePeriodSeconds
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ReplicationControllerApplyConfiguration) WithLabels(entries map[string]string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -201,11 +201,11 @@ func (b *ReplicationControllerApplyConfiguration) WithLabels(entries map[string]
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ReplicationControllerApplyConfiguration) WithAnnotations(entries map[string]string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -213,13 +213,13 @@ func (b *ReplicationControllerApplyConfiguration) WithAnnotations(entries map[st
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ReplicationControllerApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ReplicationControllerApplyConfiguration {
+func (b *ReplicationControllerApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -230,14 +230,14 @@ func (b *ReplicationControllerApplyConfiguration) WithOwnerReferences(values ...
 func (b *ReplicationControllerApplyConfiguration) WithFinalizers(values ...string) *ReplicationControllerApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ReplicationControllerApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -260,5 +260,5 @@ func (b *ReplicationControllerApplyConfiguration) WithStatus(value *ReplicationC
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ReplicationControllerApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

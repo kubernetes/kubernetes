@@ -226,6 +226,13 @@ func (ins *Instruction) IsFunctionCall() bool {
 	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoCall
 }
 
+// IsKfuncCall returns true if the instruction calls a kfunc.
+//
+// This is not the same thing as a BPF helper call.
+func (ins *Instruction) IsKfuncCall() bool {
+	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoKfuncCall
+}
+
 // IsLoadOfFunctionPointer returns true if the instruction loads a function pointer.
 func (ins *Instruction) IsLoadOfFunctionPointer() bool {
 	return ins.OpCode.IsDWordLoad() && ins.Src == PseudoFunc
@@ -318,10 +325,14 @@ func (ins Instruction) Format(f fmt.State, c rune) {
 	case cls.IsJump():
 		switch jop := op.JumpOp(); jop {
 		case Call:
-			if ins.Src == PseudoCall {
+			switch ins.Src {
+			case PseudoCall:
 				// bpf-to-bpf call
 				fmt.Fprint(f, ins.Constant)
-			} else {
+			case PseudoKfuncCall:
+				// kfunc call
+				fmt.Fprintf(f, "Kfunc(%d)", ins.Constant)
+			default:
 				fmt.Fprint(f, BuiltinFunc(ins.Constant))
 			}
 
@@ -352,6 +363,13 @@ func (ins Instruction) equal(other Instruction) bool {
 // Size returns the amount of bytes ins would occupy in binary form.
 func (ins Instruction) Size() uint64 {
 	return uint64(InstructionSize * ins.OpCode.rawInstructions())
+}
+
+// WithMetadata sets the given Metadata on the Instruction. e.g. to copy
+// Metadata from another Instruction when replacing it.
+func (ins Instruction) WithMetadata(meta Metadata) Instruction {
+	ins.Metadata = meta
+	return ins
 }
 
 type symbolMeta struct{}

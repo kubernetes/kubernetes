@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/go-logr/logr"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 	"google.golang.org/grpc/grpclog"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/klog/v2"
 )
 
 var scheme = runtime.NewScheme()
@@ -159,6 +161,11 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
+}
+
+func TestListPaging(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestListPaging(ctx, t, store)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -639,7 +646,7 @@ func TestInvalidKeys(t *testing.T) {
 
 	ctx, store, _ := testSetup(t)
 	expectInvalidKey("Create", store.Create(ctx, invalidKey, nil, nil, 0))
-	expectInvalidKey("Delete", store.Delete(ctx, invalidKey, nil, nil, nil, nil))
+	expectInvalidKey("Delete", store.Delete(ctx, invalidKey, nil, nil, nil, nil, storage.DeleteOptions{}))
 	_, watchErr := store.Watch(ctx, invalidKey, storage.ListOptions{})
 	expectInvalidKey("Watch", watchErr)
 	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
@@ -899,4 +906,21 @@ func BenchmarkStore_GetList(b *testing.B) {
 			}
 		})
 	}
+}
+
+func BenchmarkStoreListCreate(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	b.Run("RV=NotOlderThan", func(b *testing.B) {
+		ctx, store, _ := testSetup(b)
+		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchNotOlderThan)
+	})
+	b.Run("RV=ExactMatch", func(b *testing.B) {
+		ctx, store, _ := testSetup(b)
+		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchExact)
+	})
+}
+
+func BenchmarkStoreList(b *testing.B) {
+	ctx, store, _ := testSetup(b)
+	storagetesting.RunBenchmarkStoreList(ctx, b, store)
 }

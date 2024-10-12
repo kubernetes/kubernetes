@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
@@ -4677,6 +4678,9 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			if !testCase.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)
 			nft, fp := NewFakeProxier(v1.IPv4Protocol)
 			makeServiceMap(fp,
@@ -4879,17 +4883,17 @@ func TestProxier_OnServiceCIDRsChanged(t *testing.T) {
 
 	proxier = &Proxier{ipFamily: v1.IPv4Protocol}
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "fd00:10:96::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "172.30.0.0/16")
+	assert.Equal(t, "172.30.0.0/16", proxier.serviceCIDRs)
 
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "172.30.0.0/16,172.50.0.0/16")
+	assert.Equal(t, "172.30.0.0/16,172.50.0.0/16", proxier.serviceCIDRs)
 
 	proxier = &Proxier{ipFamily: v1.IPv6Protocol}
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "fd00:10:96::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112")
+	assert.Equal(t, "fd00:10:96::/112", proxier.serviceCIDRs)
 
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
-	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112,fd00:172:30::/112")
+	assert.Equal(t, "fd00:10:96::/112,fd00:172:30::/112", proxier.serviceCIDRs)
 }
 
 // TestBadIPs tests that "bad" IPs and CIDRs in Services/Endpoints are rewritten to

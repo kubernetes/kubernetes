@@ -140,15 +140,12 @@ func (p *parserHelper) id(ctx any) int64 {
 	var offset ast.OffsetRange
 	switch c := ctx.(type) {
 	case antlr.ParserRuleContext:
-		start, stop := c.GetStart(), c.GetStop()
-		if stop == nil {
-			stop = start
-		}
+		start := c.GetStart()
 		offset.Start = p.sourceInfo.ComputeOffset(int32(start.GetLine()), int32(start.GetColumn()))
-		offset.Stop = p.sourceInfo.ComputeOffset(int32(stop.GetLine()), int32(stop.GetColumn()))
+		offset.Stop = offset.Start + int32(len(c.GetText()))
 	case antlr.Token:
 		offset.Start = p.sourceInfo.ComputeOffset(int32(c.GetLine()), int32(c.GetColumn()))
-		offset.Stop = offset.Start
+		offset.Stop = offset.Start + int32(len(c.GetText()))
 	case common.Location:
 		offset.Start = p.sourceInfo.ComputeOffset(int32(c.Line()), int32(c.Column()))
 		offset.Stop = offset.Start
@@ -164,8 +161,19 @@ func (p *parserHelper) id(ctx any) int64 {
 	return id
 }
 
+func (p *parserHelper) deleteID(id int64) {
+	p.sourceInfo.ClearOffsetRange(id)
+	if id == p.nextID-1 {
+		p.nextID--
+	}
+}
+
 func (p *parserHelper) getLocation(id int64) common.Location {
 	return p.sourceInfo.GetStartLocation(id)
+}
+
+func (p *parserHelper) getLocationByOffset(offset int32) common.Location {
+	return p.getSourceInfo().GetLocationByOffset(offset)
 }
 
 // buildMacroCallArg iterates the expression and returns a new expression

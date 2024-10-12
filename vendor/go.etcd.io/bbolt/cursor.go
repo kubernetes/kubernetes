@@ -71,7 +71,7 @@ func (c *Cursor) Last() (key []byte, value []byte) {
 
 	// If this is an empty page (calling Delete may result in empty pages)
 	// we call prev to find the last page that is not empty
-	for len(c.stack) > 0 && c.stack[len(c.stack)-1].count() == 0 {
+	for len(c.stack) > 1 && c.stack[len(c.stack)-1].count() == 0 {
 		c.prev()
 	}
 
@@ -253,6 +253,15 @@ func (c *Cursor) prev() (key []byte, value []byte, flags uint32) {
 		if elem.index > 0 {
 			elem.index--
 			break
+		}
+		// If we've hit the beginning, we should stop moving the cursor,
+		// and stay at the first element, so that users can continue to
+		// iterate over the elements in reverse direction by calling `Next`.
+		// We should return nil in such case.
+		// Refer to https://github.com/etcd-io/bbolt/issues/733
+		if len(c.stack) == 1 {
+			c.first()
+			return nil, nil, 0
 		}
 		c.stack = c.stack[:i]
 	}

@@ -537,7 +537,7 @@ func (pp *PostFilterPlugin) Name() string {
 	return pp.name
 }
 
-func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	pp.numPostFilterCalled++
 	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {

@@ -77,6 +77,7 @@ func getSpamKey(event *v1.Event) string {
 		event.InvolvedObject.Name,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
+		event.Type,
 	},
 		"")
 }

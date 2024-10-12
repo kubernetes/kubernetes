@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/flowcontrol/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // FlowSchemaLister helps list FlowSchemas.
@@ -30,19 +30,19 @@ import (
 type FlowSchemaLister interface {
 	// List lists all FlowSchemas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.FlowSchema, err error)
+	List(selector labels.Selector) (ret []*flowcontrolv1.FlowSchema, err error)
 	// Get retrieves the FlowSchema from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.FlowSchema, error)
+	Get(name string) (*flowcontrolv1.FlowSchema, error)
 	FlowSchemaListerExpansion
 }
 
 // flowSchemaLister implements the FlowSchemaLister interface.
 type flowSchemaLister struct {
-	listers.ResourceIndexer[*v1.FlowSchema]
+	listers.ResourceIndexer[*flowcontrolv1.FlowSchema]
 }
 
 // NewFlowSchemaLister returns a new FlowSchemaLister.
 func NewFlowSchemaLister(indexer cache.Indexer) FlowSchemaLister {
-	return &flowSchemaLister{listers.New[*v1.FlowSchema](indexer, v1.Resource("flowschema"))}
+	return &flowSchemaLister{listers.New[*flowcontrolv1.FlowSchema](indexer, flowcontrolv1.Resource("flowschema"))}
 }

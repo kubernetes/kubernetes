@@ -1765,6 +1765,126 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			pod:          getPod("pod1", "container1", requirementsGuaranteed),
 			topologyHint: &topologymanager.TopologyHint{Preferred: true},
 		},
+		{
+			description: "should validate NUMA node can not have both single and cross NUMA node memory allocations",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0},
+							Type:         v1.ResourceMemory,
+							Size:         1024 * mb,
+						},
+					},
+				},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0},
+							Type:         v1.ResourceMemory,
+							Size:         1024 * mb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1024 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2176 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    512 * mb,
+							Free:           512 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2176 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{1},
+					NumberOfAssignments: 0,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           512 * mb,
+							Reserved:       1024 * mb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2176 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    512 * mb,
+							Free:           512 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2176 * mb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{1},
+					NumberOfAssignments: 0,
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			pod:           getPod("pod2", "container1", requirementsGuaranteed),
+			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedError: fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"),
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -3772,6 +3892,82 @@ func Test_getPodRequestedResources(t *testing.T) {
 			}
 			if diff := cmp.Diff(actual, tc.expected); diff != "" {
 				t.Errorf("getPodRequestedResources() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
+	testsCases := []struct {
+		description         string
+		machineState        map[int]*state.NUMANodeState
+		topologyHint        *topologymanager.TopologyHint
+		isViolationExpected bool
+	}{
+		{
+			description: "violating NUMA allocations because given affinity asks for NUMA ID 1 which is on different cells group",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				2: {
+					NumberOfAssignments: 1,
+					Cells:               []int{2},
+				},
+				3: {
+					NumberOfAssignments: 0,
+					Cells:               []int{3},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(1, 2),
+			},
+			isViolationExpected: true,
+		},
+		{
+			description: "violating NUMA allocations because given affinity with multiple nodes asks for NUMA ID 1 which is used for a single NUMA node memory allocation",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 0,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(0, 1),
+			},
+			isViolationExpected: true,
+		},
+		{
+			description: "valid affinity, no prior assignments",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 0,
+					Cells:               []int{0},
+				},
+				1: {
+					NumberOfAssignments: 0,
+					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(0, 1),
+			},
+			isViolationExpected: false,
+		},
+	}
+	for _, tc := range testsCases {
+		t.Run(tc.description, func(t *testing.T) {
+			if isAffinityViolatingNUMAAllocations(tc.machineState, tc.topologyHint.NUMANodeAffinity) != tc.isViolationExpected {
+				t.Errorf("isAffinityViolatingNUMAAllocations with affinity %v expected to return %t, got %t", tc.topologyHint.NUMANodeAffinity.GetBits(), tc.isViolationExpected, !tc.isViolationExpected)
 			}
 		})
 	}

@@ -25,7 +25,7 @@ import (
 	unsafe "unsafe"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -41,280 +41,280 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.HTTPIngressPath)(nil), (*networking.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*v1.HTTPIngressPath), b.(*networking.HTTPIngressPath), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.HTTPIngressPath)(nil), (*networking.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*networkingv1.HTTPIngressPath), b.(*networking.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressPath)(nil), (*v1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(a.(*networking.HTTPIngressPath), b.(*v1.HTTPIngressPath), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressPath)(nil), (*networkingv1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(a.(*networking.HTTPIngressPath), b.(*networkingv1.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.HTTPIngressRuleValue)(nil), (*networking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*v1.HTTPIngressRuleValue), b.(*networking.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.HTTPIngressRuleValue)(nil), (*networking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*networkingv1.HTTPIngressRuleValue), b.(*networking.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*v1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*v1.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*networkingv1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*networkingv1.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IPBlock_To_networking_IPBlock(a.(*v1.IPBlock), b.(*networking.IPBlock), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IPBlock_To_networking_IPBlock(a.(*networkingv1.IPBlock), b.(*networking.IPBlock), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IPBlock)(nil), (*v1.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IPBlock_To_v1_IPBlock(a.(*networking.IPBlock), b.(*v1.IPBlock), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IPBlock)(nil), (*networkingv1.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPBlock_To_v1_IPBlock(a.(*networking.IPBlock), b.(*networkingv1.IPBlock), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Ingress)(nil), (*networking.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Ingress_To_networking_Ingress(a.(*v1.Ingress), b.(*networking.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.Ingress)(nil), (*networking.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Ingress_To_networking_Ingress(a.(*networkingv1.Ingress), b.(*networking.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.Ingress)(nil), (*v1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_Ingress_To_v1_Ingress(a.(*networking.Ingress), b.(*v1.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.Ingress)(nil), (*networkingv1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_Ingress_To_v1_Ingress(a.(*networking.Ingress), b.(*networkingv1.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressBackend_To_networking_IngressBackend(a.(*v1.IngressBackend), b.(*networking.IngressBackend), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressBackend_To_networking_IngressBackend(a.(*networkingv1.IngressBackend), b.(*networking.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressBackend)(nil), (*v1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressBackend_To_v1_IngressBackend(a.(*networking.IngressBackend), b.(*v1.IngressBackend), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressBackend)(nil), (*networkingv1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressBackend_To_v1_IngressBackend(a.(*networking.IngressBackend), b.(*networkingv1.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressClass)(nil), (*networking.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressClass_To_networking_IngressClass(a.(*v1.IngressClass), b.(*networking.IngressClass), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressClass)(nil), (*networking.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressClass_To_networking_IngressClass(a.(*networkingv1.IngressClass), b.(*networking.IngressClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClass)(nil), (*v1.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClass_To_v1_IngressClass(a.(*networking.IngressClass), b.(*v1.IngressClass), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressClass)(nil), (*networkingv1.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressClass_To_v1_IngressClass(a.(*networking.IngressClass), b.(*networkingv1.IngressClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressClassList)(nil), (*networking.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressClassList_To_networking_IngressClassList(a.(*v1.IngressClassList), b.(*networking.IngressClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressClassList)(nil), (*networking.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressClassList_To_networking_IngressClassList(a.(*networkingv1.IngressClassList), b.(*networking.IngressClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassList)(nil), (*v1.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassList_To_v1_IngressClassList(a.(*networking.IngressClassList), b.(*v1.IngressClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressClassList)(nil), (*networkingv1.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressClassList_To_v1_IngressClassList(a.(*networking.IngressClassList), b.(*networkingv1.IngressClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressClassParametersReference)(nil), (*networking.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(a.(*v1.IngressClassParametersReference), b.(*networking.IngressClassParametersReference), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressClassParametersReference)(nil), (*networking.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(a.(*networkingv1.IngressClassParametersReference), b.(*networking.IngressClassParametersReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassParametersReference)(nil), (*v1.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(a.(*networking.IngressClassParametersReference), b.(*v1.IngressClassParametersReference), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressClassParametersReference)(nil), (*networkingv1.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(a.(*networking.IngressClassParametersReference), b.(*networkingv1.IngressClassParametersReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressClassSpec)(nil), (*networking.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressClassSpec_To_networking_IngressClassSpec(a.(*v1.IngressClassSpec), b.(*networking.IngressClassSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressClassSpec)(nil), (*networking.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressClassSpec_To_networking_IngressClassSpec(a.(*networkingv1.IngressClassSpec), b.(*networking.IngressClassSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassSpec)(nil), (*v1.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassSpec_To_v1_IngressClassSpec(a.(*networking.IngressClassSpec), b.(*v1.IngressClassSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressClassSpec)(nil), (*networkingv1.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressClassSpec_To_v1_IngressClassSpec(a.(*networking.IngressClassSpec), b.(*networkingv1.IngressClassSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressList_To_networking_IngressList(a.(*v1.IngressList), b.(*networking.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressList_To_networking_IngressList(a.(*networkingv1.IngressList), b.(*networking.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressList)(nil), (*v1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressList_To_v1_IngressList(a.(*networking.IngressList), b.(*v1.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressList)(nil), (*networkingv1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressList_To_v1_IngressList(a.(*networking.IngressList), b.(*networkingv1.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressLoadBalancerIngress)(nil), (*networking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*v1.IngressLoadBalancerIngress), b.(*networking.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressLoadBalancerIngress)(nil), (*networking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*networkingv1.IngressLoadBalancerIngress), b.(*networking.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerIngress)(nil), (*v1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(a.(*networking.IngressLoadBalancerIngress), b.(*v1.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerIngress)(nil), (*networkingv1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(a.(*networking.IngressLoadBalancerIngress), b.(*networkingv1.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressLoadBalancerStatus)(nil), (*networking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*v1.IngressLoadBalancerStatus), b.(*networking.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressLoadBalancerStatus)(nil), (*networking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*networkingv1.IngressLoadBalancerStatus), b.(*networking.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerStatus)(nil), (*v1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(a.(*networking.IngressLoadBalancerStatus), b.(*v1.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerStatus)(nil), (*networkingv1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(a.(*networking.IngressLoadBalancerStatus), b.(*networkingv1.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressPortStatus)(nil), (*networking.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressPortStatus_To_networking_IngressPortStatus(a.(*v1.IngressPortStatus), b.(*networking.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressPortStatus)(nil), (*networking.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressPortStatus_To_networking_IngressPortStatus(a.(*networkingv1.IngressPortStatus), b.(*networking.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressPortStatus)(nil), (*v1.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressPortStatus_To_v1_IngressPortStatus(a.(*networking.IngressPortStatus), b.(*v1.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressPortStatus)(nil), (*networkingv1.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressPortStatus_To_v1_IngressPortStatus(a.(*networking.IngressPortStatus), b.(*networkingv1.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressRule)(nil), (*networking.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressRule_To_networking_IngressRule(a.(*v1.IngressRule), b.(*networking.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressRule)(nil), (*networking.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressRule_To_networking_IngressRule(a.(*networkingv1.IngressRule), b.(*networking.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRule)(nil), (*v1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRule_To_v1_IngressRule(a.(*networking.IngressRule), b.(*v1.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressRule)(nil), (*networkingv1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressRule_To_v1_IngressRule(a.(*networking.IngressRule), b.(*networkingv1.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressRuleValue)(nil), (*networking.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressRuleValue_To_networking_IngressRuleValue(a.(*v1.IngressRuleValue), b.(*networking.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressRuleValue)(nil), (*networking.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressRuleValue_To_networking_IngressRuleValue(a.(*networkingv1.IngressRuleValue), b.(*networking.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*v1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRuleValue_To_v1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*v1.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*networkingv1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressRuleValue_To_v1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*networkingv1.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressServiceBackend)(nil), (*networking.IngressServiceBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(a.(*v1.IngressServiceBackend), b.(*networking.IngressServiceBackend), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressServiceBackend)(nil), (*networking.IngressServiceBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(a.(*networkingv1.IngressServiceBackend), b.(*networking.IngressServiceBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressServiceBackend)(nil), (*v1.IngressServiceBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(a.(*networking.IngressServiceBackend), b.(*v1.IngressServiceBackend), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressServiceBackend)(nil), (*networkingv1.IngressServiceBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(a.(*networking.IngressServiceBackend), b.(*networkingv1.IngressServiceBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressSpec_To_networking_IngressSpec(a.(*v1.IngressSpec), b.(*networking.IngressSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressSpec_To_networking_IngressSpec(a.(*networkingv1.IngressSpec), b.(*networking.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressSpec)(nil), (*v1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressSpec_To_v1_IngressSpec(a.(*networking.IngressSpec), b.(*v1.IngressSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressSpec)(nil), (*networkingv1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressSpec_To_v1_IngressSpec(a.(*networking.IngressSpec), b.(*networkingv1.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressStatus)(nil), (*networking.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressStatus_To_networking_IngressStatus(a.(*v1.IngressStatus), b.(*networking.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressStatus)(nil), (*networking.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressStatus_To_networking_IngressStatus(a.(*networkingv1.IngressStatus), b.(*networking.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressStatus)(nil), (*v1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressStatus_To_v1_IngressStatus(a.(*networking.IngressStatus), b.(*v1.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressStatus)(nil), (*networkingv1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressStatus_To_v1_IngressStatus(a.(*networking.IngressStatus), b.(*networkingv1.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.IngressTLS)(nil), (*networking.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IngressTLS_To_networking_IngressTLS(a.(*v1.IngressTLS), b.(*networking.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IngressTLS)(nil), (*networking.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IngressTLS_To_networking_IngressTLS(a.(*networkingv1.IngressTLS), b.(*networking.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressTLS)(nil), (*v1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressTLS_To_v1_IngressTLS(a.(*networking.IngressTLS), b.(*v1.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.IngressTLS)(nil), (*networkingv1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IngressTLS_To_v1_IngressTLS(a.(*networking.IngressTLS), b.(*networkingv1.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicy)(nil), (*networking.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicy_To_networking_NetworkPolicy(a.(*v1.NetworkPolicy), b.(*networking.NetworkPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicy)(nil), (*networking.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicy_To_networking_NetworkPolicy(a.(*networkingv1.NetworkPolicy), b.(*networking.NetworkPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicy)(nil), (*v1.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicy_To_v1_NetworkPolicy(a.(*networking.NetworkPolicy), b.(*v1.NetworkPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicy)(nil), (*networkingv1.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicy_To_v1_NetworkPolicy(a.(*networking.NetworkPolicy), b.(*networkingv1.NetworkPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicyEgressRule)(nil), (*networking.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(a.(*v1.NetworkPolicyEgressRule), b.(*networking.NetworkPolicyEgressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicyEgressRule)(nil), (*networking.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(a.(*networkingv1.NetworkPolicyEgressRule), b.(*networking.NetworkPolicyEgressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*v1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*v1.NetworkPolicyEgressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*networkingv1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*networkingv1.NetworkPolicyEgressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicyIngressRule)(nil), (*networking.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(a.(*v1.NetworkPolicyIngressRule), b.(*networking.NetworkPolicyIngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicyIngressRule)(nil), (*networking.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(a.(*networkingv1.NetworkPolicyIngressRule), b.(*networking.NetworkPolicyIngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyIngressRule)(nil), (*v1.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(a.(*networking.NetworkPolicyIngressRule), b.(*v1.NetworkPolicyIngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyIngressRule)(nil), (*networkingv1.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(a.(*networking.NetworkPolicyIngressRule), b.(*networkingv1.NetworkPolicyIngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicyList)(nil), (*networking.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(a.(*v1.NetworkPolicyList), b.(*networking.NetworkPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicyList)(nil), (*networking.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(a.(*networkingv1.NetworkPolicyList), b.(*networking.NetworkPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyList)(nil), (*v1.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(a.(*networking.NetworkPolicyList), b.(*v1.NetworkPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyList)(nil), (*networkingv1.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(a.(*networking.NetworkPolicyList), b.(*networkingv1.NetworkPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicyPeer)(nil), (*networking.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(a.(*v1.NetworkPolicyPeer), b.(*networking.NetworkPolicyPeer), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicyPeer)(nil), (*networking.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(a.(*networkingv1.NetworkPolicyPeer), b.(*networking.NetworkPolicyPeer), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPeer)(nil), (*v1.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(a.(*networking.NetworkPolicyPeer), b.(*v1.NetworkPolicyPeer), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPeer)(nil), (*networkingv1.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(a.(*networking.NetworkPolicyPeer), b.(*networkingv1.NetworkPolicyPeer), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicyPort)(nil), (*networking.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(a.(*v1.NetworkPolicyPort), b.(*networking.NetworkPolicyPort), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicyPort)(nil), (*networking.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(a.(*networkingv1.NetworkPolicyPort), b.(*networking.NetworkPolicyPort), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPort)(nil), (*v1.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(a.(*networking.NetworkPolicyPort), b.(*v1.NetworkPolicyPort), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicyPort)(nil), (*networkingv1.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(a.(*networking.NetworkPolicyPort), b.(*networkingv1.NetworkPolicyPort), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NetworkPolicySpec)(nil), (*networking.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(a.(*v1.NetworkPolicySpec), b.(*networking.NetworkPolicySpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.NetworkPolicySpec)(nil), (*networking.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(a.(*networkingv1.NetworkPolicySpec), b.(*networking.NetworkPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicySpec)(nil), (*v1.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(a.(*networking.NetworkPolicySpec), b.(*v1.NetworkPolicySpec), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.NetworkPolicySpec)(nil), (*networkingv1.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(a.(*networking.NetworkPolicySpec), b.(*networkingv1.NetworkPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ServiceBackendPort)(nil), (*networking.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(a.(*v1.ServiceBackendPort), b.(*networking.ServiceBackendPort), scope)
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceBackendPort)(nil), (*networking.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(a.(*networkingv1.ServiceBackendPort), b.(*networking.ServiceBackendPort), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.ServiceBackendPort)(nil), (*v1.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(a.(*networking.ServiceBackendPort), b.(*v1.ServiceBackendPort), scope)
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceBackendPort)(nil), (*networkingv1.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(a.(*networking.ServiceBackendPort), b.(*networkingv1.ServiceBackendPort), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *networkingv1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
 	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
@@ -324,13 +324,13 @@ func autoConvert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1.HTTPIng
 }
 
 // Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath is an autogenerated conversion function.
-func Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *networkingv1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	return autoConvert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking.HTTPIngressPath, out *networkingv1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
-	out.PathType = (*v1.PathType)(unsafe.Pointer(in.PathType))
+	out.PathType = (*networkingv1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -338,53 +338,53 @@ func autoConvert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking
 }
 
 // Convert_networking_HTTPIngressPath_To_v1_HTTPIngressPath is an autogenerated conversion function.
-func Convert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1.HTTPIngressPath, s conversion.Scope) error {
+func Convert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking.HTTPIngressPath, out *networkingv1.HTTPIngressPath, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *networkingv1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
 	out.Paths = *(*[]networking.HTTPIngressPath)(unsafe.Pointer(&in.Paths))
 	return nil
 }
 
 // Convert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *networkingv1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_v1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1.HTTPIngressRuleValue, s conversion.Scope) error {
-	out.Paths = *(*[]v1.HTTPIngressPath)(unsafe.Pointer(&in.Paths))
+func autoConvert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *networkingv1.HTTPIngressRuleValue, s conversion.Scope) error {
+	out.Paths = *(*[]networkingv1.HTTPIngressPath)(unsafe.Pointer(&in.Paths))
 	return nil
 }
 
 // Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *networkingv1.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1_IPBlock_To_networking_IPBlock(in *v1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
+func autoConvert_v1_IPBlock_To_networking_IPBlock(in *networkingv1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
 	out.CIDR = in.CIDR
 	out.Except = *(*[]string)(unsafe.Pointer(&in.Except))
 	return nil
 }
 
 // Convert_v1_IPBlock_To_networking_IPBlock is an autogenerated conversion function.
-func Convert_v1_IPBlock_To_networking_IPBlock(in *v1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
+func Convert_v1_IPBlock_To_networking_IPBlock(in *networkingv1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
 	return autoConvert_v1_IPBlock_To_networking_IPBlock(in, out, s)
 }
 
-func autoConvert_networking_IPBlock_To_v1_IPBlock(in *networking.IPBlock, out *v1.IPBlock, s conversion.Scope) error {
+func autoConvert_networking_IPBlock_To_v1_IPBlock(in *networking.IPBlock, out *networkingv1.IPBlock, s conversion.Scope) error {
 	out.CIDR = in.CIDR
 	out.Except = *(*[]string)(unsafe.Pointer(&in.Except))
 	return nil
 }
 
 // Convert_networking_IPBlock_To_v1_IPBlock is an autogenerated conversion function.
-func Convert_networking_IPBlock_To_v1_IPBlock(in *networking.IPBlock, out *v1.IPBlock, s conversion.Scope) error {
+func Convert_networking_IPBlock_To_v1_IPBlock(in *networking.IPBlock, out *networkingv1.IPBlock, s conversion.Scope) error {
 	return autoConvert_networking_IPBlock_To_v1_IPBlock(in, out, s)
 }
 
-func autoConvert_v1_Ingress_To_networking_Ingress(in *v1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func autoConvert_v1_Ingress_To_networking_Ingress(in *networkingv1.Ingress, out *networking.Ingress, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_IngressSpec_To_networking_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -396,11 +396,11 @@ func autoConvert_v1_Ingress_To_networking_Ingress(in *v1.Ingress, out *networkin
 }
 
 // Convert_v1_Ingress_To_networking_Ingress is an autogenerated conversion function.
-func Convert_v1_Ingress_To_networking_Ingress(in *v1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func Convert_v1_Ingress_To_networking_Ingress(in *networkingv1.Ingress, out *networking.Ingress, s conversion.Scope) error {
 	return autoConvert_v1_Ingress_To_networking_Ingress(in, out, s)
 }
 
-func autoConvert_networking_Ingress_To_v1_Ingress(in *networking.Ingress, out *v1.Ingress, s conversion.Scope) error {
+func autoConvert_networking_Ingress_To_v1_Ingress(in *networking.Ingress, out *networkingv1.Ingress, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressSpec_To_v1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -412,33 +412,33 @@ func autoConvert_networking_Ingress_To_v1_Ingress(in *networking.Ingress, out *v
 }
 
 // Convert_networking_Ingress_To_v1_Ingress is an autogenerated conversion function.
-func Convert_networking_Ingress_To_v1_Ingress(in *networking.Ingress, out *v1.Ingress, s conversion.Scope) error {
+func Convert_networking_Ingress_To_v1_Ingress(in *networking.Ingress, out *networkingv1.Ingress, s conversion.Scope) error {
 	return autoConvert_networking_Ingress_To_v1_Ingress(in, out, s)
 }
 
-func autoConvert_v1_IngressBackend_To_networking_IngressBackend(in *v1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
+func autoConvert_v1_IngressBackend_To_networking_IngressBackend(in *networkingv1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
 	out.Service = (*networking.IngressServiceBackend)(unsafe.Pointer(in.Service))
 	out.Resource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
 // Convert_v1_IngressBackend_To_networking_IngressBackend is an autogenerated conversion function.
-func Convert_v1_IngressBackend_To_networking_IngressBackend(in *v1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
+func Convert_v1_IngressBackend_To_networking_IngressBackend(in *networkingv1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
 	return autoConvert_v1_IngressBackend_To_networking_IngressBackend(in, out, s)
 }
 
-func autoConvert_networking_IngressBackend_To_v1_IngressBackend(in *networking.IngressBackend, out *v1.IngressBackend, s conversion.Scope) error {
-	out.Service = (*v1.IngressServiceBackend)(unsafe.Pointer(in.Service))
+func autoConvert_networking_IngressBackend_To_v1_IngressBackend(in *networking.IngressBackend, out *networkingv1.IngressBackend, s conversion.Scope) error {
+	out.Service = (*networkingv1.IngressServiceBackend)(unsafe.Pointer(in.Service))
 	out.Resource = (*corev1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
 // Convert_networking_IngressBackend_To_v1_IngressBackend is an autogenerated conversion function.
-func Convert_networking_IngressBackend_To_v1_IngressBackend(in *networking.IngressBackend, out *v1.IngressBackend, s conversion.Scope) error {
+func Convert_networking_IngressBackend_To_v1_IngressBackend(in *networking.IngressBackend, out *networkingv1.IngressBackend, s conversion.Scope) error {
 	return autoConvert_networking_IngressBackend_To_v1_IngressBackend(in, out, s)
 }
 
-func autoConvert_v1_IngressClass_To_networking_IngressClass(in *v1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
+func autoConvert_v1_IngressClass_To_networking_IngressClass(in *networkingv1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_IngressClassSpec_To_networking_IngressClassSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -447,11 +447,11 @@ func autoConvert_v1_IngressClass_To_networking_IngressClass(in *v1.IngressClass,
 }
 
 // Convert_v1_IngressClass_To_networking_IngressClass is an autogenerated conversion function.
-func Convert_v1_IngressClass_To_networking_IngressClass(in *v1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
+func Convert_v1_IngressClass_To_networking_IngressClass(in *networkingv1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
 	return autoConvert_v1_IngressClass_To_networking_IngressClass(in, out, s)
 }
 
-func autoConvert_networking_IngressClass_To_v1_IngressClass(in *networking.IngressClass, out *v1.IngressClass, s conversion.Scope) error {
+func autoConvert_networking_IngressClass_To_v1_IngressClass(in *networking.IngressClass, out *networkingv1.IngressClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressClassSpec_To_v1_IngressClassSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -460,33 +460,33 @@ func autoConvert_networking_IngressClass_To_v1_IngressClass(in *networking.Ingre
 }
 
 // Convert_networking_IngressClass_To_v1_IngressClass is an autogenerated conversion function.
-func Convert_networking_IngressClass_To_v1_IngressClass(in *networking.IngressClass, out *v1.IngressClass, s conversion.Scope) error {
+func Convert_networking_IngressClass_To_v1_IngressClass(in *networking.IngressClass, out *networkingv1.IngressClass, s conversion.Scope) error {
 	return autoConvert_networking_IngressClass_To_v1_IngressClass(in, out, s)
 }
 
-func autoConvert_v1_IngressClassList_To_networking_IngressClassList(in *v1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
+func autoConvert_v1_IngressClassList_To_networking_IngressClassList(in *networkingv1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]networking.IngressClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1_IngressClassList_To_networking_IngressClassList is an autogenerated conversion function.
-func Convert_v1_IngressClassList_To_networking_IngressClassList(in *v1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
+func Convert_v1_IngressClassList_To_networking_IngressClassList(in *networkingv1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
 	return autoConvert_v1_IngressClassList_To_networking_IngressClassList(in, out, s)
 }
 
-func autoConvert_networking_IngressClassList_To_v1_IngressClassList(in *networking.IngressClassList, out *v1.IngressClassList, s conversion.Scope) error {
+func autoConvert_networking_IngressClassList_To_v1_IngressClassList(in *networking.IngressClassList, out *networkingv1.IngressClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.IngressClass)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]networkingv1.IngressClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_networking_IngressClassList_To_v1_IngressClassList is an autogenerated conversion function.
-func Convert_networking_IngressClassList_To_v1_IngressClassList(in *networking.IngressClassList, out *v1.IngressClassList, s conversion.Scope) error {
+func Convert_networking_IngressClassList_To_v1_IngressClassList(in *networking.IngressClassList, out *networkingv1.IngressClassList, s conversion.Scope) error {
 	return autoConvert_networking_IngressClassList_To_v1_IngressClassList(in, out, s)
 }
 
-func autoConvert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *v1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
+func autoConvert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *networkingv1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
 	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -496,11 +496,11 @@ func autoConvert_v1_IngressClassParametersReference_To_networking_IngressClassPa
 }
 
 // Convert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference is an autogenerated conversion function.
-func Convert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *v1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
+func Convert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *networkingv1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
 	return autoConvert_v1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in, out, s)
 }
 
-func autoConvert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *v1.IngressClassParametersReference, s conversion.Scope) error {
+func autoConvert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *networkingv1.IngressClassParametersReference, s conversion.Scope) error {
 	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -510,55 +510,55 @@ func autoConvert_networking_IngressClassParametersReference_To_v1_IngressClassPa
 }
 
 // Convert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference is an autogenerated conversion function.
-func Convert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *v1.IngressClassParametersReference, s conversion.Scope) error {
+func Convert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *networkingv1.IngressClassParametersReference, s conversion.Scope) error {
 	return autoConvert_networking_IngressClassParametersReference_To_v1_IngressClassParametersReference(in, out, s)
 }
 
-func autoConvert_v1_IngressClassSpec_To_networking_IngressClassSpec(in *v1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
+func autoConvert_v1_IngressClassSpec_To_networking_IngressClassSpec(in *networkingv1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
 	out.Controller = in.Controller
 	out.Parameters = (*networking.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
 	return nil
 }
 
 // Convert_v1_IngressClassSpec_To_networking_IngressClassSpec is an autogenerated conversion function.
-func Convert_v1_IngressClassSpec_To_networking_IngressClassSpec(in *v1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
+func Convert_v1_IngressClassSpec_To_networking_IngressClassSpec(in *networkingv1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
 	return autoConvert_v1_IngressClassSpec_To_networking_IngressClassSpec(in, out, s)
 }
 
-func autoConvert_networking_IngressClassSpec_To_v1_IngressClassSpec(in *networking.IngressClassSpec, out *v1.IngressClassSpec, s conversion.Scope) error {
+func autoConvert_networking_IngressClassSpec_To_v1_IngressClassSpec(in *networking.IngressClassSpec, out *networkingv1.IngressClassSpec, s conversion.Scope) error {
 	out.Controller = in.Controller
-	out.Parameters = (*v1.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
+	out.Parameters = (*networkingv1.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
 	return nil
 }
 
 // Convert_networking_IngressClassSpec_To_v1_IngressClassSpec is an autogenerated conversion function.
-func Convert_networking_IngressClassSpec_To_v1_IngressClassSpec(in *networking.IngressClassSpec, out *v1.IngressClassSpec, s conversion.Scope) error {
+func Convert_networking_IngressClassSpec_To_v1_IngressClassSpec(in *networking.IngressClassSpec, out *networkingv1.IngressClassSpec, s conversion.Scope) error {
 	return autoConvert_networking_IngressClassSpec_To_v1_IngressClassSpec(in, out, s)
 }
 
-func autoConvert_v1_IngressList_To_networking_IngressList(in *v1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func autoConvert_v1_IngressList_To_networking_IngressList(in *networkingv1.IngressList, out *networking.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]networking.Ingress)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1_IngressList_To_networking_IngressList is an autogenerated conversion function.
-func Convert_v1_IngressList_To_networking_IngressList(in *v1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func Convert_v1_IngressList_To_networking_IngressList(in *networkingv1.IngressList, out *networking.IngressList, s conversion.Scope) error {
 	return autoConvert_v1_IngressList_To_networking_IngressList(in, out, s)
 }
 
-func autoConvert_networking_IngressList_To_v1_IngressList(in *networking.IngressList, out *v1.IngressList, s conversion.Scope) error {
+func autoConvert_networking_IngressList_To_v1_IngressList(in *networking.IngressList, out *networkingv1.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Ingress)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]networkingv1.Ingress)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_networking_IngressList_To_v1_IngressList is an autogenerated conversion function.
-func Convert_networking_IngressList_To_v1_IngressList(in *networking.IngressList, out *v1.IngressList, s conversion.Scope) error {
+func Convert_networking_IngressList_To_v1_IngressList(in *networking.IngressList, out *networkingv1.IngressList, s conversion.Scope) error {
 	return autoConvert_networking_IngressList_To_v1_IngressList(in, out, s)
 }
 
-func autoConvert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *networkingv1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
 	out.Ports = *(*[]networking.IngressPortStatus)(unsafe.Pointer(&in.Ports))
@@ -566,43 +566,43 @@ func autoConvert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancer
 }
 
 // Convert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *networkingv1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
 	return autoConvert_v1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *networkingv1.IngressLoadBalancerIngress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.Ports = *(*[]v1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	out.Ports = *(*[]networkingv1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *networkingv1.IngressLoadBalancerIngress, s conversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerIngress_To_v1_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
+func autoConvert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *networkingv1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
 	out.Ingress = *(*[]networking.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *networkingv1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
 	return autoConvert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]v1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+func autoConvert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *networkingv1.IngressLoadBalancerStatus, s conversion.Scope) error {
+	out.Ingress = *(*[]networkingv1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *networkingv1.IngressLoadBalancerStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_v1_IngressPortStatus_To_networking_IngressPortStatus(in *v1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_v1_IngressPortStatus_To_networking_IngressPortStatus(in *networkingv1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Protocol = core.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
@@ -610,11 +610,11 @@ func autoConvert_v1_IngressPortStatus_To_networking_IngressPortStatus(in *v1.Ing
 }
 
 // Convert_v1_IngressPortStatus_To_networking_IngressPortStatus is an autogenerated conversion function.
-func Convert_v1_IngressPortStatus_To_networking_IngressPortStatus(in *v1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func Convert_v1_IngressPortStatus_To_networking_IngressPortStatus(in *networkingv1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
 	return autoConvert_v1_IngressPortStatus_To_networking_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressPortStatus_To_v1_IngressPortStatus(in *networking.IngressPortStatus, out *v1.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressPortStatus_To_v1_IngressPortStatus(in *networking.IngressPortStatus, out *networkingv1.IngressPortStatus, s conversion.Scope) error {
 	out.Port = in.Port
 	out.Protocol = corev1.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
@@ -622,11 +622,11 @@ func autoConvert_networking_IngressPortStatus_To_v1_IngressPortStatus(in *networ
 }
 
 // Convert_networking_IngressPortStatus_To_v1_IngressPortStatus is an autogenerated conversion function.
-func Convert_networking_IngressPortStatus_To_v1_IngressPortStatus(in *networking.IngressPortStatus, out *v1.IngressPortStatus, s conversion.Scope) error {
+func Convert_networking_IngressPortStatus_To_v1_IngressPortStatus(in *networking.IngressPortStatus, out *networkingv1.IngressPortStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressPortStatus_To_v1_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_v1_IngressRule_To_networking_IngressRule(in *v1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func autoConvert_v1_IngressRule_To_networking_IngressRule(in *networkingv1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_v1_IngressRuleValue_To_networking_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -635,11 +635,11 @@ func autoConvert_v1_IngressRule_To_networking_IngressRule(in *v1.IngressRule, ou
 }
 
 // Convert_v1_IngressRule_To_networking_IngressRule is an autogenerated conversion function.
-func Convert_v1_IngressRule_To_networking_IngressRule(in *v1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func Convert_v1_IngressRule_To_networking_IngressRule(in *networkingv1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
 	return autoConvert_v1_IngressRule_To_networking_IngressRule(in, out, s)
 }
 
-func autoConvert_networking_IngressRule_To_v1_IngressRule(in *networking.IngressRule, out *v1.IngressRule, s conversion.Scope) error {
+func autoConvert_networking_IngressRule_To_v1_IngressRule(in *networking.IngressRule, out *networkingv1.IngressRule, s conversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_networking_IngressRuleValue_To_v1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -648,31 +648,31 @@ func autoConvert_networking_IngressRule_To_v1_IngressRule(in *networking.Ingress
 }
 
 // Convert_networking_IngressRule_To_v1_IngressRule is an autogenerated conversion function.
-func Convert_networking_IngressRule_To_v1_IngressRule(in *networking.IngressRule, out *v1.IngressRule, s conversion.Scope) error {
+func Convert_networking_IngressRule_To_v1_IngressRule(in *networking.IngressRule, out *networkingv1.IngressRule, s conversion.Scope) error {
 	return autoConvert_networking_IngressRule_To_v1_IngressRule(in, out, s)
 }
 
-func autoConvert_v1_IngressRuleValue_To_networking_IngressRuleValue(in *v1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1_IngressRuleValue_To_networking_IngressRuleValue(in *networkingv1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
 	out.HTTP = (*networking.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
 	return nil
 }
 
 // Convert_v1_IngressRuleValue_To_networking_IngressRuleValue is an autogenerated conversion function.
-func Convert_v1_IngressRuleValue_To_networking_IngressRuleValue(in *v1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func Convert_v1_IngressRuleValue_To_networking_IngressRuleValue(in *networkingv1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
 	return autoConvert_v1_IngressRuleValue_To_networking_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_IngressRuleValue_To_v1_IngressRuleValue(in *networking.IngressRuleValue, out *v1.IngressRuleValue, s conversion.Scope) error {
-	out.HTTP = (*v1.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
+func autoConvert_networking_IngressRuleValue_To_v1_IngressRuleValue(in *networking.IngressRuleValue, out *networkingv1.IngressRuleValue, s conversion.Scope) error {
+	out.HTTP = (*networkingv1.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
 	return nil
 }
 
 // Convert_networking_IngressRuleValue_To_v1_IngressRuleValue is an autogenerated conversion function.
-func Convert_networking_IngressRuleValue_To_v1_IngressRuleValue(in *networking.IngressRuleValue, out *v1.IngressRuleValue, s conversion.Scope) error {
+func Convert_networking_IngressRuleValue_To_v1_IngressRuleValue(in *networking.IngressRuleValue, out *networkingv1.IngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_IngressRuleValue_To_v1_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in *v1.IngressServiceBackend, out *networking.IngressServiceBackend, s conversion.Scope) error {
+func autoConvert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in *networkingv1.IngressServiceBackend, out *networking.IngressServiceBackend, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(&in.Port, &out.Port, s); err != nil {
 		return err
@@ -681,11 +681,11 @@ func autoConvert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in
 }
 
 // Convert_v1_IngressServiceBackend_To_networking_IngressServiceBackend is an autogenerated conversion function.
-func Convert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in *v1.IngressServiceBackend, out *networking.IngressServiceBackend, s conversion.Scope) error {
+func Convert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in *networkingv1.IngressServiceBackend, out *networking.IngressServiceBackend, s conversion.Scope) error {
 	return autoConvert_v1_IngressServiceBackend_To_networking_IngressServiceBackend(in, out, s)
 }
 
-func autoConvert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in *networking.IngressServiceBackend, out *v1.IngressServiceBackend, s conversion.Scope) error {
+func autoConvert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in *networking.IngressServiceBackend, out *networkingv1.IngressServiceBackend, s conversion.Scope) error {
 	out.Name = in.Name
 	if err := Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(&in.Port, &out.Port, s); err != nil {
 		return err
@@ -694,11 +694,11 @@ func autoConvert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in
 }
 
 // Convert_networking_IngressServiceBackend_To_v1_IngressServiceBackend is an autogenerated conversion function.
-func Convert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in *networking.IngressServiceBackend, out *v1.IngressServiceBackend, s conversion.Scope) error {
+func Convert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in *networking.IngressServiceBackend, out *networkingv1.IngressServiceBackend, s conversion.Scope) error {
 	return autoConvert_networking_IngressServiceBackend_To_v1_IngressServiceBackend(in, out, s)
 }
 
-func autoConvert_v1_IngressSpec_To_networking_IngressSpec(in *v1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+func autoConvert_v1_IngressSpec_To_networking_IngressSpec(in *networkingv1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	out.DefaultBackend = (*networking.IngressBackend)(unsafe.Pointer(in.DefaultBackend))
 	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
@@ -707,24 +707,24 @@ func autoConvert_v1_IngressSpec_To_networking_IngressSpec(in *v1.IngressSpec, ou
 }
 
 // Convert_v1_IngressSpec_To_networking_IngressSpec is an autogenerated conversion function.
-func Convert_v1_IngressSpec_To_networking_IngressSpec(in *v1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+func Convert_v1_IngressSpec_To_networking_IngressSpec(in *networkingv1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	return autoConvert_v1_IngressSpec_To_networking_IngressSpec(in, out, s)
 }
 
-func autoConvert_networking_IngressSpec_To_v1_IngressSpec(in *networking.IngressSpec, out *v1.IngressSpec, s conversion.Scope) error {
+func autoConvert_networking_IngressSpec_To_v1_IngressSpec(in *networking.IngressSpec, out *networkingv1.IngressSpec, s conversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
-	out.DefaultBackend = (*v1.IngressBackend)(unsafe.Pointer(in.DefaultBackend))
-	out.TLS = *(*[]v1.IngressTLS)(unsafe.Pointer(&in.TLS))
-	out.Rules = *(*[]v1.IngressRule)(unsafe.Pointer(&in.Rules))
+	out.DefaultBackend = (*networkingv1.IngressBackend)(unsafe.Pointer(in.DefaultBackend))
+	out.TLS = *(*[]networkingv1.IngressTLS)(unsafe.Pointer(&in.TLS))
+	out.Rules = *(*[]networkingv1.IngressRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_networking_IngressSpec_To_v1_IngressSpec is an autogenerated conversion function.
-func Convert_networking_IngressSpec_To_v1_IngressSpec(in *networking.IngressSpec, out *v1.IngressSpec, s conversion.Scope) error {
+func Convert_networking_IngressSpec_To_v1_IngressSpec(in *networking.IngressSpec, out *networkingv1.IngressSpec, s conversion.Scope) error {
 	return autoConvert_networking_IngressSpec_To_v1_IngressSpec(in, out, s)
 }
 
-func autoConvert_v1_IngressStatus_To_networking_IngressStatus(in *v1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func autoConvert_v1_IngressStatus_To_networking_IngressStatus(in *networkingv1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
 	if err := Convert_v1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -732,11 +732,11 @@ func autoConvert_v1_IngressStatus_To_networking_IngressStatus(in *v1.IngressStat
 }
 
 // Convert_v1_IngressStatus_To_networking_IngressStatus is an autogenerated conversion function.
-func Convert_v1_IngressStatus_To_networking_IngressStatus(in *v1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func Convert_v1_IngressStatus_To_networking_IngressStatus(in *networkingv1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
 	return autoConvert_v1_IngressStatus_To_networking_IngressStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressStatus_To_v1_IngressStatus(in *networking.IngressStatus, out *v1.IngressStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressStatus_To_v1_IngressStatus(in *networking.IngressStatus, out *networkingv1.IngressStatus, s conversion.Scope) error {
 	if err := Convert_networking_IngressLoadBalancerStatus_To_v1_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -744,33 +744,33 @@ func autoConvert_networking_IngressStatus_To_v1_IngressStatus(in *networking.Ing
 }
 
 // Convert_networking_IngressStatus_To_v1_IngressStatus is an autogenerated conversion function.
-func Convert_networking_IngressStatus_To_v1_IngressStatus(in *networking.IngressStatus, out *v1.IngressStatus, s conversion.Scope) error {
+func Convert_networking_IngressStatus_To_v1_IngressStatus(in *networking.IngressStatus, out *networkingv1.IngressStatus, s conversion.Scope) error {
 	return autoConvert_networking_IngressStatus_To_v1_IngressStatus(in, out, s)
 }
 
-func autoConvert_v1_IngressTLS_To_networking_IngressTLS(in *v1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func autoConvert_v1_IngressTLS_To_networking_IngressTLS(in *networkingv1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_v1_IngressTLS_To_networking_IngressTLS is an autogenerated conversion function.
-func Convert_v1_IngressTLS_To_networking_IngressTLS(in *v1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func Convert_v1_IngressTLS_To_networking_IngressTLS(in *networkingv1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
 	return autoConvert_v1_IngressTLS_To_networking_IngressTLS(in, out, s)
 }
 
-func autoConvert_networking_IngressTLS_To_v1_IngressTLS(in *networking.IngressTLS, out *v1.IngressTLS, s conversion.Scope) error {
+func autoConvert_networking_IngressTLS_To_v1_IngressTLS(in *networking.IngressTLS, out *networkingv1.IngressTLS, s conversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_networking_IngressTLS_To_v1_IngressTLS is an autogenerated conversion function.
-func Convert_networking_IngressTLS_To_v1_IngressTLS(in *networking.IngressTLS, out *v1.IngressTLS, s conversion.Scope) error {
+func Convert_networking_IngressTLS_To_v1_IngressTLS(in *networking.IngressTLS, out *networkingv1.IngressTLS, s conversion.Scope) error {
 	return autoConvert_networking_IngressTLS_To_v1_IngressTLS(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicy_To_networking_NetworkPolicy(in *v1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicy_To_networking_NetworkPolicy(in *networkingv1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -779,11 +779,11 @@ func autoConvert_v1_NetworkPolicy_To_networking_NetworkPolicy(in *v1.NetworkPoli
 }
 
 // Convert_v1_NetworkPolicy_To_networking_NetworkPolicy is an autogenerated conversion function.
-func Convert_v1_NetworkPolicy_To_networking_NetworkPolicy(in *v1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
+func Convert_v1_NetworkPolicy_To_networking_NetworkPolicy(in *networkingv1.NetworkPolicy, out *networking.NetworkPolicy, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicy_To_networking_NetworkPolicy(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicy_To_v1_NetworkPolicy(in *networking.NetworkPolicy, out *v1.NetworkPolicy, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicy_To_v1_NetworkPolicy(in *networking.NetworkPolicy, out *networkingv1.NetworkPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -792,77 +792,77 @@ func autoConvert_networking_NetworkPolicy_To_v1_NetworkPolicy(in *networking.Net
 }
 
 // Convert_networking_NetworkPolicy_To_v1_NetworkPolicy is an autogenerated conversion function.
-func Convert_networking_NetworkPolicy_To_v1_NetworkPolicy(in *networking.NetworkPolicy, out *v1.NetworkPolicy, s conversion.Scope) error {
+func Convert_networking_NetworkPolicy_To_v1_NetworkPolicy(in *networking.NetworkPolicy, out *networkingv1.NetworkPolicy, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicy_To_v1_NetworkPolicy(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *v1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *networkingv1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
 	out.Ports = *(*[]networking.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	out.To = *(*[]networking.NetworkPolicyPeer)(unsafe.Pointer(&in.To))
 	return nil
 }
 
 // Convert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule is an autogenerated conversion function.
-func Convert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *v1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
+func Convert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *networkingv1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *v1.NetworkPolicyEgressRule, s conversion.Scope) error {
-	out.Ports = *(*[]v1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
-	out.To = *(*[]v1.NetworkPolicyPeer)(unsafe.Pointer(&in.To))
+func autoConvert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *networkingv1.NetworkPolicyEgressRule, s conversion.Scope) error {
+	out.Ports = *(*[]networkingv1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
+	out.To = *(*[]networkingv1.NetworkPolicyPeer)(unsafe.Pointer(&in.To))
 	return nil
 }
 
 // Convert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *v1.NetworkPolicyEgressRule, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *networkingv1.NetworkPolicyEgressRule, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyEgressRule_To_v1_NetworkPolicyEgressRule(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *v1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *networkingv1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
 	out.Ports = *(*[]networking.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
 	out.From = *(*[]networking.NetworkPolicyPeer)(unsafe.Pointer(&in.From))
 	return nil
 }
 
 // Convert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule is an autogenerated conversion function.
-func Convert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *v1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
+func Convert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in *networkingv1.NetworkPolicyIngressRule, out *networking.NetworkPolicyIngressRule, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *v1.NetworkPolicyIngressRule, s conversion.Scope) error {
-	out.Ports = *(*[]v1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
-	out.From = *(*[]v1.NetworkPolicyPeer)(unsafe.Pointer(&in.From))
+func autoConvert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *networkingv1.NetworkPolicyIngressRule, s conversion.Scope) error {
+	out.Ports = *(*[]networkingv1.NetworkPolicyPort)(unsafe.Pointer(&in.Ports))
+	out.From = *(*[]networkingv1.NetworkPolicyPeer)(unsafe.Pointer(&in.From))
 	return nil
 }
 
 // Convert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *v1.NetworkPolicyIngressRule, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(in *networking.NetworkPolicyIngressRule, out *networkingv1.NetworkPolicyIngressRule, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyIngressRule_To_v1_NetworkPolicyIngressRule(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in *networkingv1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]networking.NetworkPolicy)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList is an autogenerated conversion function.
-func Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
+func Convert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in *networkingv1.NetworkPolicyList, out *networking.NetworkPolicyList, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicyList_To_networking_NetworkPolicyList(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1.NetworkPolicyList, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking.NetworkPolicyList, out *networkingv1.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.NetworkPolicy)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]networkingv1.NetworkPolicy)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1.NetworkPolicyList, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in *networking.NetworkPolicyList, out *networkingv1.NetworkPolicyList, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyList_To_v1_NetworkPolicyList(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *networkingv1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
 	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.IPBlock = (*networking.IPBlock)(unsafe.Pointer(in.IPBlock))
@@ -870,23 +870,23 @@ func autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.Net
 }
 
 // Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer is an autogenerated conversion function.
-func Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *v1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
+func Convert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *networkingv1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *v1.NetworkPolicyPeer, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *networkingv1.NetworkPolicyPeer, s conversion.Scope) error {
 	out.PodSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.PodSelector))
 	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
-	out.IPBlock = (*v1.IPBlock)(unsafe.Pointer(in.IPBlock))
+	out.IPBlock = (*networkingv1.IPBlock)(unsafe.Pointer(in.IPBlock))
 	return nil
 }
 
 // Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *v1.NetworkPolicyPeer, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking.NetworkPolicyPeer, out *networkingv1.NetworkPolicyPeer, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *networkingv1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*core.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	out.EndPort = (*int32)(unsafe.Pointer(in.EndPort))
@@ -894,11 +894,11 @@ func autoConvert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.Net
 }
 
 // Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort is an autogenerated conversion function.
-func Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
+func Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *networkingv1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1.NetworkPolicyPort, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *networkingv1.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*corev1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
 	out.EndPort = (*int32)(unsafe.Pointer(in.EndPort))
@@ -906,11 +906,11 @@ func autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networ
 }
 
 // Convert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort is an autogenerated conversion function.
-func Convert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1.NetworkPolicyPort, s conversion.Scope) error {
+func Convert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *networkingv1.NetworkPolicyPort, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in, out, s)
 }
 
-func autoConvert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *v1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
+func autoConvert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *networkingv1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
 	out.PodSelector = in.PodSelector
 	out.Ingress = *(*[]networking.NetworkPolicyIngressRule)(unsafe.Pointer(&in.Ingress))
 	out.Egress = *(*[]networking.NetworkPolicyEgressRule)(unsafe.Pointer(&in.Egress))
@@ -919,41 +919,41 @@ func autoConvert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *v1.Net
 }
 
 // Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec is an autogenerated conversion function.
-func Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *v1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
+func Convert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *networkingv1.NetworkPolicySpec, out *networking.NetworkPolicySpec, s conversion.Scope) error {
 	return autoConvert_v1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in, out, s)
 }
 
-func autoConvert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *v1.NetworkPolicySpec, s conversion.Scope) error {
+func autoConvert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *networkingv1.NetworkPolicySpec, s conversion.Scope) error {
 	out.PodSelector = in.PodSelector
-	out.Ingress = *(*[]v1.NetworkPolicyIngressRule)(unsafe.Pointer(&in.Ingress))
-	out.Egress = *(*[]v1.NetworkPolicyEgressRule)(unsafe.Pointer(&in.Egress))
-	out.PolicyTypes = *(*[]v1.PolicyType)(unsafe.Pointer(&in.PolicyTypes))
+	out.Ingress = *(*[]networkingv1.NetworkPolicyIngressRule)(unsafe.Pointer(&in.Ingress))
+	out.Egress = *(*[]networkingv1.NetworkPolicyEgressRule)(unsafe.Pointer(&in.Egress))
+	out.PolicyTypes = *(*[]networkingv1.PolicyType)(unsafe.Pointer(&in.PolicyTypes))
 	return nil
 }
 
 // Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec is an autogenerated conversion function.
-func Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *v1.NetworkPolicySpec, s conversion.Scope) error {
+func Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in *networking.NetworkPolicySpec, out *networkingv1.NetworkPolicySpec, s conversion.Scope) error {
 	return autoConvert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in, out, s)
 }
 
-func autoConvert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in *v1.ServiceBackendPort, out *networking.ServiceBackendPort, s conversion.Scope) error {
+func autoConvert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in *networkingv1.ServiceBackendPort, out *networking.ServiceBackendPort, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Number = in.Number
 	return nil
 }
 
 // Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort is an autogenerated conversion function.
-func Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in *v1.ServiceBackendPort, out *networking.ServiceBackendPort, s conversion.Scope) error {
+func Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in *networkingv1.ServiceBackendPort, out *networking.ServiceBackendPort, s conversion.Scope) error {
 	return autoConvert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in, out, s)
 }
 
-func autoConvert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *networking.ServiceBackendPort, out *v1.ServiceBackendPort, s conversion.Scope) error {
+func autoConvert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *networking.ServiceBackendPort, out *networkingv1.ServiceBackendPort, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Number = in.Number
 	return nil
 }
 
 // Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort is an autogenerated conversion function.
-func Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *networking.ServiceBackendPort, out *v1.ServiceBackendPort, s conversion.Scope) error {
+func Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *networking.ServiceBackendPort, out *networkingv1.ServiceBackendPort, s conversion.Scope) error {
 	return autoConvert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in, out, s)
 }

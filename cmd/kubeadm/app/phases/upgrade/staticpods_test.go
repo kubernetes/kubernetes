@@ -792,7 +792,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			// Setup up basic requities
+			// Setup up basic requisites
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
 

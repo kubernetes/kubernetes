@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,8 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -57,8 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -143,6 +145,7 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, p
 }
 
 func TestPostFilter(t *testing.T) {
+	metrics.Register()
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
 	tests := []struct {
@@ -150,7 +153,7 @@ func TestPostFilter(t *testing.T) {
 		pod                   *v1.Pod
 		pods                  []*v1.Pod
 		nodes                 []*v1.Node
-		filteredNodesStatuses framework.NodeToStatusMap
+		filteredNodesStatuses *framework.NodeToStatus
 		extender              framework.Extender
 		wantResult            *framework.PostFilterResult
 		wantStatus            *framework.Status
@@ -164,9 +167,9 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node1"),
 			wantStatus: framework.NewStatus(framework.Success),
 		},
@@ -179,9 +182,9 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."),
 		},
@@ -194,11 +197,24 @@ func TestPostFilter(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
+		},
+		{
+			name: "preemption should respect absent NodeToStatusMap entry meaning UnschedulableAndUnresolvable",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NewDefaultNodeToStatus(),
+			wantResult:            framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus:            framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
 			name: "pod can be made schedulable on one node",
@@ -211,10 +227,10 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 				st.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
 			wantStatus: framework.NewStatus(framework.Success),
 		},
@@ -229,10 +245,10 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
 				st.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			extender: &tf.FakeExtender{
 				ExtenderName: "FakeExtender1",
 				Predicates:   []tf.FitPredicate{tf.Node1PredicateExtender},
@@ -251,10 +267,10 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(nodeRes).Obj(), // no enough CPU resource
 				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(), // no enough CPU resource
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/2 nodes are available: 2 Insufficient cpu."),
 		},
@@ -271,11 +287,11 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),   // no enough CPU resource
 				st.MakeNode().Name("node3").Capacity(onePodRes).Obj(), // no pod will be preempted
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
 				"node3": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/3 nodes are available: 1 Insufficient cpu, 2 No preemption victims found for incoming pod."),
 		},
@@ -292,11 +308,11 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node3").Capacity(nodeRes).Obj(),
 				st.MakeNode().Name("node4").Capacity(nodeRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
 		},
@@ -307,10 +323,12 @@ func TestPostFilter(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
 			},
 			// label the node with key as "error" so that the TestPlugin will fail with error.
-			nodes:                 []*v1.Node{st.MakeNode().Name("node1").Capacity(largeRes).Label("error", "true").Obj()},
-			filteredNodesStatuses: framework.NodeToStatusMap{"node1": framework.NewStatus(framework.Unschedulable)},
-			wantResult:            nil,
-			wantStatus:            framework.AsStatus(errors.New("preemption: running RemovePod on PreFilter plugin \"test-plugin\": failed to remove pod: p")),
+			nodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(largeRes).Label("error", "true").Obj()},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
+				"node1": framework.NewStatus(framework.Unschedulable),
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
+			wantResult: nil,
+			wantStatus: framework.AsStatus(errors.New("preemption: running RemovePod on PreFilter plugin \"test-plugin\": failed to remove pod: p")),
 		},
 		{
 			name: "one failed with TestPlugin and the other pass",
@@ -324,10 +342,10 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(largeRes).Label("error", "true").Obj(),
 				st.MakeNode().Name("node2").Capacity(largeRes).Obj(),
 			},
-			filteredNodesStatuses: framework.NodeToStatusMap{
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
 				"node1": framework.NewStatus(framework.Unschedulable),
 				"node2": framework.NewStatus(framework.Unschedulable),
-			},
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
 			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
 			wantStatus: framework.NewStatus(framework.Success),
 		},
@@ -365,7 +383,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 				frameworkruntime.WithLogger(logger),
@@ -411,6 +429,7 @@ type candidate struct {
 }
 
 func TestDryRunPreemption(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name                    string
 		args                    *config.DefaultPreemptionArgs
@@ -620,7 +639,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
-				tf.RegisterPluginAsExtensions(interpodaffinity.Name, interpodaffinity.New, "Filter", "PreFilter"),
+				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -1102,7 +1121,7 @@ func TestDryRunPreemption(t *testing.T) {
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
@@ -1361,7 +1380,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1485,7 +1504,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				t.Fatal(err)
 			}
 			pl := DefaultPreemption{fh: f, fts: test.fts}
-			if got, _ := pl.PodEligibleToPreemptOthers(test.pod, test.nominatedNodeStatus); got != test.expected {
+			if got, _ := pl.PodEligibleToPreemptOthers(ctx, test.pod, test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
 		})
@@ -1745,7 +1764,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithWaitingPods(waitingPods),
@@ -1779,9 +1798,10 @@ func TestPreempt(t *testing.T) {
 
 			// so that these nodes are eligible for preemption, we set their status
 			// to Unschedulable.
-			nodeToStatusMap := make(framework.NodeToStatusMap, len(nodes))
+
+			nodeToStatusMap := framework.NewDefaultNodeToStatus()
 			for _, n := range nodes {
-				nodeToStatusMap[n.Name] = framework.NewStatus(framework.Unschedulable)
+				nodeToStatusMap.Set(n.Name, framework.NewStatus(framework.Unschedulable))
 			}
 
 			res, status := pe.Preempt(ctx, test.pod, nodeToStatusMap)
@@ -1839,7 +1859,7 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			res, status = pe.Preempt(ctx, test.pod, make(framework.NodeToStatusMap))
+			res, status = pe.Preempt(ctx, test.pod, framework.NewDefaultNodeToStatus())
 			if !status.IsSuccess() && !status.IsRejected() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}

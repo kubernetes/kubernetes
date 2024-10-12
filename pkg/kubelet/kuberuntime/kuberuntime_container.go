@@ -274,7 +274,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
 		return s.Message(), ErrPreStartHook
 	}
-	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, fmt.Sprintf("Created container %s", container.Name))
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container: %v", container.Name)
 
 	// Step 3: start the container.
 	err = m.runtimeService.StartContainer(ctx, containerID)
@@ -283,7 +283,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
 		return s.Message(), kubecontainer.ErrRunContainer
 	}
-	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, fmt.Sprintf("Started container %s", container.Name))
+	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container %v", container.Name)
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
@@ -780,7 +780,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	if len(message) == 0 {
 		message = fmt.Sprintf("Stopping container %s", containerSpec.Name)
 	}
-	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
+	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, "%v", message)
 
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
@@ -832,7 +832,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	wg.Add(len(runningPod.Containers))
 	var termOrdering *terminationOrdering
 	// we only care about container termination ordering if the sidecars feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && types.HasRestartableInitContainer(pod) {
 		var runningContainerNames []string
 		for _, container := range runningPod.Containers {
 			runningContainerNames = append(runningContainerNames, container.Name)
@@ -1084,7 +1084,12 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 
 		switch status.State {
 		case kubecontainer.ContainerStateCreated:
-			// nothing to do but wait for it to start
+			// The main sync loop should have created and started the container
+			// in one step. If the init container is in the 'created' state,
+			// it is likely that the container runtime failed to start it. To
+			// prevent the container from getting stuck in the 'created' state,
+			// restart it.
+			changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 
 		case kubecontainer.ContainerStateRunning:
 			if !types.IsRestartableInitContainer(container) {

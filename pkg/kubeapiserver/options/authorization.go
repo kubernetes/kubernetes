@@ -85,6 +85,10 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 
 // Complete modifies authorization options
 func (o *BuiltInAuthorizationOptions) Complete() []error {
+	if o == nil {
+		return nil
+	}
+
 	if len(o.AuthorizationConfigurationFile) == 0 && len(o.Modes) == 0 {
 		o.Modes = []string{authzmodes.ModeAlwaysAllow}
 	}
@@ -188,10 +192,9 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
 	fs.StringVar(&o.AuthorizationConfigurationFile, authorizationConfigFlag, o.AuthorizationConfigurationFile, ""+
-		"File with Authorization Configuration to configure the authorizer chain."+
-		"Note: This feature is in Alpha since v1.29."+
-		"--feature-gate=StructuredAuthorizationConfiguration=true feature flag needs to be set to true for enabling the functionality."+
-		"This feature is mutually exclusive with the other --authorization-mode and --authorization-webhook-* flags.")
+		"File with Authorization Configuration to configure the authorizer chain. "+
+		"Requires feature gate StructuredAuthorizationConfiguration. "+
+		"This flag is mutually exclusive with the other --authorization-mode and --authorization-webhook-* flags.")
 
 	// preserves compatibility with any method set during initialization
 	oldAreLegacyFlagsSet := o.AreLegacyFlagsSet

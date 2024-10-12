@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
-	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 )
 
 // FooLister helps list Foos.
@@ -30,7 +30,7 @@ import (
 type FooLister interface {
 	// List lists all Foos in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.Foo, err error)
+	List(selector labels.Selector) (ret []*samplecontrollerv1alpha1.Foo, err error)
 	// Foos returns an object that can list and get Foos.
 	Foos(namespace string) FooNamespaceLister
 	FooListerExpansion
@@ -38,17 +38,17 @@ type FooLister interface {
 
 // fooLister implements the FooLister interface.
 type fooLister struct {
-	listers.ResourceIndexer[*v1alpha1.Foo]
+	listers.ResourceIndexer[*samplecontrollerv1alpha1.Foo]
 }
 
 // NewFooLister returns a new FooLister.
 func NewFooLister(indexer cache.Indexer) FooLister {
-	return &fooLister{listers.New[*v1alpha1.Foo](indexer, v1alpha1.Resource("foo"))}
+	return &fooLister{listers.New[*samplecontrollerv1alpha1.Foo](indexer, samplecontrollerv1alpha1.Resource("foo"))}
 }
 
 // Foos returns an object that can list and get Foos.
 func (s *fooLister) Foos(namespace string) FooNamespaceLister {
-	return fooNamespaceLister{listers.NewNamespaced[*v1alpha1.Foo](s.ResourceIndexer, namespace)}
+	return fooNamespaceLister{listers.NewNamespaced[*samplecontrollerv1alpha1.Foo](s.ResourceIndexer, namespace)}
 }
 
 // FooNamespaceLister helps list and get Foos.
@@ -56,15 +56,15 @@ func (s *fooLister) Foos(namespace string) FooNamespaceLister {
 type FooNamespaceLister interface {
 	// List lists all Foos in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.Foo, err error)
+	List(selector labels.Selector) (ret []*samplecontrollerv1alpha1.Foo, err error)
 	// Get retrieves the Foo from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.Foo, error)
+	Get(name string) (*samplecontrollerv1alpha1.Foo, error)
 	FooNamespaceListerExpansion
 }
 
 // fooNamespaceLister implements the FooNamespaceLister
 // interface.
 type fooNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha1.Foo]
+	listers.ResourceIndexer[*samplecontrollerv1alpha1.Foo]
 }

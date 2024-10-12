@@ -1,49 +1,25 @@
-version = "unstable"
-generator = "gogoctrd"
-plugins = ["grpc", "fieldpath"]
+version = "2"
+generators = ["go", "go-grpc"]
 
-# Control protoc include paths. Below are usually some good defaults, but feel
-# free to try it without them if it works for your project.
+# Control protoc include paths.
 [includes]
-  # Include paths that will be added before all others. Typically, you want to
-  # treat the root of the project as an include, but this may not be necessary.
   before = ["./protobuf"]
 
-  # Paths that should be treated as include roots in relation to the vendor
-  # directory. These will be calculated with the vendor directory nearest the
-  # target package.
-  packages = ["github.com/gogo/protobuf"]
+  # defaults are "/usr/local/include" and "/usr/include", which don't exist on Windows.
+  # override defaults to supress errors about non-existant directories.
+  after = []
 
-  # Paths that will be added untouched to the end of the includes. We use
-  # `/usr/local/include` to pickup the common install location of protobuf.
-  # This is the default.
-  after = ["/usr/local/include"]
-
-# This section maps protobuf imports to Go packages. These will become
-# `-M` directives in the call to the go protobuf generator.
+# This section maps protobuf imports to Go packages.
 [packages]
-  "gogoproto/gogo.proto" = "github.com/gogo/protobuf/gogoproto"
-  "google/protobuf/any.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/empty.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/struct.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/descriptor.proto" = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
-  "google/protobuf/field_mask.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/timestamp.proto" = "github.com/gogo/protobuf/types"
-  "google/protobuf/duration.proto" = "github.com/gogo/protobuf/types"
-  "github/containerd/cgroups/stats/v1/metrics.proto" = "github.com/containerd/cgroups/stats/v1"
+  # github.com/containerd/cgroups protofiles still list their go path as "github.com/containerd/cgroups/cgroup1/stats"
+  "github.com/containerd/cgroups/v3/cgroup1/stats/metrics.proto" = "github.com/containerd/cgroups/v3/cgroup1/stats"
 
 [[overrides]]
-prefixes = ["github.com/Microsoft/hcsshim/internal/shimdiag"]
-plugins = ["ttrpc"]
-
-[[overrides]]
-prefixes = ["github.com/Microsoft/hcsshim/internal/computeagent"]
-plugins = ["ttrpc"]
-
-[[overrides]]
-prefixes = ["github.com/Microsoft/hcsshim/internal/ncproxyttrpc"]
-plugins = ["ttrpc"]
-
-[[overrides]]
-prefixes = ["github.com/Microsoft/hcsshim/internal/vmservice"]
-plugins = ["ttrpc"]
+prefixes = [
+  "github.com/Microsoft/hcsshim/internal/shimdiag",
+  "github.com/Microsoft/hcsshim/internal/extendedtask",
+  "github.com/Microsoft/hcsshim/internal/computeagent",
+  "github.com/Microsoft/hcsshim/internal/ncproxyttrpc",
+  "github.com/Microsoft/hcsshim/internal/vmservice",
+]
+generators = ["go", "go-ttrpc"]

@@ -59,7 +59,7 @@ var (
 
 		`)
 
-	joinControPlaneDoneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
+	joinControlPlaneDoneTemp = template.Must(template.New("join").Parse(dedent.Dedent(`
 		This node has joined the cluster and a new control plane instance was created:
 
 		* Certificate signing request was sent to apiserver and approval was received.
@@ -196,7 +196,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
-				if err := joinControPlaneDoneTemp.Execute(data.outputWriter, ctx); err != nil {
+				if err := joinControlPlaneDoneTemp.Execute(data.outputWriter, ctx); err != nil {
 					return err
 				}
 

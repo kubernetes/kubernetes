@@ -473,6 +473,23 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "cacher.Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"resource-version": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
+						},
+					},
+					events: []string{
+						"About to Get from underlying storage",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -560,6 +577,22 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"About to List from storage",
 						"Listing from storage done",
 						"Writing http response done",
+					},
+				},
+				{
+					name: "cacher.GetList",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"Ready",
+						"Listed items from cache",
+						"Filtered items",
 					},
 				},
 				{

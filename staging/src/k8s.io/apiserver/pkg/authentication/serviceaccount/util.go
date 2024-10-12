@@ -17,18 +17,12 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -36,9 +30,6 @@ const (
 	ServiceAccountUsernameSeparator = ":"
 	ServiceAccountGroupPrefix       = "system:serviceaccounts:"
 	AllServiceAccountsGroup         = "system:serviceaccounts"
-	// CredentialIDKey is the key used in a user's "extra" to specify the unique
-	// identifier for this identity document).
-	CredentialIDKey = "authentication.kubernetes.io/credential-id"
 	// IssuedCredentialIDAuditAnnotationKey is the annotation key used in the audit event that is persisted to the
 	// '/token' endpoint for service accounts.
 	// This annotation indicates the generated credential identifier for the service account token being issued.
@@ -156,7 +147,7 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		if info.Extra == nil {
 			info.Extra = make(map[string][]string)
 		}
-		info.Extra[CredentialIDKey] = []string{sa.CredentialID}
+		info.Extra[user.CredentialIDKey] = []string{sa.CredentialID}
 	}
 	if sa.NodeName != "" {
 		if info.Extra == nil {
@@ -170,15 +161,6 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 	}
 
 	return info
-}
-
-// CredentialIDForJTI converts a given JTI string into a credential identifier for use in a
-// users 'extra' info.
-func CredentialIDForJTI(jti string) string {
-	if len(jti) == 0 {
-		return ""
-	}
-	return "JTI=" + jti
 }
 
 // IsServiceAccountToken returns true if the secret is a valid api token for the service account
@@ -199,30 +181,4 @@ func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 	}
 
 	return true
-}
-
-func GetOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
-	sa, err := coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err == nil {
-		return sa, nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	// Create the namespace if we can't verify it exists.
-	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
-	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
-		}
-	}
-
-	// Create the service account
-	sa, err = coreClient.ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		// If we're racing to init and someone else already created it, re-fetch
-		return coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
-	return sa, err
 }

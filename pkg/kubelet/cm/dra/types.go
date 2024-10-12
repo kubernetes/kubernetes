@@ -17,6 +17,8 @@ limitations under the License.
 package dra
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -27,14 +29,14 @@ import (
 type Manager interface {
 	// Start starts the reconcile loop of the manager.
 	// This will ensure that all claims are unprepared even if pods get deleted unexpectedly.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
 
 	// PrepareResources prepares resources for a pod.
 	// It communicates with the DRA resource plugin to prepare resources.
-	PrepareResources(pod *v1.Pod) error
+	PrepareResources(ctx context.Context, pod *v1.Pod) error
 
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
-	UnprepareResources(pod *v1.Pod) error
+	UnprepareResources(ctx context.Context, pod *v1.Pod) error
 
 	// GetResources gets a ContainerInfo object from the claimInfo cache.
 	// This information is used by the caller to update a container config.

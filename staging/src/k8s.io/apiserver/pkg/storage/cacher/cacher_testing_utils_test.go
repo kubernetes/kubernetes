@@ -55,7 +55,7 @@ func init() {
 func newPod() runtime.Object     { return &example.Pod{} }
 func newPodList() runtime.Object { return &example.PodList{} }
 
-func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	storage := etcd3.New(
 		server.V3Client,

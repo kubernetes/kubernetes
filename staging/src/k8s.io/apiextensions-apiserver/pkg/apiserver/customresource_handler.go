@@ -858,14 +858,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 					MediaTypeType:    "application",
 					MediaTypeSubType: "json",
 					EncodesAsText:    true,
-					Serializer:       json.NewSerializer(json.DefaultMetaFactory, creator, typer, false),
-					PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, creator, typer, true),
+					Serializer:       json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{}),
+					PrettySerializer: json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{Pretty: true}),
 					StrictSerializer: json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{
 						Strict: true,
 					}),
 					StreamSerializer: &runtime.StreamSerializerInfo{
 						EncodesAsText: true,
-						Serializer:    json.NewSerializer(json.DefaultMetaFactory, creator, typer, false),
+						Serializer:    json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{}),
 						Framer:        json.Framer,
 					},
 				},
@@ -874,7 +874,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 					MediaTypeType:    "application",
 					MediaTypeSubType: "yaml",
 					EncodesAsText:    true,
-					Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, creator, typer),
+					Serializer:       json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{Yaml: true}),
 					StrictSerializer: json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{
 						Yaml:   true,
 						Strict: true,

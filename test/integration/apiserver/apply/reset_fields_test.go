@@ -75,7 +75,7 @@ const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus"
 
 var resetFieldsSkippedResources = map[string]struct{}{}
 
-// noConflicts is the set of reources for which
+// noConflicts is the set of resources for which
 // a conflict cannot occur.
 var noConflicts = map[string]struct{}{
 	// both spec and status get wiped for CSRs,

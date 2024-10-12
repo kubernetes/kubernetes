@@ -1,8 +1,9 @@
+//go:build windows
+
 package winapi
 
 import (
 	"errors"
-	"reflect"
 	"syscall"
 	"unsafe"
 
@@ -12,11 +13,7 @@ import (
 // Uint16BufferToSlice wraps a uint16 pointer-and-length into a slice
 // for easier interop with Go APIs
 func Uint16BufferToSlice(buffer *uint16, bufferLength int) (result []uint16) {
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&result))
-	hdr.Data = uintptr(unsafe.Pointer(buffer))
-	hdr.Cap = bufferLength
-	hdr.Len = bufferLength
-
+	result = unsafe.Slice(buffer, bufferLength)
 	return
 }
 
@@ -32,7 +29,7 @@ type UnicodeString struct {
 // denotes the maximum number of wide chars a path can have.
 const NTSTRSAFE_UNICODE_STRING_MAX_CCH = 32767
 
-//String converts a UnicodeString to a golang string
+// String converts a UnicodeString to a golang string
 func (uni UnicodeString) String() string {
 	// UnicodeString is not guaranteed to be null terminated, therefore
 	// use the UnicodeString's Length field
@@ -77,4 +74,10 @@ func ConvertStringSetToSlice(buf []byte) ([]string, error) {
 		}
 	}
 	return nil, errors.New("string set malformed: missing null terminator at end of buffer")
+}
+
+// ParseUtf16LE parses a UTF-16LE byte array into a string (without passing
+// through a uint16 or rune array).
+func ParseUtf16LE(b []byte) string {
+	return windows.UTF16PtrToString((*uint16)(unsafe.Pointer(&b[0])))
 }

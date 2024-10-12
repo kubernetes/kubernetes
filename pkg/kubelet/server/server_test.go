@@ -50,7 +50,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	// Do some initialization to decode the query parameters correctly.
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -802,8 +802,8 @@ func TestContainerLogs(t *testing.T) {
 		podLogOption *v1.PodLogOptions
 	}{
 		"without tail":     {"", &v1.PodLogOptions{}},
-		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
-		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: pointer.Int64(5)}},
+		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: ptr.To[int64](5)}},
+		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: ptr.To[int64](5)}},
 		"with tail all":    {"?tail=all", &v1.PodLogOptions{}},
 		"with follow":      {"?follow=1", &v1.PodLogOptions{Follow: true}},
 	}
@@ -918,9 +918,9 @@ func TestCheckpointContainer(t *testing.T) {
 			t.Errorf("Got error POSTing: %v", err)
 		}
 		defer resp.Body.Close()
-		assert.Equal(t, resp.StatusCode, 500)
+		assert.Equal(t, 500, resp.StatusCode)
 		body, _ := io.ReadAll(resp.Body)
-		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
+		assert.Equal(t, "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)", string(body))
 	})
 	// Now test a successful checkpoint succeeds
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
@@ -929,7 +929,7 @@ func TestCheckpointContainer(t *testing.T) {
 		if err != nil {
 			t.Errorf("Got error POSTing: %v", err)
 		}
-		assert.Equal(t, resp.StatusCode, 200)
+		assert.Equal(t, 200, resp.StatusCode)
 	})
 
 	// Now test for 404 if checkpointing support is explicitly disabled.
@@ -1525,6 +1525,6 @@ func TestTrimURLPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
+		assert.Equalf(t, test.expected, getURLRootPath(test.path), "path is: %s", test.path)
 	}
 }

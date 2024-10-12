@@ -29,8 +29,6 @@ import (
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
-
-	"github.com/imdario/mergo"
 )
 
 const (
@@ -241,45 +239,37 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, userAuthPartialConfig, mergo.WithOverride)
-
-		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
-		if err != nil {
+		if err := merge(clientConfig, userAuthPartialConfig); err != nil {
 			return nil, err
 		}
-		mergo.Merge(clientConfig, serverAuthPartialConfig, mergo.WithOverride)
+
+		serverAuthPartialConfig := getServerIdentificationPartialConfig(configClusterInfo)
+		if err := merge(clientConfig, serverAuthPartialConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	return clientConfig, nil
 }
 
 // clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
-// both, so we have to split the objects and merge them separately
-// we want this order of precedence for the server identification
-// 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  load the ~/.kubernetes_auth file as a default
-func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, configClusterInfo clientcmdapi.Cluster) (*restclient.Config, error) {
-	mergedConfig := &restclient.Config{}
+// both, so we have to split the objects and merge them separately.
 
-	// configClusterInfo holds the information identify the server provided by .kubeconfig
+// getServerIdentificationPartialConfig extracts server identification information from configClusterInfo
+// (the final result of command line flags and merged .kubeconfig files).
+func getServerIdentificationPartialConfig(configClusterInfo clientcmdapi.Cluster) *restclient.Config {
 	configClientConfig := &restclient.Config{}
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	configClientConfig.ServerName = configClusterInfo.TLSServerName
-	mergo.Merge(mergedConfig, configClientConfig, mergo.WithOverride)
 
-	return mergedConfig, nil
+	return configClientConfig
 }
 
-// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
-// both, so we have to split the objects and merge them separately
-// we want this order of precedence for user identification
-// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  if there is not enough information to identify the user, load try the ~/.kubernetes_auth file
-// 4.  if there is not enough information to identify the user, prompt if possible
+// getUserIdentificationPartialConfig extracts user identification information from configAuthInfo
+// (the final result of command line flags and merged .kubeconfig files);
+// if the information available there is insufficient, it prompts (if possible) for additional information.
 func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader, persistAuthConfig restclient.AuthProviderConfigPersister, configClusterInfo clientcmdapi.Cluster) (*restclient.Config, error) {
 	mergedConfig := &restclient.Config{}
 
@@ -338,8 +328,12 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &restclient.Config{}
-		mergo.Merge(mergedConfig, promptedConfig, mergo.WithOverride)
-		mergo.Merge(mergedConfig, previouslyMergedConfig, mergo.WithOverride)
+		if err := merge(mergedConfig, promptedConfig); err != nil {
+			return nil, err
+		}
+		if err := merge(mergedConfig, previouslyMergedConfig); err != nil {
+			return nil, err
+		}
 		config.promptedCredentials.username = mergedConfig.Username
 		config.promptedCredentials.password = mergedConfig.Password
 	}
@@ -347,7 +341,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	return mergedConfig, nil
 }
 
-// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only user identification information
+// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged for only user identification information
 func makeUserIdentificationConfig(info clientauth.Info) *restclient.Config {
 	config := &restclient.Config{}
 	config.Username = info.User
@@ -507,12 +501,16 @@ func (config *DirectClientConfig) getContext() (clientcmdapi.Context, error) {
 
 	mergedContext := clientcmdapi.NewContext()
 	if configContext, exists := contexts[contextName]; exists {
-		mergo.Merge(mergedContext, configContext, mergo.WithOverride)
+		if err := merge(mergedContext, configContext); err != nil {
+			return clientcmdapi.Context{}, err
+		}
 	} else if required {
 		return clientcmdapi.Context{}, fmt.Errorf("context %q does not exist", contextName)
 	}
 	if config.overrides != nil {
-		mergo.Merge(mergedContext, config.overrides.Context, mergo.WithOverride)
+		if err := merge(mergedContext, &config.overrides.Context); err != nil {
+			return clientcmdapi.Context{}, err
+		}
 	}
 
 	return *mergedContext, nil
@@ -525,12 +523,16 @@ func (config *DirectClientConfig) getAuthInfo() (clientcmdapi.AuthInfo, error) {
 
 	mergedAuthInfo := clientcmdapi.NewAuthInfo()
 	if configAuthInfo, exists := authInfos[authInfoName]; exists {
-		mergo.Merge(mergedAuthInfo, configAuthInfo, mergo.WithOverride)
+		if err := merge(mergedAuthInfo, configAuthInfo); err != nil {
+			return clientcmdapi.AuthInfo{}, err
+		}
 	} else if required {
 		return clientcmdapi.AuthInfo{}, fmt.Errorf("auth info %q does not exist", authInfoName)
 	}
 	if config.overrides != nil {
-		mergo.Merge(mergedAuthInfo, config.overrides.AuthInfo, mergo.WithOverride)
+		if err := merge(mergedAuthInfo, &config.overrides.AuthInfo); err != nil {
+			return clientcmdapi.AuthInfo{}, err
+		}
 	}
 
 	return *mergedAuthInfo, nil
@@ -543,15 +545,21 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 
 	mergedClusterInfo := clientcmdapi.NewCluster()
 	if config.overrides != nil {
-		mergo.Merge(mergedClusterInfo, config.overrides.ClusterDefaults, mergo.WithOverride)
+		if err := merge(mergedClusterInfo, &config.overrides.ClusterDefaults); err != nil {
+			return clientcmdapi.Cluster{}, err
+		}
 	}
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
-		mergo.Merge(mergedClusterInfo, configClusterInfo, mergo.WithOverride)
+		if err := merge(mergedClusterInfo, configClusterInfo); err != nil {
+			return clientcmdapi.Cluster{}, err
+		}
 	} else if required {
 		return clientcmdapi.Cluster{}, fmt.Errorf("cluster %q does not exist", clusterInfoName)
 	}
 	if config.overrides != nil {
-		mergo.Merge(mergedClusterInfo, config.overrides.ClusterInfo, mergo.WithOverride)
+		if err := merge(mergedClusterInfo, &config.overrides.ClusterInfo); err != nil {
+			return clientcmdapi.Cluster{}, err
+		}
 	}
 
 	// * An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data

@@ -1,3 +1,5 @@
+//go:build windows
+
 package hcn
 
 import (
@@ -137,7 +139,7 @@ func AddRoute(endpoints []HostComputeEndpoint, destinationPrefix string, nextHop
 	logrus.Debugf("hcn::HostComputeRoute::AddRoute endpointId=%v, destinationPrefix=%v, nextHop=%v, needEncapsulation=%v", endpoints, destinationPrefix, nextHop, needEncapsulation)
 
 	if len(endpoints) <= 0 {
-		return nil, errors.New("Missing endpoints")
+		return nil, errors.New("missing endpoints")
 	}
 
 	route := &HostComputeRoute{

@@ -47,6 +47,13 @@ func TestGetVersion(t *testing.T) {
 			expected: version.MajorMinor(5, 4),
 		},
 		{
+			name: "valid microsoft WSL2 kernel version",
+			readFileFunc: func(_ string) ([]byte, error) {
+				return []byte("5.15.146.1-microsoft-standard-WSL2"), nil
+			},
+			expected: version.MajorMinor(5, 15).WithPatch(146),
+		},
+		{
 			name: "failed to read os-release file",
 			readFileFunc: func(_ string) ([]byte, error) {
 				return nil, errors.New("open /proc/sys/kernel/osrelease: failed to read file")

@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodTemplateLister helps list PodTemplates.
@@ -30,7 +30,7 @@ import (
 type PodTemplateLister interface {
 	// List lists all PodTemplates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PodTemplate, err error)
+	List(selector labels.Selector) (ret []*corev1.PodTemplate, err error)
 	// PodTemplates returns an object that can list and get PodTemplates.
 	PodTemplates(namespace string) PodTemplateNamespaceLister
 	PodTemplateListerExpansion
@@ -38,17 +38,17 @@ type PodTemplateLister interface {
 
 // podTemplateLister implements the PodTemplateLister interface.
 type podTemplateLister struct {
-	listers.ResourceIndexer[*v1.PodTemplate]
+	listers.ResourceIndexer[*corev1.PodTemplate]
 }
 
 // NewPodTemplateLister returns a new PodTemplateLister.
 func NewPodTemplateLister(indexer cache.Indexer) PodTemplateLister {
-	return &podTemplateLister{listers.New[*v1.PodTemplate](indexer, v1.Resource("podtemplate"))}
+	return &podTemplateLister{listers.New[*corev1.PodTemplate](indexer, corev1.Resource("podtemplate"))}
 }
 
 // PodTemplates returns an object that can list and get PodTemplates.
 func (s *podTemplateLister) PodTemplates(namespace string) PodTemplateNamespaceLister {
-	return podTemplateNamespaceLister{listers.NewNamespaced[*v1.PodTemplate](s.ResourceIndexer, namespace)}
+	return podTemplateNamespaceLister{listers.NewNamespaced[*corev1.PodTemplate](s.ResourceIndexer, namespace)}
 }
 
 // PodTemplateNamespaceLister helps list and get PodTemplates.
@@ -56,15 +56,15 @@ func (s *podTemplateLister) PodTemplates(namespace string) PodTemplateNamespaceL
 type PodTemplateNamespaceLister interface {
 	// List lists all PodTemplates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.PodTemplate, err error)
+	List(selector labels.Selector) (ret []*corev1.PodTemplate, err error)
 	// Get retrieves the PodTemplate from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.PodTemplate, error)
+	Get(name string) (*corev1.PodTemplate, error)
 	PodTemplateNamespaceListerExpansion
 }
 
 // podTemplateNamespaceLister implements the PodTemplateNamespaceLister
 // interface.
 type podTemplateNamespaceLister struct {
-	listers.ResourceIndexer[*v1.PodTemplate]
+	listers.ResourceIndexer[*corev1.PodTemplate]
 }

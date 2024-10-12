@@ -35,8 +35,9 @@ import (
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct {
-	pvcLister    corelisters.PersistentVolumeClaimLister
-	sharedLister framework.SharedLister
+	pvcLister                 corelisters.PersistentVolumeClaimLister
+	sharedLister              framework.SharedLister
+	enableSchedulingQueueHint bool
 }
 
 var _ framework.PreFilterPlugin = &VolumeRestrictions{}
@@ -319,6 +320,16 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = framework.Add
+	}
+
 	return []framework.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
@@ -326,7 +337,7 @@ func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]framework.C
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
@@ -408,7 +419,8 @@ func New(_ context.Context, _ runtime.Object, handle framework.Handle, fts featu
 	sharedLister := handle.SnapshotSharedLister()
 
 	return &VolumeRestrictions{
-		pvcLister:    pvcLister,
-		sharedLister: sharedLister,
+		pvcLister:                 pvcLister,
+		sharedLister:              sharedLister,
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil
 }

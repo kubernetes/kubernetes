@@ -602,7 +602,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 				nil, matchingParams,
 				admission.Create), &admission.RuntimeObjectInterfaces{}),
 		`Denied`)
-	require.Equal(t, numCompiles, 1)
+	require.Equal(t, 1, numCompiles)
 }
 
 func TestReconfigureBinding(t *testing.T) {

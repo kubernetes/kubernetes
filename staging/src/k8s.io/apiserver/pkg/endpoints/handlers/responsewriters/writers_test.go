@@ -326,7 +326,7 @@ func TestSerializeObject(t *testing.T) {
 			compressionEnabled: true,
 			statusCode:         http.StatusInternalServerError,
 			out:                smallPayload,
-			outErrs:            []error{fmt.Errorf(string(largePayload)), fmt.Errorf("bad2")},
+			outErrs:            []error{errors.New(string(largePayload)), errors.New("bad2")},
 			mediaType:          "application/json",
 			req: &http.Request{
 				Header: http.Header{

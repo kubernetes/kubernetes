@@ -18,6 +18,7 @@ package expand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -28,7 +29,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -205,7 +206,7 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 		return err
 	}
 	pvc, err := expc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	logger := klog.FromContext(ctx)
@@ -256,14 +257,14 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 		if err != nil {
 			errorMsg := fmt.Sprintf("error getting CSI driver name for pvc %s, with error %v", key, err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
-			return fmt.Errorf(errorMsg)
+			return errors.New(errorMsg)
 		}
 
 		pvc, err := util.SetClaimResizer(pvc, csiResizerName, expc.kubeClient)
 		if err != nil {
 			errorMsg := fmt.Sprintf("error setting resizer annotation to pvc %s, with error %v", key, err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
-			return fmt.Errorf(errorMsg)
+			return errors.New(errorMsg)
 		}
 		return nil
 	}

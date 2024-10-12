@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	yaml "gopkg.in/yaml.v2"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 type EditTestCase struct {

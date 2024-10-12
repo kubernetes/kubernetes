@@ -37,8 +37,13 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	if obj.PodEvictionTimeout == zero {
 		obj.PodEvictionTimeout = metav1.Duration{Duration: 5 * time.Minute}
 	}
+	// NodeMonitorGracePeriod is set to a default value of 50 seconds.
+	// This value should be greater than the sum of HTTP2_PING_TIMEOUT_SECONDS (30s)
+	// and HTTP2_READ_IDLE_TIMEOUT_SECONDS (15s) from the http2 health check
+	// to ensure that the server has adequate time to handle slow or idle connections
+	// properly before marking a node as unhealthy.
 	if obj.NodeMonitorGracePeriod == zero {
-		obj.NodeMonitorGracePeriod = metav1.Duration{Duration: 40 * time.Second}
+		obj.NodeMonitorGracePeriod = metav1.Duration{Duration: 50 * time.Second}
 	}
 	if obj.NodeStartupGracePeriod == zero {
 		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}

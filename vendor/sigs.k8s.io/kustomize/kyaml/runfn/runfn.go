@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/fn/runtime/container"
 	"sigs.k8s.io/kustomize/kyaml/fn/runtime/exec"
 	"sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil"
-	"sigs.k8s.io/kustomize/kyaml/fn/runtime/starlark"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -60,9 +59,6 @@ type RunFns struct {
 	// NoFunctionsFromInput if set to true will not read any functions from the input,
 	// and only use explicit sources
 	NoFunctionsFromInput *bool
-
-	// EnableStarlark will enable functions run as starlark scripts
-	EnableStarlark bool
 
 	// EnableExec will enable exec functions
 	EnableExec bool
@@ -209,8 +205,6 @@ func (r RunFns) runFunctions(
 				identifier = filter.Image
 			case *exec.Filter:
 				identifier = filter.Path
-			case *starlark.Filter:
-				identifier = filter.String()
 			default:
 				identifier = "unknown-type function"
 			}
@@ -495,41 +489,6 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode, currentUser
 		cf.Exec.ResultsFile = resultsFile
 		cf.Exec.DeferFailure = spec.DeferFailure
 		return cf, nil
-	}
-	if r.EnableStarlark && (spec.Starlark.Path != "" || spec.Starlark.URL != "") {
-		// the script path is relative to the function config file
-		m, err := api.GetMeta()
-		if err != nil {
-			return nil, errors.Wrap(err)
-		}
-
-		var p string
-		if spec.Starlark.Path != "" {
-			pathAnno := m.Annotations[kioutil.PathAnnotation]
-			if pathAnno == "" {
-				pathAnno = m.Annotations[kioutil.LegacyPathAnnotation]
-			}
-			p = filepath.ToSlash(path.Clean(pathAnno))
-
-			spec.Starlark.Path = filepath.ToSlash(path.Clean(spec.Starlark.Path))
-			if filepath.IsAbs(spec.Starlark.Path) || path.IsAbs(spec.Starlark.Path) {
-				return nil, errors.Errorf(
-					"absolute function path %s not allowed", spec.Starlark.Path)
-			}
-			if strings.HasPrefix(spec.Starlark.Path, "..") {
-				return nil, errors.Errorf(
-					"function path %s not allowed to start with ../", spec.Starlark.Path)
-			}
-			p = filepath.ToSlash(filepath.Join(r.Path, filepath.Dir(p), spec.Starlark.Path))
-		}
-
-		sf := &starlark.Filter{Name: spec.Starlark.Name, Path: p, URL: spec.Starlark.URL}
-
-		sf.FunctionConfig = api
-		sf.GlobalScope = r.GlobalScope
-		sf.ResultsFile = resultsFile
-		sf.DeferFailure = spec.DeferFailure
-		return sf, nil
 	}
 
 	if r.EnableExec && spec.Exec.Path != "" {

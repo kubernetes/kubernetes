@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
+	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type DaemonSetsGetter interface {
 
 // DaemonSetInterface has methods to work with DaemonSet resources.
 type DaemonSetInterface interface {
-	Create(ctx context.Context, daemonSet *v1beta2.DaemonSet, opts v1.CreateOptions) (*v1beta2.DaemonSet, error)
-	Update(ctx context.Context, daemonSet *v1beta2.DaemonSet, opts v1.UpdateOptions) (*v1beta2.DaemonSet, error)
+	Create(ctx context.Context, daemonSet *appsv1beta2.DaemonSet, opts v1.CreateOptions) (*appsv1beta2.DaemonSet, error)
+	Update(ctx context.Context, daemonSet *appsv1beta2.DaemonSet, opts v1.UpdateOptions) (*appsv1beta2.DaemonSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, daemonSet *v1beta2.DaemonSet, opts v1.UpdateOptions) (*v1beta2.DaemonSet, error)
+	UpdateStatus(ctx context.Context, daemonSet *appsv1beta2.DaemonSet, opts v1.UpdateOptions) (*appsv1beta2.DaemonSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.DaemonSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.DaemonSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta2.DaemonSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta2.DaemonSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.DaemonSet, err error)
-	Apply(ctx context.Context, daemonSet *appsv1beta2.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.DaemonSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta2.DaemonSet, err error)
+	Apply(ctx context.Context, daemonSet *applyconfigurationsappsv1beta2.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.DaemonSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, daemonSet *appsv1beta2.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.DaemonSet, err error)
+	ApplyStatus(ctx context.Context, daemonSet *applyconfigurationsappsv1beta2.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	*gentype.ClientWithListAndApply[*v1beta2.DaemonSet, *v1beta2.DaemonSetList, *appsv1beta2.DaemonSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta2.DaemonSet, *appsv1beta2.DaemonSetList, *applyconfigurationsappsv1beta2.DaemonSetApplyConfiguration]
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *AppsV1beta2Client, namespace string) *daemonSets {
 	return &daemonSets{
-		gentype.NewClientWithListAndApply[*v1beta2.DaemonSet, *v1beta2.DaemonSetList, *appsv1beta2.DaemonSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta2.DaemonSet, *appsv1beta2.DaemonSetList, *applyconfigurationsappsv1beta2.DaemonSetApplyConfiguration](
 			"daemonsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.DaemonSet { return &v1beta2.DaemonSet{} },
-			func() *v1beta2.DaemonSetList { return &v1beta2.DaemonSetList{} }),
+			func() *appsv1beta2.DaemonSet { return &appsv1beta2.DaemonSet{} },
+			func() *appsv1beta2.DaemonSetList { return &appsv1beta2.DaemonSetList{} }),
 	}
 }

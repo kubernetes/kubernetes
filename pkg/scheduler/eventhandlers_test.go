@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -41,13 +42,14 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
@@ -55,6 +57,7 @@ import (
 func TestUpdatePodInCache(t *testing.T) {
 	ttl := 10 * time.Second
 	nodeName := "node"
+	metrics.Register()
 
 	tests := []struct {
 		name   string
@@ -115,6 +118,7 @@ func TestPreCheckForNode(t *testing.T) {
 		nodeFn             func() *v1.Node
 		existingPods, pods []*v1.Pod
 		want               []bool
+		qHintEnabled       bool
 	}{
 		{
 			name: "regular node, pods with a single constraint",
@@ -128,7 +132,7 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p1").Req(cpu4).Obj(),
 				st.MakePod().Name("p2").Req(cpu16).Obj(),
 				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
-				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
 				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
 				st.MakePod().Name("p6").Obj(),
 				st.MakePod().Name("p7").Node("invalid-node").Obj(),
@@ -136,6 +140,28 @@ func TestPreCheckForNode(t *testing.T) {
 				st.MakePod().Name("p9").HostPort(80).Obj(),
 			},
 			want: []bool{true, false, false, true, false, true, false, true, false},
+		},
+		{
+			name: "no filtering when QHint is enabled",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).Obj(),
+				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
+				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p6").Obj(),
+				st.MakePod().Name("p7").Node("invalid-node").Obj(),
+				st.MakePod().Name("p8").HostPort(8080).Obj(),
+				st.MakePod().Name("p9").HostPort(80).Obj(),
+			},
+			qHintEnabled: true,
+			want:         []bool{true, true, true, true, true, true, true, true, true},
 		},
 		{
 			name: "tainted node, pods with a single constraint",
@@ -165,10 +191,10 @@ func TestPreCheckForNode(t *testing.T) {
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
+				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
 				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
-				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
+				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).HostPort(80).Obj(),
 			},
 			want: []bool{false, false, true, false, false},
 		},
@@ -194,13 +220,15 @@ func TestPreCheckForNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.qHintEnabled)
+
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.nodeFn())
 			preCheckFn := preCheckForNode(nodeInfo)
 
-			var got []bool
+			got := make([]bool, 0, len(tt.pods))
 			for _, pod := range tt.pods {
-				got = append(got, preCheckFn(pod))
+				got = append(got, preCheckFn == nil || preCheckFn(pod))
 			}
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
@@ -216,6 +244,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		name                   string
 		gvkMap                 map[framework.GVK]framework.ActionType
 		enableDRA              bool
+		enableClassicDRA       bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
@@ -234,6 +263,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			gvkMap: map[framework.GVK]framework.ActionType{
 				framework.PodSchedulingContext: framework.Add,
 				framework.ResourceClaim:        framework.Add,
+				framework.ResourceSlice:        framework.Add,
 				framework.DeviceClass:          framework.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
@@ -244,19 +274,41 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "DRA events enabled",
+			name: "some DRA events enabled",
 			gvkMap: map[framework.GVK]framework.ActionType{
 				framework.PodSchedulingContext: framework.Add,
 				framework.ResourceClaim:        framework.Add,
+				framework.ResourceSlice:        framework.Add,
 				framework.DeviceClass:          framework.Add,
 			},
 			enableDRA: true,
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                    true,
+				reflect.TypeOf(&v1.Node{}):                   true,
+				reflect.TypeOf(&v1.Namespace{}):              true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "all DRA events enabled",
+			gvkMap: map[framework.GVK]framework.ActionType{
+				framework.PodSchedulingContext: framework.Add,
+				framework.ResourceClaim:        framework.Add,
+				framework.ResourceSlice:        framework.Add,
+				framework.DeviceClass:          framework.Add,
+			},
+			enableDRA:        true,
+			enableClassicDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):                           true,
 				reflect.TypeOf(&v1.Node{}):                          true,
 				reflect.TypeOf(&v1.Namespace{}):                     true,
 				reflect.TypeOf(&resourceapi.PodSchedulingContext{}): true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -320,6 +372,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDRA)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tt.enableClassicDRA)
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

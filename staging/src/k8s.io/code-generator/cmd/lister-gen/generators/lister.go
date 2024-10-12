@@ -149,7 +149,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 						groupVersion:   gv,
 						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
-						imports:        generator.NewImportTracker(),
+						imports:        generator.NewImportTrackerForPackage(outputPkg),
 						objectMeta:     objectMeta,
 					})
 				}
@@ -213,11 +213,6 @@ func (g *listerGenerator) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
-	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
-	imports = append(imports, "k8s.io/client-go/listers")
-	// for Indexer
-	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
 }
 
@@ -226,9 +221,14 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	klog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
-		"Resource":   c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
-		"type":       t,
-		"objectMeta": g.objectMeta,
+		"Resource":               c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
+		"labelsSelector":         c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Selector"}),
+		"listersResourceIndexer": c.Universe.Function(types.Name{Package: "k8s.io/client-go/listers", Name: "ResourceIndexer"}),
+		"listersNew":             c.Universe.Function(types.Name{Package: "k8s.io/client-go/listers", Name: "New"}),
+		"listersNewNamespaced":   c.Universe.Function(types.Name{Package: "k8s.io/client-go/listers", Name: "NewNamespaced"}),
+		"cacheIndexer":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/tools/cache", Name: "Indexer"}),
+		"type":                   t,
+		"objectMeta":             g.objectMeta,
 	}
 
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
@@ -262,7 +262,7 @@ var typeListerInterface = `
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	List(selector $.labelsSelector|raw$) (ret []*$.type|raw$, err error)
 	// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 	$.type|publicPlural$(namespace string) $.type|public$NamespaceLister
 	$.type|public$ListerExpansion
@@ -275,7 +275,7 @@ var typeListerInterfaceNonNamespaced = `
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	List(selector $.labelsSelector|raw$) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the index for a given name.
 	// Objects returned here must be treated as read-only.
 	Get(name string) (*$.type|raw$, error)
@@ -289,21 +289,21 @@ type $.type|public$Lister interface {
 var typeListerStruct = `
 // $.type|private$Lister implements the $.type|public$Lister interface.
 type $.type|private$Lister struct {
-	listers.ResourceIndexer[*$.type|raw$]
+	$.listersResourceIndexer|raw$[*$.type|raw$]
 }
 `
 
 var typeListerConstructor = `
 // New$.type|public$Lister returns a new $.type|public$Lister.
-func New$.type|public$Lister(indexer cache.Indexer) $.type|public$Lister {
-	return &$.type|private$Lister{listers.New[*$.type|raw$](indexer, $.Resource|raw$("$.type|lowercaseSingular$"))}
+func New$.type|public$Lister(indexer $.cacheIndexer|raw$) $.type|public$Lister {
+	return &$.type|private$Lister{$.listersNew|raw$[*$.type|raw$](indexer, $.Resource|raw$("$.type|lowercaseSingular$"))}
 }
 `
 
 var typeListerNamespaceLister = `
 // $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|public$NamespaceLister {
-	return $.type|private$NamespaceLister{listers.NewNamespaced[*$.type|raw$](s.ResourceIndexer, namespace)}
+	return $.type|private$NamespaceLister{$.listersNewNamespaced|raw$[*$.type|raw$](s.ResourceIndexer, namespace)}
 }
 `
 
@@ -313,7 +313,7 @@ var namespaceListerInterface = `
 type $.type|public$NamespaceLister interface {
 	// List lists all $.type|publicPlural$ in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	List(selector $.labelsSelector|raw$) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
 	Get(name string) (*$.type|raw$, error)
@@ -328,6 +328,6 @@ var namespaceListerStruct = `
 // $.type|private$NamespaceLister implements the $.type|public$NamespaceLister
 // interface.
 type $.type|private$NamespaceLister struct {
-	listers.ResourceIndexer[*$.type|raw$]
+	$.listersResourceIndexer|raw$[*$.type|raw$]
 }
 `

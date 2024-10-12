@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	batchv1beta1 "k8s.io/client-go/applyconfigurations/batch/v1beta1"
+	applyconfigurationsbatchv1beta1 "k8s.io/client-go/applyconfigurations/batch/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.CreateOptions) (*v1beta1.CronJob, error)
-	Update(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.UpdateOptions) (*v1beta1.CronJob, error)
+	Create(ctx context.Context, cronJob *batchv1beta1.CronJob, opts v1.CreateOptions) (*batchv1beta1.CronJob, error)
+	Update(ctx context.Context, cronJob *batchv1beta1.CronJob, opts v1.UpdateOptions) (*batchv1beta1.CronJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, cronJob *v1beta1.CronJob, opts v1.UpdateOptions) (*v1beta1.CronJob, error)
+	UpdateStatus(ctx context.Context, cronJob *batchv1beta1.CronJob, opts v1.UpdateOptions) (*batchv1beta1.CronJob, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CronJob, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CronJobList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*batchv1beta1.CronJob, error)
+	List(ctx context.Context, opts v1.ListOptions) (*batchv1beta1.CronJobList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CronJob, err error)
-	Apply(ctx context.Context, cronJob *batchv1beta1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CronJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *batchv1beta1.CronJob, err error)
+	Apply(ctx context.Context, cronJob *applyconfigurationsbatchv1beta1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *batchv1beta1.CronJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, cronJob *batchv1beta1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CronJob, err error)
+	ApplyStatus(ctx context.Context, cronJob *applyconfigurationsbatchv1beta1.CronJobApplyConfiguration, opts v1.ApplyOptions) (result *batchv1beta1.CronJob, err error)
 	CronJobExpansion
 }
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	*gentype.ClientWithListAndApply[*v1beta1.CronJob, *v1beta1.CronJobList, *batchv1beta1.CronJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*batchv1beta1.CronJob, *batchv1beta1.CronJobList, *applyconfigurationsbatchv1beta1.CronJobApplyConfiguration]
 }
 
 // newCronJobs returns a CronJobs
 func newCronJobs(c *BatchV1beta1Client, namespace string) *cronJobs {
 	return &cronJobs{
-		gentype.NewClientWithListAndApply[*v1beta1.CronJob, *v1beta1.CronJobList, *batchv1beta1.CronJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*batchv1beta1.CronJob, *batchv1beta1.CronJobList, *applyconfigurationsbatchv1beta1.CronJobApplyConfiguration](
 			"cronjobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.CronJob { return &v1beta1.CronJob{} },
-			func() *v1beta1.CronJobList { return &v1beta1.CronJobList{} }),
+			func() *batchv1beta1.CronJob { return &batchv1beta1.CronJob{} },
+			func() *batchv1beta1.CronJobList { return &batchv1beta1.CronJobList{} }),
 	}
 }

@@ -66,8 +66,8 @@ func (i *DefaultInfo) GetExtra() map[string][]string {
 	return i.Extra
 }
 
-// well-known user and group names
 const (
+	// well-known user and group names
 	SystemPrivilegedGroup = "system:masters"
 	NodesGroup            = "system:nodes"
 	MonitoringGroup       = "system:monitoring"
@@ -81,4 +81,8 @@ const (
 	KubeProxy             = "system:kube-proxy"
 	KubeControllerManager = "system:kube-controller-manager"
 	KubeScheduler         = "system:kube-scheduler"
+
+	// CredentialIDKey is the key used in a user's "extra" to specify the unique
+	// identifier for this identity document).
+	CredentialIDKey = "authentication.kubernetes.io/credential-id"
 )

@@ -445,22 +445,32 @@ func shuffle(statuses []v1.ContainerStatus) []v1.ContainerStatus {
 }
 
 func TestStatusEquality(t *testing.T) {
-	pod := v1.Pod{
-		Spec: v1.PodSpec{},
-	}
-	containerStatus := []v1.ContainerStatus{}
-	for i := 0; i < 10; i++ {
-		s := v1.ContainerStatus{
-			Name: fmt.Sprintf("container%d", i),
+	getContainersAndStatuses := func() ([]v1.Container, []v1.ContainerStatus) {
+		var containers []v1.Container
+		var containerStatuses []v1.ContainerStatus
+		for i := 0; i < 10; i++ {
+			containerName := fmt.Sprintf("container%d", i)
+			containers = append(containers, v1.Container{Name: containerName})
+			containerStatuses = append(containerStatuses, v1.ContainerStatus{Name: containerName})
 		}
-		containerStatus = append(containerStatus, s)
+		return containers, containerStatuses
+	}
+	containers, containerStatuses := getContainersAndStatuses()
+	pod := v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: containers,
+		},
 	}
 	podStatus := v1.PodStatus{
-		ContainerStatuses: containerStatus,
+		ContainerStatuses:          containerStatuses,
+		InitContainerStatuses:      containerStatuses,
+		EphemeralContainerStatuses: containerStatuses,
 	}
 	for i := 0; i < 10; i++ {
 		oldPodStatus := v1.PodStatus{
-			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
+			ContainerStatuses:          shuffle(podStatus.ContainerStatuses),
+			InitContainerStatuses:      shuffle(podStatus.InitContainerStatuses),
+			EphemeralContainerStatuses: shuffle(podStatus.EphemeralContainerStatuses),
 		}
 		normalizeStatus(&pod, &oldPodStatus)
 		normalizeStatus(&pod, &podStatus)
@@ -504,8 +514,9 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 		containerStatus = append(containerStatus, s)
 	}
 	podStatus := v1.PodStatus{
-		InitContainerStatuses: containerStatus[:24],
-		ContainerStatuses:     containerStatus[24:],
+		InitContainerStatuses:      containerStatus[:16],
+		ContainerStatuses:          containerStatus[16:32],
+		EphemeralContainerStatuses: containerStatus[32:],
 	}
 	result := normalizeStatus(&pod, &podStatus)
 	count := 0
@@ -518,6 +529,49 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	}
 	if count > kubecontainer.MaxPodTerminationMessageLogLength {
 		t.Errorf("message length not truncated")
+	}
+}
+
+func TestStatusNormalizeTimeStamp(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+
+	now := metav1.Now()
+	podStatus := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+		InitContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+		EphemeralContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+	}
+
+	expectedTime := now.DeepCopy().Rfc3339Copy()
+	expectedPodStatus := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+		InitContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+		EphemeralContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+	}
+
+	normalizedStatus := normalizeStatus(&pod, &podStatus)
+	if !isPodStatusByKubeletEqual(&expectedPodStatus, normalizedStatus) {
+		t.Fatalf("The timestamp is not correctly converted to RFC3339 format.")
 	}
 }
 
@@ -561,7 +615,7 @@ func TestStaticPod(t *testing.T) {
 	assert.True(t, isPodStatusByKubeletEqual(&status, &retrievedStatus), "Expected: %+v, Got: %+v", status, retrievedStatus)
 
 	t.Logf("Should sync pod because the corresponding mirror pod is created")
-	assert.Equal(t, m.syncBatch(true), 1)
+	assert.Equal(t, 1, m.syncBatch(true))
 	verifyActions(t, m, []core.Action{getAction(), patchAction()})
 
 	t.Logf("syncBatch should not sync any pods because nothing is changed.")
@@ -575,7 +629,7 @@ func TestStaticPod(t *testing.T) {
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)
 
 	t.Logf("Should not update to mirror pod, because UID has changed.")
-	assert.Equal(t, m.syncBatch(true), 1)
+	assert.Equal(t, 1, m.syncBatch(true))
 	verifyActions(t, m, []core.Action{getAction()})
 }
 
@@ -629,10 +683,10 @@ func TestTerminatePod(t *testing.T) {
 	t.Logf("we expect the container statuses to have changed to terminated")
 	newStatus := expectPodStatus(t, syncer, testPod)
 	for i := range newStatus.ContainerStatuses {
-		assert.False(t, newStatus.ContainerStatuses[i].State.Terminated == nil, "expected containers to be terminated")
+		assert.NotNil(t, newStatus.ContainerStatuses[i].State.Terminated, "expected containers to be terminated")
 	}
 	for i := range newStatus.InitContainerStatuses {
-		assert.False(t, newStatus.InitContainerStatuses[i].State.Terminated == nil, "expected init containers to be terminated")
+		assert.NotNil(t, newStatus.InitContainerStatuses[i].State.Terminated, "expected init containers to be terminated")
 	}
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: kubecontainer.ContainerReasonStatusUnknown, Message: "The container could not be located when the pod was terminated", ExitCode: 137}}
@@ -711,13 +765,13 @@ func TestTerminatePodWaiting(t *testing.T) {
 	t.Logf("we expect the container statuses to have changed to terminated")
 	newStatus := expectPodStatus(t, syncer, testPod)
 	for _, container := range newStatus.ContainerStatuses {
-		assert.False(t, container.State.Terminated == nil, "expected containers to be terminated")
+		assert.NotNil(t, container.State.Terminated, "expected containers to be terminated")
 	}
 	for _, container := range newStatus.InitContainerStatuses[:2] {
-		assert.False(t, container.State.Terminated == nil, "expected init containers to be terminated")
+		assert.NotNil(t, container.State.Terminated, "expected init containers to be terminated")
 	}
 	for _, container := range newStatus.InitContainerStatuses[2:] {
-		assert.False(t, container.State.Waiting == nil, "expected init containers to be waiting")
+		assert.NotNil(t, container.State.Waiting, "expected init containers to be waiting")
 	}
 
 	expectUnknownState := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: kubecontainer.ContainerReasonStatusUnknown, Message: "The container could not be located when the pod was terminated", ExitCode: 137}}

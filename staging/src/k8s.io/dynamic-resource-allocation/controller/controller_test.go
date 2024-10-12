@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,10 +30,12 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 )
@@ -49,7 +52,7 @@ func TestController(t *testing.T) {
 	claim := createClaim(claimName, claimNamespace, driverName)
 	otherClaim := createClaim(claimName, claimNamespace, otherDriverName)
 	podName := "pod"
-	podKey := "schedulingCtx:default/pod"
+	podSchedulingCtxKey := "schedulingCtx:default/pod"
 	pod := createPod(podName, claimNamespace, nil)
 	podClaimName := "my-pod-claim"
 	podSchedulingCtx := createPodSchedulingContexts(pod)
@@ -125,11 +128,20 @@ func TestController(t *testing.T) {
 		pod                                  *corev1.Pod
 		schedulingCtx, expectedSchedulingCtx *resourceapi.PodSchedulingContext
 		claim, expectedClaim                 *resourceapi.ResourceClaim
+		expectedWorkQueueState               Mock[string]
 		expectedError                        string
+		// expectedEvent is a slice of strings representing expected events.
+		// Each string in the slice should follow the format: "EventType Reason Message".
+		// - "Warning Failed processing failed"
+		expectedEvent []string
 	}{
 		"invalid-key": {
-			key:           "claim:x/y/z",
-			expectedError: `unexpected key format: "x/y/z"`,
+			key: "claim:x/y/z",
+			expectedWorkQueueState: Mock[string]{
+				Failures: map[string]int{
+					"claim:x/y/z": 1,
+				},
+			},
 		},
 		"not-found": {
 			key: "claim:default/claim",
@@ -154,7 +166,12 @@ func TestController(t *testing.T) {
 			claim:         withDeallocate(withAllocate(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withDeallocate(withAllocate(claim)),
-			expectedError: "deallocate: fake error",
+			expectedWorkQueueState: Mock[string]{
+				Failures: map[string]int{
+					claimKey: 1,
+				},
+			},
+			expectedEvent: []string{"Warning Failed deallocate: fake error"},
 		},
 
 		// deletion time stamp set, our finalizer set, not allocated  -> remove finalizer
@@ -170,7 +187,12 @@ func TestController(t *testing.T) {
 			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
-			expectedError: "stop allocation: fake error",
+			expectedWorkQueueState: Mock[string]{
+				Failures: map[string]int{
+					claimKey: 1,
+				},
+			},
+			expectedEvent: []string{"Warning Failed stop allocation: fake error"},
 		},
 		// deletion time stamp set, other finalizer set, not allocated  -> do nothing
 		"deleted-finalizer-no-removal": {
@@ -191,7 +213,12 @@ func TestController(t *testing.T) {
 			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withAllocate(withDeletionTimestamp(claim)),
-			expectedError: "deallocate: fake error",
+			expectedWorkQueueState: Mock[string]{
+				Failures: map[string]int{
+					claimKey: 1,
+				},
+			},
+			expectedEvent: []string{"Warning Failed deallocate: fake error"},
 		},
 		// deletion time stamp set, finalizer not set -> do nothing
 		"deleted-no-finalizer": {
@@ -208,16 +235,23 @@ func TestController(t *testing.T) {
 
 		// pod with no claims -> shouldn't occur, check again anyway
 		"pod-nop": {
-			key:                   podKey,
+			key:                   podSchedulingCtxKey,
 			pod:                   pod,
 			schedulingCtx:         withSelectedNode(podSchedulingCtx),
 			expectedSchedulingCtx: withSelectedNode(podSchedulingCtx),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     podSchedulingCtxKey,
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 
 		// no potential nodes -> shouldn't occur
 		"no-nodes": {
-			key:                   podKey,
+			key:                   podSchedulingCtxKey,
 			claim:                 claim,
 			expectedClaim:         claim,
 			pod:                   podWithClaim,
@@ -227,7 +261,7 @@ func TestController(t *testing.T) {
 
 		// potential nodes -> provide unsuitable nodes
 		"info": {
-			key:           podKey,
+			key:           podSchedulingCtxKey,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -236,12 +270,19 @@ func TestController(t *testing.T) {
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil),
 			expectedSchedulingCtx: withUnsuitableNodes(withPotentialNodes(podSchedulingCtx)),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     podSchedulingCtxKey,
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 
 		// potential nodes, selected node -> allocate
 		"allocate": {
-			key:           podKey,
+			key:           podSchedulingCtxKey,
 			claim:         claim,
 			expectedClaim: withReservedFor(withAllocate(claim), pod),
 			pod:           podWithClaim,
@@ -251,11 +292,18 @@ func TestController(t *testing.T) {
 				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil).
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, selectedNode: nodeName, allocErr: nil}}),
 			expectedSchedulingCtx: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     "schedulingCtx:default/pod",
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 		// potential nodes, selected node, all unsuitable -> update unsuitable nodes
 		"is-potential-node": {
-			key:           podKey,
+			key:           podSchedulingCtxKey,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -264,11 +312,18 @@ func TestController(t *testing.T) {
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: potentialNodes}, nil),
 			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx)), potentialNodes),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     podSchedulingCtxKey,
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 		// max potential nodes, other selected node, all unsuitable -> update unsuitable nodes with truncation at start
 		"is-potential-node-truncate-first": {
-			key:           podKey,
+			key:           podSchedulingCtxKey,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -277,11 +332,18 @@ func TestController(t *testing.T) {
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: append(maxNodes, nodeName)}, nil),
 			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), append(maxNodes[1:], nodeName)),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     podSchedulingCtxKey,
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 		// max potential nodes, other selected node, all unsuitable (but in reverse order) -> update unsuitable nodes with truncation at end
 		"pod-selected-is-potential-node-truncate-last": {
-			key:           podKey,
+			key:           podSchedulingCtxKey,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -290,7 +352,14 @@ func TestController(t *testing.T) {
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
 				expectUnsuitableNodes(map[string][]string{podClaimName: append([]string{nodeName}, maxNodes...)}, nil),
 			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), append([]string{nodeName}, maxNodes[:len(maxNodes)-1]...)),
-			expectedError:         errPeriodic.Error(),
+			expectedWorkQueueState: Mock[string]{
+				Later: []MockDelayedItem[string]{
+					{
+						Item:     podSchedulingCtxKey,
+						Duration: time.Second * 30,
+					},
+				},
+			},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -340,16 +409,14 @@ func TestController(t *testing.T) {
 			) {
 				t.Fatal("could not sync caches")
 			}
-			_, err := ctrl.(*controller).syncKey(ctx, test.key)
-			if err != nil && test.expectedError == "" {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if err == nil && test.expectedError != "" {
-				t.Fatalf("did not get expected error %q", test.expectedError)
-			}
-			if err != nil && err.Error() != test.expectedError {
-				t.Fatalf("expected error %q, got %q", test.expectedError, err.Error())
-			}
+			var workQueueState Mock[string]
+			c := ctrl.(*controller)
+			// We need to mock the event recorder to test the controller's event.
+			fakeRecorder := record.NewFakeRecorder(100)
+			c.eventRecorder = fakeRecorder
+			workQueueState.SyncOne(test.key, c.sync)
+			assert.Equal(t, test.expectedWorkQueueState, workQueueState)
+
 			claims, err := kubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list claims")
 			var expectedClaims []resourceapi.ResourceClaim
@@ -365,10 +432,8 @@ func TestController(t *testing.T) {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
 			}
 			assert.Equal(t, expectedPodSchedulings, podSchedulings.Items)
-
-			// TODO: add testing of events.
-			// Right now, client-go/tools/record/event.go:267 fails during unit testing with
-			// request namespace does not match object namespace, request: "" object: "default",
+			// Assert that the events are correct.
+			assertEqualEvents(t, test.expectedEvent, fakeRecorder.Events)
 		})
 	}
 }
@@ -527,4 +592,26 @@ func fakeK8s(objs []runtime.Object) (kubernetes.Interface, informers.SharedInfor
 	client := fake.NewSimpleClientset(objs...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return client, informerFactory
+}
+
+func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
+	t.Logf("Assert for events: %v", expected)
+	c := time.After(wait.ForeverTestTimeout)
+	for _, e := range expected {
+		select {
+		case a := <-actual:
+			assert.Equal(t, a, e)
+		case <-c:
+			t.Errorf("Expected event %q, got nothing", e)
+			// continue iterating to print all expected events
+		}
+	}
+	for {
+		select {
+		case a := <-actual:
+			t.Errorf("Unexpected event: %q", a)
+		default:
+			return // No more events, as expected.
+		}
+	}
 }

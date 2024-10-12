@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/component-base/featuregate"
 )
 
 const (
@@ -93,13 +92,12 @@ type Plugin struct {
 
 var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
-var _ initializer.WantsFeatures = &Plugin{}
 var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
 
 func NewPlugin(_ io.Reader) *Plugin {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 
-	return &Plugin{
+	p := &Plugin{
 		Plugin: generic.NewPlugin(
 			handler,
 			func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
@@ -119,15 +117,13 @@ func NewPlugin(_ io.Reader) *Plugin {
 			},
 		),
 	}
+	p.SetEnabled(true)
+	return p
 }
 
 // Validate makes an admission decision based on the request attributes.
 func (a *Plugin) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	return a.Plugin.Dispatch(ctx, attr, o)
-}
-
-func (a *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	a.Plugin.SetEnabled(featureGates.Enabled(features.ValidatingAdmissionPolicy))
 }
 
 func compilePolicy(policy *Policy) Validator {

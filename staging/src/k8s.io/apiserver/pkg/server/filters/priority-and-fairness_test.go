@@ -177,11 +177,21 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
 			Groups: []string{user.AllUnauthenticated},
 		}))
-		apfHandler.ServeHTTP(w, r)
-		postExecute()
-		if atomicReadOnlyExecuting != 0 {
-			t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
-		}
+		func() {
+			// the APF handler completes its run, either normally or
+			// with a panic, in either case, all APF book keeping must
+			// be completed by now. Also, whether the request is
+			// executed or rejected, we expect the counter to be zero.
+			// TODO: all test(s) using this filter must run
+			// serially to each other
+			defer func() {
+				if atomicReadOnlyExecuting != 0 {
+					t.Errorf("Wanted %d requests executing, got %d", 0, atomicReadOnlyExecuting)
+				}
+			}()
+			apfHandler.ServeHTTP(w, r)
+			postExecute()
+		}()
 	}), requestInfoFactory)
 
 	return handler

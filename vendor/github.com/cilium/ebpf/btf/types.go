@@ -1,6 +1,7 @@
 package btf
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -8,14 +9,27 @@ import (
 	"strings"
 
 	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 const maxTypeDepth = 32
 
 // TypeID identifies a type in a BTF section.
-type TypeID uint32
+type TypeID = sys.TypeID
 
 // Type represents a type described by BTF.
+//
+// Identity of Type follows the [Go specification]: two Types are considered
+// equal if they have the same concrete type and the same dynamic value, aka
+// they point at the same location in memory. This means that the following
+// Types are considered distinct even though they have the same "shape".
+//
+//	a := &Int{Size: 1}
+//	b := &Int{Size: 1}
+//	a != b
+//
+// [Go specification]: https://go.dev/ref/spec#Comparison_operators
 type Type interface {
 	// Type can be formatted using the %s and %v verbs. %s outputs only the
 	// identity of the type, without any detail. %v outputs additional detail.
@@ -35,9 +49,7 @@ type Type interface {
 	// Make a copy of the type, without copying Type members.
 	copy() Type
 
-	// Enumerate all nested Types. Repeated calls must visit nested
-	// types in the same order.
-	walk(*typeDeque)
+	// New implementations must update walkType.
 }
 
 var (
@@ -51,19 +63,10 @@ var (
 	_ Type = (*Var)(nil)
 	_ Type = (*Datasec)(nil)
 	_ Type = (*Float)(nil)
+	_ Type = (*declTag)(nil)
+	_ Type = (*typeTag)(nil)
+	_ Type = (*cycle)(nil)
 )
-
-// types is a list of Type.
-//
-// The order determines the ID of a type.
-type types []Type
-
-func (ts types) ByID(id TypeID) (Type, error) {
-	if int(id) > len(ts) {
-		return nil, fmt.Errorf("type ID %d: %w", id, ErrNotFound)
-	}
-	return ts[id], nil
-}
 
 // Void is the unit type of BTF.
 type Void struct{}
@@ -72,40 +75,32 @@ func (v *Void) Format(fs fmt.State, verb rune) { formatType(fs, verb, v) }
 func (v *Void) TypeName() string               { return "" }
 func (v *Void) size() uint32                   { return 0 }
 func (v *Void) copy() Type                     { return (*Void)(nil) }
-func (v *Void) walk(*typeDeque)                {}
 
 type IntEncoding byte
 
+// Valid IntEncodings.
+//
+// These may look like they are flags, but they aren't.
 const (
-	Signed IntEncoding = 1 << iota
-	Char
-	Bool
+	Unsigned IntEncoding = 0
+	Signed   IntEncoding = 1
+	Char     IntEncoding = 2
+	Bool     IntEncoding = 4
 )
 
-func (ie IntEncoding) IsSigned() bool {
-	return ie&Signed != 0
-}
-
-func (ie IntEncoding) IsChar() bool {
-	return ie&Char != 0
-}
-
-func (ie IntEncoding) IsBool() bool {
-	return ie&Bool != 0
-}
-
 func (ie IntEncoding) String() string {
-	switch {
-	case ie.IsChar() && ie.IsSigned():
+	switch ie {
+	case Char:
+		// NB: There is no way to determine signedness for char.
 		return "char"
-	case ie.IsChar() && !ie.IsSigned():
-		return "uchar"
-	case ie.IsBool():
+	case Bool:
 		return "bool"
-	case ie.IsSigned():
+	case Signed:
 		return "signed"
-	default:
+	case Unsigned:
 		return "unsigned"
+	default:
+		return fmt.Sprintf("IntEncoding(%d)", byte(ie))
 	}
 }
 
@@ -126,7 +121,6 @@ func (i *Int) Format(fs fmt.State, verb rune) {
 
 func (i *Int) TypeName() string { return i.Name }
 func (i *Int) size() uint32     { return i.Size }
-func (i *Int) walk(*typeDeque)  {}
 func (i *Int) copy() Type {
 	cpy := *i
 	return &cpy
@@ -141,9 +135,8 @@ func (p *Pointer) Format(fs fmt.State, verb rune) {
 	formatType(fs, verb, p, "target=", p.Target)
 }
 
-func (p *Pointer) TypeName() string    { return "" }
-func (p *Pointer) size() uint32        { return 8 }
-func (p *Pointer) walk(tdq *typeDeque) { tdq.push(&p.Target) }
+func (p *Pointer) TypeName() string { return "" }
+func (p *Pointer) size() uint32     { return 8 }
 func (p *Pointer) copy() Type {
 	cpy := *p
 	return &cpy
@@ -161,11 +154,6 @@ func (arr *Array) Format(fs fmt.State, verb rune) {
 }
 
 func (arr *Array) TypeName() string { return "" }
-
-func (arr *Array) walk(tdq *typeDeque) {
-	tdq.push(&arr.Index)
-	tdq.push(&arr.Type)
-}
 
 func (arr *Array) copy() Type {
 	cpy := *arr
@@ -187,12 +175,6 @@ func (s *Struct) Format(fs fmt.State, verb rune) {
 func (s *Struct) TypeName() string { return s.Name }
 
 func (s *Struct) size() uint32 { return s.Size }
-
-func (s *Struct) walk(tdq *typeDeque) {
-	for i := range s.Members {
-		tdq.push(&s.Members[i].Type)
-	}
-}
 
 func (s *Struct) copy() Type {
 	cpy := *s
@@ -220,12 +202,6 @@ func (u *Union) TypeName() string { return u.Name }
 
 func (u *Union) size() uint32 { return u.Size }
 
-func (u *Union) walk(tdq *typeDeque) {
-	for i := range u.Members {
-		tdq.push(&u.Members[i].Type)
-	}
-}
-
 func (u *Union) copy() Type {
 	cpy := *u
 	cpy.Members = copyMembers(u.Members)
@@ -243,6 +219,7 @@ func copyMembers(orig []Member) []Member {
 }
 
 type composite interface {
+	Type
 	members() []Member
 }
 
@@ -273,7 +250,9 @@ type Member struct {
 type Enum struct {
 	Name string
 	// Size of the enum value in bytes.
-	Size   uint32
+	Size uint32
+	// True if the values should be interpreted as signed integers.
+	Signed bool
 	Values []EnumValue
 }
 
@@ -288,16 +267,30 @@ func (e *Enum) TypeName() string { return e.Name }
 // Is is not a valid Type
 type EnumValue struct {
 	Name  string
-	Value int32
+	Value uint64
 }
 
-func (e *Enum) size() uint32    { return e.Size }
-func (e *Enum) walk(*typeDeque) {}
+func (e *Enum) size() uint32 { return e.Size }
 func (e *Enum) copy() Type {
 	cpy := *e
 	cpy.Values = make([]EnumValue, len(e.Values))
 	copy(cpy.Values, e.Values)
 	return &cpy
+}
+
+// has64BitValues returns true if the Enum contains a value larger than 32 bits.
+// Kernels before 6.0 have enum values that overrun u32 replaced with zeroes.
+//
+// 64-bit enums have their Enum.Size attributes correctly set to 8, but if we
+// use the size attribute as a heuristic during BTF marshaling, we'll emit
+// ENUM64s to kernels that don't support them.
+func (e *Enum) has64BitValues() bool {
+	for _, v := range e.Values {
+		if v.Value > math.MaxUint32 {
+			return true
+		}
+	}
+	return false
 }
 
 // FwdKind is the type of forward declaration.
@@ -332,7 +325,6 @@ func (f *Fwd) Format(fs fmt.State, verb rune) {
 
 func (f *Fwd) TypeName() string { return f.Name }
 
-func (f *Fwd) walk(*typeDeque) {}
 func (f *Fwd) copy() Type {
 	cpy := *f
 	return &cpy
@@ -350,7 +342,6 @@ func (td *Typedef) Format(fs fmt.State, verb rune) {
 
 func (td *Typedef) TypeName() string { return td.Name }
 
-func (td *Typedef) walk(tdq *typeDeque) { tdq.push(&td.Type) }
 func (td *Typedef) copy() Type {
 	cpy := *td
 	return &cpy
@@ -367,8 +358,7 @@ func (v *Volatile) Format(fs fmt.State, verb rune) {
 
 func (v *Volatile) TypeName() string { return "" }
 
-func (v *Volatile) qualify() Type       { return v.Type }
-func (v *Volatile) walk(tdq *typeDeque) { tdq.push(&v.Type) }
+func (v *Volatile) qualify() Type { return v.Type }
 func (v *Volatile) copy() Type {
 	cpy := *v
 	return &cpy
@@ -385,8 +375,7 @@ func (c *Const) Format(fs fmt.State, verb rune) {
 
 func (c *Const) TypeName() string { return "" }
 
-func (c *Const) qualify() Type       { return c.Type }
-func (c *Const) walk(tdq *typeDeque) { tdq.push(&c.Type) }
+func (c *Const) qualify() Type { return c.Type }
 func (c *Const) copy() Type {
 	cpy := *c
 	return &cpy
@@ -403,8 +392,7 @@ func (r *Restrict) Format(fs fmt.State, verb rune) {
 
 func (r *Restrict) TypeName() string { return "" }
 
-func (r *Restrict) qualify() Type       { return r.Type }
-func (r *Restrict) walk(tdq *typeDeque) { tdq.push(&r.Type) }
+func (r *Restrict) qualify() Type { return r.Type }
 func (r *Restrict) copy() Type {
 	cpy := *r
 	return &cpy
@@ -422,13 +410,18 @@ func FuncMetadata(ins *asm.Instruction) *Func {
 	return fn
 }
 
+// WithFuncMetadata adds a btf.Func to the Metadata of asm.Instruction.
+func WithFuncMetadata(ins asm.Instruction, fn *Func) asm.Instruction {
+	ins.Metadata.Set(funcInfoMeta{}, fn)
+	return ins
+}
+
 func (f *Func) Format(fs fmt.State, verb rune) {
 	formatType(fs, verb, f, f.Linkage, "proto=", f.Type)
 }
 
 func (f *Func) TypeName() string { return f.Name }
 
-func (f *Func) walk(tdq *typeDeque) { tdq.push(&f.Type) }
 func (f *Func) copy() Type {
 	cpy := *f
 	return &cpy
@@ -445,13 +438,6 @@ func (fp *FuncProto) Format(fs fmt.State, verb rune) {
 }
 
 func (fp *FuncProto) TypeName() string { return "" }
-
-func (fp *FuncProto) walk(tdq *typeDeque) {
-	tdq.push(&fp.Return)
-	for i := range fp.Params {
-		tdq.push(&fp.Params[i].Type)
-	}
-}
 
 func (fp *FuncProto) copy() Type {
 	cpy := *fp
@@ -478,7 +464,6 @@ func (v *Var) Format(fs fmt.State, verb rune) {
 
 func (v *Var) TypeName() string { return v.Name }
 
-func (v *Var) walk(tdq *typeDeque) { tdq.push(&v.Type) }
 func (v *Var) copy() Type {
 	cpy := *v
 	return &cpy
@@ -499,12 +484,6 @@ func (ds *Datasec) TypeName() string { return ds.Name }
 
 func (ds *Datasec) size() uint32 { return ds.Size }
 
-func (ds *Datasec) walk(tdq *typeDeque) {
-	for i := range ds.Vars {
-		tdq.push(&ds.Vars[i].Type)
-	}
-}
-
 func (ds *Datasec) copy() Type {
 	cpy := *ds
 	cpy.Vars = make([]VarSecinfo, len(ds.Vars))
@@ -516,6 +495,7 @@ func (ds *Datasec) copy() Type {
 //
 // It is not a valid Type.
 type VarSecinfo struct {
+	// Var or Func.
 	Type   Type
 	Offset uint32
 	Size   uint32
@@ -535,9 +515,45 @@ func (f *Float) Format(fs fmt.State, verb rune) {
 
 func (f *Float) TypeName() string { return f.Name }
 func (f *Float) size() uint32     { return f.Size }
-func (f *Float) walk(*typeDeque)  {}
 func (f *Float) copy() Type {
 	cpy := *f
+	return &cpy
+}
+
+// declTag associates metadata with a declaration.
+type declTag struct {
+	Type  Type
+	Value string
+	// The index this tag refers to in the target type. For composite types,
+	// a value of -1 indicates that the tag refers to the whole type. Otherwise
+	// it indicates which member or argument the tag applies to.
+	Index int
+}
+
+func (dt *declTag) Format(fs fmt.State, verb rune) {
+	formatType(fs, verb, dt, "type=", dt.Type, "value=", dt.Value, "index=", dt.Index)
+}
+
+func (dt *declTag) TypeName() string { return "" }
+func (dt *declTag) copy() Type {
+	cpy := *dt
+	return &cpy
+}
+
+// typeTag associates metadata with a type.
+type typeTag struct {
+	Type  Type
+	Value string
+}
+
+func (tt *typeTag) Format(fs fmt.State, verb rune) {
+	formatType(fs, verb, tt, "type=", tt.Type, "value=", tt.Value)
+}
+
+func (tt *typeTag) TypeName() string { return "" }
+func (tt *typeTag) qualify() Type    { return tt.Type }
+func (tt *typeTag) copy() Type {
+	cpy := *tt
 	return &cpy
 }
 
@@ -549,7 +565,6 @@ type cycle struct {
 func (c *cycle) ID() TypeID                     { return math.MaxUint32 }
 func (c *cycle) Format(fs fmt.State, verb rune) { formatType(fs, verb, c, "root=", c.root) }
 func (c *cycle) TypeName() string               { return "" }
-func (c *cycle) walk(*typeDeque)                {}
 func (c *cycle) copy() Type {
 	cpy := *c
 	return &cpy
@@ -576,7 +591,10 @@ var (
 	_ qualifier = (*Const)(nil)
 	_ qualifier = (*Restrict)(nil)
 	_ qualifier = (*Volatile)(nil)
+	_ qualifier = (*typeTag)(nil)
 )
+
+var errUnsizedType = errors.New("type is unsized")
 
 // Sizeof returns the size of a type in bytes.
 //
@@ -612,7 +630,7 @@ func Sizeof(typ Type) (int, error) {
 			continue
 
 		default:
-			return 0, fmt.Errorf("unsized type %T", typ)
+			return 0, fmt.Errorf("type %T: %w", typ, errUnsizedType)
 		}
 
 		if n > 0 && elem > math.MaxInt64/n {
@@ -632,16 +650,33 @@ func Sizeof(typ Type) (int, error) {
 
 // alignof returns the alignment of a type.
 //
-// Currently only supports the subset of types necessary for bitfield relocations.
+// Returns an error if the Type can't be aligned, like an integer with an uneven
+// size. Currently only supports the subset of types necessary for bitfield
+// relocations.
 func alignof(typ Type) (int, error) {
+	var n int
+
 	switch t := UnderlyingType(typ).(type) {
 	case *Enum:
-		return int(t.size()), nil
+		n = int(t.size())
 	case *Int:
-		return int(t.Size), nil
+		n = int(t.Size)
+	case *Array:
+		return alignof(t.Type)
 	default:
 		return 0, fmt.Errorf("can't calculate alignment of %T", t)
 	}
+
+	if !pow(n) {
+		return 0, fmt.Errorf("alignment value %d is not a power of two", n)
+	}
+
+	return n, nil
+}
+
+// pow returns true if n is a power of two.
+func pow(n int) bool {
+	return n != 0 && (n&(n-1)) == 0
 }
 
 // Transformer modifies a given Type and returns the result.
@@ -655,7 +690,7 @@ type Transformer func(Type) Type
 // typ may form a cycle. If transform is not nil, it is called with the
 // to be copied type, and the returned value is copied instead.
 func Copy(typ Type, transform Transformer) Type {
-	copies := make(copier)
+	copies := copier{copies: make(map[Type]Type)}
 	copies.copy(&typ, transform)
 	return typ
 }
@@ -667,7 +702,7 @@ func copyTypes(types []Type, transform Transformer) []Type {
 	result := make([]Type, len(types))
 	copy(result, types)
 
-	copies := make(copier)
+	copies := copier{copies: make(map[Type]Type, len(types))}
 	for i := range result {
 		copies.copy(&result[i], transform)
 	}
@@ -675,13 +710,15 @@ func copyTypes(types []Type, transform Transformer) []Type {
 	return result
 }
 
-type copier map[Type]Type
+type copier struct {
+	copies map[Type]Type
+	work   typeDeque
+}
 
-func (c copier) copy(typ *Type, transform Transformer) {
-	var work typeDeque
-	for t := typ; t != nil; t = work.pop() {
+func (c *copier) copy(typ *Type, transform Transformer) {
+	for t := typ; t != nil; t = c.work.Pop() {
 		// *t is the identity of the type.
-		if cpy := c[*t]; cpy != nil {
+		if cpy := c.copies[*t]; cpy != nil {
 			*t = cpy
 			continue
 		}
@@ -693,108 +730,41 @@ func (c copier) copy(typ *Type, transform Transformer) {
 			cpy = (*t).copy()
 		}
 
-		c[*t] = cpy
+		c.copies[*t] = cpy
 		*t = cpy
 
 		// Mark any nested types for copying.
-		cpy.walk(&work)
+		walkType(cpy, c.work.Push)
 	}
 }
 
-// typeDeque keeps track of pointers to types which still
-// need to be visited.
-type typeDeque struct {
-	types       []*Type
-	read, write uint64
-	mask        uint64
-}
-
-func (dq *typeDeque) empty() bool {
-	return dq.read == dq.write
-}
-
-// push adds a type to the stack.
-func (dq *typeDeque) push(t *Type) {
-	if dq.write-dq.read < uint64(len(dq.types)) {
-		dq.types[dq.write&dq.mask] = t
-		dq.write++
-		return
-	}
-
-	new := len(dq.types) * 2
-	if new == 0 {
-		new = 8
-	}
-
-	types := make([]*Type, new)
-	pivot := dq.read & dq.mask
-	n := copy(types, dq.types[pivot:])
-	n += copy(types[n:], dq.types[:pivot])
-	types[n] = t
-
-	dq.types = types
-	dq.mask = uint64(new) - 1
-	dq.read, dq.write = 0, uint64(n+1)
-}
-
-// shift returns the first element or null.
-func (dq *typeDeque) shift() *Type {
-	if dq.empty() {
-		return nil
-	}
-
-	index := dq.read & dq.mask
-	t := dq.types[index]
-	dq.types[index] = nil
-	dq.read++
-	return t
-}
-
-// pop returns the last element or null.
-func (dq *typeDeque) pop() *Type {
-	if dq.empty() {
-		return nil
-	}
-
-	dq.write--
-	index := dq.write & dq.mask
-	t := dq.types[index]
-	dq.types[index] = nil
-	return t
-}
-
-// all returns all elements.
-//
-// The deque is empty after calling this method.
-func (dq *typeDeque) all() []*Type {
-	length := dq.write - dq.read
-	types := make([]*Type, 0, length)
-	for t := dq.shift(); t != nil; t = dq.shift() {
-		types = append(types, t)
-	}
-	return types
-}
+type typeDeque = internal.Deque[*Type]
 
 // inflateRawTypes takes a list of raw btf types linked via type IDs, and turns
 // it into a graph of Types connected via pointers.
 //
-// If baseTypes are provided, then the raw types are
-// considered to be of a split BTF (e.g., a kernel module).
+// If base is provided, then the raw types are considered to be of a split BTF
+// (e.g., a kernel module).
 //
-// Returns  a slice of types indexed by TypeID. Since BTF ignores compilation
+// Returns a slice of types indexed by TypeID. Since BTF ignores compilation
 // units, multiple types may share the same name. A Type may form a cyclic graph
 // by pointing at itself.
-func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTable) ([]Type, error) {
+func inflateRawTypes(rawTypes []rawType, rawStrings *stringTable, base *Spec) ([]Type, error) {
 	types := make([]Type, 0, len(rawTypes)+1) // +1 for Void added to base types
 
-	typeIDOffset := TypeID(1) // Void is TypeID(0), so the rest starts from TypeID(1)
+	// Void is defined to always be type ID 0, and is thus omitted from BTF.
+	types = append(types, (*Void)(nil))
 
-	if baseTypes == nil {
-		// Void is defined to always be type ID 0, and is thus omitted from BTF.
-		types = append(types, (*Void)(nil))
-	} else {
-		// For split BTF, the next ID is max base BTF type ID + 1
-		typeIDOffset = TypeID(len(baseTypes))
+	firstTypeID := TypeID(0)
+	if base != nil {
+		var err error
+		firstTypeID, err = base.nextTypeID()
+		if err != nil {
+			return nil, err
+		}
+
+		// Split BTF doesn't contain Void.
+		types = types[:0]
 	}
 
 	type fixupDef struct {
@@ -803,39 +773,42 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 	}
 
 	var fixups []fixupDef
-	fixup := func(id TypeID, typ *Type) {
-		if id < TypeID(len(baseTypes)) {
-			*typ = baseTypes[id]
-			return
+	fixup := func(id TypeID, typ *Type) bool {
+		if id < firstTypeID {
+			if baseType, err := base.TypeByID(id); err == nil {
+				*typ = baseType
+				return true
+			}
 		}
 
-		idx := id
-		if baseTypes != nil {
-			idx = id - TypeID(len(baseTypes))
-		}
-		if idx < TypeID(len(types)) {
+		idx := int(id - firstTypeID)
+		if idx < len(types) {
 			// We've already inflated this type, fix it up immediately.
 			*typ = types[idx]
-			return
+			return true
 		}
+
 		fixups = append(fixups, fixupDef{id, typ})
+		return false
 	}
 
 	type assertion struct {
+		id   TypeID
 		typ  *Type
 		want reflect.Type
 	}
 
 	var assertions []assertion
-	assert := func(typ *Type, want reflect.Type) error {
-		if *typ != nil {
-			// The type has already been fixed up, check the type immediately.
-			if reflect.TypeOf(*typ) != want {
-				return fmt.Errorf("expected %s, got %T", want, *typ)
-			}
+	fixupAndAssert := func(id TypeID, typ *Type, want reflect.Type) error {
+		if !fixup(id, typ) {
+			assertions = append(assertions, assertion{id, typ, want})
 			return nil
 		}
-		assertions = append(assertions, assertion{typ, want})
+
+		// The type has already been fixed up, check the type immediately.
+		if reflect.TypeOf(*typ) != want {
+			return fmt.Errorf("type ID %d: expected %s, got %T", id, want, *typ)
+		}
 		return nil
 	}
 
@@ -903,11 +876,16 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 		return members, nil
 	}
 
-	for i, raw := range rawTypes {
+	var declTags []*declTag
+	for _, raw := range rawTypes {
 		var (
-			id  = typeIDOffset + TypeID(i)
+			id  = firstTypeID + TypeID(len(types))
 			typ Type
 		)
+
+		if id < firstTypeID {
+			return nil, fmt.Errorf("no more type IDs")
+		}
 
 		name, err := rawStrings.Lookup(raw.NameOff)
 		if err != nil {
@@ -936,14 +914,14 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 			typ = arr
 
 		case kindStruct:
-			members, err := convertMembers(raw.data.([]btfMember), raw.KindFlag())
+			members, err := convertMembers(raw.data.([]btfMember), raw.Bitfield())
 			if err != nil {
 				return nil, fmt.Errorf("struct %s (id %d): %w", name, id, err)
 			}
 			typ = &Struct{name, raw.Size(), members}
 
 		case kindUnion:
-			members, err := convertMembers(raw.data.([]btfMember), raw.KindFlag())
+			members, err := convertMembers(raw.data.([]btfMember), raw.Bitfield())
 			if err != nil {
 				return nil, fmt.Errorf("union %s (id %d): %w", name, id, err)
 			}
@@ -952,24 +930,23 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 		case kindEnum:
 			rawvals := raw.data.([]btfEnum)
 			vals := make([]EnumValue, 0, len(rawvals))
+			signed := raw.Signed()
 			for i, btfVal := range rawvals {
 				name, err := rawStrings.Lookup(btfVal.NameOff)
 				if err != nil {
 					return nil, fmt.Errorf("get name for enum value %d: %s", i, err)
 				}
-				vals = append(vals, EnumValue{
-					Name:  name,
-					Value: btfVal.Val,
-				})
+				value := uint64(btfVal.Val)
+				if signed {
+					// Sign extend values to 64 bit.
+					value = uint64(int32(btfVal.Val))
+				}
+				vals = append(vals, EnumValue{name, value})
 			}
-			typ = &Enum{name, raw.Size(), vals}
+			typ = &Enum{name, raw.Size(), signed, vals}
 
 		case kindForward:
-			if raw.KindFlag() {
-				typ = &Fwd{name, FwdUnion}
-			} else {
-				typ = &Fwd{name, FwdStruct}
-			}
+			typ = &Fwd{name, raw.FwdKind()}
 
 		case kindTypedef:
 			typedef := &Typedef{name, nil}
@@ -993,8 +970,7 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 
 		case kindFunc:
 			fn := &Func{name, nil, raw.Linkage()}
-			fixup(raw.Type(), &fn.Type)
-			if err := assert(&fn.Type, reflect.TypeOf((*FuncProto)(nil))); err != nil {
+			if err := fixupAndAssert(raw.Type(), &fn.Type, reflect.TypeOf((*FuncProto)(nil))); err != nil {
 				return nil, err
 			}
 			typ = fn
@@ -1036,14 +1012,41 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 			}
 			for i := range vars {
 				fixup(btfVars[i].Type, &vars[i].Type)
-				if err := assert(&vars[i].Type, reflect.TypeOf((*Var)(nil))); err != nil {
-					return nil, err
-				}
 			}
-			typ = &Datasec{name, raw.SizeType, vars}
+			typ = &Datasec{name, raw.Size(), vars}
 
 		case kindFloat:
 			typ = &Float{name, raw.Size()}
+
+		case kindDeclTag:
+			btfIndex := raw.data.(*btfDeclTag).ComponentIdx
+			if uint64(btfIndex) > math.MaxInt {
+				return nil, fmt.Errorf("type id %d: index exceeds int", id)
+			}
+
+			dt := &declTag{nil, name, int(int32(btfIndex))}
+			fixup(raw.Type(), &dt.Type)
+			typ = dt
+
+			declTags = append(declTags, dt)
+
+		case kindTypeTag:
+			tt := &typeTag{nil, name}
+			fixup(raw.Type(), &tt.Type)
+			typ = tt
+
+		case kindEnum64:
+			rawvals := raw.data.([]btfEnum64)
+			vals := make([]EnumValue, 0, len(rawvals))
+			for i, btfVal := range rawvals {
+				name, err := rawStrings.Lookup(btfVal.NameOff)
+				if err != nil {
+					return nil, fmt.Errorf("get name for enum64 value %d: %s", i, err)
+				}
+				value := (uint64(btfVal.ValHi32) << 32) | uint64(btfVal.ValLo32)
+				vals = append(vals, EnumValue{name, value})
+			}
+			typ = &Enum{name, raw.Size(), raw.Signed(), vals}
 
 		default:
 			return nil, fmt.Errorf("type id %d: unknown kind: %v", id, raw.Kind())
@@ -1053,19 +1056,20 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 	}
 
 	for _, fixup := range fixups {
-		i := int(fixup.id)
-		if i >= len(types)+len(baseTypes) {
-			return nil, fmt.Errorf("reference to invalid type id: %d", fixup.id)
-		}
-		if i < len(baseTypes) {
-			return nil, fmt.Errorf("fixup for base type id %d is not expected", i)
+		if fixup.id < firstTypeID {
+			return nil, fmt.Errorf("fixup for base type id %d is not expected", fixup.id)
 		}
 
-		*fixup.typ = types[i-len(baseTypes)]
+		idx := int(fixup.id - firstTypeID)
+		if idx >= len(types) {
+			return nil, fmt.Errorf("reference to invalid type id: %d", fixup.id)
+		}
+
+		*fixup.typ = types[idx]
 	}
 
 	for _, bitfieldFixup := range bitfieldFixups {
-		if bitfieldFixup.id < TypeID(len(baseTypes)) {
+		if bitfieldFixup.id < firstTypeID {
 			return nil, fmt.Errorf("bitfield fixup from split to base types is not expected")
 		}
 
@@ -1079,7 +1083,29 @@ func inflateRawTypes(rawTypes []rawType, baseTypes types, rawStrings *stringTabl
 
 	for _, assertion := range assertions {
 		if reflect.TypeOf(*assertion.typ) != assertion.want {
-			return nil, fmt.Errorf("expected %s, got %T", assertion.want, *assertion.typ)
+			return nil, fmt.Errorf("type ID %d: expected %s, got %T", assertion.id, assertion.want, *assertion.typ)
+		}
+	}
+
+	for _, dt := range declTags {
+		switch t := dt.Type.(type) {
+		case *Var, *Typedef:
+			if dt.Index != -1 {
+				return nil, fmt.Errorf("type %s: index %d is not -1", dt, dt.Index)
+			}
+
+		case composite:
+			if dt.Index >= len(t.members()) {
+				return nil, fmt.Errorf("type %s: index %d exceeds members of %s", dt, dt.Index, t)
+			}
+
+		case *Func:
+			if dt.Index >= len(t.Type.(*FuncProto).Params) {
+				return nil, fmt.Errorf("type %s: index %d exceeds params of %s", dt, dt.Index, t)
+			}
+
+		default:
+			return nil, fmt.Errorf("type %s: decl tag for type %s is not supported", dt, t)
 		}
 	}
 
@@ -1123,6 +1149,29 @@ func UnderlyingType(typ Type) Type {
 	return &cycle{typ}
 }
 
+// as returns typ if is of type T. Otherwise it peels qualifiers and Typedefs
+// until it finds a T.
+//
+// Returns the zero value and false if there is no T or if the type is nested
+// too deeply.
+func as[T Type](typ Type) (T, bool) {
+	for depth := 0; depth <= maxTypeDepth; depth++ {
+		switch v := (typ).(type) {
+		case T:
+			return v, true
+		case qualifier:
+			typ = v.qualify()
+		case *Typedef:
+			typ = v.Type
+		default:
+			goto notFound
+		}
+	}
+notFound:
+	var zero T
+	return zero, false
+}
+
 type formatState struct {
 	fmt.State
 	depth int
@@ -1145,10 +1194,7 @@ func formatType(f fmt.State, verb rune, t formattableType, extra ...interface{})
 		return
 	}
 
-	// This is the same as %T, but elides the package name. Assumes that
-	// formattableType is implemented by a pointer receiver.
-	goTypeName := reflect.TypeOf(t).Elem().Name()
-	_, _ = io.WriteString(f, goTypeName)
+	_, _ = io.WriteString(f, internal.GoTypeName(t))
 
 	if name := t.TypeName(); name != "" {
 		// Output BTF type name if present.

@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,63 +30,63 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*v1.ConfigMap)) })
-	scheme.AddTypeDefaultingFunc(&v1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*v1.ConfigMapList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*v1.Endpoints)) })
-	scheme.AddTypeDefaultingFunc(&v1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*v1.EndpointsList)) })
-	scheme.AddTypeDefaultingFunc(&v1.LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*v1.LimitRange)) })
-	scheme.AddTypeDefaultingFunc(&v1.LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*v1.LimitRangeList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*v1.Namespace)) })
-	scheme.AddTypeDefaultingFunc(&v1.NamespaceList{}, func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*v1.NamespaceList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Node{}, func(obj interface{}) { SetObjectDefaults_Node(obj.(*v1.Node)) })
-	scheme.AddTypeDefaultingFunc(&v1.NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*v1.NodeList)) })
-	scheme.AddTypeDefaultingFunc(&v1.PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*v1.PersistentVolume)) })
-	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*v1.PersistentVolumeClaim)) })
-	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeClaimList{}, func(obj interface{}) {
-		SetObjectDefaults_PersistentVolumeClaimList(obj.(*v1.PersistentVolumeClaimList))
+	scheme.AddTypeDefaultingFunc(&corev1.ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*corev1.ConfigMap)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*corev1.ConfigMapList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*corev1.Endpoints)) })
+	scheme.AddTypeDefaultingFunc(&corev1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*corev1.EndpointsList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.LimitRange{}, func(obj interface{}) { SetObjectDefaults_LimitRange(obj.(*corev1.LimitRange)) })
+	scheme.AddTypeDefaultingFunc(&corev1.LimitRangeList{}, func(obj interface{}) { SetObjectDefaults_LimitRangeList(obj.(*corev1.LimitRangeList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Namespace{}, func(obj interface{}) { SetObjectDefaults_Namespace(obj.(*corev1.Namespace)) })
+	scheme.AddTypeDefaultingFunc(&corev1.NamespaceList{}, func(obj interface{}) { SetObjectDefaults_NamespaceList(obj.(*corev1.NamespaceList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Node{}, func(obj interface{}) { SetObjectDefaults_Node(obj.(*corev1.Node)) })
+	scheme.AddTypeDefaultingFunc(&corev1.NodeList{}, func(obj interface{}) { SetObjectDefaults_NodeList(obj.(*corev1.NodeList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PersistentVolume{}, func(obj interface{}) { SetObjectDefaults_PersistentVolume(obj.(*corev1.PersistentVolume)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PersistentVolumeClaim{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeClaim(obj.(*corev1.PersistentVolumeClaim)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PersistentVolumeClaimList{}, func(obj interface{}) {
+		SetObjectDefaults_PersistentVolumeClaimList(obj.(*corev1.PersistentVolumeClaimList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*v1.PersistentVolumeList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*v1.Pod)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*v1.PodList)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*v1.PodStatusResult)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*v1.PodTemplate)) })
-	scheme.AddTypeDefaultingFunc(&v1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*v1.PodTemplateList)) })
-	scheme.AddTypeDefaultingFunc(&v1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*v1.ReplicationController)) })
-	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) {
-		SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList))
+	scheme.AddTypeDefaultingFunc(&corev1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*corev1.PersistentVolumeList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*corev1.Pod)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*corev1.PodList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*corev1.PodStatusResult)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*corev1.PodTemplate)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*corev1.PodTemplateList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*corev1.ReplicationController)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ReplicationControllerList{}, func(obj interface{}) {
+		SetObjectDefaults_ReplicationControllerList(obj.(*corev1.ReplicationControllerList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*v1.ResourceQuota)) })
-	scheme.AddTypeDefaultingFunc(&v1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*v1.ResourceQuotaList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*v1.Secret)) })
-	scheme.AddTypeDefaultingFunc(&v1.SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*v1.SecretList)) })
-	scheme.AddTypeDefaultingFunc(&v1.Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*v1.Service)) })
-	scheme.AddTypeDefaultingFunc(&v1.ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*v1.ServiceList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*corev1.ResourceQuota)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*corev1.ResourceQuotaList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*corev1.Secret)) })
+	scheme.AddTypeDefaultingFunc(&corev1.SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*corev1.SecretList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*corev1.Service)) })
+	scheme.AddTypeDefaultingFunc(&corev1.ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*corev1.ServiceList)) })
 	return nil
 }
 
-func SetObjectDefaults_ConfigMap(in *v1.ConfigMap) {
+func SetObjectDefaults_ConfigMap(in *corev1.ConfigMap) {
 	SetDefaults_ConfigMap(in)
 }
 
-func SetObjectDefaults_ConfigMapList(in *v1.ConfigMapList) {
+func SetObjectDefaults_ConfigMapList(in *corev1.ConfigMapList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ConfigMap(a)
 	}
 }
 
-func SetObjectDefaults_Endpoints(in *v1.Endpoints) {
+func SetObjectDefaults_Endpoints(in *corev1.Endpoints) {
 	SetDefaults_Endpoints(in)
 }
 
-func SetObjectDefaults_EndpointsList(in *v1.EndpointsList) {
+func SetObjectDefaults_EndpointsList(in *corev1.EndpointsList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Endpoints(a)
 	}
 }
 
-func SetObjectDefaults_LimitRange(in *v1.LimitRange) {
+func SetObjectDefaults_LimitRange(in *corev1.LimitRange) {
 	for i := range in.Spec.Limits {
 		a := &in.Spec.Limits[i]
 		SetDefaults_LimitRangeItem(a)
@@ -98,39 +98,39 @@ func SetObjectDefaults_LimitRange(in *v1.LimitRange) {
 	}
 }
 
-func SetObjectDefaults_LimitRangeList(in *v1.LimitRangeList) {
+func SetObjectDefaults_LimitRangeList(in *corev1.LimitRangeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_LimitRange(a)
 	}
 }
 
-func SetObjectDefaults_Namespace(in *v1.Namespace) {
+func SetObjectDefaults_Namespace(in *corev1.Namespace) {
 	SetDefaults_Namespace(in)
 	SetDefaults_NamespaceStatus(&in.Status)
 }
 
-func SetObjectDefaults_NamespaceList(in *v1.NamespaceList) {
+func SetObjectDefaults_NamespaceList(in *corev1.NamespaceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Namespace(a)
 	}
 }
 
-func SetObjectDefaults_Node(in *v1.Node) {
+func SetObjectDefaults_Node(in *corev1.Node) {
 	SetDefaults_NodeStatus(&in.Status)
 	SetDefaults_ResourceList(&in.Status.Capacity)
 	SetDefaults_ResourceList(&in.Status.Allocatable)
 }
 
-func SetObjectDefaults_NodeList(in *v1.NodeList) {
+func SetObjectDefaults_NodeList(in *corev1.NodeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Node(a)
 	}
 }
 
-func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
+func SetObjectDefaults_PersistentVolume(in *corev1.PersistentVolume) {
 	SetDefaults_PersistentVolume(in)
 	SetDefaults_ResourceList(&in.Spec.Capacity)
 	if in.Spec.PersistentVolumeSource.HostPath != nil {
@@ -154,7 +154,7 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		if in.Spec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
-			ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+			ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
 			in.Spec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
 		}
 		if in.Spec.PersistentVolumeSource.AzureDisk.FSType == nil {
@@ -166,7 +166,7 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 			in.Spec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
 		}
 		if in.Spec.PersistentVolumeSource.AzureDisk.Kind == nil {
-			ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+			ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
 			in.Spec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
 		}
 	}
@@ -180,7 +180,7 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	}
 }
 
-func SetObjectDefaults_PersistentVolumeClaim(in *v1.PersistentVolumeClaim) {
+func SetObjectDefaults_PersistentVolumeClaim(in *corev1.PersistentVolumeClaim) {
 	SetDefaults_PersistentVolumeClaim(in)
 	SetDefaults_PersistentVolumeClaimSpec(&in.Spec)
 	SetDefaults_ResourceList(&in.Spec.Resources.Limits)
@@ -189,21 +189,21 @@ func SetObjectDefaults_PersistentVolumeClaim(in *v1.PersistentVolumeClaim) {
 	SetDefaults_ResourceList(&in.Status.AllocatedResources)
 }
 
-func SetObjectDefaults_PersistentVolumeClaimList(in *v1.PersistentVolumeClaimList) {
+func SetObjectDefaults_PersistentVolumeClaimList(in *corev1.PersistentVolumeClaimList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PersistentVolumeClaim(a)
 	}
 }
 
-func SetObjectDefaults_PersistentVolumeList(in *v1.PersistentVolumeList) {
+func SetObjectDefaults_PersistentVolumeList(in *corev1.PersistentVolumeList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PersistentVolume(a)
 	}
 }
 
-func SetObjectDefaults_Pod(in *v1.Pod) {
+func SetObjectDefaults_Pod(in *corev1.Pod) {
 	SetDefaults_Pod(in)
 	SetDefaults_PodSpec(&in.Spec)
 	for i := range in.Spec.Volumes {
@@ -245,7 +245,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
 				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
 			}
 			if a.VolumeSource.AzureDisk.FSType == nil {
@@ -257,7 +257,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
 			}
 			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
 				a.VolumeSource.AzureDisk.Kind = &ptrVar1
 			}
 		}
@@ -525,14 +525,14 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 	}
 }
 
-func SetObjectDefaults_PodList(in *v1.PodList) {
+func SetObjectDefaults_PodList(in *corev1.PodList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Pod(a)
 	}
 }
 
-func SetObjectDefaults_PodStatusResult(in *v1.PodStatusResult) {
+func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 	for i := range in.Status.InitContainerStatuses {
 		a := &in.Status.InitContainerStatuses[i]
 		SetDefaults_ResourceList(&a.AllocatedResources)
@@ -559,7 +559,7 @@ func SetObjectDefaults_PodStatusResult(in *v1.PodStatusResult) {
 	}
 }
 
-func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
+func SetObjectDefaults_PodTemplate(in *corev1.PodTemplate) {
 	SetDefaults_PodSpec(&in.Template.Spec)
 	for i := range in.Template.Spec.Volumes {
 		a := &in.Template.Spec.Volumes[i]
@@ -600,7 +600,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			if a.VolumeSource.AzureDisk.CachingMode == nil {
-				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
 				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
 			}
 			if a.VolumeSource.AzureDisk.FSType == nil {
@@ -612,7 +612,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
 			}
 			if a.VolumeSource.AzureDisk.Kind == nil {
-				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
 				a.VolumeSource.AzureDisk.Kind = &ptrVar1
 			}
 		}
@@ -856,14 +856,14 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 	SetDefaults_ResourceList(&in.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_PodTemplateList(in *v1.PodTemplateList) {
+func SetObjectDefaults_PodTemplateList(in *corev1.PodTemplateList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PodTemplate(a)
 	}
 }
 
-func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
+func SetObjectDefaults_ReplicationController(in *corev1.ReplicationController) {
 	SetDefaults_ReplicationController(in)
 	if in.Spec.Template != nil {
 		SetDefaults_PodSpec(&in.Spec.Template.Spec)
@@ -906,7 +906,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 			if a.VolumeSource.AzureDisk != nil {
 				if a.VolumeSource.AzureDisk.CachingMode == nil {
-					ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+					ptrVar1 := corev1.AzureDataDiskCachingMode(corev1.AzureDataDiskCachingReadWrite)
 					a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
 				}
 				if a.VolumeSource.AzureDisk.FSType == nil {
@@ -918,7 +918,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 					a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
 				}
 				if a.VolumeSource.AzureDisk.Kind == nil {
-					ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+					ptrVar1 := corev1.AzureDataDiskKind(corev1.AzureSharedBlobDisk)
 					a.VolumeSource.AzureDisk.Kind = &ptrVar1
 				}
 			}
@@ -1163,38 +1163,38 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 	}
 }
 
-func SetObjectDefaults_ReplicationControllerList(in *v1.ReplicationControllerList) {
+func SetObjectDefaults_ReplicationControllerList(in *corev1.ReplicationControllerList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicationController(a)
 	}
 }
 
-func SetObjectDefaults_ResourceQuota(in *v1.ResourceQuota) {
+func SetObjectDefaults_ResourceQuota(in *corev1.ResourceQuota) {
 	SetDefaults_ResourceList(&in.Spec.Hard)
 	SetDefaults_ResourceList(&in.Status.Hard)
 	SetDefaults_ResourceList(&in.Status.Used)
 }
 
-func SetObjectDefaults_ResourceQuotaList(in *v1.ResourceQuotaList) {
+func SetObjectDefaults_ResourceQuotaList(in *corev1.ResourceQuotaList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ResourceQuota(a)
 	}
 }
 
-func SetObjectDefaults_Secret(in *v1.Secret) {
+func SetObjectDefaults_Secret(in *corev1.Secret) {
 	SetDefaults_Secret(in)
 }
 
-func SetObjectDefaults_SecretList(in *v1.SecretList) {
+func SetObjectDefaults_SecretList(in *corev1.SecretList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Secret(a)
 	}
 }
 
-func SetObjectDefaults_Service(in *v1.Service) {
+func SetObjectDefaults_Service(in *corev1.Service) {
 	SetDefaults_Service(in)
 	for i := range in.Spec.Ports {
 		a := &in.Spec.Ports[i]
@@ -1204,7 +1204,7 @@ func SetObjectDefaults_Service(in *v1.Service) {
 	}
 }
 
-func SetObjectDefaults_ServiceList(in *v1.ServiceList) {
+func SetObjectDefaults_ServiceList(in *corev1.ServiceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Service(a)

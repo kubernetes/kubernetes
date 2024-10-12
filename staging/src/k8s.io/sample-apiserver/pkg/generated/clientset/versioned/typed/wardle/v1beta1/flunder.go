@@ -19,14 +19,14 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
-	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	applyconfigurationwardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -38,36 +38,36 @@ type FlundersGetter interface {
 
 // FlunderInterface has methods to work with Flunder resources.
 type FlunderInterface interface {
-	Create(ctx context.Context, flunder *v1beta1.Flunder, opts v1.CreateOptions) (*v1beta1.Flunder, error)
-	Update(ctx context.Context, flunder *v1beta1.Flunder, opts v1.UpdateOptions) (*v1beta1.Flunder, error)
+	Create(ctx context.Context, flunder *wardlev1beta1.Flunder, opts v1.CreateOptions) (*wardlev1beta1.Flunder, error)
+	Update(ctx context.Context, flunder *wardlev1beta1.Flunder, opts v1.UpdateOptions) (*wardlev1beta1.Flunder, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, flunder *v1beta1.Flunder, opts v1.UpdateOptions) (*v1beta1.Flunder, error)
+	UpdateStatus(ctx context.Context, flunder *wardlev1beta1.Flunder, opts v1.UpdateOptions) (*wardlev1beta1.Flunder, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Flunder, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.FlunderList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*wardlev1beta1.Flunder, error)
+	List(ctx context.Context, opts v1.ListOptions) (*wardlev1beta1.FlunderList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Flunder, err error)
-	Apply(ctx context.Context, flunder *wardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Flunder, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *wardlev1beta1.Flunder, err error)
+	Apply(ctx context.Context, flunder *applyconfigurationwardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *wardlev1beta1.Flunder, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, flunder *wardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Flunder, err error)
+	ApplyStatus(ctx context.Context, flunder *applyconfigurationwardlev1beta1.FlunderApplyConfiguration, opts v1.ApplyOptions) (result *wardlev1beta1.Flunder, err error)
 	FlunderExpansion
 }
 
 // flunders implements FlunderInterface
 type flunders struct {
-	*gentype.ClientWithListAndApply[*v1beta1.Flunder, *v1beta1.FlunderList, *wardlev1beta1.FlunderApplyConfiguration]
+	*gentype.ClientWithListAndApply[*wardlev1beta1.Flunder, *wardlev1beta1.FlunderList, *applyconfigurationwardlev1beta1.FlunderApplyConfiguration]
 }
 
 // newFlunders returns a Flunders
 func newFlunders(c *WardleV1beta1Client, namespace string) *flunders {
 	return &flunders{
-		gentype.NewClientWithListAndApply[*v1beta1.Flunder, *v1beta1.FlunderList, *wardlev1beta1.FlunderApplyConfiguration](
+		gentype.NewClientWithListAndApply[*wardlev1beta1.Flunder, *wardlev1beta1.FlunderList, *applyconfigurationwardlev1beta1.FlunderApplyConfiguration](
 			"flunders",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta1.Flunder { return &v1beta1.Flunder{} },
-			func() *v1beta1.FlunderList { return &v1beta1.FlunderList{} }),
+			func() *wardlev1beta1.Flunder { return &wardlev1beta1.Flunder{} },
+			func() *wardlev1beta1.FlunderList { return &wardlev1beta1.FlunderList{} }),
 	}
 }

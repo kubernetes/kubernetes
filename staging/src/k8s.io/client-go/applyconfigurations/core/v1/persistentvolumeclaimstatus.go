@@ -19,18 +19,18 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PersistentVolumeClaimStatusApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimStatus type for use
 // with apply.
 type PersistentVolumeClaimStatusApplyConfiguration struct {
-	Phase                            *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
-	AccessModes                      []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
-	Capacity                         *v1.ResourceList                                   `json:"capacity,omitempty"`
+	Phase                            *corev1.PersistentVolumeClaimPhase                 `json:"phase,omitempty"`
+	AccessModes                      []corev1.PersistentVolumeAccessMode                `json:"accessModes,omitempty"`
+	Capacity                         *corev1.ResourceList                               `json:"capacity,omitempty"`
 	Conditions                       []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
-	AllocatedResources               *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
-	AllocatedResourceStatuses        map[v1.ResourceName]v1.ClaimResourceStatus         `json:"allocatedResourceStatuses,omitempty"`
+	AllocatedResources               *corev1.ResourceList                               `json:"allocatedResources,omitempty"`
+	AllocatedResourceStatuses        map[corev1.ResourceName]corev1.ClaimResourceStatus `json:"allocatedResourceStatuses,omitempty"`
 	CurrentVolumeAttributesClassName *string                                            `json:"currentVolumeAttributesClassName,omitempty"`
 	ModifyVolumeStatus               *ModifyVolumeStatusApplyConfiguration              `json:"modifyVolumeStatus,omitempty"`
 }
@@ -44,7 +44,7 @@ func PersistentVolumeClaimStatus() *PersistentVolumeClaimStatusApplyConfiguratio
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *PersistentVolumeClaimStatusApplyConfiguration) WithPhase(value v1.PersistentVolumeClaimPhase) *PersistentVolumeClaimStatusApplyConfiguration {
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithPhase(value corev1.PersistentVolumeClaimPhase) *PersistentVolumeClaimStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -52,7 +52,7 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithPhase(value v1.Persi
 // WithAccessModes adds the given value to the AccessModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the AccessModes field.
-func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAccessModes(values ...v1.PersistentVolumeAccessMode) *PersistentVolumeClaimStatusApplyConfiguration {
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAccessModes(values ...corev1.PersistentVolumeAccessMode) *PersistentVolumeClaimStatusApplyConfiguration {
 	for i := range values {
 		b.AccessModes = append(b.AccessModes, values[i])
 	}
@@ -62,7 +62,7 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAccessModes(values .
 // WithCapacity sets the Capacity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Capacity field is set to the value of the last call.
-func (b *PersistentVolumeClaimStatusApplyConfiguration) WithCapacity(value v1.ResourceList) *PersistentVolumeClaimStatusApplyConfiguration {
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithCapacity(value corev1.ResourceList) *PersistentVolumeClaimStatusApplyConfiguration {
 	b.Capacity = &value
 	return b
 }
@@ -83,7 +83,7 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithConditions(values ..
 // WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AllocatedResources field is set to the value of the last call.
-func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResources(value v1.ResourceList) *PersistentVolumeClaimStatusApplyConfiguration {
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *PersistentVolumeClaimStatusApplyConfiguration {
 	b.AllocatedResources = &value
 	return b
 }
@@ -92,9 +92,9 @@ func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResources(v
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the AllocatedResourceStatuses field,
 // overwriting an existing map entries in AllocatedResourceStatuses field with the same key.
-func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResourceStatuses(entries map[v1.ResourceName]v1.ClaimResourceStatus) *PersistentVolumeClaimStatusApplyConfiguration {
+func (b *PersistentVolumeClaimStatusApplyConfiguration) WithAllocatedResourceStatuses(entries map[corev1.ResourceName]corev1.ClaimResourceStatus) *PersistentVolumeClaimStatusApplyConfiguration {
 	if b.AllocatedResourceStatuses == nil && len(entries) > 0 {
-		b.AllocatedResourceStatuses = make(map[v1.ResourceName]v1.ClaimResourceStatus, len(entries))
+		b.AllocatedResourceStatuses = make(map[corev1.ResourceName]corev1.ClaimResourceStatus, len(entries))
 	}
 	for k, v := range entries {
 		b.AllocatedResourceStatuses[k] = v

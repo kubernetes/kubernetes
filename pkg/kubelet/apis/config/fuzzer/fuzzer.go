@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.
@@ -118,7 +118,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Logging.Format = "text"
 			}
 			obj.EnableSystemLogHandler = true
-			obj.MemoryThrottlingFactor = utilpointer.Float64(rand.Float64())
+			obj.MemoryThrottlingFactor = ptr.To(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
 		},
 	}

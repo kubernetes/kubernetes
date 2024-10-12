@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/mount-utils"
@@ -39,7 +40,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (unsupportedContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 

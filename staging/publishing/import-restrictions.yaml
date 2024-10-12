@@ -54,7 +54,7 @@
   - "./staging/src/k8s.io/code-generator/examples"
   - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
-  - k8s.io/gengo
+  - k8s.io/gengo/v2
   - k8s.io/code-generator
   - k8s.io/kube-openapi
   - k8s.io/klog
@@ -180,7 +180,7 @@
 - baseImportPath: "./vendor/k8s.io/kube-openapi"
   allowedImports:
   - k8s.io/kube-openapi
-  - k8s.io/gengo
+  - k8s.io/gengo/v2
   - k8s.io/klog
   - k8s.io/utils
 

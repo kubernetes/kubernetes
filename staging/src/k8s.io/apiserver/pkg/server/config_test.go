@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -80,6 +81,34 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestAuthorizeClientBearerTokenRequiredGroups(t *testing.T) {
+	fakeAuthenticator := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: &user.DefaultInfo{}}, false, nil
+	})
+	fakeAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+		return authorizer.DecisionAllow, "", nil
+	})
+	target := &rest.Config{BearerToken: "secretToken"}
+	authN := &AuthenticationInfo{Authenticator: fakeAuthenticator}
+	authC := &AuthorizationInfo{Authorizer: fakeAuthorizer}
+
+	AuthorizeClientBearerToken(target, authN, authC)
+
+	fakeRequest, err := http.NewRequest("", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeRequest.Header.Set("Authorization", "bearer secretToken")
+	rsp, _, err := authN.Authenticator.AuthenticateRequest(fakeRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedGroups := []string{user.AllAuthenticated, user.SystemPrivilegedGroup}
+	if !reflect.DeepEqual(expectedGroups, rsp.User.GetGroups()) {
+		t.Fatalf("unexpected groups = %v returned, expected = %v", rsp.User.GetGroups(), expectedGroups)
 	}
 }
 

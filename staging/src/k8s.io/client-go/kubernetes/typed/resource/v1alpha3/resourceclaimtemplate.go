@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
+	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type ResourceClaimTemplatesGetter interface {
 
 // ResourceClaimTemplateInterface has methods to work with ResourceClaimTemplate resources.
 type ResourceClaimTemplateInterface interface {
-	Create(ctx context.Context, resourceClaimTemplate *v1alpha3.ResourceClaimTemplate, opts v1.CreateOptions) (*v1alpha3.ResourceClaimTemplate, error)
-	Update(ctx context.Context, resourceClaimTemplate *v1alpha3.ResourceClaimTemplate, opts v1.UpdateOptions) (*v1alpha3.ResourceClaimTemplate, error)
+	Create(ctx context.Context, resourceClaimTemplate *resourcev1alpha3.ResourceClaimTemplate, opts v1.CreateOptions) (*resourcev1alpha3.ResourceClaimTemplate, error)
+	Update(ctx context.Context, resourceClaimTemplate *resourcev1alpha3.ResourceClaimTemplate, opts v1.UpdateOptions) (*resourcev1alpha3.ResourceClaimTemplate, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha3.ResourceClaimTemplate, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha3.ResourceClaimTemplateList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1alpha3.ResourceClaimTemplate, error)
+	List(ctx context.Context, opts v1.ListOptions) (*resourcev1alpha3.ResourceClaimTemplateList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha3.ResourceClaimTemplate, err error)
-	Apply(ctx context.Context, resourceClaimTemplate *resourcev1alpha3.ResourceClaimTemplateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha3.ResourceClaimTemplate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *resourcev1alpha3.ResourceClaimTemplate, err error)
+	Apply(ctx context.Context, resourceClaimTemplate *applyconfigurationsresourcev1alpha3.ResourceClaimTemplateApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.ResourceClaimTemplate, err error)
 	ResourceClaimTemplateExpansion
 }
 
 // resourceClaimTemplates implements ResourceClaimTemplateInterface
 type resourceClaimTemplates struct {
-	*gentype.ClientWithListAndApply[*v1alpha3.ResourceClaimTemplate, *v1alpha3.ResourceClaimTemplateList, *resourcev1alpha3.ResourceClaimTemplateApplyConfiguration]
+	*gentype.ClientWithListAndApply[*resourcev1alpha3.ResourceClaimTemplate, *resourcev1alpha3.ResourceClaimTemplateList, *applyconfigurationsresourcev1alpha3.ResourceClaimTemplateApplyConfiguration]
 }
 
 // newResourceClaimTemplates returns a ResourceClaimTemplates
 func newResourceClaimTemplates(c *ResourceV1alpha3Client, namespace string) *resourceClaimTemplates {
 	return &resourceClaimTemplates{
-		gentype.NewClientWithListAndApply[*v1alpha3.ResourceClaimTemplate, *v1alpha3.ResourceClaimTemplateList, *resourcev1alpha3.ResourceClaimTemplateApplyConfiguration](
+		gentype.NewClientWithListAndApply[*resourcev1alpha3.ResourceClaimTemplate, *resourcev1alpha3.ResourceClaimTemplateList, *applyconfigurationsresourcev1alpha3.ResourceClaimTemplateApplyConfiguration](
 			"resourceclaimtemplates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1alpha3.ResourceClaimTemplate { return &v1alpha3.ResourceClaimTemplate{} },
-			func() *v1alpha3.ResourceClaimTemplateList { return &v1alpha3.ResourceClaimTemplateList{} }),
+			func() *resourcev1alpha3.ResourceClaimTemplate { return &resourcev1alpha3.ResourceClaimTemplate{} },
+			func() *resourcev1alpha3.ResourceClaimTemplateList {
+				return &resourcev1alpha3.ResourceClaimTemplateList{}
+			}),
 	}
 }

@@ -26,9 +26,9 @@ limitations under the License.
 //
 //   - Support custom environment variables in control plane components under `ClusterConfiguration`.
 //     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`, `Etcd.Local.ExtraEnvs`.
-//   - The ResetConfiguration API type is now supported in v1beta4. Users are able to reset a node by passing
+//   - The `ResetConfiguration` API type is now supported in v1beta4. Users are able to reset a node by passing
 //     a `--config` file to `kubeadm reset`.
-//   - Dry run mode is now configurable in InitConfiguration and JoinConfiguration.
+//   - Dry run mode is now configurable in `InitConfiguration` and `JoinConfiguration`.
 //   - Replace the existing string/string extra argument maps with structured extra arguments that support duplicates.
 //     The change applies to `ClusterConfiguration` - `APIServer.ExtraArgs`, `ControllerManager.ExtraArgs`,
 //     `Scheduler.ExtraArgs`, `Etcd.Local.ExtraArgs`. Also to `NodeRegistrationOptions.KubeletExtraArgs`.
@@ -36,11 +36,11 @@ limitations under the License.
 //     used for this cluster's keys and certificates. Can be one of "RSA-2048" (default), "RSA-3072", "RSA-4096" or "ECDSA-P256".
 //   - Add `ClusterConfiguration.DNS.Disabled` and `ClusterConfiguration.Proxy.Disabled` that can be used to disable
 //     the CoreDNS and kube-proxy addons during cluster initialization. Skipping the related addons phases,
-//     during cluster creation will set the same fields to `false`.
+//     during cluster creation will set the same fields to `true`.
 //   - Add the `NodeRegistration.ImagePullSerial` field in `InitConfiguration` and `JoinConfiguration`, which
 //     can be used to control if kubeadm pulls images serially or in parallel.
-//   - The UpgradeConfiguration kubeadm API is now supported in v1beta4 when passing `--config` to `kubeadm upgrade` subcommands.
-//     Usage of component configuration for kubelet and kube-proxy, InitConfiguration and ClusterConfiguration is deprecated
+//   - The `UpgradeConfiguration` kubeadm API is now supported in v1beta4 when passing `--config` to `kubeadm upgrade` subcommands.
+//     Usage of component configuration for kubelet and kube-proxy, `InitConfiguration` and `ClusterConfiguration` is deprecated
 //     and will be ignored when passing `--config` to upgrade subcommands.
 //   - Add a `Timeouts` structure to `InitConfiguration`, `JoinConfiguration`, `ResetConfiguration` and `UpgradeConfiguration`
 //     that can be used to configure various timeouts. The `ClusterConfiguration.TimeoutForControlPlane` field is replaced

@@ -1,3 +1,5 @@
+//go:build windows
+
 package hcsshim
 
 import (
@@ -13,7 +15,7 @@ type HNSEndpointStats = hns.EndpointStats
 // Namespace represents a Compartment.
 type Namespace = hns.Namespace
 
-//SystemType represents the type of the system on which actions are done
+// SystemType represents the type of the system on which actions are done
 type SystemType string
 
 // SystemType const

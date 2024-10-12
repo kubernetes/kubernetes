@@ -19,9 +19,7 @@ package app
 import (
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
@@ -32,18 +30,10 @@ import (
 func createCloudProvider(logger klog.Logger, cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
 	allowUntaggedCloud bool, sharedInformers informers.SharedInformerFactory) (cloudprovider.Interface, ControllerLoopMode, error) {
 	var cloud cloudprovider.Interface
-	var loopMode ControllerLoopMode
 	var err error
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
-		cloudprovider.DisableWarningForProvider(cloudProvider)
-		return nil, ExternalLoops, fmt.Errorf(
-			"cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider",
-			cloudProvider)
-	}
+	loopMode := ExternalLoops
 
 	if cloudprovider.IsExternal(cloudProvider) {
-		loopMode = ExternalLoops
 		if externalCloudVolumePlugin == "" {
 			// externalCloudVolumePlugin is temporary until we split all cloud providers out.
 			// So we just tell the caller that we need to run ExternalLoops without any cloud provider.
@@ -51,10 +41,17 @@ func createCloudProvider(logger klog.Logger, cloudProvider string, externalCloud
 		}
 		cloud, err = cloudprovider.InitCloudProvider(externalCloudVolumePlugin, cloudConfigFile)
 	} else {
-		cloudprovider.DeprecationWarningForProvider(cloudProvider)
-
-		loopMode = IncludeCloudLoops
-		cloud, err = cloudprovider.InitCloudProvider(cloudProvider, cloudConfigFile)
+		// in the case where the cloudProvider is not set, we need to inform the caller that there
+		// is no cloud provider and that the default loops should be used, and there is no error.
+		// this will cause the kube-controller-manager to start the default controller contexts
+		// without being attached to a specific cloud.
+		if len(cloudProvider) == 0 {
+			loopMode = IncludeCloudLoops
+		} else {
+			// for all other cloudProvider values the internal cloud loops are disabled
+			cloudprovider.DisableWarningForProvider(cloudProvider)
+			err = cloudprovider.ErrorForDisabledProvider(cloudProvider)
+		}
 	}
 	if err != nil {
 		return nil, loopMode, fmt.Errorf("cloud provider could not be initialized: %v", err)

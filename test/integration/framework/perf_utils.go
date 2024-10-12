@@ -18,6 +18,7 @@ package framework
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -109,20 +110,19 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 			}
 		}
 		if err != nil {
-			klog.Fatalf("Error creating node: %v", err)
+			return fmt.Errorf("creating node: %w", err)
 		}
 	}
 
 	nodes, err := waitListAllNodes(p.client)
 	if err != nil {
-		klog.Fatalf("Error listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %w", err)
 	}
 	index := nextNodeIndex
 	for _, v := range p.countToStrategy {
 		for i := 0; i < v.Count; i, index = i+1, index+1 {
 			if err := testutils.DoPrepareNode(ctx, p.client, &nodes.Items[index], v.Strategy); err != nil {
-				klog.Errorf("Aborting node preparation: %v", err)
-				return err
+				return fmt.Errorf("aborting node preparation: %w", err)
 			}
 		}
 	}

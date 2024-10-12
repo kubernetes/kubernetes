@@ -266,17 +266,23 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 
 		select {
 		case <-shouldStartWatchCh:
-			watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
-			watchReq = r.WithContext(watchCtx)
-			h.handler.ServeHTTP(w, watchReq)
-			// Protect from the situation when request will not reach storage layer
-			// and the initialization signal will not be send.
-			// It has to happen before waiting on the resultCh below.
-			watchInitializationSignal.Signal()
-			// TODO: Consider finishing the request as soon as Handle call panics.
-			if err := <-resultCh; err != nil {
-				panic(err)
-			}
+			func() {
+				// TODO: if both goroutines panic, propagate the stack traces from both
+				// goroutines so they are logged properly:
+				defer func() {
+					// Protect from the situation when request will not reach storage layer
+					// and the initialization signal will not be send.
+					// It has to happen before waiting on the resultCh below.
+					watchInitializationSignal.Signal()
+					// TODO: Consider finishing the request as soon as Handle call panics.
+					if err := <-resultCh; err != nil {
+						panic(err)
+					}
+				}()
+				watchCtx := utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+				watchReq = r.WithContext(watchCtx)
+				h.handler.ServeHTTP(w, watchReq)
+			}()
 		case err := <-resultCh:
 			if err != nil {
 				panic(err)

@@ -208,7 +208,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			alloc.requestData[requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}] = requestData
 			numDevices += requestData.numDevices
 		}
-		alloc.logger.Info("Checked claim", "claim", klog.KObj(claim), "numDevices", numDevices)
+		alloc.logger.V(6).Info("Checked claim", "claim", klog.KObj(claim), "numDevices", numDevices)
 
 		// Check that we don't end up with too many results.
 		if numDevices > resourceapi.AllocationResultsMaxSize {

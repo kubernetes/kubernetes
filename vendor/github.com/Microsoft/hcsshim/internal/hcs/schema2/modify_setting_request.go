@@ -9,10 +9,12 @@
 
 package hcsschema
 
+import "github.com/Microsoft/hcsshim/internal/protocol/guestrequest"
+
 type ModifySettingRequest struct {
 	ResourcePath string `json:"ResourcePath,omitempty"`
 
-	RequestType string `json:"RequestType,omitempty"`
+	RequestType guestrequest.RequestType `json:"RequestType,omitempty"` // NOTE: Swagger generated as string. Locally updated.
 
 	Settings interface{} `json:"Settings,omitempty"` // NOTE: Swagger generated as *interface{}. Locally updated
 

@@ -19,19 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PodConditionApplyConfiguration represents a declarative configuration of the PodCondition type for use
 // with apply.
 type PodConditionApplyConfiguration struct {
-	Type               *v1.PodConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus  `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time         `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time         `json:"lastTransitionTime,omitempty"`
-	Reason             *string              `json:"reason,omitempty"`
-	Message            *string              `json:"message,omitempty"`
+	Type               *corev1.PodConditionType `json:"type,omitempty"`
+	Status             *corev1.ConditionStatus  `json:"status,omitempty"`
+	LastProbeTime      *metav1.Time             `json:"lastProbeTime,omitempty"`
+	LastTransitionTime *metav1.Time             `json:"lastTransitionTime,omitempty"`
+	Reason             *string                  `json:"reason,omitempty"`
+	Message            *string                  `json:"message,omitempty"`
 }
 
 // PodConditionApplyConfiguration constructs a declarative configuration of the PodCondition type for use with
@@ -43,7 +43,7 @@ func PodCondition() *PodConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PodConditionApplyConfiguration) WithType(value v1.PodConditionType) *PodConditionApplyConfiguration {
+func (b *PodConditionApplyConfiguration) WithType(value corev1.PodConditionType) *PodConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -51,7 +51,7 @@ func (b *PodConditionApplyConfiguration) WithType(value v1.PodConditionType) *Po
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *PodConditionApplyConfiguration) WithStatus(value v1.ConditionStatus) *PodConditionApplyConfiguration {
+func (b *PodConditionApplyConfiguration) WithStatus(value corev1.ConditionStatus) *PodConditionApplyConfiguration {
 	b.Status = &value
 	return b
 }

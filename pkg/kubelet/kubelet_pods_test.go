@@ -6115,7 +6115,7 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 
 	assert.Len(t, fakeRecorder.Events, 1)
 	event := <-fakeRecorder.Events
-	assert.Equal(t, event, expectedEvent)
+	assert.Equal(t, expectedEvent, event)
 }
 
 func TestParseGetSubIdsOutput(t *testing.T) {

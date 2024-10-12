@@ -203,6 +203,26 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
+	// Check for mutually exclusive keys before the main validation loop
+	reservedKeys := map[string]bool{
+		kubetypes.SystemReservedEnforcementKey:             false,
+		kubetypes.SystemReservedCompressibleEnforcementKey: false,
+		kubetypes.KubeReservedEnforcementKey:               false,
+		kubetypes.KubeReservedCompressibleEnforcementKey:   false,
+	}
+
+	for _, val := range kc.EnforceNodeAllocatable {
+		reservedKeys[val] = true
+	}
+
+	if reservedKeys[kubetypes.SystemReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.SystemReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
+	}
+
+	if reservedKeys[kubetypes.KubeReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.KubeReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
+	}
+
 	uniqueEnforcements := sets.Set[string]{}
 	for _, val := range kc.EnforceNodeAllocatable {
 		if uniqueEnforcements.Has(val) {
@@ -213,13 +233,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
-		case kubetypes.SystemReservedEnforcementKey:
+		case kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey:
 			if kc.SystemReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
 			}
-		case kubetypes.KubeReservedEnforcementKey:
+		case kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey:
 			if kc.KubeReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
 			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
@@ -228,8 +248,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			// skip all further checks when this is explicitly "none"
 			continue
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, or %q",
-				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey, kubetypes.NodeAllocatableNoneKey))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, %q, %q or %q",
+				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey,
+				kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey, kubetypes.NodeAllocatableNoneKey))
 			continue
 		}
 

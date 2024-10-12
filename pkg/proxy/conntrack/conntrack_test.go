@@ -20,253 +20,84 @@ limitations under the License.
 package conntrack
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
+	"github.com/stretchr/testify/require"
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+
+	netutils "k8s.io/utils/net"
 )
 
-var success = func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil }
-var nothingToDelete = func() ([]byte, []byte, error) {
-	return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+type fakeHandler struct {
+	tableType netlink.ConntrackTableType
+	ipFamily  netlink.InetFamily
+	filters   []*conntrackFilter
 }
 
-type testCT struct {
-	execCT
-
-	fcmd *fakeexec.FakeCmd
-}
-
-func makeCT(result fakeexec.FakeAction) *testCT {
-	fcmd := &fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{result},
+func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
+	f.tableType = tableType
+	f.ipFamily = family
+	f.filters = make([]*conntrackFilter, 0, len(netlinkFilters))
+	for _, netlinkFilter := range netlinkFilters {
+		f.filters = append(f.filters, netlinkFilter.(*conntrackFilter))
 	}
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-	}
-
-	return &testCT{execCT{fexec}, fcmd}
+	return uint(len(f.filters)), nil
 }
 
-// Gets the command that ct executed. (If it didn't execute any commands, this will
-// return "".)
-func (ct *testCT) getExecutedCommand() string {
-	// FakeExec panics if you try to run more commands than you set it up for. So the
-	// only possibilities here are that we ran 1 command or we ran 0.
-	if ct.execer.(*fakeexec.FakeExec).CommandCalls != 1 {
-		return ""
-	}
-	return strings.Join(ct.fcmd.CombinedOutputLog[0], " ")
-}
+var _ netlinkHandler = (*fakeHandler)(nil)
 
-func TestExec(t *testing.T) {
+func TestConntracker_ClearEntries(t *testing.T) {
+
 	testCases := []struct {
-		args      []string
-		result    fakeexec.FakeAction
-		expectErr bool
+		name     string
+		ipFamily uint8
+		filters  []netlink.CustomConntrackFilter
 	}{
 		{
-			args:      []string{"-D", "-p", "udp", "-d", "10.0.240.1"},
-			result:    success,
-			expectErr: false,
+			name:     "single IPv6 filter",
+			ipFamily: unix.AF_INET6,
+			filters: []netlink.CustomConntrackFilter{
+				&conntrackFilter{
+					protocol: 17,
+					original: &connectionTuple{dstPort: 8000},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+				},
+			},
 		},
 		{
-			args:      []string{"-D", "-p", "udp", "--orig-dst", "10.240.0.2", "--dst-nat", "10.0.10.2"},
-			result:    nothingToDelete,
-			expectErr: true,
+			name:     "multiple IPv4 filters",
+			ipFamily: unix.AF_INET,
+			filters: []netlink.CustomConntrackFilter{
+				&conntrackFilter{
+					protocol: 6,
+					original: &connectionTuple{dstPort: 3000},
+				},
+				&conntrackFilter{
+					protocol: 17,
+					original: &connectionTuple{dstPort: 5000},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				},
+				&conntrackFilter{
+					protocol: 132,
+					original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
+					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
-		ct := makeCT(tc.result)
-		err := ct.exec(tc.args...)
-		if tc.expectErr {
-			if err == nil {
-				t.Errorf("expected err, got %v", err)
+		t.Run(tc.name, func(t *testing.T) {
+			handler := &fakeHandler{}
+			ct := newConntracker(handler)
+			require.NoError(t, ct.ClearEntries(tc.ipFamily, tc.filters...))
+			require.Equal(t, netlink.ConntrackTableType(netlink.ConntrackTable), handler.tableType)
+			require.Equal(t, netlink.InetFamily(tc.ipFamily), handler.ipFamily)
+			require.Equal(t, len(tc.filters), len(handler.filters))
+			for i := 0; i < len(tc.filters); i++ {
+				require.Equal(t, tc.filters[i], handler.filters[i])
 			}
-		} else {
-			if err != nil {
-				t.Errorf("expected success, got %v", err)
-			}
-		}
-
-		execCmd := ct.getExecutedCommand()
-		expectCmd := "conntrack " + strings.Join(tc.args, " ")
-		if execCmd != expectCmd {
-			t.Errorf("expect execute command: %s, but got: %s", expectCmd, execCmd)
-		}
-	}
-}
-
-func TestClearEntriesForIP(t *testing.T) {
-	testCases := []struct {
-		name string
-		ip   string
-
-		expectCommand string
-	}{
-		{
-			name: "IPv4",
-			ip:   "10.240.0.3",
-
-			expectCommand: "conntrack -D --orig-dst 10.240.0.3 -p udp",
-		},
-		{
-			name: "IPv6",
-			ip:   "2001:db8::10",
-
-			expectCommand: "conntrack -D --orig-dst 2001:db8::10 -p udp -f ipv6",
-		},
-	}
-
-	for _, tc := range testCases {
-		ct := makeCT(success)
-		if err := ct.ClearEntriesForIP(tc.ip, v1.ProtocolUDP); err != nil {
-			t.Errorf("%s/success: Unexpected error: %v", tc.name, err)
-		}
-		execCommand := ct.getExecutedCommand()
-		if tc.expectCommand != execCommand {
-			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
-		}
-
-		ct = makeCT(nothingToDelete)
-		if err := ct.ClearEntriesForIP(tc.ip, v1.ProtocolUDP); err != nil {
-			t.Errorf("%s/nothing to delete: Unexpected error: %v", tc.name, err)
-		}
-	}
-}
-
-func TestClearEntriesForPort(t *testing.T) {
-	testCases := []struct {
-		name   string
-		port   int
-		isIPv6 bool
-
-		expectCommand string
-	}{
-		{
-			name:   "IPv4",
-			port:   8080,
-			isIPv6: false,
-
-			expectCommand: "conntrack -D -p udp --dport 8080",
-		},
-		{
-			name:   "IPv6",
-			port:   6666,
-			isIPv6: true,
-
-			expectCommand: "conntrack -D -p udp --dport 6666 -f ipv6",
-		},
-	}
-
-	for _, tc := range testCases {
-		ct := makeCT(success)
-		err := ct.ClearEntriesForPort(tc.port, tc.isIPv6, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/success: Unexpected error: %v", tc.name, err)
-		}
-		execCommand := ct.getExecutedCommand()
-		if tc.expectCommand != execCommand {
-			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
-		}
-
-		ct = makeCT(nothingToDelete)
-		err = ct.ClearEntriesForPort(tc.port, tc.isIPv6, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/nothing to delete: Unexpected error: %v", tc.name, err)
-		}
-	}
-}
-
-func TestClearEntriesForNAT(t *testing.T) {
-	testCases := []struct {
-		name   string
-		origin string
-		dest   string
-
-		expectCommand string
-	}{
-		{
-			name:   "IPv4",
-			origin: "1.2.3.4",
-			dest:   "10.20.30.40",
-
-			expectCommand: "conntrack -D --orig-dst 1.2.3.4 --dst-nat 10.20.30.40 -p udp",
-		},
-		{
-			name:   "IPv6",
-			origin: "fd00::600d:f00d",
-			dest:   "2001:db8::5",
-
-			expectCommand: "conntrack -D --orig-dst fd00::600d:f00d --dst-nat 2001:db8::5 -p udp -f ipv6",
-		},
-	}
-
-	for _, tc := range testCases {
-		ct := makeCT(success)
-		err := ct.ClearEntriesForNAT(tc.origin, tc.dest, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/success: unexpected error: %v", tc.name, err)
-		}
-		execCommand := ct.getExecutedCommand()
-		if tc.expectCommand != execCommand {
-			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
-		}
-
-		ct = makeCT(nothingToDelete)
-		err = ct.ClearEntriesForNAT(tc.origin, tc.dest, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/nothing to delete: unexpected error: %v", tc.name, err)
-		}
-	}
-}
-
-func TestClearEntriesForPortNAT(t *testing.T) {
-	testCases := []struct {
-		name string
-		port int
-		dest string
-
-		expectCommand string
-	}{
-		{
-			name: "IPv4",
-			port: 30211,
-			dest: "1.2.3.4",
-
-			expectCommand: "conntrack -D -p udp --dport 30211 --dst-nat 1.2.3.4",
-		},
-		{
-			name: "IPv6",
-			port: 30212,
-			dest: "2600:5200::7800",
-
-			expectCommand: "conntrack -D -p udp --dport 30212 --dst-nat 2600:5200::7800 -f ipv6",
-		},
-	}
-
-	for _, tc := range testCases {
-		ct := makeCT(success)
-		err := ct.ClearEntriesForPortNAT(tc.dest, tc.port, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/success: unexpected error: %v", tc.name, err)
-		}
-		execCommand := ct.getExecutedCommand()
-		if tc.expectCommand != execCommand {
-			t.Errorf("%s/success: Expect command: %s, but executed %s", tc.name, tc.expectCommand, execCommand)
-		}
-
-		ct = makeCT(nothingToDelete)
-		err = ct.ClearEntriesForPortNAT(tc.dest, tc.port, v1.ProtocolUDP)
-		if err != nil {
-			t.Errorf("%s/nothing to delete: unexpected error: %v", tc.name, err)
-		}
+		})
 	}
 }

@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	flowcontrolv1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
+	applyconfigurationsflowcontrolv1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,38 @@ type PriorityLevelConfigurationsGetter interface {
 
 // PriorityLevelConfigurationInterface has methods to work with PriorityLevelConfiguration resources.
 type PriorityLevelConfigurationInterface interface {
-	Create(ctx context.Context, priorityLevelConfiguration *v1.PriorityLevelConfiguration, opts metav1.CreateOptions) (*v1.PriorityLevelConfiguration, error)
-	Update(ctx context.Context, priorityLevelConfiguration *v1.PriorityLevelConfiguration, opts metav1.UpdateOptions) (*v1.PriorityLevelConfiguration, error)
+	Create(ctx context.Context, priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, opts metav1.CreateOptions) (*flowcontrolv1.PriorityLevelConfiguration, error)
+	Update(ctx context.Context, priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, opts metav1.UpdateOptions) (*flowcontrolv1.PriorityLevelConfiguration, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1.PriorityLevelConfiguration, opts metav1.UpdateOptions) (*v1.PriorityLevelConfiguration, error)
+	UpdateStatus(ctx context.Context, priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfiguration, opts metav1.UpdateOptions) (*flowcontrolv1.PriorityLevelConfiguration, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PriorityLevelConfiguration, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PriorityLevelConfigurationList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*flowcontrolv1.PriorityLevelConfiguration, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*flowcontrolv1.PriorityLevelConfigurationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PriorityLevelConfiguration, err error)
-	Apply(ctx context.Context, priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PriorityLevelConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *flowcontrolv1.PriorityLevelConfiguration, err error)
+	Apply(ctx context.Context, priorityLevelConfiguration *applyconfigurationsflowcontrolv1.PriorityLevelConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *flowcontrolv1.PriorityLevelConfiguration, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, priorityLevelConfiguration *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PriorityLevelConfiguration, err error)
+	ApplyStatus(ctx context.Context, priorityLevelConfiguration *applyconfigurationsflowcontrolv1.PriorityLevelConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *flowcontrolv1.PriorityLevelConfiguration, err error)
 	PriorityLevelConfigurationExpansion
 }
 
 // priorityLevelConfigurations implements PriorityLevelConfigurationInterface
 type priorityLevelConfigurations struct {
-	*gentype.ClientWithListAndApply[*v1.PriorityLevelConfiguration, *v1.PriorityLevelConfigurationList, *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*flowcontrolv1.PriorityLevelConfiguration, *flowcontrolv1.PriorityLevelConfigurationList, *applyconfigurationsflowcontrolv1.PriorityLevelConfigurationApplyConfiguration]
 }
 
 // newPriorityLevelConfigurations returns a PriorityLevelConfigurations
 func newPriorityLevelConfigurations(c *FlowcontrolV1Client) *priorityLevelConfigurations {
 	return &priorityLevelConfigurations{
-		gentype.NewClientWithListAndApply[*v1.PriorityLevelConfiguration, *v1.PriorityLevelConfigurationList, *flowcontrolv1.PriorityLevelConfigurationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*flowcontrolv1.PriorityLevelConfiguration, *flowcontrolv1.PriorityLevelConfigurationList, *applyconfigurationsflowcontrolv1.PriorityLevelConfigurationApplyConfiguration](
 			"prioritylevelconfigurations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.PriorityLevelConfiguration { return &v1.PriorityLevelConfiguration{} },
-			func() *v1.PriorityLevelConfigurationList { return &v1.PriorityLevelConfigurationList{} }),
+			func() *flowcontrolv1.PriorityLevelConfiguration { return &flowcontrolv1.PriorityLevelConfiguration{} },
+			func() *flowcontrolv1.PriorityLevelConfigurationList {
+				return &flowcontrolv1.PriorityLevelConfigurationList{}
+			}),
 	}
 }

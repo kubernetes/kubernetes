@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EndpointSliceLister helps list EndpointSlices.
@@ -30,7 +30,7 @@ import (
 type EndpointSliceLister interface {
 	// List lists all EndpointSlices in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.EndpointSlice, err error)
+	List(selector labels.Selector) (ret []*discoveryv1.EndpointSlice, err error)
 	// EndpointSlices returns an object that can list and get EndpointSlices.
 	EndpointSlices(namespace string) EndpointSliceNamespaceLister
 	EndpointSliceListerExpansion
@@ -38,17 +38,17 @@ type EndpointSliceLister interface {
 
 // endpointSliceLister implements the EndpointSliceLister interface.
 type endpointSliceLister struct {
-	listers.ResourceIndexer[*v1.EndpointSlice]
+	listers.ResourceIndexer[*discoveryv1.EndpointSlice]
 }
 
 // NewEndpointSliceLister returns a new EndpointSliceLister.
 func NewEndpointSliceLister(indexer cache.Indexer) EndpointSliceLister {
-	return &endpointSliceLister{listers.New[*v1.EndpointSlice](indexer, v1.Resource("endpointslice"))}
+	return &endpointSliceLister{listers.New[*discoveryv1.EndpointSlice](indexer, discoveryv1.Resource("endpointslice"))}
 }
 
 // EndpointSlices returns an object that can list and get EndpointSlices.
 func (s *endpointSliceLister) EndpointSlices(namespace string) EndpointSliceNamespaceLister {
-	return endpointSliceNamespaceLister{listers.NewNamespaced[*v1.EndpointSlice](s.ResourceIndexer, namespace)}
+	return endpointSliceNamespaceLister{listers.NewNamespaced[*discoveryv1.EndpointSlice](s.ResourceIndexer, namespace)}
 }
 
 // EndpointSliceNamespaceLister helps list and get EndpointSlices.
@@ -56,15 +56,15 @@ func (s *endpointSliceLister) EndpointSlices(namespace string) EndpointSliceName
 type EndpointSliceNamespaceLister interface {
 	// List lists all EndpointSlices in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.EndpointSlice, err error)
+	List(selector labels.Selector) (ret []*discoveryv1.EndpointSlice, err error)
 	// Get retrieves the EndpointSlice from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.EndpointSlice, error)
+	Get(name string) (*discoveryv1.EndpointSlice, error)
 	EndpointSliceNamespaceListerExpansion
 }
 
 // endpointSliceNamespaceLister implements the EndpointSliceNamespaceLister
 // interface.
 type endpointSliceNamespaceLister struct {
-	listers.ResourceIndexer[*v1.EndpointSlice]
+	listers.ResourceIndexer[*discoveryv1.EndpointSlice]
 }

@@ -391,15 +391,13 @@ func TestKMSvsEnablement(t *testing.T) {
 	}
 	tts := []struct {
 		name            string
-		kmsv2Enabled    bool
 		expectedErr     string
 		expectedTimeout time.Duration
 		config          apiserver.EncryptionConfiguration
 		wantV2Used      bool
 	}{
 		{
-			name:         "with kmsv1 and kmsv2, KMSv2=true",
-			kmsv2Enabled: true,
+			name: "with kmsv1 and kmsv2, KMSv2=true",
 			config: apiserver.EncryptionConfiguration{
 				Resources: []apiserver.ResourceConfiguration{
 					{
@@ -440,8 +438,6 @@ func TestKMSvsEnablement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Just testing KMSv2 feature flag
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, tt.kmsv2Enabled)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel() // cancel this upfront so the kms v2 checks do not block
@@ -1428,7 +1424,15 @@ func TestWildcardStructure(t *testing.T) {
 			for resource, expectedTransformerName := range tc.expectedResourceTransformers {
 				transformer := transformerFromOverrides(transformers, schema.ParseGroupResource(resource))
 				transformerName := string(
-					reflect.ValueOf(transformer).Elem().FieldByName("transformers").Index(0).FieldByName("Prefix").Bytes(),
+					reflect.ValueOf(transformer).
+						Elem().
+						FieldByName("delegate").
+						Elem().
+						Elem().
+						FieldByName("transformers").
+						Index(0).
+						FieldByName("Prefix").
+						Bytes(),
 				)
 
 				if transformerName != expectedTransformerName {

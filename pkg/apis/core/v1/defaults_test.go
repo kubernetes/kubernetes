@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -185,7 +186,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 		if !reflect.DeepEqual(expectedDefaults, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expectedDefaults, defaults))
+			t.Log(cmp.Diff(expectedDefaults, defaults))
 		}
 	})
 	t.Run("hostnet PodTemplateSpec with ports", func(t *testing.T) {
@@ -223,7 +224,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		}()
 		if !reflect.DeepEqual(expected, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expected, defaults))
+			t.Log(cmp.Diff(expected, defaults))
 		}
 	})
 }
@@ -374,7 +375,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(cmp.Diff(expectedDefaults, defaults))
+		t.Log(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 
@@ -1260,6 +1261,9 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)

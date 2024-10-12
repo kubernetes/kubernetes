@@ -191,9 +191,13 @@ var _ = SIGDescribe("Mount propagation", func() {
 		cmd = "pidof kubelet"
 		kubeletPid, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 		framework.ExpectNoError(err, "Checking kubelet pid")
-		kubeletPid = strings.TrimSuffix(kubeletPid, "\n")
-		gomega.Expect(strings.Count(kubeletPid, " ")).To(gomega.Equal(0), "kubelet should only have a single PID in the system (pidof returned %q)", kubeletPid)
-		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPid)
+		framework.Logf("pidof kubelet returns %s", kubeletPid)
+		// In rare cases in the CI, we are seeing two pids for kubelet.
+		// We did some investigating and the last entry of this list is the one that we want
+		// Higher pids are more likely to be created after the first one
+		kubeletPids := strings.Split(strings.TrimSuffix(kubeletPid, "\n"), " ")
+		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPids[len(kubeletPids)-1])
+		framework.Logf(enterKubeletMountNS)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {

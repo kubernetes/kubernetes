@@ -74,15 +74,12 @@ func addSwapCheck(checks []Checker) []Checker {
 // addExecChecks adds checks that verify if certain binaries are in PATH
 func addExecChecks(checks []Checker, execer utilsexec.Interface) []Checker {
 	checks = append(checks,
-		InPathCheck{executable: "crictl", mandatory: false, exec: execer},
 		InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 		InPathCheck{executable: "ip", mandatory: true, exec: execer},
 		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 		InPathCheck{executable: "mount", mandatory: true, exec: execer},
 		InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
-		InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
 		InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
-		InPathCheck{executable: "socat", mandatory: false, exec: execer},
 		InPathCheck{executable: "tc", mandatory: false, exec: execer},
 		InPathCheck{executable: "touch", mandatory: false, exec: execer})
 	return checks

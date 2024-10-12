@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
-	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
+	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 )
 
 // APIServiceLister helps list APIServices.
@@ -30,19 +30,19 @@ import (
 type APIServiceLister interface {
 	// List lists all APIServices in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.APIService, err error)
+	List(selector labels.Selector) (ret []*apiregistrationv1beta1.APIService, err error)
 	// Get retrieves the APIService from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.APIService, error)
+	Get(name string) (*apiregistrationv1beta1.APIService, error)
 	APIServiceListerExpansion
 }
 
 // aPIServiceLister implements the APIServiceLister interface.
 type aPIServiceLister struct {
-	listers.ResourceIndexer[*v1beta1.APIService]
+	listers.ResourceIndexer[*apiregistrationv1beta1.APIService]
 }
 
 // NewAPIServiceLister returns a new APIServiceLister.
 func NewAPIServiceLister(indexer cache.Indexer) APIServiceLister {
-	return &aPIServiceLister{listers.New[*v1beta1.APIService](indexer, v1beta1.Resource("apiservice"))}
+	return &aPIServiceLister{listers.New[*apiregistrationv1beta1.APIService](indexer, apiregistrationv1beta1.Resource("apiservice"))}
 }

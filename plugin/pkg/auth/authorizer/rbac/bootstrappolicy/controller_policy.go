@@ -186,11 +186,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 			rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-			// glusterfs
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			eventsRule(),
+
+			// volume plugin - portworx
+			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 
@@ -281,19 +280,15 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch", "get", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-
-			// glusterfs
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "create", "update", "delete").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "create", "delete").Groups(legacyGroup).Resources("services").RuleOrDie(),
-			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-			// openstack
-			rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			eventsRule(),
 
 			// recyclerClient.WatchPod
 			rbacv1helpers.NewRule("watch").Groups(legacyGroup).Resources("events").RuleOrDie(),
 
-			eventsRule(),
+			// volume plugin - portworx
+			rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("services").RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
@@ -383,13 +378,14 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("update").Groups(appsGroup).Resources("statefulsets/finalizers").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "create", "delete", "update", "patch", "list", "watch").Groups(appsGroup).Resources("controllerrevisions").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "create").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "create", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 				eventsRule(),
 			},
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update", "delete").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie())
 		}
 
 		return role
@@ -446,18 +442,17 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidatingAdmissionPolicy) {
-		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(admissionRegistrationGroup).
-					Resources("validatingadmissionpolicies").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "patch", "update").Groups(admissionRegistrationGroup).
-					Resources("validatingadmissionpolicies/status").RuleOrDie(),
-				eventsRule(),
-			},
-		})
-	}
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(admissionRegistrationGroup).
+				Resources("validatingadmissionpolicies").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "patch", "update").Groups(admissionRegistrationGroup).
+				Resources("validatingadmissionpolicies/status").RuleOrDie(),
+			eventsRule(),
+		},
+	})
+
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{

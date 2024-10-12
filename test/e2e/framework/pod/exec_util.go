@@ -68,8 +68,7 @@ func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).
-		SubResource("exec").
-		Param("container", options.ContainerName)
+		SubResource("exec")
 	req.VersionedParams(&v1.PodExecOptions{
 		Container: options.ContainerName,
 		Command:   options.Command,

@@ -22,7 +22,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -32,12 +32,12 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v1beta1.CronJob)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v1beta1.CronJobList)) })
+	scheme.AddTypeDefaultingFunc(&batchv1beta1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*batchv1beta1.CronJob)) })
+	scheme.AddTypeDefaultingFunc(&batchv1beta1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*batchv1beta1.CronJobList)) })
 	return nil
 }
 
-func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
+func SetObjectDefaults_CronJob(in *batchv1beta1.CronJob) {
 	SetDefaults_CronJob(in)
 	corev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
@@ -335,7 +335,7 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 	corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
 }
 
-func SetObjectDefaults_CronJobList(in *v1beta1.CronJobList) {
+func SetObjectDefaults_CronJobList(in *batchv1beta1.CronJobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CronJob(a)

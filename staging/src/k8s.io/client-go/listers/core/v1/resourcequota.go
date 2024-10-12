@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ResourceQuotaLister helps list ResourceQuotas.
@@ -30,7 +30,7 @@ import (
 type ResourceQuotaLister interface {
 	// List lists all ResourceQuotas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ResourceQuota, err error)
+	List(selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
 	// ResourceQuotas returns an object that can list and get ResourceQuotas.
 	ResourceQuotas(namespace string) ResourceQuotaNamespaceLister
 	ResourceQuotaListerExpansion
@@ -38,17 +38,17 @@ type ResourceQuotaLister interface {
 
 // resourceQuotaLister implements the ResourceQuotaLister interface.
 type resourceQuotaLister struct {
-	listers.ResourceIndexer[*v1.ResourceQuota]
+	listers.ResourceIndexer[*corev1.ResourceQuota]
 }
 
 // NewResourceQuotaLister returns a new ResourceQuotaLister.
 func NewResourceQuotaLister(indexer cache.Indexer) ResourceQuotaLister {
-	return &resourceQuotaLister{listers.New[*v1.ResourceQuota](indexer, v1.Resource("resourcequota"))}
+	return &resourceQuotaLister{listers.New[*corev1.ResourceQuota](indexer, corev1.Resource("resourcequota"))}
 }
 
 // ResourceQuotas returns an object that can list and get ResourceQuotas.
 func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaNamespaceLister {
-	return resourceQuotaNamespaceLister{listers.NewNamespaced[*v1.ResourceQuota](s.ResourceIndexer, namespace)}
+	return resourceQuotaNamespaceLister{listers.NewNamespaced[*corev1.ResourceQuota](s.ResourceIndexer, namespace)}
 }
 
 // ResourceQuotaNamespaceLister helps list and get ResourceQuotas.
@@ -56,15 +56,15 @@ func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaName
 type ResourceQuotaNamespaceLister interface {
 	// List lists all ResourceQuotas in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ResourceQuota, err error)
+	List(selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
 	// Get retrieves the ResourceQuota from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ResourceQuota, error)
+	Get(name string) (*corev1.ResourceQuota, error)
 	ResourceQuotaNamespaceListerExpansion
 }
 
 // resourceQuotaNamespaceLister implements the ResourceQuotaNamespaceLister
 // interface.
 type resourceQuotaNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ResourceQuota]
+	listers.ResourceIndexer[*corev1.ResourceQuota]
 }

@@ -177,7 +177,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 						t.Fatalf("GuaranteedUpdate failed: %v", err)
 					}
 				} else {
-					err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil)
+					err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 					if err != nil {
 						t.Fatalf("Delete failed: %v", err)
 					}
@@ -294,7 +294,7 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); err != nil {
+	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 	testCheckEventType(t, w, watch.Deleted)
@@ -498,7 +498,7 @@ func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T
 	}
 
 	deletedObj := &example.Pod{}
-	if err := store.Delete(ctx, key, deletedObj, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil); err != nil {
+	if err := store.Delete(ctx, key, deletedObj, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -1460,6 +1460,21 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 				createdPods = append(createdPods, out)
 			}
 
+			if len(createdPods) > 0 {
+				// this list call ensures that the cache has seen the created pods.
+				// this makes the watch request below deterministic.
+				listObject := &example.PodList{}
+				opts := storage.ListOptions{
+					Predicate:            storage.Everything,
+					Recursive:            true,
+					ResourceVersion:      createdPods[len(createdPods)-1].ResourceVersion,
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				}
+				err := store.GetList(ctx, fmt.Sprintf("/pods/%s", ns), opts, listObject)
+				require.NoError(t, err)
+				require.Len(t, listObject.Items, len(createdPods))
+			}
+
 			if scenario.useCurrentRV {
 				currentStorageRV, err := storage.GetCurrentResourceVersionFromStorage(ctx, store, func() runtime.Object { return &example.PodList{} }, "/pods", "")
 				require.NoError(t, err)
@@ -1478,7 +1493,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			defer w.Stop()
 
 			// make sure we only get initial events
-			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
+			TestCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
 
 			// make sure that the actual bookmark has at least RV >= to the expected one
 			if scenario.expectedInitialEventsBookmarkWithMinimalRV != nil {
@@ -1512,8 +1527,9 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 				require.NoError(t, err, "failed to add a pod: %v")
 				createdPods = append(createdPods, out)
 			}
-			testCheckResultsInStrictOrder(t, w, scenario.expectedEventsAfterEstablishingWatch(createdPods))
-			testCheckNoMoreResults(t, w)
+			ignoreEventsFn := func(event watch.Event) bool { return event.Type == watch.Bookmark }
+			testCheckResultWithIgnoreFunc(t, w, scenario.expectedEventsAfterEstablishingWatch(createdPods), ignoreEventsFn)
+			TestCheckNoMoreResultsWithIgnoreFunc(t, w, ignoreEventsFn)
 		})
 	}
 }
@@ -1567,8 +1583,63 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 
 	// make sure we only get initial events from the first ns
 	// followed by the bookmark with the global RV
-	testCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(initialPods, otherNsPod.ResourceVersion))
-	testCheckNoMoreResults(t, w)
+	TestCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(initialPods, otherNsPod.ResourceVersion))
+	TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
+}
+
+func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.Interface) {
+	trueVal := true
+	expectedInitialEventsInStrictOrder := func(initialPod *example.Pod, globalResourceVersion string) []watch.Event {
+		watchEvents := []watch.Event{}
+		watchEvents = append(watchEvents, watch.Event{Type: watch.Added, Object: initialPod})
+		watchEvents = append(watchEvents, watch.Event{Type: watch.Bookmark, Object: &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: globalResourceVersion,
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+			},
+		}})
+		return watchEvents
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+
+	// add the pod for which the field selector will be constructed
+	ns := "ns-foo"
+	expectedPod := &example.Pod{}
+	initialPod := makePod("1")
+	initialPod.Namespace = ns
+	err := store.Create(ctx, computePodKey(initialPod), initialPod, expectedPod, 0)
+	require.NoError(t, err, "failed to add a pod: %v")
+
+	// add more pods that won't match the field selector
+	lastAddedPod := &example.Pod{}
+	for _, otherPod := range []*example.Pod{makePod("2"), makePod("3"), makePod("4"), makePod("5")} {
+		otherPod.Namespace = ns
+		err = store.Create(ctx, computePodKey(otherPod), otherPod, lastAddedPod, 0)
+		require.NoError(t, err, "failed to add a pod: %v")
+	}
+
+	opts := storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name=pod-1"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
+		},
+		Recursive: true,
+	}
+	opts.SendInitialEvents = &trueVal
+	opts.Predicate.AllowWatchBookmarks = true
+
+	w, err := store.Watch(context.Background(), "/pods", opts)
+	require.NoError(t, err, "failed to create watch: %v")
+	defer w.Stop()
+
+	// make sure we only get a single pod matching the field selector
+	// followed by the bookmark with the global RV
+	TestCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(expectedPod, lastAddedPod.ResourceVersion))
+	TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
 func makePod(namePrefix string) *example.Pod {

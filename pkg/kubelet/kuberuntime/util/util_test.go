@@ -22,7 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -162,10 +165,25 @@ func TestPodSandboxChanged(t *testing.T) {
 	}
 }
 
+type fakeRuntimeHandlerResolver struct{}
+
+func (*fakeRuntimeHandlerResolver) LookupRuntimeHandler(s *string) (string, error) {
+	return "", nil
+}
+
 func TestNamespacesForPod(t *testing.T) {
+	usernsIDs := &runtimeapi.IDMapping{
+		HostId:      65536,
+		ContainerId: 0,
+		Length:      65536,
+	}
+
 	for desc, test := range map[string]struct {
-		input    *v1.Pod
-		expected *runtimeapi.NamespaceOption
+		input           *v1.Pod
+		runtimeHandlers map[string]kubecontainer.RuntimeHandler
+		usernsEnabled   bool
+		expected        *runtimeapi.NamespaceOption
+		expErr          bool
 	}{
 		"nil pod -> default v1 namespaces": {
 			input: nil,
@@ -221,11 +239,84 @@ func TestNamespacesForPod(t *testing.T) {
 				Pid:     runtimeapi.NamespaceMode_CONTAINER,
 			},
 		},
+		"hostUsers: false and feature enabled": {
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &[]bool{false}[0],
+				},
+			},
+			usernsEnabled: true,
+			runtimeHandlers: map[string]kubecontainer.RuntimeHandler{
+				"": {
+					SupportsUserNamespaces: true,
+				},
+			},
+			expected: &runtimeapi.NamespaceOption{
+				Ipc:     runtimeapi.NamespaceMode_POD,
+				Network: runtimeapi.NamespaceMode_POD,
+				Pid:     runtimeapi.NamespaceMode_CONTAINER,
+				UsernsOptions: &runtimeapi.UserNamespace{
+					Mode: runtimeapi.NamespaceMode_POD,
+					Uids: []*runtimeapi.IDMapping{usernsIDs},
+					Gids: []*runtimeapi.IDMapping{usernsIDs},
+				},
+			},
+		},
+		// The hostUsers field can't be set to any value if the feature is disabled.
+		"hostUsers: false and feature disabled --> error": {
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &[]bool{false}[0],
+				},
+			},
+			usernsEnabled: false,
+			expErr:        true,
+		},
+		// The hostUsers field can't be set to any value if the feature is disabled.
+		"hostUsers: true and feature disabled --> error": {
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &[]bool{true}[0],
+				},
+			},
+			usernsEnabled: false,
+			expErr:        true,
+		},
+		"error if runtime handler not found": {
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &[]bool{false}[0],
+				},
+			},
+			usernsEnabled: true,
+			runtimeHandlers: map[string]kubecontainer.RuntimeHandler{
+				"other": {},
+			},
+			expErr: true,
+		},
+		"error if runtime handler does not support userns": {
+			input: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &[]bool{false}[0],
+				},
+			},
+			usernsEnabled: true,
+			expErr:        true,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			actual, err := NamespacesForPod(test.input, &kubecontainertest.FakeRuntimeHelper{}, nil)
-			require.NoError(t, err)
-			require.Equal(t, test.expected, actual)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, test.usernsEnabled)
+
+			fakeRuntimeHelper := kubecontainertest.FakeRuntimeHelper{
+				RuntimeHandlers: test.runtimeHandlers,
+			}
+			actual, err := NamespacesForPod(test.input, &fakeRuntimeHelper, &fakeRuntimeHandlerResolver{})
+			if test.expErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.expected, actual)
+			}
 		})
 	}
 }

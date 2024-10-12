@@ -146,8 +146,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must keep pod in pending state if NodePrepareResources times out", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unblock := kubeletPlugin.BlockNodePrepareResources()
-			defer unblock()
+			unblockNodePrepareResources := kubeletPlugin.BlockNodePrepareResources()
+			defer unblockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -166,7 +166,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must run pod if NodePrepareResources fails and then succeeds", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
+			unsetNodePrepareResourcesFailureMode := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -178,7 +178,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for NodePrepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesFailed)
 
-			unset()
+			unsetNodePrepareResourcesFailureMode()
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -191,7 +191,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must run pod if NodeUnprepareResources fails and then succeeds", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
+			unsetNodeUnprepareResourcesFailureMode := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
@@ -200,7 +200,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
-			unset()
+			unsetNodeUnprepareResourcesFailureMode()
 
 			ginkgo.By("wait for NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -213,7 +213,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must retry NodePrepareResources after Kubelet restart", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
+			unsetNodePrepareResourcesFailureMode := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -228,7 +228,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("stop Kubelet")
 			startKubelet := stopKubelet()
 
-			unset()
+			unsetNodePrepareResourcesFailureMode()
 
 			ginkgo.By("start Kubelet")
 			startKubelet()
@@ -244,7 +244,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must retry NodeUnprepareResources after Kubelet restart", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
+			unsetNodeUnprepareResourcesFailureMode := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			ginkgo.By("wait for NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -255,7 +255,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("stop Kubelet")
 			startKubelet := stopKubelet()
 
-			unset()
+			unsetNodeUnprepareResourcesFailureMode()
 
 			ginkgo.By("start Kubelet")
 			startKubelet()
@@ -271,7 +271,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
+			unsetNodeUnprepareResourcesFailureMode := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
@@ -286,7 +286,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
-			unset()
+			unsetNodeUnprepareResourcesFailureMode()
 
 			ginkgo.By("wait for NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -295,7 +295,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
+			unsetNodeUnprepareResourcesFailureMode := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
@@ -317,7 +317,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
-			unset()
+			unsetNodeUnprepareResourcesFailureMode()
 
 			ginkgo.By("wait for NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -326,7 +326,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must not call NodePrepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
 			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
-			unblock := kubeletPlugin.BlockNodePrepareResources()
+			unblockNodePrepareResources := kubeletPlugin.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -341,7 +341,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("delete pod")
 			e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
 
-			unblock()
+			unblockNodePrepareResources()
 
 			ginkgo.By("start Kubelet")
 			startKubelet()
@@ -386,7 +386,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must run pod if NodePrepareResources fails for one plugin and then succeeds", func(ctx context.Context) {
 			_, kubeletPlugin2 := start(ctx)
 
-			unset := kubeletPlugin2.SetNodePrepareResourcesFailureMode()
+			unsetNodePrepareResourcesFailureMode := kubeletPlugin2.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -398,7 +398,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for plugin2 NodePrepareResources call to fail")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesFailed)
 
-			unset()
+			unsetNodePrepareResourcesFailureMode()
 
 			ginkgo.By("wait for plugin2 NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -411,7 +411,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must run pod if NodeUnprepareResources fails for one plugin and then succeeds", func(ctx context.Context) {
 			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unset := kubeletPlugin2.SetNodeUnprepareResourcesFailureMode()
+			unsetNodeUnprepareResourcesFailureMode := kubeletPlugin2.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for plugin1 NodePrepareResources call to succeed")
@@ -423,7 +423,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("wait for plugin2 NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
-			unset()
+			unsetNodeUnprepareResourcesFailureMode()
 
 			ginkgo.By("wait for plugin2 NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -436,7 +436,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must run pod if NodePrepareResources is in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
 			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unblock := kubeletPlugin1.BlockNodePrepareResources()
+			unblockNodePrepareResources := kubeletPlugin1.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -448,7 +448,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("restart Kubelet")
 			restartKubelet(true)
 
-			unblock()
+			unblockNodePrepareResources()
 
 			ginkgo.By("wait for plugin2 NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -461,7 +461,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must call NodeUnprepareResources again if it's in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
 			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unblock := kubeletPlugin2.BlockNodeUnprepareResources()
+			unblockNodeUnprepareResources := kubeletPlugin2.BlockNodeUnprepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for plugin1 NodePrepareResources call to succeed")
@@ -473,7 +473,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.By("restart Kubelet")
 			restartKubelet(true)
 
-			unblock()
+			unblockNodeUnprepareResources()
 
 			ginkgo.By("wait for plugin2 NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)

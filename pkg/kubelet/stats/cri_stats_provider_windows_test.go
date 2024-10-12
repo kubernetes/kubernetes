@@ -39,9 +39,24 @@ type fakeNetworkStatsProvider struct {
 	containers []containerStats
 }
 
+// NetworkStats holds the network statistics for a container
+type fakeNetworkStats struct {
+	BytesReceived          uint64
+	BytesSent              uint64
+	PacketsReceived        uint64
+	PacketsSent            uint64
+	DroppedPacketsIncoming uint64
+	DroppedPacketsOutgoing uint64
+	EndpointId             string
+	InstanceId             string
+}
+
+type fakeContainerProperties struct {
+	ID string
+}
 type containerStats struct {
-	container hcsshim.ContainerProperties
-	hcsStats  []hcsshim.NetworkStats
+	container fakeContainerProperties
+	hcsStats  []fakeNetworkStats
 }
 
 func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
@@ -105,9 +120,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -117,9 +132,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -170,9 +185,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -182,9 +197,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -194,9 +209,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c3",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 3,
 								BytesSent:     30,
@@ -262,9 +277,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -280,9 +295,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -333,9 +348,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -351,9 +366,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,

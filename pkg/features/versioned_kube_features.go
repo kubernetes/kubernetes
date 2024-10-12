@@ -17,18 +17,734 @@ limitations under the License.
 package features
 
 import (
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apimachinery/pkg/util/version"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/component-base/featuregate"
+	kcmfeatures "k8s.io/controller-manager/pkg/features"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
-// To add a new feature, define a key for it and add it here. The features will be
+// To add a new feature, define a key for it in pkg/features/kube_features.go and add it here. The features will be
 // available throughout Kubernetes binaries.
+// For features available via specific kubernetes components like apiserver,
+// cloud-controller-manager, etc find the respective kube_features.go file
+// (eg:staging/src/apiserver/pkg/features/kube_features.go), define the versioned
+// feature gate there, and reference it in this file.
+// To support n-3 compatibility version, features may only be removed 3 releases after graduation.
 //
-// Entries are separated from each other with blank lines to avoid sweeping gofmt changes
-// when adding or removing one entry.
+// Entries are alphabetized.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	// Example:
-	// genericfeatures.EmulationVersion: {
-	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-	// },
+	AllowDNSOnlyNodeCSR: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	AllowInsecureKubeletCertificateSigningRequests: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	AllowOverwriteTerminationGracePeriodSeconds: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+	AnyVolumeDataSource: {
+		{Version: version.MustParse("1.18"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	AppArmor: {
+		{Version: version.MustParse("1.4"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	AppArmorFields: {
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	AuthorizeNodeWithSelectors: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	kcmfeatures.CloudControllerManagerWebhook: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ClusterTrustBundle: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ClusterTrustBundleProjection: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ContainerCheckpoint: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CPUCFSQuotaPeriod: {
+		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	CPUManager: {
+		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.10"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
+	},
+
+	CPUManagerPolicyAlphaOptions: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	CPUManagerPolicyBetaOptions: {
+		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CPUManagerPolicyOptions: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.23"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CronJobsScheduledAnnotation: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
+	// unintentionally on either side:
+	apiextensionsfeatures.CRDValidationRatcheting: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	CrossNamespaceVolumeDataSource: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	CSIMigrationPortworx: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta}, // On by default (requires Portworx CSI driver)
+	},
+
+	CSIVolumeHealth: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
+	// unintentionally on either side:
+	apiextensionsfeatures.CustomResourceFieldSelectors: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+	},
+
+	DevicePluginCDIDevices: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	DisableAllocatorDualWrite: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha}, // remove after MultiCIDRServiceAllocator is GA
+	},
+
+	DisableCloudProviders: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	DisableKubeletCloudCredentialProviders: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	DisableNodeKubeProxyVersion: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	DRAControlPlaneController: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DynamicResourceAllocation: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ElasticIndexedJob: {
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.32
+	},
+
+	EventedPLEG: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ExecProbeTimeout: {
+		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
+	},
+
+	genericfeatures.AdmissionWebhookMatchConditions: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.AggregatedDiscoveryEndpoint: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.AnonymousAuthConfigurableEndpoints: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.APIListChunking: {
+		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.9"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.APIResponseCompression: {
+		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.APIServerIdentity: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.APIServerTracing: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.APIServingWithRoutine: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.AuthorizeWithSelectors: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.ConcurrentWatchObjectDecode: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.ConsistentListFromCache: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.CoordinatedLeaderElection: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.EfficientWatchResumption: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.21"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.KMSv1: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	genericfeatures.MutatingAdmissionPolicy: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.OpenAPIEnums: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.RemainingItemCount: {
+		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.ResilientWatchCacheInitialization: {
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.RetryGenerateName: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+	},
+
+	genericfeatures.SeparateCacheWatchRPC: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.StorageVersionAPI: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.StorageVersionHash: {
+		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.StrictCostEnforcementForVAP: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.StrictCostEnforcementForWebhooks: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.StructuredAuthenticationConfiguration: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.StructuredAuthorizationConfiguration: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.UnauthenticatedHTTP2DOSMitigation: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.WatchBookmark: {
+		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.17"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	genericfeatures.WatchCacheInitializationPostStartHook: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.WatchFromStorageWithoutResourceVersion: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	genericfeatures.WatchList: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	genericfeatures.ZeroLimitedNominalConcurrencyShares: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	GracefulNodeShutdown: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.21"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	GracefulNodeShutdownBasedOnPodPriority: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	HonorPVReclaimPolicy: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	HPAContainerMetrics: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+	},
+
+	HPAScaleToZero: {
+		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ImageMaximumGCAge: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ImageVolume: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	InPlacePodVerticalScaling: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	InTreePluginPortworxUnregister: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	JobBackoffLimitPerIndex: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	JobManagedBy: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	JobPodFailurePolicy: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	JobPodReplacementPolicy: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	JobSuccessPolicy: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	KubeletCgroupDriverFromCRI: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	KubeletInUserNamespace: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	KubeletPodResourcesDynamicResources: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	KubeletPodResourcesGet: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	KubeletRegistrationGetOnExistsOnly: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	KubeletSeparateDiskGC: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	KubeletTracing: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	KubeProxyDrainingTerminatingNodes: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31; remove in 1.33
+	},
+
+	LoadBalancerIPMode: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {
+		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	LogarithmicScaleDown: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	MatchLabelKeysInPodAffinity: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	MatchLabelKeysInPodTopologySpread: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	MaxUnavailableStatefulSet: {
+		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	MemoryManager: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	MemoryQoS: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	MultiCIDRServiceAllocator: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	NFTablesProxyMode: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	NodeInclusionPolicyInPodTopologySpread: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	NodeLogQuery: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	NodeSwap: {
+		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PDBUnhealthyPodEvictionPolicy: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	PersistentVolumeLastPhaseTransitionTime: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	PodAndContainerStatsFromCRI: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	PodDeletionCost: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PodDisruptionConditions: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+	},
+
+	PodHostIPs: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+	},
+
+	PodIndexLabel: {
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PodLifecycleSleepAction: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PodReadyToStartContainersCondition: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PodSchedulingReadiness: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
+	},
+
+	PortForwardWebsockets: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ProcMountType: {
+		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	QOSReserved: {
+		{Version: version.MustParse("1.11"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	RecoverVolumeExpansionFailure: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	RecursiveReadOnlyMounts: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RelaxedDNSSearchValidation: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	RelaxedEnvironmentVariableValidation: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ReloadKubeletServerCertificateFile: {
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ResourceHealthStatus: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	RotateKubeletServerCertificate: {
+		{Version: version.MustParse("1.7"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.12"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	RuntimeClassInImageCriAPI: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	SchedulerQueueingHints: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	SELinuxMount: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	SELinuxMountReadWriteOncePod: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	SeparateTaintEvictionController: {
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StorageNamespaceIndex: {
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ServiceAccountTokenJTI: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ServiceAccountTokenNodeBinding: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ServiceAccountTokenNodeBindingValidation: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ServiceAccountTokenPodNodeInfo: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ServiceTrafficDistribution: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	SidecarContainers: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	SizeMemoryBackedVolumes: {
+		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StatefulSetAutoDeletePVC: {
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StatefulSetStartOrdinal: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.33
+	},
+
+	StorageVersionMigrator: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	SupplementalGroupsPolicy: {
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	TopologyAwareHints: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	TopologyManagerPolicyAlphaOptions: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	TopologyManagerPolicyBetaOptions: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	TopologyManagerPolicyOptions: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	TranslateStreamCloseWebsocketRequests: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	UnknownVersionInteroperabilityProxy: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	UserNamespacesPodSecurityStandards: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	UserNamespacesSupport: {
+		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	VolumeAttributesClass: {
+		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	VolumeCapacityPriority: {
+		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	WinDSR: {
+		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	WinOverlay: {
+		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.20"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WindowsHostNetwork: {
+		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Alpha},
+	},
 }

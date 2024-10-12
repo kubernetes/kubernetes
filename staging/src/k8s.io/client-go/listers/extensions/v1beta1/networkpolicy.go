@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NetworkPolicyLister helps list NetworkPolicies.
@@ -30,7 +30,7 @@ import (
 type NetworkPolicyLister interface {
 	// List lists all NetworkPolicies in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.NetworkPolicy, err error)
+	List(selector labels.Selector) (ret []*extensionsv1beta1.NetworkPolicy, err error)
 	// NetworkPolicies returns an object that can list and get NetworkPolicies.
 	NetworkPolicies(namespace string) NetworkPolicyNamespaceLister
 	NetworkPolicyListerExpansion
@@ -38,17 +38,17 @@ type NetworkPolicyLister interface {
 
 // networkPolicyLister implements the NetworkPolicyLister interface.
 type networkPolicyLister struct {
-	listers.ResourceIndexer[*v1beta1.NetworkPolicy]
+	listers.ResourceIndexer[*extensionsv1beta1.NetworkPolicy]
 }
 
 // NewNetworkPolicyLister returns a new NetworkPolicyLister.
 func NewNetworkPolicyLister(indexer cache.Indexer) NetworkPolicyLister {
-	return &networkPolicyLister{listers.New[*v1beta1.NetworkPolicy](indexer, v1beta1.Resource("networkpolicy"))}
+	return &networkPolicyLister{listers.New[*extensionsv1beta1.NetworkPolicy](indexer, extensionsv1beta1.Resource("networkpolicy"))}
 }
 
 // NetworkPolicies returns an object that can list and get NetworkPolicies.
 func (s *networkPolicyLister) NetworkPolicies(namespace string) NetworkPolicyNamespaceLister {
-	return networkPolicyNamespaceLister{listers.NewNamespaced[*v1beta1.NetworkPolicy](s.ResourceIndexer, namespace)}
+	return networkPolicyNamespaceLister{listers.NewNamespaced[*extensionsv1beta1.NetworkPolicy](s.ResourceIndexer, namespace)}
 }
 
 // NetworkPolicyNamespaceLister helps list and get NetworkPolicies.
@@ -56,15 +56,15 @@ func (s *networkPolicyLister) NetworkPolicies(namespace string) NetworkPolicyNam
 type NetworkPolicyNamespaceLister interface {
 	// List lists all NetworkPolicies in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.NetworkPolicy, err error)
+	List(selector labels.Selector) (ret []*extensionsv1beta1.NetworkPolicy, err error)
 	// Get retrieves the NetworkPolicy from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.NetworkPolicy, error)
+	Get(name string) (*extensionsv1beta1.NetworkPolicy, error)
 	NetworkPolicyNamespaceListerExpansion
 }
 
 // networkPolicyNamespaceLister implements the NetworkPolicyNamespaceLister
 // interface.
 type networkPolicyNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.NetworkPolicy]
+	listers.ResourceIndexer[*extensionsv1beta1.NetworkPolicy]
 }

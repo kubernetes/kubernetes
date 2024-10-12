@@ -290,7 +290,7 @@ type ResourceSliceList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// +optional
-	metav1.ListMeta `json:"listMeta" protobuf:"bytes,1,opt,name=listMeta"`
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of resource ResourceSlices.
 	Items []ResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
@@ -298,7 +298,7 @@ type ResourceSliceList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -368,6 +368,12 @@ type DeviceClaim struct {
 	// +optional
 	// +listType=atomic
 	Config []DeviceClaimConfiguration `json:"config,omitempty" protobuf:"bytes,3,opt,name=config"`
+
+	// Potential future extension, ignored by older schedulers. This is
+	// fine because scoring allows users to define a preference, without
+	// making it a hard requirement.
+	//
+	// Score *SomeScoringStruct
 }
 
 const (
@@ -558,6 +564,16 @@ type DeviceConstraint struct {
 	// +optional
 	// +oneOf=ConstraintType
 	MatchAttribute *FullyQualifiedName `json:"matchAttribute,omitempty" protobuf:"bytes,2,opt,name=matchAttribute"`
+
+	// Potential future extension, not part of the current design:
+	// A CEL expression which compares different devices and returns
+	// true if they match.
+	//
+	// Because it would be part of a one-of, old schedulers will not
+	// accidentally ignore this additional, for them unknown match
+	// criteria.
+	//
+	// MatchExpression string
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
@@ -799,7 +815,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
@@ -814,7 +830,7 @@ type ResourceClaimList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
@@ -900,7 +916,7 @@ type ResourceClaimSchedulingStatus struct {
 const PodSchedulingNodeListMaxSize = 128
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // PodSchedulingContextList is a collection of Pod scheduling objects.
 type PodSchedulingContextList struct {
@@ -984,7 +1000,7 @@ type DeviceClassConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
@@ -999,7 +1015,7 @@ type DeviceClassList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 //
@@ -1021,7 +1037,7 @@ type ResourceClaimTemplate struct {
 
 // ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 type ResourceClaimTemplateSpec struct {
-	// ObjectMeta may contain labels and annotations that will be copied into the PVC
+	// ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
 	// +optional
@@ -1034,7 +1050,7 @@ type ResourceClaimTemplateSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.26
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {

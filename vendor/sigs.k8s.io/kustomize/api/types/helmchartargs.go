@@ -96,6 +96,9 @@ type HelmChart struct {
 
 	// SkipTests skips tests from templated output.
 	SkipTests bool `json:"skipTests,omitempty" yaml:"skipTests,omitempty"`
+
+	// debug enables debug output from the Helm chart inflator generator.
+	Debug bool `json:"debug,omitempty" yaml:"debug,omitempty"`
 }
 
 // HelmChartArgs contains arguments to helm.
@@ -187,6 +190,9 @@ func (h HelmChart) AsHelmArgs(absChartHome string) []string {
 	}
 	if h.SkipHooks {
 		args = append(args, "--no-hooks")
+	}
+	if h.Debug {
+		args = append(args, "--debug")
 	}
 	return args
 }

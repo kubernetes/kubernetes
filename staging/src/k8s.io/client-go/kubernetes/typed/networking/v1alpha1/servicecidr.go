@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	networkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
+	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,36 @@ type ServiceCIDRsGetter interface {
 
 // ServiceCIDRInterface has methods to work with ServiceCIDR resources.
 type ServiceCIDRInterface interface {
-	Create(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.CreateOptions) (*v1alpha1.ServiceCIDR, error)
-	Update(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.UpdateOptions) (*v1alpha1.ServiceCIDR, error)
+	Create(ctx context.Context, serviceCIDR *networkingv1alpha1.ServiceCIDR, opts v1.CreateOptions) (*networkingv1alpha1.ServiceCIDR, error)
+	Update(ctx context.Context, serviceCIDR *networkingv1alpha1.ServiceCIDR, opts v1.UpdateOptions) (*networkingv1alpha1.ServiceCIDR, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.UpdateOptions) (*v1alpha1.ServiceCIDR, error)
+	UpdateStatus(ctx context.Context, serviceCIDR *networkingv1alpha1.ServiceCIDR, opts v1.UpdateOptions) (*networkingv1alpha1.ServiceCIDR, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ServiceCIDR, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ServiceCIDRList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*networkingv1alpha1.ServiceCIDR, error)
+	List(ctx context.Context, opts v1.ListOptions) (*networkingv1alpha1.ServiceCIDRList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ServiceCIDR, err error)
-	Apply(ctx context.Context, serviceCIDR *networkingv1alpha1.ServiceCIDRApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ServiceCIDR, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *networkingv1alpha1.ServiceCIDR, err error)
+	Apply(ctx context.Context, serviceCIDR *applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration, opts v1.ApplyOptions) (result *networkingv1alpha1.ServiceCIDR, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, serviceCIDR *networkingv1alpha1.ServiceCIDRApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ServiceCIDR, err error)
+	ApplyStatus(ctx context.Context, serviceCIDR *applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration, opts v1.ApplyOptions) (result *networkingv1alpha1.ServiceCIDR, err error)
 	ServiceCIDRExpansion
 }
 
 // serviceCIDRs implements ServiceCIDRInterface
 type serviceCIDRs struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.ServiceCIDR, *v1alpha1.ServiceCIDRList, *networkingv1alpha1.ServiceCIDRApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkingv1alpha1.ServiceCIDR, *networkingv1alpha1.ServiceCIDRList, *applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration]
 }
 
 // newServiceCIDRs returns a ServiceCIDRs
 func newServiceCIDRs(c *NetworkingV1alpha1Client) *serviceCIDRs {
 	return &serviceCIDRs{
-		gentype.NewClientWithListAndApply[*v1alpha1.ServiceCIDR, *v1alpha1.ServiceCIDRList, *networkingv1alpha1.ServiceCIDRApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkingv1alpha1.ServiceCIDR, *networkingv1alpha1.ServiceCIDRList, *applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration](
 			"servicecidrs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.ServiceCIDR { return &v1alpha1.ServiceCIDR{} },
-			func() *v1alpha1.ServiceCIDRList { return &v1alpha1.ServiceCIDRList{} }),
+			func() *networkingv1alpha1.ServiceCIDR { return &networkingv1alpha1.ServiceCIDR{} },
+			func() *networkingv1alpha1.ServiceCIDRList { return &networkingv1alpha1.ServiceCIDRList{} }),
 	}
 }

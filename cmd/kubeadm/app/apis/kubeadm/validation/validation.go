@@ -609,8 +609,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.FeatureGatesString,                                       // TODO: remove this line when --feature-gates flag is deprecated and dropped from "kubeadm upgrade apply/plan"
-		"api-server-manifest", "controller-manager-manifest", "scheduler-manifest", // TODO: remove this line when these flags are deprecated and dropped from "kubeadm upgrade diff"
+		kubeadmcmdoptions.PrintManifest,
 		"allow-missing-template-keys", "output", "show-managed-fields",
 		"print-join-command", "rootfs", "v", "log-file", "yes")
 	if allowedFlags.Has(flagName) {
@@ -783,7 +782,7 @@ func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorLi
 	return allErrs
 }
 
-// ValidateCertValidity validates if the values for cert validity are too big
+// ValidateCertValidity validates if the values for cert validity are too big or don't match
 func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
 	var allErrs []error
 	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
@@ -795,6 +794,13 @@ func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
 		allErrs = append(allErrs,
 			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
 				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
+	}
+	if cfg.CertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod != nil {
+		if cfg.CertificateValidityPeriod.Duration > cfg.CACertificateValidityPeriod.Duration {
+			allErrs = append(allErrs,
+				errors.Errorf("certificateValidityPeriod: the value %v is more than the caCertificateValidityPeriod: %v",
+					cfg.CertificateValidityPeriod.Duration, cfg.CACertificateValidityPeriod.Duration))
+		}
 	}
 	return allErrs
 }

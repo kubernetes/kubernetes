@@ -63,7 +63,7 @@ func TestPruneXML(t *testing.T) {
 	writer := bufio.NewWriter(&output)
 	_ = streamXML(writer, suites)
 	_ = writer.Flush()
-	assert.Equal(t, outputXML, string(output.Bytes()), "xml was not pruned correctly")
+	assert.Equal(t, outputXML, output.String(), "xml was not pruned correctly")
 }
 
 func TestPruneTESTS(t *testing.T) {
@@ -114,5 +114,5 @@ func TestPruneTESTS(t *testing.T) {
 	writer := bufio.NewWriter(&output)
 	_ = streamXML(writer, suites)
 	_ = writer.Flush()
-	assert.Equal(t, outputXML, string(output.Bytes()), "tests in xml was not pruned correctly")
+	assert.Equal(t, outputXML, output.String(), "tests in xml was not pruned correctly")
 }

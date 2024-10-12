@@ -113,6 +113,9 @@ type Config struct {
 
 	// QPS indicates the maximum QPS to the master from this client.
 	// If it's zero, the created RESTClient will use DefaultQPS: 5
+	//
+	// Setting this to a negative value will disable client-side ratelimiting
+	// unless `Ratelimiter` is also set.
 	QPS float32
 
 	// Maximum burst for throttle.

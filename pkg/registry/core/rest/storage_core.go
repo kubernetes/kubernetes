@@ -440,7 +440,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 					if err != nil {
 						return nil, err
 					}
-					rangeRegistry.Range = serviceClusterIPRange.String()
+					rangeRegistry.Range = c.Services.SecondaryClusterIPRange.String()
 					if len(rangeRegistry.ResourceVersion) == 0 {
 						klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
 						err := etcd.CreateOrUpdate(rangeRegistry)

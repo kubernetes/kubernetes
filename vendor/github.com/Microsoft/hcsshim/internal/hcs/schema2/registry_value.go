@@ -14,7 +14,7 @@ type RegistryValue struct {
 
 	Name string `json:"Name,omitempty"`
 
-	Type_ string `json:"Type,omitempty"`
+	Type_ RegistryValueType `json:"Type,omitempty"`
 
 	//  One and only one value type must be set.
 	StringValue string `json:"StringValue,omitempty"`

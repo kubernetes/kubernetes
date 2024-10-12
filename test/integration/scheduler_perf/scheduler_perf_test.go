@@ -19,11 +19,19 @@ limitations under the License.
 package benchmark_test
 
 import (
+	"flag"
+	"strings"
 	"testing"
 
 	benchmark "k8s.io/kubernetes/test/integration/scheduler_perf"
 )
 
+var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
+
 func BenchmarkPerfScheduling(b *testing.B) {
-	benchmark.RunBenchmarkPerfScheduling(b, nil)
+	if testing.Short() {
+		*perfSchedulingLabelFilter += ",+short"
+	}
+
+	benchmark.RunBenchmarkPerfScheduling(b, nil, strings.Split(*perfSchedulingLabelFilter, ","))
 }

@@ -19,12 +19,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
@@ -36,26 +36,26 @@ type NodeMetricsesGetter interface {
 
 // NodeMetricsInterface has methods to work with NodeMetrics resources.
 type NodeMetricsInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NodeMetrics, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NodeMetricsList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*metricsv1alpha1.NodeMetrics, error)
+	List(ctx context.Context, opts v1.ListOptions) (*metricsv1alpha1.NodeMetricsList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	NodeMetricsExpansion
 }
 
 // nodeMetricses implements NodeMetricsInterface
 type nodeMetricses struct {
-	*gentype.ClientWithList[*v1alpha1.NodeMetrics, *v1alpha1.NodeMetricsList]
+	*gentype.ClientWithList[*metricsv1alpha1.NodeMetrics, *metricsv1alpha1.NodeMetricsList]
 }
 
 // newNodeMetricses returns a NodeMetricses
 func newNodeMetricses(c *MetricsV1alpha1Client) *nodeMetricses {
 	return &nodeMetricses{
-		gentype.NewClientWithList[*v1alpha1.NodeMetrics, *v1alpha1.NodeMetricsList](
+		gentype.NewClientWithList[*metricsv1alpha1.NodeMetrics, *metricsv1alpha1.NodeMetricsList](
 			"nodes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.NodeMetrics { return &v1alpha1.NodeMetrics{} },
-			func() *v1alpha1.NodeMetricsList { return &v1alpha1.NodeMetricsList{} }),
+			func() *metricsv1alpha1.NodeMetrics { return &metricsv1alpha1.NodeMetrics{} },
+			func() *metricsv1alpha1.NodeMetricsList { return &metricsv1alpha1.NodeMetricsList{} }),
 	}
 }

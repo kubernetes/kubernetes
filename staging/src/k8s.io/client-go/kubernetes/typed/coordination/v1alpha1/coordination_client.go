@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
-	"k8s.io/client-go/kubernetes/scheme"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -85,7 +85,7 @@ func New(c rest.Interface) *CoordinationV1alpha1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := coordinationv1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()

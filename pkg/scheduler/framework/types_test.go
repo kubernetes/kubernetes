@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1394,13 +1395,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
 					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
 		},
@@ -1409,13 +1410,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
 					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				// PostFilterMsg will be included.
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
@@ -1426,11 +1427,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1439,11 +1440,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1453,11 +1454,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1466,11 +1467,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1479,10 +1480,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Permit on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// There should be only one node here.
 					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
 		},
@@ -1490,10 +1491,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Reserve on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// There should be only one node here.
 					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
@@ -1524,34 +1525,83 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			Name:      "testpod",
 			UID:       types.UID("testpod"),
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:      "c1",
-					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
-				},
-			},
-		},
 		Status: v1.PodStatus{
-			Phase:  v1.PodRunning,
-			Resize: "",
-			ContainerStatuses: []v1.ContainerStatus{
-				{
-					Name:               "c1",
-					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-				},
-			},
+			Phase: v1.PodRunning,
 		},
 	}
 
+	restartAlways := v1.ContainerRestartPolicyAlways
+
+	preparePod := func(pod v1.Pod,
+		requests, allocatedResources,
+		initRequests, initAllocatedResources,
+		sidecarRequests, sidecarAllocatedResources *v1.ResourceList,
+		resizeStatus v1.PodResizeStatus) v1.Pod {
+
+		if requests != nil {
+			pod.Spec.Containers = append(pod.Spec.Containers,
+				v1.Container{
+					Name:      "c1",
+					Resources: v1.ResourceRequirements{Requests: *requests},
+				})
+		}
+		if allocatedResources != nil {
+			pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses,
+				v1.ContainerStatus{
+					Name:               "c1",
+					AllocatedResources: *allocatedResources,
+				})
+		}
+
+		if initRequests != nil {
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+				v1.Container{
+					Name:      "i1",
+					Resources: v1.ResourceRequirements{Requests: *initRequests},
+				},
+			)
+		}
+		if initAllocatedResources != nil {
+			pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses,
+				v1.ContainerStatus{
+					Name:               "i1",
+					AllocatedResources: *initAllocatedResources,
+				})
+		}
+
+		if sidecarRequests != nil {
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+				v1.Container{
+					Name:          "s1",
+					Resources:     v1.ResourceRequirements{Requests: *sidecarRequests},
+					RestartPolicy: &restartAlways,
+				},
+			)
+		}
+		if sidecarAllocatedResources != nil {
+			pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses,
+				v1.ContainerStatus{
+					Name:               "s1",
+					AllocatedResources: *sidecarAllocatedResources,
+				})
+		}
+
+		pod.Status.Resize = resizeStatus
+		return pod
+	}
+
 	tests := []struct {
-		name               string
-		requests           v1.ResourceList
-		allocatedResources v1.ResourceList
-		resizeStatus       v1.PodResizeStatus
-		expectedResource   Resource
-		expectedNon0CPU    int64
-		expectedNon0Mem    int64
+		name                      string
+		requests                  v1.ResourceList
+		allocatedResources        v1.ResourceList
+		initRequests              *v1.ResourceList
+		initAllocatedResources    *v1.ResourceList
+		sidecarRequests           *v1.ResourceList
+		sidecarAllocatedResources *v1.ResourceList
+		resizeStatus              v1.PodResizeStatus
+		expectedResource          Resource
+		expectedNon0CPU           int64
+		expectedNon0Mem           int64
 	}{
 		{
 			name:               "Pod with no pending resize",
@@ -1589,16 +1639,44 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			expectedNon0CPU:    cpu500m.MilliValue(),
 			expectedNon0Mem:    mem500M.Value(),
 		},
+		{
+			name:                   "Pod with init container and no pending resize",
+			requests:               v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources:     v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			initRequests:           &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			initAllocatedResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			resizeStatus:           "",
+			expectedResource:       Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedNon0CPU:        cpu700m.MilliValue(),
+			expectedNon0Mem:        mem800M.Value(),
+		},
+		{
+			name:                      "Pod with sider container and no pending resize",
+			requests:                  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			initRequests:              &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			initAllocatedResources:    &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			sidecarRequests:           &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			sidecarAllocatedResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			resizeStatus:              "",
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+				Memory:   mem500M.Value() + mem800M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+			expectedNon0Mem: mem500M.Value() + mem800M.Value(),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pod := testpod.DeepCopy()
-			pod.Spec.Containers[0].Resources.Requests = tt.requests
-			pod.Status.ContainerStatuses[0].AllocatedResources = tt.allocatedResources
-			pod.Status.Resize = tt.resizeStatus
+			pod := preparePod(*testpod.DeepCopy(),
+				&tt.requests, &tt.allocatedResources,
+				tt.initRequests, tt.initAllocatedResources,
+				tt.sidecarRequests, tt.sidecarAllocatedResources,
+				tt.resizeStatus)
 
-			res, non0CPU, non0Mem := calculateResource(pod)
+			res, non0CPU, non0Mem := calculateResource(&pod)
 			if !reflect.DeepEqual(tt.expectedResource, res) {
 				t.Errorf("Test: %s expected resource: %+v, got: %+v", tt.name, tt.expectedResource, res)
 			}

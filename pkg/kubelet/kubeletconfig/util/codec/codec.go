@@ -109,14 +109,15 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 }
 
 // DecodeKubeletConfigurationIntoJSON decodes a serialized KubeletConfiguration to the internal type.
-func DecodeKubeletConfigurationIntoJSON(kubeletCodecs *serializer.CodecFactory, data []byte) ([]byte, error) {
+func DecodeKubeletConfigurationIntoJSON(kubeletCodecs *serializer.CodecFactory, data []byte) ([]byte, *schema.GroupVersionKind, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
-	obj, _, err := kubeletCodecs.UniversalDecoder().Decode(data, nil, &unstructured.Unstructured{})
+	obj, gvk, err := kubeletCodecs.UniversalDecoder().Decode(data, nil, &unstructured.Unstructured{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	objT := obj.(*unstructured.Unstructured)
 
-	return json.Marshal(objT.Object)
+	jsonData, err := json.Marshal(objT.Object)
+	return jsonData, gvk, err
 }

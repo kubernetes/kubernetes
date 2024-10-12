@@ -19,12 +19,14 @@ limitations under the License.
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
+	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
+	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
+	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -53,15 +55,23 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=example.crd.code-generator.k8s.io, Version=v1
-	case v1.SchemeGroupVersion.WithResource("clustertesttypes"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().ClusterTestTypes().Informer()}, nil
+	// Group=conflicting.test.crd.code-generator.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("testtypes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.ConflictingExample().V1().TestTypes().Informer()}, nil
+
+		// Group=example.crd.code-generator.k8s.io, Version=v1
+	case examplev1.SchemeGroupVersion.WithResource("clustertesttypes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().ClusterTestTypes().Informer()}, nil
+	case examplev1.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Example().V1().TestTypes().Informer()}, nil
 
 		// Group=example.test.crd.code-generator.k8s.io, Version=v1
 	case example2v1.SchemeGroupVersion.WithResource("testtypes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.SecondExample().V1().TestTypes().Informer()}, nil
+
+		// Group=extensions.test.crd.code-generator.k8s.io, Version=v1
+	case extensionsv1.SchemeGroupVersion.WithResource("testtypes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.ExtensionsExample().V1().TestTypes().Informer()}, nil
 
 	}
 

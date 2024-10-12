@@ -285,7 +285,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		pod := makePod(f, pvcBlock, isEphemeral)
 		pod.Spec.Containers[0].VolumeDevices = []v1.VolumeDevice{{
 			Name:       pod.Spec.Volumes[0].Name,
-			DevicePath: "/mnt/" + pvcBlock.Name,
+			DevicePath: "/mnt/" + pod.Spec.Volumes[0].Name,
 		}}
 		pod.Spec.Containers[0].VolumeMounts = nil
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
@@ -429,13 +429,6 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
 		if err != nil {
 			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
-		}
-
-		// Forced detach metric should be present
-		forceDetachKey := "attachdetach_controller_forced_detaches"
-		_, ok := updatedControllerMetrics[forceDetachKey]
-		if !ok {
-			framework.Failf("Key %q not found in A/D Controller metrics", forceDetachKey)
 		}
 
 		// Wait and validate

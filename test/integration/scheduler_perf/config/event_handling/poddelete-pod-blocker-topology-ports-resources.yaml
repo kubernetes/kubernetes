@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-blocker-topology-
+  labels:
+    topology: blue
+    type: blocker
+spec:
+  topologySpreadConstraints:
+    - maxSkew: 10
+      minDomains: 10000
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          topology: blue
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
+    ports:
+    - hostPort: 8{{ mod .Index 12 }}
+      containerPort: 8{{ mod .Index 12 }}
+    resources:
+      requests:
+        cpu: 0.35
+        memory: 3Gi
+  terminationGracePeriodSeconds: 0

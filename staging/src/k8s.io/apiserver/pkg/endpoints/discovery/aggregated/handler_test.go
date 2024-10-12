@@ -470,7 +470,7 @@ func TestMultipleSources(t *testing.T) {
 	_, _, initialDocument := fetchPath(defaultManager, "application/json", discoveryPath, "")
 
 	require.Len(t, initialDocument.Items, len(expectedResult))
-	require.Equal(t, initialDocument.Items, expectedResult)
+	require.Equal(t, expectedResult, initialDocument.Items)
 }
 
 // Shows that if you have multiple sources including Default source using
@@ -674,11 +674,11 @@ func TestVersionSortingNoPriority(t *testing.T) {
 	versions := decoded.Items[0].Versions
 
 	// Ensure that v1 is sorted before v1alpha1
-	assert.Equal(t, versions[0].Version, "v2")
-	assert.Equal(t, versions[1].Version, "v1")
-	assert.Equal(t, versions[2].Version, "v2beta1")
-	assert.Equal(t, versions[3].Version, "v1beta1")
-	assert.Equal(t, versions[4].Version, "v1alpha1")
+	assert.Equal(t, "v2", versions[0].Version)
+	assert.Equal(t, "v1", versions[1].Version)
+	assert.Equal(t, "v2beta1", versions[2].Version)
+	assert.Equal(t, "v1beta1", versions[3].Version)
+	assert.Equal(t, "v1alpha1", versions[4].Version)
 }
 
 func TestVersionSortingWithPriority(t *testing.T) {
@@ -699,8 +699,8 @@ func TestVersionSortingWithPriority(t *testing.T) {
 	versions := decoded.Items[0].Versions
 
 	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
-	assert.Equal(t, versions[0].Version, "v1alpha1")
-	assert.Equal(t, versions[1].Version, "v1")
+	assert.Equal(t, "v1alpha1", versions[0].Version)
+	assert.Equal(t, "v1", versions[1].Version)
 }
 
 // if two apiservices declare conflicting priorities for their group priority, take the higher one.
@@ -726,8 +726,8 @@ func TestGroupVersionSortingConflictingPriority(t *testing.T) {
 	groups := decoded.Items
 
 	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
-	assert.Equal(t, groups[0].Name, "test")
-	assert.Equal(t, groups[1].Name, "default")
+	assert.Equal(t, "test", groups[0].Name)
+	assert.Equal(t, "default", groups[1].Name)
 }
 
 // Show that the GroupPriorityMinimum is not sticky if a higher group version is removed
@@ -756,8 +756,8 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 	// Expect v1alpha1's group priority to be used and sort it first in the list
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
-	assert.Equal(t, decoded.Items[0].Name, "experimental.example.com")
-	assert.Equal(t, decoded.Items[1].Name, "stable.example.com")
+	assert.Equal(t, "experimental.example.com", decoded.Items[0].Name)
+	assert.Equal(t, "stable.example.com", decoded.Items[1].Name)
 
 	// Remove v1alpha1 and expect the new lower priority to take hold
 	manager.RemoveGroupVersion(metav1.GroupVersion{Group: experimentalGroup, Version: "v1alpha1"})
@@ -765,6 +765,6 @@ func TestStatelessGroupPriorityMinimum(t *testing.T) {
 	response, _, decoded = fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
 
-	assert.Equal(t, decoded.Items[0].Name, "stable.example.com")
-	assert.Equal(t, decoded.Items[1].Name, "experimental.example.com")
+	assert.Equal(t, "stable.example.com", decoded.Items[0].Name)
+	assert.Equal(t, "experimental.example.com", decoded.Items[1].Name)
 }

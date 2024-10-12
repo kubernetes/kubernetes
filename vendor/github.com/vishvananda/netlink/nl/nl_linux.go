@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -27,13 +28,20 @@ const (
 	// tc rules or filters, or other more memory requiring data.
 	RECEIVE_BUFFER_SIZE = 65536
 	// Kernel netlink pid
-	PidKernel uint32 = 0
+	PidKernel     uint32 = 0
+	SizeofCnMsgOp        = 0x18
 )
 
 // SupportedNlFamilies contains the list of netlink families this netlink package supports
 var SupportedNlFamilies = []int{unix.NETLINK_ROUTE, unix.NETLINK_XFRM, unix.NETLINK_NETFILTER}
 
 var nextSeqNr uint32
+
+// Default netlink socket timeout, 60s
+var SocketTimeoutTv = unix.Timeval{Sec: 60, Usec: 0}
+
+// ErrorMessageReporting is the default error message reporting configuration for the new netlink sockets
+var EnableErrorMessageReporting bool = false
 
 // GetIPFamily returns the family type of a net.IP.
 func GetIPFamily(ip net.IP) int {
@@ -77,9 +85,67 @@ func Swap32(i uint32) uint32 {
 	return (i&0xff000000)>>24 | (i&0xff0000)>>8 | (i&0xff00)<<8 | (i&0xff)<<24
 }
 
+const (
+	NLMSGERR_ATTR_UNUSED = 0
+	NLMSGERR_ATTR_MSG    = 1
+	NLMSGERR_ATTR_OFFS   = 2
+	NLMSGERR_ATTR_COOKIE = 3
+	NLMSGERR_ATTR_POLICY = 4
+)
+
 type NetlinkRequestData interface {
 	Len() int
 	Serialize() []byte
+}
+
+const (
+	PROC_CN_MCAST_LISTEN = 1
+	PROC_CN_MCAST_IGNORE
+)
+
+type CbID struct {
+	Idx uint32
+	Val uint32
+}
+
+type CnMsg struct {
+	ID     CbID
+	Seq    uint32
+	Ack    uint32
+	Length uint16
+	Flags  uint16
+}
+
+type CnMsgOp struct {
+	CnMsg
+	// here we differ from the C header
+	Op uint32
+}
+
+func NewCnMsg(idx, val, op uint32) *CnMsgOp {
+	var cm CnMsgOp
+
+	cm.ID.Idx = idx
+	cm.ID.Val = val
+
+	cm.Ack = 0
+	cm.Seq = 1
+	cm.Length = uint16(binary.Size(op))
+	cm.Op = op
+
+	return &cm
+}
+
+func (msg *CnMsgOp) Serialize() []byte {
+	return (*(*[SizeofCnMsgOp]byte)(unsafe.Pointer(msg)))[:]
+}
+
+func DeserializeCnMsgOp(b []byte) *CnMsgOp {
+	return (*CnMsgOp)(unsafe.Pointer(&b[0:SizeofCnMsgOp][0]))
+}
+
+func (msg *CnMsgOp) Len() int {
+	return SizeofCnMsgOp
 }
 
 // IfInfomsg is related to links, but it is used for list requests as well
@@ -249,6 +315,12 @@ func (msg *IfInfomsg) EncapType() string {
 	return fmt.Sprintf("unknown%d", msg.Type)
 }
 
+// Round the length of a netlink message up to align it properly.
+// Taken from syscall/netlink_linux.go by The Go Authors under BSD-style license.
+func nlmAlignOf(msglen int) int {
+	return (msglen + syscall.NLMSG_ALIGNTO - 1) & ^(syscall.NLMSG_ALIGNTO - 1)
+}
+
 func rtaAlignOf(attrlen int) int {
 	return (attrlen + unix.RTA_ALIGNTO - 1) & ^(unix.RTA_ALIGNTO - 1)
 }
@@ -257,6 +329,42 @@ func NewIfInfomsgChild(parent *RtAttr, family int) *IfInfomsg {
 	msg := NewIfInfomsg(family)
 	parent.children = append(parent.children, msg)
 	return msg
+}
+
+type Uint32Bitfield struct {
+	Value    uint32
+	Selector uint32
+}
+
+func (a *Uint32Bitfield) Serialize() []byte {
+	return (*(*[SizeofUint32Bitfield]byte)(unsafe.Pointer(a)))[:]
+}
+
+func DeserializeUint32Bitfield(data []byte) *Uint32Bitfield {
+	return (*Uint32Bitfield)(unsafe.Pointer(&data[0:SizeofUint32Bitfield][0]))
+}
+
+type Uint32Attribute struct {
+	Type  uint16
+	Value uint32
+}
+
+func (a *Uint32Attribute) Serialize() []byte {
+	native := NativeEndian()
+	buf := make([]byte, rtaAlignOf(8))
+	native.PutUint16(buf[0:2], 8)
+	native.PutUint16(buf[2:4], a.Type)
+
+	if a.Type&NLA_F_NET_BYTEORDER != 0 {
+		binary.BigEndian.PutUint32(buf[4:], a.Value)
+	} else {
+		native.PutUint32(buf[4:], a.Value)
+	}
+	return buf
+}
+
+func (a *Uint32Attribute) Len() int {
+	return 8
 }
 
 // Extend RtAttr to handle data and children
@@ -381,10 +489,30 @@ func (req *NetlinkRequest) AddRawData(data []byte) {
 	req.RawData = append(req.RawData, data...)
 }
 
-// Execute the request against a the given sockType.
+// Execute the request against the given sockType.
 // Returns a list of netlink messages in serialized format, optionally filtered
 // by resType.
 func (req *NetlinkRequest) Execute(sockType int, resType uint16) ([][]byte, error) {
+	var res [][]byte
+	err := req.ExecuteIter(sockType, resType, func(msg []byte) bool {
+		res = append(res, msg)
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// ExecuteIter executes the request against the given sockType.
+// Calls the provided callback func once for each netlink message.
+// If the callback returns false, it is not called again, but
+// the remaining messages are consumed/discarded.
+//
+// Thread safety: ExecuteIter holds a lock on the socket until
+// it finishes iteration so the callback must not call back into
+// the netlink API.
+func (req *NetlinkRequest) ExecuteIter(sockType int, resType uint16, f func(msg []byte) bool) error {
 	var (
 		s   *NetlinkSocket
 		err error
@@ -401,8 +529,21 @@ func (req *NetlinkRequest) Execute(sockType int, resType uint16) ([][]byte, erro
 	if s == nil {
 		s, err = getNetlinkSocket(sockType)
 		if err != nil {
-			return nil, err
+			return err
 		}
+
+		if err := s.SetSendTimeout(&SocketTimeoutTv); err != nil {
+			return err
+		}
+		if err := s.SetReceiveTimeout(&SocketTimeoutTv); err != nil {
+			return err
+		}
+		if EnableErrorMessageReporting {
+			if err := s.SetExtAck(true); err != nil {
+				return err
+			}
+		}
+
 		defer s.Close()
 	} else {
 		s.Lock()
@@ -410,56 +551,94 @@ func (req *NetlinkRequest) Execute(sockType int, resType uint16) ([][]byte, erro
 	}
 
 	if err := s.Send(req); err != nil {
-		return nil, err
+		return err
 	}
 
 	pid, err := s.GetPid()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	var res [][]byte
 
 done:
 	for {
 		msgs, from, err := s.Receive()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if from.Pid != PidKernel {
-			return nil, fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, PidKernel)
+			return fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, PidKernel)
 		}
 		for _, m := range msgs {
 			if m.Header.Seq != req.Seq {
 				if sharedSocket {
 					continue
 				}
-				return nil, fmt.Errorf("Wrong Seq nr %d, expected %d", m.Header.Seq, req.Seq)
+				return fmt.Errorf("Wrong Seq nr %d, expected %d", m.Header.Seq, req.Seq)
 			}
 			if m.Header.Pid != pid {
 				continue
 			}
-			if m.Header.Type == unix.NLMSG_DONE {
-				break done
+
+			if m.Header.Flags&unix.NLM_F_DUMP_INTR != 0 {
+				return syscall.Errno(unix.EINTR)
 			}
-			if m.Header.Type == unix.NLMSG_ERROR {
-				native := NativeEndian()
-				error := int32(native.Uint32(m.Data[0:4]))
-				if error == 0 {
+
+			if m.Header.Type == unix.NLMSG_DONE || m.Header.Type == unix.NLMSG_ERROR {
+				// NLMSG_DONE might have no payload, if so assume no error.
+				if m.Header.Type == unix.NLMSG_DONE && len(m.Data) == 0 {
 					break done
 				}
-				return nil, syscall.Errno(-error)
+
+				native := NativeEndian()
+				errno := int32(native.Uint32(m.Data[0:4]))
+				if errno == 0 {
+					break done
+				}
+				var err error
+				err = syscall.Errno(-errno)
+
+				unreadData := m.Data[4:]
+				if m.Header.Flags&unix.NLM_F_ACK_TLVS != 0 && len(unreadData) > syscall.SizeofNlMsghdr {
+					// Skip the echoed request message.
+					echoReqH := (*syscall.NlMsghdr)(unsafe.Pointer(&unreadData[0]))
+					unreadData = unreadData[nlmAlignOf(int(echoReqH.Len)):]
+
+					// Annotate `err` using nlmsgerr attributes.
+					for len(unreadData) >= syscall.SizeofRtAttr {
+						attr := (*syscall.RtAttr)(unsafe.Pointer(&unreadData[0]))
+						attrData := unreadData[syscall.SizeofRtAttr:attr.Len]
+
+						switch attr.Type {
+						case NLMSGERR_ATTR_MSG:
+							err = fmt.Errorf("%w: %s", err, unix.ByteSliceToString(attrData))
+						default:
+							// TODO: handle other NLMSGERR_ATTR types
+						}
+
+						unreadData = unreadData[rtaAlignOf(int(attr.Len)):]
+					}
+				}
+
+				return err
 			}
 			if resType != 0 && m.Header.Type != resType {
 				continue
 			}
-			res = append(res, m.Data)
+			if cont := f(m.Data); !cont {
+				// Drain the rest of the messages from the kernel but don't
+				// pass them to the iterator func.
+				f = dummyMsgIterFunc
+			}
 			if m.Header.Flags&unix.NLM_F_MULTI == 0 {
 				break done
 			}
 		}
 	}
-	return res, nil
+	return nil
+}
+
+func dummyMsgIterFunc(msg []byte) bool {
+	return true
 }
 
 // Create a new netlink request from proto and flags
@@ -477,8 +656,9 @@ func NewNetlinkRequest(proto, flags int) *NetlinkRequest {
 }
 
 type NetlinkSocket struct {
-	fd  int32
-	lsa unix.SockaddrNetlink
+	fd   int32
+	file *os.File
+	lsa  unix.SockaddrNetlink
 	sync.Mutex
 }
 
@@ -487,8 +667,13 @@ func getNetlinkSocket(protocol int) (*NetlinkSocket, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = unix.SetNonblock(fd, true)
+	if err != nil {
+		return nil, err
+	}
 	s := &NetlinkSocket{
-		fd: int32(fd),
+		fd:   int32(fd),
+		file: os.NewFile(uintptr(fd), "netlink"),
 	}
 	s.lsa.Family = unix.AF_NETLINK
 	if err := unix.Bind(fd, &s.lsa); err != nil {
@@ -519,12 +704,14 @@ func GetNetlinkSocketAt(newNs, curNs netns.NsHandle, protocol int) (*NetlinkSock
 // In case of success, the caller is expected to execute the returned function
 // at the end of the code that needs to be executed in the network namespace.
 // Example:
-// func jobAt(...) error {
-//      d, err := executeInNetns(...)
-//      if err != nil { return err}
-//      defer d()
-//      < code which needs to be executed in specific netns>
-//  }
+//
+//	func jobAt(...) error {
+//	     d, err := executeInNetns(...)
+//	     if err != nil { return err}
+//	     defer d()
+//	     < code which needs to be executed in specific netns>
+//	 }
+//
 // TODO: his function probably belongs to netns pkg.
 func executeInNetns(newNs, curNs netns.NsHandle) (func(), error) {
 	var (
@@ -573,8 +760,13 @@ func Subscribe(protocol int, groups ...uint) (*NetlinkSocket, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = unix.SetNonblock(fd, true)
+	if err != nil {
+		return nil, err
+	}
 	s := &NetlinkSocket{
-		fd: int32(fd),
+		fd:   int32(fd),
+		file: os.NewFile(uintptr(fd), "netlink"),
 	}
 	s.lsa.Family = unix.AF_NETLINK
 
@@ -603,33 +795,36 @@ func SubscribeAt(newNs, curNs netns.NsHandle, protocol int, groups ...uint) (*Ne
 }
 
 func (s *NetlinkSocket) Close() {
-	fd := int(atomic.SwapInt32(&s.fd, -1))
-	unix.Close(fd)
+	s.file.Close()
 }
 
 func (s *NetlinkSocket) GetFd() int {
-	return int(atomic.LoadInt32(&s.fd))
+	return int(s.fd)
 }
 
 func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
-	fd := int(atomic.LoadInt32(&s.fd))
-	if fd < 0 {
-		return fmt.Errorf("Send called on a closed socket")
-	}
-	if err := unix.Sendto(fd, request.Serialize(), 0, &s.lsa); err != nil {
-		return err
-	}
-	return nil
+	return unix.Sendto(int(s.fd), request.Serialize(), 0, &s.lsa)
 }
 
 func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetlink, error) {
-	fd := int(atomic.LoadInt32(&s.fd))
-	if fd < 0 {
-		return nil, nil, fmt.Errorf("Receive called on a closed socket")
+	rawConn, err := s.file.SyscallConn()
+	if err != nil {
+		return nil, nil, err
 	}
-	var fromAddr *unix.SockaddrNetlink
-	var rb [RECEIVE_BUFFER_SIZE]byte
-	nr, from, err := unix.Recvfrom(fd, rb[:], 0)
+	var (
+		fromAddr *unix.SockaddrNetlink
+		rb       [RECEIVE_BUFFER_SIZE]byte
+		nr       int
+		from     unix.Sockaddr
+		innerErr error
+	)
+	err = rawConn.Read(func(fd uintptr) (done bool) {
+		nr, from, innerErr = unix.Recvfrom(int(fd), rb[:], 0)
+		return innerErr != unix.EWOULDBLOCK
+	})
+	if innerErr != nil {
+		err = innerErr
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -640,8 +835,9 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetli
 	if nr < unix.NLMSG_HDRLEN {
 		return nil, nil, fmt.Errorf("Got short response from netlink")
 	}
-	rb2 := make([]byte, nr)
-	copy(rb2, rb[:nr])
+	msgLen := nlmAlignOf(nr)
+	rb2 := make([]byte, msgLen)
+	copy(rb2, rb[:msgLen])
 	nl, err := syscall.ParseNetlinkMessage(rb2)
 	if err != nil {
 		return nil, nil, err
@@ -663,9 +859,27 @@ func (s *NetlinkSocket) SetReceiveTimeout(timeout *unix.Timeval) error {
 	return unix.SetsockoptTimeval(int(s.fd), unix.SOL_SOCKET, unix.SO_RCVTIMEO, timeout)
 }
 
+// SetReceiveBufferSize allows to set a receive buffer size on the socket
+func (s *NetlinkSocket) SetReceiveBufferSize(size int, force bool) error {
+	opt := unix.SO_RCVBUF
+	if force {
+		opt = unix.SO_RCVBUFFORCE
+	}
+	return unix.SetsockoptInt(int(s.fd), unix.SOL_SOCKET, opt, size)
+}
+
+// SetExtAck requests error messages to be reported on the socket
+func (s *NetlinkSocket) SetExtAck(enable bool) error {
+	var enableN int
+	if enable {
+		enableN = 1
+	}
+
+	return unix.SetsockoptInt(int(s.fd), unix.SOL_NETLINK, unix.NETLINK_EXT_ACK, enableN)
+}
+
 func (s *NetlinkSocket) GetPid() (uint32, error) {
-	fd := int(atomic.LoadInt32(&s.fd))
-	lsa, err := unix.Getsockname(fd)
+	lsa, err := unix.Getsockname(int(s.fd))
 	if err != nil {
 		return 0, err
 	}
@@ -709,6 +923,12 @@ func Uint16Attr(v uint16) []byte {
 	return bytes
 }
 
+func BEUint16Attr(v uint16) []byte {
+	bytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(bytes, v)
+	return bytes
+}
+
 func Uint32Attr(v uint32) []byte {
 	native := NativeEndian()
 	bytes := make([]byte, 4)
@@ -716,10 +936,22 @@ func Uint32Attr(v uint32) []byte {
 	return bytes
 }
 
+func BEUint32Attr(v uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, v)
+	return bytes
+}
+
 func Uint64Attr(v uint64) []byte {
 	native := NativeEndian()
 	bytes := make([]byte, 8)
 	native.PutUint64(bytes, v)
+	return bytes
+}
+
+func BEUint64Attr(v uint64) []byte {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, v)
 	return bytes
 }
 
@@ -735,6 +967,22 @@ func ParseRouteAttr(b []byte) ([]syscall.NetlinkRouteAttr, error) {
 		b = b[alen:]
 	}
 	return attrs, nil
+}
+
+// ParseRouteAttrAsMap parses provided buffer that contains raw RtAttrs and returns a map of parsed
+// atttributes indexed by attribute type or error if occured.
+func ParseRouteAttrAsMap(b []byte) (map[uint16]syscall.NetlinkRouteAttr, error) {
+	attrMap := make(map[uint16]syscall.NetlinkRouteAttr)
+
+	attrs, err := ParseRouteAttr(b)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, attr := range attrs {
+		attrMap[attr.Attr.Type] = attr
+	}
+	return attrMap, nil
 }
 
 func netlinkRouteAttrAndValue(b []byte) (*unix.RtAttr, []byte, int, error) {

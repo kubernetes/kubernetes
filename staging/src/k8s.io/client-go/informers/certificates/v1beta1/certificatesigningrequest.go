@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	apicertificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // CertificateSigningRequests.
 type CertificateSigningRequestInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.CertificateSigningRequestLister
+	Lister() certificatesv1beta1.CertificateSigningRequestLister
 }
 
 type certificateSigningRequestInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, r
 				return client.CertificatesV1beta1().CertificateSigningRequests().Watch(context.TODO(), options)
 			},
 		},
-		&certificatesv1beta1.CertificateSigningRequest{},
+		&apicertificatesv1beta1.CertificateSigningRequest{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *certificateSigningRequestInformer) defaultInformer(client kubernetes.In
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificatesv1beta1.CertificateSigningRequest{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicertificatesv1beta1.CertificateSigningRequest{}, f.defaultInformer)
 }
 
-func (f *certificateSigningRequestInformer) Lister() v1beta1.CertificateSigningRequestLister {
-	return v1beta1.NewCertificateSigningRequestLister(f.Informer().GetIndexer())
+func (f *certificateSigningRequestInformer) Lister() certificatesv1beta1.CertificateSigningRequestLister {
+	return certificatesv1beta1.NewCertificateSigningRequestLister(f.Informer().GetIndexer())
 }

@@ -139,13 +139,9 @@ func NewNamed(name string) *Type {
 // newQueueWithConfig constructs a new named workqueue
 // with the ability to customize different properties for testing purposes
 func newQueueWithConfig[T comparable](config TypedQueueConfig[T], updatePeriod time.Duration) *Typed[T] {
-	var metricsFactory *queueMetricsFactory
+	metricsProvider := globalMetricsProvider
 	if config.MetricsProvider != nil {
-		metricsFactory = &queueMetricsFactory{
-			metricsProvider: config.MetricsProvider,
-		}
-	} else {
-		metricsFactory = &globalMetricsFactory
+		metricsProvider = config.MetricsProvider
 	}
 
 	if config.Clock == nil {
@@ -159,12 +155,12 @@ func newQueueWithConfig[T comparable](config TypedQueueConfig[T], updatePeriod t
 	return newQueue(
 		config.Clock,
 		config.Queue,
-		metricsFactory.newQueueMetrics(config.Name, config.Clock),
+		newQueueMetrics[T](metricsProvider, config.Name, config.Clock),
 		updatePeriod,
 	)
 }
 
-func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMetrics, updatePeriod time.Duration) *Typed[T] {
+func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMetrics[T], updatePeriod time.Duration) *Typed[T] {
 	t := &Typed[T]{
 		clock:                      c,
 		queue:                      queue,
@@ -177,7 +173,7 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 
 	// Don't start the goroutine for a type of noMetrics so we don't consume
 	// resources unnecessarily
-	if _, ok := metrics.(noMetrics); !ok {
+	if _, ok := metrics.(noMetrics[T]); !ok {
 		go t.updateUnfinishedWorkLoop()
 	}
 
@@ -210,7 +206,7 @@ type Typed[T comparable] struct {
 	shuttingDown bool
 	drain        bool
 
-	metrics queueMetrics
+	metrics queueMetrics[t]
 
 	unfinishedWorkUpdatePeriod time.Duration
 	clock                      clock.WithTicker
