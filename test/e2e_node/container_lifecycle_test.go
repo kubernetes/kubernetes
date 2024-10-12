@@ -1631,7 +1631,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStartAfter(restartableInit1, regular1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
 			})
 			ginkgo.It("should run a regular container to completion", func() {
 				framework.ExpectNoError(results.Exits(regular1))
@@ -2033,7 +2033,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 				results = parseOutput(context.TODO(), f, podSpec)
 			})
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStartAfter(restartableInit1, regular1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
 			})
 			ginkgo.It("should run a regular container to completion", func() {
 				framework.ExpectNoError(results.Exits(regular1))
@@ -2454,7 +2454,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 			})
 
 			ginkgo.It("should not restart a restartable init container", func() {
-				framework.ExpectNoError(results.DoesntStartAfter(restartableInit1, regular1))
+				framework.ExpectNoError(results.HasNotRestarted(restartableInit1))
 			})
 			// this test case is different from restartPolicy=Never
 			ginkgo.It("should start a regular container", func() {
