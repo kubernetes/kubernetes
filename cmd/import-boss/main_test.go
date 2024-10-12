@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestRemoveLastDir(t *testing.T) {
@@ -219,7 +221,8 @@ func checkAllErrorStrings(t *testing.T, errs []error, expect []string) {
 }
 
 func TestSimpleForward(t *testing.T) {
-	pkgs, err := loadPkgs("./testdata/simple-fwd/aaa")
+	_, ctx := ktesting.NewTestContext(t)
+	pkgs, err := loadPkgs(ctx, "./testdata/simple-fwd/aaa")
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}
@@ -231,7 +234,7 @@ func TestSimpleForward(t *testing.T) {
 	}
 
 	boss := newBoss(pkgs)
-	errs := boss.Verify(pkgs[0])
+	errs := boss.Verify(ctx, pkgs[0])
 
 	expect := []string{
 		`"k8s.io/kubernetes/cmd/import-boss/testdata/simple-fwd/aaa" -> "k8s.io/kubernetes/cmd/import-boss/testdata/simple-fwd/forbidden" is forbidden`,
@@ -244,7 +247,8 @@ func TestSimpleForward(t *testing.T) {
 }
 
 func TestNestedForward(t *testing.T) {
-	pkgs, err := loadPkgs("./testdata/nested-fwd/aaa")
+	_, ctx := ktesting.NewTestContext(t)
+	pkgs, err := loadPkgs(ctx, "./testdata/nested-fwd/aaa")
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}
@@ -256,7 +260,7 @@ func TestNestedForward(t *testing.T) {
 	}
 
 	boss := newBoss(pkgs)
-	errs := boss.Verify(pkgs[0])
+	errs := boss.Verify(ctx, pkgs[0])
 
 	expect := []string{
 		`"k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/aaa" -> "k8s.io/kubernetes/cmd/import-boss/testdata/nested-fwd/forbidden-by-both" is forbidden`,
@@ -269,7 +273,8 @@ func TestNestedForward(t *testing.T) {
 }
 
 func TestInverse(t *testing.T) {
-	pkgs, err := loadPkgs("./testdata/inverse/...")
+	_, ctx := ktesting.NewTestContext(t)
+	pkgs, err := loadPkgs(ctx, "./testdata/inverse/...")
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}
@@ -281,7 +286,7 @@ func TestInverse(t *testing.T) {
 
 	var errs []error
 	for _, pkg := range pkgs {
-		errs = append(errs, boss.Verify(pkg)...)
+		errs = append(errs, boss.Verify(ctx, pkg)...)
 	}
 
 	expect := []string{
@@ -295,7 +300,8 @@ func TestInverse(t *testing.T) {
 }
 
 func TestTransitive(t *testing.T) {
-	pkgs, err := loadPkgs("./testdata/transitive/...")
+	_, ctx := ktesting.NewTestContext(t)
+	pkgs, err := loadPkgs(ctx, "./testdata/transitive/...")
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
 	}
@@ -307,7 +313,7 @@ func TestTransitive(t *testing.T) {
 
 	var errs []error
 	for _, pkg := range pkgs {
-		errs = append(errs, boss.Verify(pkg)...)
+		errs = append(errs, boss.Verify(ctx, pkg)...)
 	}
 
 	expect := []string{
