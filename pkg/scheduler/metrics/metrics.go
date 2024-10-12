@@ -96,6 +96,8 @@ var (
 	pendingPods                *metrics.GaugeVec
 	InFlightEvents             *metrics.GaugeVec
 	Goroutines                 *metrics.GaugeVec
+	GoroutinesDuration         *metrics.HistogramVec
+	GoroutinesExecutionTotal   *metrics.CounterVec
 
 	// PodSchedulingDuration is deprecated as of Kubernetes v1.28, and will be removed
 	// in v1.31. Please use PodSchedulingSLIDuration instead.
@@ -204,6 +206,23 @@ func InitMetrics() {
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
+	GoroutinesDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "goroutines_duration_seconds",
+			Help:           "how long each preemption goroutine takes to complete",
+			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation"})
+	GoroutinesExecutionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "goroutines_execution_total",
+			Help:           "how many preemption goroutines have executed",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation", "result"})
 
 	// PodSchedulingDuration is deprecated as of Kubernetes v1.28, and will be removed
 	// in v1.31. Please use PodSchedulingSLIDuration instead.
