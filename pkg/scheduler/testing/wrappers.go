@@ -939,6 +939,13 @@ func (p *PersistentVolumeClaimWrapper) Resources(resources v1.VolumeResourceRequ
 	return p
 }
 
+// StorageClassName sets `StorageClassName` as the StorageClassName of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) StorageClassName(name *string) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.StorageClassName = name
+	return p
+}
+
 // PersistentVolumeWrapper wraps a PersistentVolume inside.
 type PersistentVolumeWrapper struct{ v1.PersistentVolume }
 
@@ -1006,6 +1013,12 @@ func (p *PersistentVolumeWrapper) Label(k, v string) *PersistentVolumeWrapper {
 		p.PersistentVolume.ObjectMeta.Labels = make(map[string]string)
 	}
 	p.PersistentVolume.ObjectMeta.Labels[k] = v
+	return p
+}
+
+// StorageClassName sets `StorageClassName` of the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) StorageClassName(name string) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.StorageClassName = name
 	return p
 }
 
@@ -1164,4 +1177,106 @@ func (s *StorageClassWrapper) VolumeBindingMode(mode storagev1.VolumeBindingMode
 func (s *StorageClassWrapper) Provisioner(p string) *StorageClassWrapper {
 	s.StorageClass.Provisioner = p
 	return s
+}
+
+// AllowedTopologies sets `AllowedTopologies` of the inner StorageClass.
+func (s *StorageClassWrapper) AllowedTopologies(topologies []v1.TopologySelectorTerm) *StorageClassWrapper {
+	s.StorageClass.AllowedTopologies = topologies
+	return s
+}
+
+// Label sets a {k,v} pair to the inner StorageClass label.
+func (s *StorageClassWrapper) Label(k, v string) *StorageClassWrapper {
+	if s.ObjectMeta.Labels == nil {
+		s.ObjectMeta.Labels = make(map[string]string)
+	}
+	s.ObjectMeta.Labels[k] = v
+	return s
+}
+
+// CSINodeWrapper wraps a CSINode inside.
+type CSINodeWrapper struct{ storagev1.CSINode }
+
+// MakeCSINode creates a CSINode wrapper.
+func MakeCSINode() *CSINodeWrapper {
+	return &CSINodeWrapper{}
+}
+
+// Obj returns the inner CSINode.
+func (c *CSINodeWrapper) Obj() *storagev1.CSINode {
+	return &c.CSINode
+}
+
+// Name sets `n` as the name of the inner CSINode.
+func (c *CSINodeWrapper) Name(n string) *CSINodeWrapper {
+	c.SetName(n)
+	return c
+}
+
+// Annotation sets a {k,v} pair to the inner CSINode annotation.
+func (c *CSINodeWrapper) Annotation(key, value string) *CSINodeWrapper {
+	metav1.SetMetaDataAnnotation(&c.ObjectMeta, key, value)
+	return c
+}
+
+// Driver adds a driver to the inner CSINode.
+func (c *CSINodeWrapper) Driver(driver storagev1.CSINodeDriver) *CSINodeWrapper {
+	c.Spec.Drivers = append(c.Spec.Drivers, driver)
+	return c
+}
+
+// CSIDriverWrapper wraps a CSIDriver inside.
+type CSIDriverWrapper struct{ storagev1.CSIDriver }
+
+// MakeCSIDriver creates a CSIDriver wrapper.
+func MakeCSIDriver() *CSIDriverWrapper {
+	return &CSIDriverWrapper{}
+}
+
+// Obj returns the inner CSIDriver.
+func (c *CSIDriverWrapper) Obj() *storagev1.CSIDriver {
+	return &c.CSIDriver
+}
+
+// Name sets `n` as the name of the inner CSIDriver.
+func (c *CSIDriverWrapper) Name(n string) *CSIDriverWrapper {
+	c.SetName(n)
+	return c
+}
+
+// StorageCapacity sets the `StorageCapacity` of the inner CSIDriver.
+func (c *CSIDriverWrapper) StorageCapacity(storageCapacity *bool) *CSIDriverWrapper {
+	c.Spec.StorageCapacity = storageCapacity
+	return c
+}
+
+// CSIStorageCapacityWrapper wraps a CSIStorageCapacity inside.
+type CSIStorageCapacityWrapper struct{ storagev1.CSIStorageCapacity }
+
+// MakeCSIStorageCapacity creates a CSIStorageCapacity wrapper.
+func MakeCSIStorageCapacity() *CSIStorageCapacityWrapper {
+	return &CSIStorageCapacityWrapper{}
+}
+
+// Obj returns the inner CSIStorageCapacity.
+func (c *CSIStorageCapacityWrapper) Obj() *storagev1.CSIStorageCapacity {
+	return &c.CSIStorageCapacity
+}
+
+// Name sets `n` as the name of the inner CSIStorageCapacity.
+func (c *CSIStorageCapacityWrapper) Name(n string) *CSIStorageCapacityWrapper {
+	c.SetName(n)
+	return c
+}
+
+// StorageClassName sets the `StorageClassName` of the inner CSIStorageCapacity.
+func (c *CSIStorageCapacityWrapper) StorageClassName(name string) *CSIStorageCapacityWrapper {
+	c.CSIStorageCapacity.StorageClassName = name
+	return c
+}
+
+// Capacity sets the `Capacity` of the inner CSIStorageCapacity.
+func (c *CSIStorageCapacityWrapper) Capacity(capacity *resource.Quantity) *CSIStorageCapacityWrapper {
+	c.CSIStorageCapacity.Capacity = capacity
+	return c
 }
