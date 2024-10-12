@@ -206,7 +206,7 @@ type Typed[T comparable] struct {
 	shuttingDown bool
 	drain        bool
 
-	metrics queueMetrics[t]
+	metrics queueMetrics[T]
 
 	unfinishedWorkUpdatePeriod time.Duration
 	clock                      clock.WithTicker
