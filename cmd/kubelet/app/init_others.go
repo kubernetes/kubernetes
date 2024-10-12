@@ -19,8 +19,8 @@ limitations under the License.
 
 package app
 
-import "k8s.io/klog/v2"
+import "context"
 
-func initForOS(logger klog.Logger, service bool, priorityClass string) error {
+func initForOS(ctx context.Context, service bool, priorityClass string) error {
 	return nil
 }

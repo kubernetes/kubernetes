@@ -20,12 +20,11 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
-
-	"k8s.io/klog/v2"
 )
 
-func watchForLockfileContention(logger klog.Logger, path string, done chan struct{}) error {
+func watchForLockfileContention(ctx context.Context, path string, done chan struct{}) error {
 	return errors.New("kubelet unsupported in this build")
 }
 

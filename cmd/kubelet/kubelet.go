@@ -22,19 +22,19 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"os"
 
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubelet/app"
 )
 
 func main() {
-	logger := klog.Background()
-	command := app.NewKubeletCommand(logger)
+	ctx := context.Background()
+	command := app.NewKubeletCommand(ctx)
 	code := cli.Run(command)
 	os.Exit(code)
 }

@@ -17,13 +17,16 @@ limitations under the License.
 package app
 
 import (
+	"context"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/inotify"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
-func watchForLockfileContention(logger klog.Logger, path string, done chan struct{}) error {
+func watchForLockfileContention(ctx context.Context, path string, done chan struct{}) error {
+	logger := klog.FromContext(ctx)
 	watcher, err := inotify.NewWatcher()
 	if err != nil {
 		logger.Error(err, "Unable to create watcher for lockfile")

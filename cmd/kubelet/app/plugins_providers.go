@@ -17,6 +17,8 @@ limitations under the License.
 package app
 
 import (
+	"context"
+
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
@@ -28,8 +30,9 @@ import (
 
 type probeFn func() []volume.VolumePlugin
 
-func appendPluginBasedOnFeatureFlags(logger klog.Logger, plugins []volume.VolumePlugin, inTreePluginName string,
+func appendPluginBasedOnFeatureFlags(ctx context.Context, plugins []volume.VolumePlugin, inTreePluginName string,
 	featureGate featuregate.FeatureGate, pluginInfo pluginInfo) ([]volume.VolumePlugin, error) {
+	logger := klog.FromContext(ctx)
 	_, err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginUnregisterFeature)
 	if err != nil {
 		logger.Info("Unexpected CSI Migration Feature Flags combination detected, CSI Migration may not take effect", "err", err)
@@ -53,12 +56,12 @@ type pluginInfo struct {
 	pluginProbeFunction     probeFn
 }
 
-func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+func appendLegacyProviderVolumes(ctx context.Context, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
 	pluginMigrationStatus[plugins.PortworxVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationPortworx, pluginUnregisterFeature: features.InTreePluginPortworxUnregister, pluginProbeFunction: portworx.ProbeVolumePlugins}
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {
-		allPlugins, err = appendPluginBasedOnFeatureFlags(logger, allPlugins, pluginName, featureGate, pluginInfo)
+		allPlugins, err = appendPluginBasedOnFeatureFlags(ctx, allPlugins, pluginName, featureGate, pluginInfo)
 		if err != nil {
 			return allPlugins, err
 		}

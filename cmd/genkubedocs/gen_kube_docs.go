@@ -18,13 +18,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -35,7 +35,7 @@ import (
 )
 
 func main() {
-	logger := klog.Background()
+	ctx := context.Background()
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := ""
 	module := ""
@@ -72,7 +72,7 @@ func main() {
 		doc.GenMarkdownTree(scheduler, outDir)
 	case "kubelet":
 		// generate docs for kubelet
-		kubelet := kubeletapp.NewKubeletCommand(logger)
+		kubelet := kubeletapp.NewKubeletCommand(ctx)
 		doc.GenMarkdownTree(kubelet, outDir)
 	case "kubeadm":
 		// resets global flags created by kubelet or other commands e.g.

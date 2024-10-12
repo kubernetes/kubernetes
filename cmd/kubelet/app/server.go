@@ -138,7 +138,8 @@ const (
 )
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
-func NewKubeletCommand(logger klog.Logger) *cobra.Command {
+func NewKubeletCommand(ctx context.Context) *cobra.Command {
+	logger := klog.FromContext(ctx)
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
@@ -267,12 +268,12 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
-			kubeletDeps, err := UnsecuredDependencies(logger, kubeletServer, utilfeature.DefaultFeatureGate)
+			kubeletDeps, err := UnsecuredDependencies(ctx, kubeletServer, utilfeature.DefaultFeatureGate)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
 			}
 
-			if err := checkPermissions(logger); err != nil {
+			if err := checkPermissions(ctx); err != nil {
 				logger.Error(err, "kubelet running with insufficient permissions")
 			}
 
@@ -467,9 +468,9 @@ func loadDropinConfigFileIntoJSON(name string) ([]byte, *schema.GroupVersionKind
 
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
-func UnsecuredDependencies(logger klog.Logger, s *options.KubeletServer, featureGate featuregate.FeatureGate) (*kubelet.Dependencies, error) {
+func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featureGate featuregate.FeatureGate) (*kubelet.Dependencies, error) {
 	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(logger, &s.KubeletFlags, &s.KubeletConfiguration)
+	tlsOptions, err := InitializeTLS(ctx, &s.KubeletFlags, &s.KubeletConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +480,7 @@ func UnsecuredDependencies(logger klog.Logger, s *options.KubeletServer, feature
 	hu := hostutil.NewHostUtil()
 	pluginRunner := exec.New()
 
-	plugins, err := ProbeVolumePlugins(logger, featureGate)
+	plugins, err := ProbeVolumePlugins(ctx, featureGate)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +522,7 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
-	if err := initForOS(logger, s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
+	if err := initForOS(ctx, s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %w", err)
 	}
 	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
@@ -543,7 +544,8 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 	return nil
 }
 
-func initConfigz(logger klog.Logger, kc *kubeletconfiginternal.KubeletConfiguration) error {
+func initConfigz(ctx context.Context, kc *kubeletconfiginternal.KubeletConfiguration) error {
+	logger := klog.FromContext(ctx)
 	cz, err := configz.New("kubeletconfig")
 	if err != nil {
 		logger.Error(err, "Failed to register configz")
@@ -624,14 +626,14 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 		if s.ExitOnLockContention {
 			logger.Info("Watching for inotify events", "path", s.LockFilePath)
-			if err := watchForLockfileContention(logger, s.LockFilePath, done); err != nil {
+			if err := watchForLockfileContention(ctx, s.LockFilePath, done); err != nil {
 				return err
 			}
 		}
 	}
 
 	// Register current configuration with /configz endpoint
-	err = initConfigz(logger, &s.KubeletConfiguration)
+	err = initConfigz(ctx, &s.KubeletConfiguration)
 	if err != nil {
 		logger.Error(err, "Failed to register kubelet configuration with configz")
 	}
@@ -647,7 +649,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if kubeDeps == nil {
-		kubeDeps, err = UnsecuredDependencies(logger, s, featureGate)
+		kubeDeps, err = UnsecuredDependencies(ctx, s, featureGate)
 		if err != nil {
 			return err
 		}
@@ -665,7 +667,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if err != nil {
 		return err
 	}
-	nodeName, err := getNodeName(logger, kubeDeps.Cloud, hostName)
+	nodeName, err := getNodeName(ctx, kubeDeps.Cloud, hostName)
 	if err != nil {
 		return err
 	}
@@ -1111,7 +1113,8 @@ func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclien
 
 // getNodeName returns the node name according to the cloud provider
 // if cloud provider is specified. Otherwise, returns the hostname of the node.
-func getNodeName(logger klog.Logger, cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
+func getNodeName(ctx context.Context, cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
+	logger := klog.FromContext(ctx)
 	if cloud == nil {
 		return types.NodeName(hostname), nil
 	}
@@ -1133,7 +1136,8 @@ func getNodeName(logger klog.Logger, cloud cloudprovider.Interface, hostname str
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(logger klog.Logger, kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
+func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
+	logger := klog.FromContext(ctx)
 	if !kc.ServerTLSBootstrap && kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
 		kc.TLSCertFile = filepath.Join(kf.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = filepath.Join(kf.CertDirectory, "kubelet.key")
@@ -1243,7 +1247,7 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 		return err
 	}
 	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
-	nodeName, err := getNodeName(logger, kubeDeps.Cloud, hostname)
+	nodeName, err := getNodeName(ctx, kubeDeps.Cloud, hostname)
 	if err != nil {
 		return err
 	}
