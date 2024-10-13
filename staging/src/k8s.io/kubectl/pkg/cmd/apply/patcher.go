@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -386,8 +387,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err := p.delete(namespace, name); err != nil {
 		return modified, nil, err
 	}
-	// TODO: use wait
-	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, p.Timeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := p.Helper.Get(namespace, name); !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -405,7 +405,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		// but still propagate and advertise error to user
 		recreated, recreateErr := p.Helper.Create(namespace, true, original)
 		if recreateErr != nil {
-			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
+			err = fmt.Errorf("an error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
 		} else {
 			createdObject = recreated
 		}
