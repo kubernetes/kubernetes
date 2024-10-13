@@ -24,6 +24,7 @@ const (
 	NodeLabelControlPlane = "node-role.kubernetes.io/control-plane"
 	NodeLabelMaster       = "node-role.kubernetes.io/master"
 	NodeLabelWorker       = "node-role.kubernetes.io/worker"
+	NodeLabelArbiter      = "node-role.kubernetes.io/arbiter"
 	NodeLabelEtcd         = "node-role.kubernetes.io/etcd"
 )
 
@@ -32,6 +33,7 @@ var openshiftNodeLabels = sets.NewString(
 	NodeLabelMaster,
 	NodeLabelWorker,
 	NodeLabelEtcd,
+	NodeLabelArbiter,
 )
 
 func OpenShiftNodeLabels() []string {
