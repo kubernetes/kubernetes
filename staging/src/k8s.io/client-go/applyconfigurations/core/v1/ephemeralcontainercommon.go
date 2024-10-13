@@ -46,6 +46,7 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty"`
 	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty"`
 	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
+	StopSignal               *string                                   `json:"stopSignal,omitempty"`
 	Stdin                    *bool                                     `json:"stdin,omitempty"`
 	StdinOnce                *bool                                     `json:"stdinOnce,omitempty"`
 	TTY                      *bool                                     `json:"tty,omitempty"`
@@ -256,6 +257,14 @@ func (b *EphemeralContainerCommonApplyConfiguration) WithImagePullPolicy(value c
 // If called multiple times, the SecurityContext field is set to the value of the last call.
 func (b *EphemeralContainerCommonApplyConfiguration) WithSecurityContext(value *SecurityContextApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
 	b.SecurityContext = value
+	return b
+}
+
+// WithStopSignal sets the StopSignal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StopSignal field is set to the value of the last call.
+func (b *EphemeralContainerCommonApplyConfiguration) WithStopSignal(value string) *EphemeralContainerCommonApplyConfiguration {
+	b.StopSignal = &value
 	return b
 }
 

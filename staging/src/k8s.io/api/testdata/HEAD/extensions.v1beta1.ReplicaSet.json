@@ -791,6 +791,7 @@
                 "localhostProfile": "localhostProfileValue"
               }
             },
+            "stopSignal": "stopSignalValue",
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1087,6 +1088,7 @@
                 "localhostProfile": "localhostProfileValue"
               }
             },
+            "stopSignal": "stopSignalValue",
             "stdin": true,
             "stdinOnce": true,
             "tty": true
@@ -1383,6 +1385,7 @@
                 "localhostProfile": "localhostProfileValue"
               }
             },
+            "stopSignal": "stopSignalValue",
             "stdin": true,
             "stdinOnce": true,
             "tty": true,

@@ -237,6 +237,14 @@ func (b *EphemeralContainerApplyConfiguration) WithSecurityContext(value *Securi
 	return b
 }
 
+// WithStopSignal sets the StopSignal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StopSignal field is set to the value of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithStopSignal(value string) *EphemeralContainerApplyConfiguration {
+	b.EphemeralContainerCommonApplyConfiguration.StopSignal = &value
+	return b
+}
+
 // WithStdin sets the Stdin field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Stdin field is set to the value of the last call.

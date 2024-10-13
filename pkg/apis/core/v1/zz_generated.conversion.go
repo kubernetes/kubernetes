@@ -3165,6 +3165,7 @@ func autoConvert_v1_Container_To_core_Container(in *corev1.Container, out *core.
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.StopSignal = in.StopSignal
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3200,6 +3201,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *corev1.
 	out.TerminationMessagePolicy = corev1.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*corev1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.StopSignal = in.StopSignal
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3400,6 +3402,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *corev1.Container
 	out.VolumeMounts = *(*[]core.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
 	out.User = (*core.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]core.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
+	out.StopSignal = in.StopSignal
 	return nil
 }
 
@@ -3427,6 +3430,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.VolumeMounts = *(*[]corev1.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
 	out.User = (*corev1.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]corev1.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
+	out.StopSignal = in.StopSignal
 	return nil
 }
 
@@ -3809,6 +3813,7 @@ func autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.StopSignal = in.StopSignal
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3844,6 +3849,7 @@ func autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in
 	out.TerminationMessagePolicy = corev1.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	out.SecurityContext = (*corev1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.StopSignal = in.StopSignal
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
