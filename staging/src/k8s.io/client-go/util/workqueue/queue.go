@@ -212,8 +212,6 @@ type Typed[T comparable] struct {
 	clock                      clock.WithTicker
 }
 
-type t interface{}
-
 // Add marks item as needing processing.
 func (q *Typed[T]) Add(item T) {
 	q.cond.L.Lock()
