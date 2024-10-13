@@ -19,6 +19,7 @@ package dns
 import (
 	"fmt"
 	"io"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"net"
 	"os"
 	"path/filepath"
@@ -36,11 +37,6 @@ import (
 	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 	utilnet "k8s.io/utils/net"
-)
-
-var (
-	// The default dns opt strings.
-	defaultDNSOptions = []string{"ndots:5"}
 )
 
 type podDNSType int
@@ -70,10 +66,14 @@ type Configurer struct {
 	// the container's DNS resolver configuration file. This can be used in
 	// conjunction with clusterDomain and clusterDNS.
 	ResolverConfig string
+	// The ndots option is used for DNS lookups and sets the number of dots (periods) in a domain name.
+	// If the number of dots is less than the specified value, it combines the domain with the local domain for the lookup.
+	// If the value is higher, it tries to resolve the domain name as entered. The default value is 5, and adjusting it can optimize DNS query behavior.
+	DnsNdots int32
 }
 
 // NewConfigurer returns a DNS configurer for launching pods.
-func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
+func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string, dnsNdots int32) *Configurer {
 	return &Configurer{
 		recorder:         recorder,
 		getHostDNSConfig: getHostDNSConfig,
@@ -82,6 +82,7 @@ func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, n
 		clusterDNS:       clusterDNS,
 		ClusterDomain:    clusterDomain,
 		ResolverConfig:   resolverConfig,
+		DnsNdots:         dnsNdots,
 	}
 }
 
@@ -96,6 +97,25 @@ func omitDuplicates(strs []string) []string {
 		}
 	}
 	return ret
+}
+
+func (c *Configurer) generateDefaultDNSOptions() ([]string, error) {
+	var options []string
+	var ndots string
+
+	if c.DnsNdots <= 0 {
+		err := fmt.Errorf("Encountered error while parsing dns-ndots setting. The ndots setting must be greator than 0.")
+		klog.ErrorS(err, "Could not parse dns-ndots setting. The ndots setting must be greator than 0.")
+
+		ndots = fmt.Sprintf("ndots:%d", kubetypes.DNSNdotsDefault)
+		options = append(options, ndots)
+
+		return options, err
+	}
+
+	ndots = fmt.Sprintf("ndots:%d", c.DnsNdots)
+	options = append(options, ndots)
+	return options, nil
 }
 
 func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
@@ -409,6 +429,11 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 				dnsConfig.Servers = append(dnsConfig.Servers, ip.String())
 			}
 			dnsConfig.Searches = c.generateSearchesForDNSClusterFirst(dnsConfig.Searches, pod)
+
+			defaultDNSOptions, err := c.generateDefaultDNSOptions()
+			if err != nil {
+				klog.ErrorS(err, "Failed to get DNS ndots setting. Falling back to default ndots setting.")
+			}
 			dnsConfig.Options = defaultDNSOptions
 			break
 		}

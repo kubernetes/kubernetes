@@ -19,6 +19,7 @@ package types
 const (
 	// ResolvConfDefault is the system default DNS resolver configuration.
 	ResolvConfDefault = "/etc/resolv.conf"
+	DNSNdotsDefault   = 5
 )
 
 // User visible keys for managing node allocatable enforcement on the node.

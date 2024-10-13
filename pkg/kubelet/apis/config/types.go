@@ -279,6 +279,8 @@ type KubeletConfiguration struct {
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string
+	// DnsNdots sets the ndots configuration for all pods on the node. defaults to 5
+	DnsNdots int32
 	// RunOnce causes the Kubelet to check the API server once for pods,
 	// run those in addition to the pods specified by static pod files, and exit.
 	RunOnce bool

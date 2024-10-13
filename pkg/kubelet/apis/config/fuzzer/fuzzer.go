@@ -89,6 +89,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.RegistryBurst = 10
 			obj.RegistryPullQPS = 5
 			obj.ResolverConfig = kubetypes.ResolvConfDefault
+			obj.DnsNdots = kubetypes.DNSNdotsDefault
 			obj.SerializeImagePulls = true
 			obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 			obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}

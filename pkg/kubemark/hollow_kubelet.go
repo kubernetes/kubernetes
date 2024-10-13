@@ -23,13 +23,11 @@ import (
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -201,6 +199,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault
+	c.DnsNdots = 5
 	c.KubeletCgroups = "/kubelet"
 	c.SerializeImagePulls = true
 	c.SystemCgroups = ""
