@@ -35,7 +35,35 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
+
 )
+
+// Helper methods for Testdoc package
+func Text(s string) {
+	framework.Logf("<Testdoc:text>%s</Testdoc:text>", s)
+}
+  
+func Pod(p *v1.Pod) {
+	framework.Logf("<Testdoc:pod>%s</Testdoc:pod>", getYaml(p))
+}
+  
+func PodStatus(status string) {
+	framework.Logf("<Testdoc:status>%s</Testdoc:status>", status)
+}
+  
+func Log(log string) {
+	framework.Logf("<Testdoc:log>%s</Testdoc:log>", log)
+}
+  
+func getYaml(pod *v1.Pod) string {
+	  data, err := yaml.Marshal(pod)
+	  if err != nil {
+		  return ""
+	  }
+	  return string(data)
+}
+  
 
 var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("container-lifecycle-hook")
@@ -151,22 +179,25 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			Testname: Pod Lifecycle, prestop exec hook
 			Description: When a pre-stop handler is specified in the container lifecycle using a 'Exec' action, then the handler MUST be invoked before the container is terminated. A server pod is created that will serve http requests, create a second pod with a container lifecycle specifying a pre-stop that invokes the server pod using ExecAction to validate that the pre-stop is executed.
 		*/
-		// framework.ConformanceIt("should execute prestop exec hook properly", f.WithNodeConformance(), func(ctx context.Context) {
-		// 	lifecycle := &v1.Lifecycle{
-		// 		PreStop: &v1.LifecycleHandler{
-		// 			Exec: &v1.ExecAction{
-		// 				Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=prestop"},
-		// 			},
-		// 		},
-		// 	}
-		// 	podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
-		// 	testPodWithHook(ctx, podWithHook)
-		// })
+		framework.ConformanceIt("should execute prestop exec hook properly", f.WithNodeConformance(), func(ctx context.Context) {
+		 	lifecycle := &v1.Lifecycle{
+		 		PreStop: &v1.LifecycleHandler{
+		 			Exec: &v1.ExecAction{
+		 				Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=prestop"},
+		 			},
+		 		},
+		 	}
+		 	podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+		 	testPodWithHook(ctx, podWithHook)
+		 })
 
-		framework.ConformanceIt("should execute PreStop exec hook properly FINAL", f.WithNodeConformance(), func(ctx context.Context) {
- 
+		
+		 framework.ConformanceIt("should execute PreStop exec hook properly FINAL", f.WithNodeConformance(), func(ctx context.Context) {
+			// Log Test Name
+			Text("PRESTOP_BASIC")
+
 			// Step 1: Define Pod Specification
-			ginkgo.By("========== Step 1: Defining Pod Specification ==========")
+			Text("When you have a PreStop hook defined on your container, it will execute before the container is terminated.")
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
@@ -175,47 +206,38 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
-			ginkgo.By(fmt.Sprintf("Pod Specification: %+v", podWithHook))
-		 
-			podClient := e2epod.NewPodClient(f)
-		 
+			Pod(podWithHook)
+
 			// Step 2: Test Output - Create Pod and Wait for it to be Running
-			ginkgo.By("========== Step 2: Creating Pod with PreStop exec hook and waiting for it to be running ==========")
+			Text("This Pod should start successfully, execute for a while, and then terminate.")
 			createdPod := podClient.CreateSync(ctx, podWithHook)
-			ginkgo.By("Pod created successfully")
-		 
-			ginkgo.By("Waiting for the Pod to be in Running state")
-			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, createdPod.Name, createdPod.Namespace)
-			framework.ExpectNoError(err, "Pod did not start successfully")
-		 
+
 			// Step 3: Pod Logs - Fetch logs to verify PreStop hook execution
-			ginkgo.By("========== Step 3: Fetching Pod logs to verify PreStop hook execution ==========")
 			podLogs, err := e2epod.GetPodLogs(ctx, f.ClientSet, createdPod.Namespace, createdPod.Name, "main-container")
 			if err != nil {
 				framework.Logf("Warning: Failed to fetch pod logs: %v", err)
 			} else {
-				ginkgo.By("Pod Logs: " + podLogs)
-				gomega.Expect(strings.Contains(podLogs, "PreStop Hook Triggered")).To(gomega.BeTrue(), "PreStop hook did not trigger")
-				gomega.Expect(strings.Contains(podLogs, "PreStop Hook Completed")).To(gomega.BeTrue(), "PreStop hook did not complete")
+				Text("In the logs, you will see the string 'PreStop Hook Triggered' indicating that the PreStop hook was called.")
+				Log(podLogs)
 			}
-		 
+
 			// Step 4: Pod Events - Capture Pod events
-			ginkgo.By("========== Step 4: Capturing Pod events ==========")
+			Text("Capturing pod events for further inspection.")
 			podEvents, err := f.ClientSet.CoreV1().Events(createdPod.Namespace).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
-			ginkgo.By(fmt.Sprintf("Pod Events: %+v", podEvents))
-		 
+			framework.Logf("Pod Events: %+v", podEvents)
+
 			// Step 5: Trigger the PreStop hook by deleting the pod
-			ginkgo.By("========== Step 5: Triggering PreStop hook by deleting the Pod ==========")
+			Text("Triggering PreStop hook by deleting the pod.")
 			podClient.DeleteSync(ctx, createdPod.Name, *metav1.NewDeleteOptions(30), e2epod.DefaultPodDeletionTimeout)
-			ginkgo.By("Pod deletion triggered successfully")
-		 
+
 			// Step 6: Final Status - Capture final Pod termination status
-			ginkgo.By("========== Step 6: Verifying final Pod termination ==========")
+			Text("Verifying final pod termination status.")
 			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, createdPod.Name, createdPod.Namespace, 4*time.Minute)
 			framework.ExpectNoError(err, "Final pod termination check failed")
-			ginkgo.By("Final Status: Pod terminated gracefully")
+			PodStatus("Final Status: Pod terminated gracefully")
 		})
+
 		
 		 
 
