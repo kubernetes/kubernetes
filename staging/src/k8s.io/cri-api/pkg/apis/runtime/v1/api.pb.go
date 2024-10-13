@@ -627,8 +627,10 @@ func (m *PortMapping) GetHostIp() string {
 type Mount struct {
 	// Path of the mount within the container.
 	ContainerPath string `protobuf:"bytes,1,opt,name=container_path,json=containerPath,proto3" json:"container_path,omitempty"`
-	// Path of the mount on the host. If the hostPath doesn't exist, then runtimes
-	// should report error. If the hostpath is a symbolic link, runtimes should
+	// Path of the mount on the host. Has to be empty if the image field below
+	// is provided, because those fields are mutually exclusive. If the image
+	// field below is nil and the host path doesn't exist, then runtimes should
+	// report an error. If the hostpath is a symbolic link, runtimes should
 	// follow the symlink and mount the real destination to container.
 	HostPath string `protobuf:"bytes,2,opt,name=host_path,json=hostPath,proto3" json:"host_path,omitempty"`
 	// If set, the mount is read-only.
