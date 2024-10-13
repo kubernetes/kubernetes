@@ -141,7 +141,7 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 	}
 	testClusterDNSDomain := "TEST"
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", 5)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -245,7 +245,7 @@ func TestFormDNSNameserversFitsLimits(t *testing.T) {
 	}
 	testClusterDNSDomain := "TEST"
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", 5)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -352,7 +352,7 @@ func TestGetPodDNSType(t *testing.T) {
 	clusterNS := "203.0.113.1"
 	testClusterDNS := []net.IP{netutils.ParseIPSloppy(clusterNS)}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", 5)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -456,7 +456,7 @@ func TestGetPodDNS(t *testing.T) {
 	testClusterDNSDomain := "kubernetes.io"
 	testClusterDNS := []net.IP{netutils.ParseIPSloppy(clusterNS)}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, "", 5)
 
 	pods := newTestPods(4)
 	pods[0].Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
@@ -502,7 +502,7 @@ func TestGetPodDNS(t *testing.T) {
 		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
 	}
 
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf)
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, defaultResolvConf, int32(defaultDnsNdots))
 	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 	for i, pod := range pods {
 		var err error
@@ -578,7 +578,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
+	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name(), int32(defaultDnsNdots))
 
 	testCases := []struct {
 		desc              string

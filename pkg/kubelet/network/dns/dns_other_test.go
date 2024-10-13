@@ -21,6 +21,7 @@ package dns
 
 var (
 	defaultResolvConf = "/etc/resolv.conf"
+	defaultDnsNdots   = 5
 	// configurer.getHostDNSConfig is faked on Windows, while it is not faked on Linux.
 	fakeGetHostDNSConfigCustom = getHostDNSConfig
 )
