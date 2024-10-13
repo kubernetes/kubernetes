@@ -241,7 +241,7 @@ type Bootstrap interface {
 	ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources()
-	Run(<-chan kubetypes.PodUpdate)
+	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
 
@@ -345,7 +345,8 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration, 
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+func NewMainKubelet(ctx context.Context,
+	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	hostname string,
@@ -373,8 +374,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
 ) (*Kubelet, error) {
-	ctx := context.Background()
-	logger := klog.TODO()
+	logger := klog.FromContext(ctx)
 
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -405,13 +405,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return kubeInformers.Core().V1().Nodes().Informer().HasSynced()
 		}
 		kubeInformers.Start(wait.NeverStop)
-		klog.InfoS("Attempting to sync node with API server")
+		logger.Info("Attempting to sync node with API server")
 	} else {
 		// we don't have a client to sync!
 		nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeLister = corelisters.NewNodeLister(nodeIndexer)
 		nodeHasSynced = func() bool { return true }
-		klog.InfoS("Kubelet is running in standalone mode, will skip API server sync")
+		logger.Info("Kubelet is running in standalone mode, will skip API server sync")
 	}
 
 	if kubeDeps.PodConfig == nil {
@@ -441,7 +441,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if utilfeature.DefaultFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		imageGCPolicy.MaxAge = kubeCfg.ImageMaximumGCAge.Duration
 	} else if kubeCfg.ImageMaximumGCAge.Duration != 0 {
-		klog.InfoS("ImageMaximumGCAge flag enabled, but corresponding feature gate is not enabled. Ignoring flag.")
+		logger.Info("ImageMaximumGCAge flag enabled, but corresponding feature gate is not enabled. Ignoring flag.")
 	}
 
 	enforceNodeAllocatable := kubeCfg.EnforceNodeAllocatable
@@ -492,10 +492,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) {
 				// oomwatcher.NewWatcher returns "open /dev/kmsg: operation not permitted" error,
 				// when running in a user namespace with sysctl value `kernel.dmesg_restrict=1`.
-				klog.V(2).InfoS("Failed to create an oomWatcher (running in UserNS, ignoring)", "err", err)
+				logger.V(2).Info("Failed to create an oomWatcher (running in UserNS, ignoring)", "err", err)
 				oomWatcher = nil
 			} else {
-				klog.ErrorS(err, "Failed to create an oomWatcher (running in UserNS, Hint: enable KubeletInUserNamespace feature flag to ignore the error)")
+				logger.Error(err, "Failed to create an oomWatcher (running in UserNS, Hint: enable KubeletInUserNamespace feature flag to ignore the error)")
 				return nil, err
 			}
 		} else {
@@ -507,7 +507,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	for _, ipEntry := range kubeCfg.ClusterDNS {
 		ip := netutils.ParseIPSloppy(ipEntry)
 		if ip == nil {
-			klog.InfoS("Invalid clusterDNS IP", "IP", ipEntry)
+			logger.Info("Invalid clusterDNS IP", "IP", ipEntry)
 		} else {
 			clusterDNS = append(clusterDNS, ip)
 		}
@@ -765,7 +765,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
 	}
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
-		klog.ErrorS(err, "Pod CIDR update failed")
+		logger.Error(err, "Pod CIDR update failed")
 	}
 
 	// setup containerGC
@@ -830,11 +830,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, fmt.Errorf("while starting informer-based ClusterTrustBundle manager: %w", err)
 		}
 		kubeInformers.Start(wait.NeverStop)
-		klog.InfoS("Started ClusterTrustBundle informer")
+		logger.Info("Started ClusterTrustBundle informer")
 	} else {
 		// In static kubelet mode, use a no-op manager.
 		clusterTrustBundleManager = &clustertrustbundle.NoopManager{}
-		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode")
+		logger.Info("Not starting ClusterTrustBundle informer because we are in static kubelet mode")
 	}
 
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
@@ -1594,8 +1594,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 }
 
 // Run starts the kubelet reacting to config updates
-func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
-	ctx := context.Background()
+func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) {
+	logger := klog.FromContext(ctx)
 	if kl.logServer == nil {
 		file := http.FileServer(http.Dir(nodeLogDir))
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLogQuery) && kl.kubeletConfiguration.EnableSystemLogQuery {
@@ -1632,7 +1632,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		}
 	}
 	if kl.kubeClient == nil {
-		klog.InfoS("No API server defined - no node status update will be sent")
+		logger.Info("No API server defined - no node status update will be sent")
 	}
 
 	// Start the cloud provider sync manager
@@ -1642,12 +1642,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
-		klog.ErrorS(err, "Failed to initialize internal modules")
+		logger.Error(err, "Failed to initialize internal modules")
 		os.Exit(1)
 	}
 
 	if err := kl.cgroupVersionCheck(); err != nil {
-		klog.V(2).InfoS("Warning: cgroup check", "error", err)
+		logger.V(2).Info("Warning: cgroup check", "error", err)
 	}
 
 	// Start volume manager

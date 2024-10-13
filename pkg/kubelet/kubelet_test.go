@@ -61,6 +61,7 @@ import (
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -3034,6 +3035,7 @@ func createRemoteRuntimeService(endpoint string, t *testing.T, tp oteltrace.Trac
 }
 
 func TestNewMainKubeletStandAlone(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
 	ContainerLogsDir = tempDir
 	assert.NoError(t, err)
@@ -3088,6 +3090,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	crOptions := &config.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
+		ctx,
 		kubeCfg,
 		kubeDep,
 		crOptions,

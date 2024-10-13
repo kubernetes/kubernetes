@@ -1265,7 +1265,7 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := createAndInitKubelet(kubeServer,
+	k, err := createAndInitKubelet(ctx, kubeServer,
 		kubeDeps,
 		hostname,
 		hostnameOverridden,
@@ -1293,15 +1293,15 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 		}
 		klog.InfoS("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)
+		startKubelet(ctx, k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)
 		klog.InfoS("Started kubelet")
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
+func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
-	go k.Run(podCfg.Updates())
+	go k.Run(ctx, podCfg.Updates())
 
 	// start the kubelet server
 	if enableServer {
@@ -1313,7 +1313,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 	go k.ListenAndServePodResources()
 }
 
-func createAndInitKubelet(kubeServer *options.KubeletServer,
+func createAndInitKubelet(ctx context.Context, kubeServer *options.KubeletServer,
 	kubeDeps *kubelet.Dependencies,
 	hostname string,
 	hostnameOverridden bool,
@@ -1322,7 +1322,8 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(&kubeServer.KubeletConfiguration,
+	k, err = kubelet.NewMainKubelet(ctx,
+		&kubeServer.KubeletConfiguration,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		hostname,
