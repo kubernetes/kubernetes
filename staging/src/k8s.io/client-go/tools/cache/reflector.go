@@ -121,11 +121,11 @@ type Reflector struct {
 	UseWatchList *bool
 }
 
-func (r *Reflector) GetName() string {
+func (r *Reflector) Name() string {
 	return r.name
 }
 
-func (r *Reflector) GetTypeDescription() string {
+func (r *Reflector) TypeDescription() string {
 	return r.typeDescription
 }
 
