@@ -1132,7 +1132,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					podSpec, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err)
 
-					//subtract a buffer so that the pod still exists
+					// subtract a buffer so that the pod still exists
 					gomega.Consistently(ctx, func() bool {
 						podSpec, err = client.Get(ctx, podSpec.Name, metav1.GetOptions{})
 						framework.ExpectNoError(err)
@@ -1911,7 +1911,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 			})
 		})
 
-		//Same as restartPolicy=Always
+		// Same as restartPolicy=Always
 		ginkgo.It("Should begin initializing the pod, restartPolicy=OnFailure", func(ctx context.Context) {
 			originalPodSpec.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 			originalPodSpec.Name = "restartable-init-container-initialization-imgupdate-onfailure"
@@ -2015,7 +2015,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 				framework.ExpectNoError(err)
 			})
 
-			//Init containers don't restart when restartPolicy=Never
+			// Init containers don't restart when restartPolicy=Never
 			ginkgo.By("Waiting for the pod to fail", func() {
 				err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "", pod.Namespace)
 				framework.ExpectNoError(err)
@@ -4250,8 +4250,8 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 						pod.Spec.InitContainers[1].Image = updatedImage
 					})
 
-					//TODO verify this is the intended behavior
-					//during termination of the regular and last restartable init container
+					// FIXME Consistently: this will be implemented in KEP 4438
+					// During termination of the regular and last restartable init container
 					ginkgo.By("ensuring the restartable init container does not restart during termination", func() {
 						gomega.Consistently(ctx, func() bool {
 							pod, err = client.Get(ctx, pod.Name, metav1.GetOptions{})
