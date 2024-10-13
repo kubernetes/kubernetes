@@ -165,7 +165,7 @@ func (f *RemoteRuntime) StartContainer(ctx context.Context, req *kubeapi.StartCo
 // This call is idempotent, and must not return an error if the container has
 // already been stopped.
 func (f *RemoteRuntime) StopContainer(ctx context.Context, req *kubeapi.StopContainerRequest) (*kubeapi.StopContainerResponse, error) {
-	err := f.RuntimeService.StopContainer(ctx, req.ContainerId, req.Timeout)
+	err := f.RuntimeService.StopContainer(ctx, req.ContainerId, req.Timeout, req.StopSignal)
 	if err != nil {
 		return nil, err
 	}

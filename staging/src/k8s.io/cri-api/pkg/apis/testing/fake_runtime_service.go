@@ -414,7 +414,7 @@ func (r *FakeRuntimeService) StartContainer(_ context.Context, containerID strin
 }
 
 // StopContainer emulates stop of a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) StopContainer(_ context.Context, containerID string, timeout int64) error {
+func (r *FakeRuntimeService) StopContainer(_ context.Context, containerID string, timeout int64, stopSignal string) error {
 	r.Lock()
 	defer r.Unlock()
 
