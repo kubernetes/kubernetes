@@ -96,11 +96,11 @@ func (in instrumentedRuntimeService) StartContainer(ctx context.Context, contain
 	return err
 }
 
-func (in instrumentedRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
+func (in instrumentedRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64, stopSignal string) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StopContainer(ctx, containerID, timeout)
+	err := in.service.StopContainer(ctx, containerID, timeout, stopSignal)
 	recordError(operation, err)
 	return err
 }
