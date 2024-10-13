@@ -1707,9 +1707,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.eventedPleg.Start()
 	}
 
-	if kl.healthChecker != nil {
-		kl.healthChecker.Start()
-	}
+	kl.healthChecker.Start()
 
 	kl.syncLoop(ctx, updates, kl)
 }

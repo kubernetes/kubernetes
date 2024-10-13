@@ -72,6 +72,22 @@ var _ HealthChecker = &healthChecker{}
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
 func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+	hc := &healthChecker{
+		watchdog: &DefaultWatchdogClient{},
+	}
+	// get watchdog information
+	watchdogVal, err := hc.watchdog.SdWatchdogEnabled(false)
+	if err != nil {
+		// Failed to get watchdog configuration information.
+		// This occurs when we want to start the watchdog but the configuration is incorrect,
+		// for example, the time is not configured correctly.
+		return nil, fmt.Errorf("configure watchdog: %w", err)
+	}
+	if watchdogVal == 0 {
+		klog.InfoS("Systemd watchdog is not enabled")
+		return &healthChecker{}, nil
+	}
+
 	// The health checks performed by checkers are the same as those for "/healthz".
 	checkers := []healthz.HealthChecker{
 		healthz.PingHealthz,
@@ -84,33 +100,22 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		Jitter:   0.1,
 		Steps:    2,
 	}
-	hc := &healthChecker{
-		checkers:     checkers,
-		retryBackoff: retryBackoff,
-		watchdog:     &DefaultWatchdogClient{},
-	}
+	hc.checkers = checkers
+	hc.retryBackoff = retryBackoff
+	hc.interval = watchdogVal / 2
+
 	for _, o := range opts {
 		o(hc)
 	}
-
-	// get watchdog information
-	watchdogVal, err := hc.watchdog.SdWatchdogEnabled(false)
-	if err != nil {
-		// Failed to get watchdog configuration information.
-		// This occurs when we want to start the watchdog but the configuration is incorrect,
-		// for example, the time is not configured correctly.
-		return nil, fmt.Errorf("configure watchdog: %w", err)
-	}
-	if watchdogVal == 0 {
-		klog.InfoS("Systemd watchdog is not enabled")
-		return nil, nil
-	}
-	hc.interval = watchdogVal / 2
 
 	return hc, nil
 }
 
 func (hc *healthChecker) Start() {
+	if hc.interval <= 0 {
+		klog.InfoS("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
+		return
+	}
 	klog.InfoS("Starting systemd watchdog with interval", "interval", hc.interval)
 
 	go wait.Forever(func() {
