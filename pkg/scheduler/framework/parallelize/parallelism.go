@@ -52,16 +52,22 @@ func chunkSizeFor(n, parallelism int) int {
 	return s
 }
 
+type DoWorkPieceFuncWithError func(piece int) error
+
 // Until is a wrapper around workqueue.ParallelizeUntil to use in scheduling algorithms.
 // A given operation will be a label that is recorded in the goroutine metric.
-func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string) {
+func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece DoWorkPieceFuncWithError, operation string) {
 	goroutinesMetric := metrics.Goroutines.WithLabelValues(operation)
 	goroutinesDurationMetric := metrics.GoroutinesDuration.WithLabelValues(operation)
 
 	withMetrics := func(piece int) {
 		startTime := time.Now()
+		result := "success"
 		goroutinesMetric.Inc()
-		doWorkPiece(piece)
+		if err := doWorkPiece(piece); err != nil {
+			result = "error"
+		}
+		metrics.GoroutinesExecutionTotal.WithLabelValues(operation, result).Inc()
 		goroutinesMetric.Dec()
 		timeTaken := time.Since(startTime).Seconds()
 		goroutinesDurationMetric.Observe(timeTaken)

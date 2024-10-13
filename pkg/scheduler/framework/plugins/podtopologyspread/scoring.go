@@ -145,20 +145,20 @@ func (pl *PodTopologySpread) PreScore(
 
 	// Ignore parsing errors for backwards compatibility.
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	processAllNode := func(i int) {
+	processAllNode := func(i int) error {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 			if match, _ := requiredNodeAffinity.Match(node); !match {
-				return
+				return nil
 			}
 		}
 
 		// All topologyKeys need to be present in `node`
 		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
-			return
+			return nil
 		}
 
 		for _, c := range state.Constraints {
@@ -178,6 +178,7 @@ func (pl *PodTopologySpread) PreScore(
 			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
 			atomic.AddInt64(tpCount, int64(count))
 		}
+		return nil
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
 

@@ -347,7 +347,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	defer cancel()
 	logger := klog.FromContext(ctx)
 	errCh := parallelize.NewErrorChannel()
-	preemptPod := func(index int) {
+	preemptPod := func(index int) error {
 		victim := c.Victims().Pods[index]
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
@@ -367,18 +367,19 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 				if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
 					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 					errCh.SendErrorWithCancel(err, cancel)
-					return
+					return nil
 				}
 			}
 			if err := util.DeletePod(ctx, cs, victim); err != nil {
 				logger.Error(err, "Preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 				errCh.SendErrorWithCancel(err, cancel)
-				return
+				return nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(pod), "victim", klog.KObj(victim), "node", c.Name())
 		}
 
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", pod.UID, c.Name())
+		return nil
 	}
 
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), preemptPod, ev.PluginName)
@@ -553,7 +554,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 
 	var statusesLock sync.Mutex
 	var errs []error
-	checkNode := func(i int) {
+	checkNode := func(i int) error {
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
 		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
 
@@ -577,7 +578,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 			if nvcSize > 0 && nvcSize+vcSize >= candidatesNum {
 				cancel()
 			}
-			return
+			return nil
 		}
 		if status.IsSuccess() && len(pods) == 0 {
 			status = framework.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeInfoCopy.Node().Name))
@@ -588,6 +589,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 		}
 		nodeStatuses.Set(nodeInfoCopy.Node().Name, status)
 		statusesLock.Unlock()
+		return nil
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)

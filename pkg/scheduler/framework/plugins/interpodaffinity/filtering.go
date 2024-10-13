@@ -155,7 +155,7 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
 	topoMaps := make([]topologyToMatchedTermCount, len(nodes))
 	index := int32(-1)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := nodes[i]
 		node := nodeInfo.Node()
 
@@ -166,6 +166,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 		if len(topoMap) != 0 {
 			topoMaps[atomic.AddInt32(&index, 1)] = topoMap
 		}
+		return nil
 	}
 	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
 
@@ -191,7 +192,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	affinityCountsList := make([]topologyToMatchedTermCount, len(allNodes))
 	antiAffinityCountsList := make([]topologyToMatchedTermCount, len(allNodes))
 	index := int32(-1)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 
@@ -209,6 +210,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 			affinityCountsList[k] = affinity
 			antiAffinityCountsList[k] = antiAffinity
 		}
+		return nil
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 

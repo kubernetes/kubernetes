@@ -622,14 +622,14 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		status *framework.Status
 	}
 	result := make([]*nodeStatus, numAllNodes)
-	checkNode := func(i int) {
+	checkNode := func(i int) error {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
 		nodeInfo := nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == framework.Error {
 			errCh.SendErrorWithCancel(status.AsError(), cancel)
-			return
+			return nil
 		}
 		if status.IsSuccess() {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
@@ -642,6 +642,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		} else {
 			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
+		return nil
 	}
 
 	beginCheckNode := time.Now()

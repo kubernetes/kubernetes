@@ -2441,9 +2441,10 @@ func BenchmarkFilter(b *testing.B) {
 				if _, s := p.PreFilter(ctx, state, tt.pod); !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
-				filterNode := func(i int) {
+				filterNode := func(i int) error {
 					n, _ := p.sharedLister.NodeInfos().Get(allNodes[i].Name)
 					p.Filter(ctx, state, tt.pod, n)
+					return nil
 				}
 				p.parallelizer.Until(ctx, len(allNodes), filterNode, "")
 			}
