@@ -1831,6 +1831,7 @@ func describeContainerBasicInfo(container corev1.Container, status corev1.Contai
 	if ok {
 		w.Write(LEVEL_2, "Image ID:\t%s\n", status.ImageID)
 	}
+	w.Write(LEVEL_2, "StopSignal:\t%s\n", container.StopSignal)
 	portString := describeContainerPorts(container.Ports)
 	if strings.Contains(portString, ",") {
 		w.Write(LEVEL_2, "Ports:\t%s\n", portString)
