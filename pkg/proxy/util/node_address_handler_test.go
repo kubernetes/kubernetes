@@ -379,13 +379,13 @@ func TestGetNodeIPs(t *testing.T) {
 			}
 
 			for _, family := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
-				npa := NewNodePortAddresses(family, tc.cidrs)
+				nah := NewNodeAddressHandler(family, tc.cidrs)
 
-				if npa.MatchAll() != tc.expected[family].matchAll {
+				if nah.MatchAll() != tc.expected[family].matchAll {
 					t.Errorf("unexpected MatchAll(%s), expected: %v", family, tc.expected[family].matchAll)
 				}
 
-				ips, err := npa.GetNodeIPs(nw)
+				ips, err := nah.GetNodeIPs(nw)
 				expectedIPs := tc.expected[family].ips
 
 				// The fake InterfaceAddrs() never returns an error, so
@@ -451,13 +451,13 @@ func TestContainsIPv4Loopback(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			npa := NewNodePortAddresses(v1.IPv4Protocol, tt.cidrStrings)
-			if got := npa.ContainsIPv4Loopback(); got != tt.want {
+			nah := NewNodeAddressHandler(v1.IPv4Protocol, tt.cidrStrings)
+			if got := nah.ContainsIPv4Loopback(); got != tt.want {
 				t.Errorf("IPv4 ContainsIPv4Loopback() = %v, want %v", got, tt.want)
 			}
 			// ContainsIPv4Loopback should always be false for family=IPv6
-			npa = NewNodePortAddresses(v1.IPv6Protocol, tt.cidrStrings)
-			if got := npa.ContainsIPv4Loopback(); got {
+			nah = NewNodeAddressHandler(v1.IPv6Protocol, tt.cidrStrings)
+			if got := nah.ContainsIPv4Loopback(); got {
 				t.Errorf("IPv6 ContainsIPv4Loopback() = %v, want %v", got, false)
 			}
 		})
