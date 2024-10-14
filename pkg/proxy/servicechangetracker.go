@@ -117,11 +117,6 @@ type UpdateServiceMapResult struct {
 	// UpdatedServices lists the names of all services added/updated/deleted since the
 	// last Update.
 	UpdatedServices sets.Set[types.NamespacedName]
-
-	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
-	// that had UDP ports. Callers can use this to abort timeout-waits or clear
-	// connection-tracking information.
-	DeletedUDPClusterIPs sets.Set[string]
 }
 
 // HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
@@ -178,8 +173,7 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 	defer sct.lock.Unlock()
 
 	result := UpdateServiceMapResult{
-		UpdatedServices:      sets.New[types.NamespacedName](),
-		DeletedUDPClusterIPs: sets.New[string](),
+		UpdatedServices: sets.New[types.NamespacedName](),
 	}
 
 	for nn, change := range sct.items {
@@ -192,7 +186,7 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 		// filter out the Update event of current changes from previous changes
 		// before calling unmerge() so that can skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous, result.DeletedUDPClusterIPs)
+		sm.unmerge(change.previous)
 	}
 	// clear changes after applying them to ServicePortMap.
 	sct.items = make(map[types.NamespacedName]*serviceChange)
@@ -226,16 +220,12 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 	}
 }
 
-// unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
-// updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
-func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.Set[string]) {
+// unmerge deletes all other ServicePortMap's elements from current ServicePortMap.
+func (sm *ServicePortMap) unmerge(other ServicePortMap) {
 	for svcPortName := range other {
-		info, exists := (*sm)[svcPortName]
+		_, exists := (*sm)[svcPortName]
 		if exists {
 			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
-			if info.Protocol() == v1.ProtocolUDP {
-				deletedUDPClusterIPs.Insert(info.ClusterIP().String())
-			}
 			delete(*sm, svcPortName)
 		} else {
 			klog.ErrorS(nil, "Service port does not exists", "portName", svcPortName)
