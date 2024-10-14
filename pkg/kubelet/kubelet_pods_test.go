@@ -6018,7 +6018,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			podWorkers, _, processed := createPodWorkers()
 			kl.podWorkers = podWorkers
 			originalPodSyncer := podWorkers.podSyncer
-			syncFuncs := newPodSyncerFuncs(originalPodSyncer)
+			syncFuncs := newTestPodSyncerFuncs(originalPodSyncer)
 			podWorkers.podSyncer = &syncFuncs
 			if tt.terminatingErr != nil {
 				syncFuncs.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
