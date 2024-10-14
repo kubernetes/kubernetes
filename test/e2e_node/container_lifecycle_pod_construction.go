@@ -94,7 +94,7 @@ func ExecCommand(name string, c execCommand) []string {
 	}
 	fmt.Fprintf(&cmd, "echo %s '%s Exiting'  | tee -a %s >> /proc/1/fd/1; ", timeCmd, name, containerLog)
 	fmt.Fprintf(&cmd, "exit %d", c.ExitCode)
-	return []string{"sh", "-c", cmd.String()}
+	return e2epod.GenerateScriptCmd(cmd.String())
 }
 
 // sleepCommand returns a command that sleeps for the given number of seconds
