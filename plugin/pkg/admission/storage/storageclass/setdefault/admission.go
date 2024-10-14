@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+
 	"k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
@@ -100,6 +101,11 @@ func (a *claimDefaulterPlugin) Admit(ctx context.Context, attr admission.Attribu
 
 	if helper.PersistentVolumeClaimHasClass(pvc) {
 		// The user asked for a class.
+		return nil
+	}
+
+	if pvc.Spec.VolumeName != "" {
+		// The user asked for a specific volume.
 		return nil
 	}
 

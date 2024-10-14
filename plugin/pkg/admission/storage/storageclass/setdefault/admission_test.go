@@ -155,6 +155,18 @@ func TestAdmission(t *testing.T) {
 			Namespace: "ns",
 		},
 	}
+	claimWithVolume := &api.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "PersistentVolumeClaim",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "claimWithVolumeName",
+			Namespace: "ns",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			VolumeName: "volume",
+		},
+	}
 
 	tests := []struct {
 		name              string
@@ -176,6 +188,13 @@ func TestAdmission(t *testing.T) {
 			claimWithNoClass,
 			false,
 			"default1",
+		},
+		{
+			"one default, no modification of PVC with volume!=''",
+			[]*storagev1.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			claimWithVolume,
+			false,
+			"",
 		},
 		{
 			"one default, no modification of PVC with class=''",
