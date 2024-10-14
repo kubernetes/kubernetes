@@ -46,7 +46,7 @@ type entry interface {
 
 // channelMap is the storage data structure for channelz.
 //
-// Methods of channelMap can be divided in two two categories with respect to
+// Methods of channelMap can be divided into two categories with respect to
 // locking.
 //
 // 1. Methods acquire the global lock.

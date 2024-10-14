@@ -46,6 +46,10 @@ var (
 	// by setting the environment variable "GRPC_ENFORCE_ALPN_ENABLED" to "true"
 	// or "false".
 	EnforceALPNEnabled = boolFromEnv("GRPC_ENFORCE_ALPN_ENABLED", false)
+	// XDSFallbackSupport is the env variable that controls whether support for
+	// xDS fallback is turned on. If this is unset or is false, only the first
+	// xDS server in the list of server configs will be used.
+	XDSFallbackSupport = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FALLBACK", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

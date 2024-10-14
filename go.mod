@@ -14,7 +14,7 @@ require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/Microsoft/hcsshim v0.12.6
+	github.com/Microsoft/hnslib v0.0.7
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/blang/semver/v4 v4.0.0
@@ -52,7 +52,7 @@ require (
 	github.com/opencontainers/selinux v1.11.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
-	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/client_golang v1.20.2
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
 	github.com/robfig/cron/v3 v3.0.1
@@ -77,12 +77,12 @@ require (
 	golang.org/x/net v0.28.0
 	golang.org/x/oauth2 v0.21.0
 	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.23.0
+	golang.org/x/sys v0.25.0
 	golang.org/x/term v0.23.0
 	golang.org/x/time v0.3.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094
-	google.golang.org/grpc v1.65.0
+	google.golang.org/grpc v1.66.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -137,7 +137,6 @@ require (
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/checkpoint-restore/go-criu/v5 v5.3.0 // indirect
 	github.com/cilium/ebpf v0.11.0 // indirect
-	github.com/containerd/cgroups/v3 v3.0.3 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/containerd/containerd/api v1.7.19 // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
@@ -176,6 +175,8 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/karrick/godirwalk v1.17.0 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
@@ -219,7 +220,7 @@ require (
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect

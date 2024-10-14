@@ -2486,7 +2486,7 @@ type XDPMmapOffsets struct {
 type XDPUmemReg struct {
 	Addr            uint64
 	Len             uint64
-	Chunk_size      uint32
+	Size            uint32
 	Headroom        uint32
 	Flags           uint32
 	Tx_metadata_len uint32
@@ -3807,6 +3807,9 @@ const (
 	ETHTOOL_MSG_PSE_GET_REPLY                 = 0x25
 	ETHTOOL_MSG_RSS_GET_REPLY                 = 0x26
 	ETHTOOL_MSG_KERNEL_MAX                    = 0x2b
+	ETHTOOL_FLAG_COMPACT_BITSETS              = 0x1
+	ETHTOOL_FLAG_OMIT_REPLY                   = 0x2
+	ETHTOOL_FLAG_STATS                        = 0x4
 	ETHTOOL_A_HEADER_UNSPEC                   = 0x0
 	ETHTOOL_A_HEADER_DEV_INDEX                = 0x1
 	ETHTOOL_A_HEADER_DEV_NAME                 = 0x2
