@@ -219,6 +219,9 @@ func TestNewResetData(t *testing.T) {
 			resetOptions := newResetOptions()
 			cmd := newCmdReset(nil, nil, resetOptions)
 
+			// make sure all cases use dry-run as we are not constructing a kubeconfig
+			tc.flags[options.DryRun] = "true"
+
 			// sets cmd flags (that will be reflected on the reset options)
 			for f, v := range tc.flags {
 				cmd.Flags().Set(f, v)

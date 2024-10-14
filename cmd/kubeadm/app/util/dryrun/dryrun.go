@@ -76,7 +76,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		}
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
-		apiclient.PrintBytesWithLinePrefix(w, fileBytes, "\t")
+		fmt.Fprintf(w, "%s", fileBytes)
 	}
 	return errorsutil.NewAggregate(errs)
 }

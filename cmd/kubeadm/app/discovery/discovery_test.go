@@ -21,6 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -76,7 +77,8 @@ func TestFor(t *testing.T) {
 			config.Timeouts = &kubeadm.Timeouts{
 				Discovery: &metav1.Duration{Duration: 1 * time.Minute},
 			}
-			_, actual := For(&config)
+			client := fakeclient.NewSimpleClientset()
+			_, actual := For(client, &config)
 			if (actual == nil) != rt.expect {
 				t.Errorf(
 					"failed For:\n\texpected: %t\n\t  actual: %t",

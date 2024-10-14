@@ -104,10 +104,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 	}
 
 	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
-	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	backupDir, err := kubeadmconstants.CreateTempDir("", "kubeadm-kubelet-config")
 	if err != nil {
 		return err
 	}
+	klog.Warningf("Using temporary directory %s for kubelet config. To override it set the environment variable %s",
+		backupDir, kubeadmconstants.EnvVarUpgradeDryRunDir)
+
 	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
@@ -139,7 +142,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 // GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
 func GetKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
-		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
+		return kubeadmconstants.CreateTempDir("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
 }
