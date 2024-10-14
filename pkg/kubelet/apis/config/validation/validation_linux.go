@@ -28,8 +28,13 @@ import (
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	if kc.FailCgroupV1 && !libcontainercgroups.IsCgroup2UnifiedMode() {
+	isCgroup1 := !libcontainercgroups.IsCgroup2UnifiedMode()
+	if kc.FailCgroupV1 && isCgroup1 {
 		return fmt.Errorf("kubelet is configured to not run on a host using cgroup v1. cgroup v1 support is in maintenance mode")
+	}
+
+	if isCgroup1 && kc.SingleProcessOOMKill != nil && !*kc.SingleProcessOOMKill {
+		return fmt.Errorf("invalid configuration: singleProcessOOMKill must not be explicitly set to false when using cgroup v1")
 	}
 
 	return nil
