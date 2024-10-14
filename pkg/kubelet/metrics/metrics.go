@@ -950,7 +950,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           DRAGRPCOperationsDurationKey,
-			Help:           "Duration in seconds of the DRA GRPC operations",
+			Help:           "Duration in seconds of the DRA gRPC operations",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
