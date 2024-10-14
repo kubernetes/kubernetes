@@ -204,6 +204,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
 	out.ImageMaximumGCAge = in.ImageMaximumGCAge
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	if in.SingleProcessOOMKill != nil {
+		in, out := &in.SingleProcessOOMKill, &out.SingleProcessOOMKill
+		*out = new(bool)
+		**out = **in
+	}
 	if in.CPUManagerPolicyOptions != nil {
 		in, out := &in.CPUManagerPolicyOptions, &out.CPUManagerPolicyOptions
 		*out = make(map[string]string, len(*in))

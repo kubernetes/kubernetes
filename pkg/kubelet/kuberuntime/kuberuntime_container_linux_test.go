@@ -249,12 +249,13 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		cpuReq        *resource.Quantity
-		cpuLim        *resource.Quantity
-		memLim        *resource.Quantity
-		expected      *runtimeapi.LinuxContainerResources
-		cgroupVersion CgroupVersion
+		name                 string
+		cpuReq               *resource.Quantity
+		cpuLim               *resource.Quantity
+		memLim               *resource.Quantity
+		expected             *runtimeapi.LinuxContainerResources
+		cgroupVersion        CgroupVersion
+		singleProcessOOMKill bool
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -322,6 +323,20 @@ func TestCalculateLinuxResources(t *testing.T) {
 			cgroupVersion: cgroupV2,
 		},
 		{
+			name:   "Request128MBLimit256MBSingleProcess",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion:        cgroupV2,
+			singleProcessOOMKill: true,
+		},
+		{
 			name:   "RequestNoMemory",
 			cpuReq: generateResourceQuantity("2"),
 			cpuLim: generateResourceQuantity("8"),
@@ -365,6 +380,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
+		m.singleProcessOOMKill = ptr.To(test.singleProcessOOMKill)
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
@@ -808,16 +824,18 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name          string
-		limits        v1.ResourceList
-		requests      v1.ResourceList
-		expected      *runtimeapi.LinuxContainerResources
-		cgroupVersion CgroupVersion
+		name                 string
+		limits               v1.ResourceList
+		requests             v1.ResourceList
+		singleProcessOOMKill bool
+		expected             *runtimeapi.LinuxContainerResources
+		cgroupVersion        CgroupVersion
 	}{
 		{
 			"requests & limits, cpu & memory, guaranteed qos",
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			true,
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
 			cgroupV1,
 		},
@@ -825,6 +843,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			"requests & limits, cpu & memory, burstable qos",
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			true,
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
 			cgroupV1,
 		},
@@ -832,6 +851,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			"best-effort qos",
 			nil,
 			nil,
+			true,
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
 			cgroupV1,
 		},
@@ -839,6 +859,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			"requests & limits, cpu & memory, guaranteed qos",
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			false,
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
 			cgroupV2,
 		},
@@ -846,6 +867,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			"requests & limits, cpu & memory, burstable qos",
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			false,
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
 			cgroupV2,
 		},
@@ -853,6 +875,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			"best-effort qos",
 			nil,
 			nil,
+			false,
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
 			cgroupV2,
 		},
@@ -862,6 +885,8 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Limits: tc.limits, Requests: tc.requests}
+
+			m.singleProcessOOMKill = ptr.To(tc.singleProcessOOMKill)
 
 			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
