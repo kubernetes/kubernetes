@@ -551,7 +551,7 @@ func validDuration(duration time.Duration, low, high int64) bool {
 	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
 }
 
-var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
+var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -560,6 +560,11 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			podClient = e2epod.NewPodClient(f)
 		})
+		/*
+			Release : v1.32
+			Testname: Pod Lifecycle, prestop sleep hook
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created to verify if its termination time aligns with the sleep time specified when it is terminated.
+		*/
 		ginkgo.It("valid prestop hook using sleep action", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
@@ -580,11 +585,15 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
-
+		/*
+			Release : v1.32
+			Testname: Pod Lifecycle, prestop sleep hook with low gracePeriodSeconds
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod will be created, and its `gracePeriodSeconds` will be modified to a value less than the sleep time before termination. The termination time will then be checked to ensure it aligns with the `gracePeriodSeconds` value.
+		*/
 		ginkgo.It("reduce GracePeriodSeconds during runtime", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 15},
+					Sleep: &v1.SleepAction{Seconds: 30},
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
@@ -592,20 +601,24 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			podClient.CreateSync(ctx, podWithHook)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(5), e2epod.DefaultPodDeletionTimeout)
 			cost := time.Since(start)
 			// cost should be
-			// longer than 2 seconds (we change gracePeriodSeconds to 2 seconds here, and it's less than sleep action)
+			// longer than 5 seconds (we change gracePeriodSeconds to 5 seconds here, and it's less than sleep action)
 			// shorter than sleep action (to make sure it doesn't take effect)
-			if !validDuration(cost, 2, 15) {
+			if !validDuration(cost, 5, 15) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
-
+		/*
+			Release : v1.32
+			Testname: Pod Lifecycle, prestop sleep hook with erroneous startup command
+			Description: When a pre-stop handler is specified in the container lifecycle using a 'Sleep' action, then the handler MUST be invoked before the container is terminated. A test pod with an erroneous startup command will be created, and upon termination, it will be checked whether it ignored the sleep time.
+		*/
 		ginkgo.It("ignore terminated container", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 20},
+					Sleep: &v1.SleepAction{Seconds: 25},
 				},
 			}
 			name := "pod-with-prestop-sleep-hook"
@@ -622,11 +635,10 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			cost := time.Since(start)
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
-			if !validDuration(cost, 0, 15) {
+			if !validDuration(cost, 0, 25) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
-
 	})
 })
 
