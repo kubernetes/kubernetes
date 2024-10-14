@@ -1116,7 +1116,6 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	errCh := parallelize.NewErrorChannel()
 
 	if len(plugins) > 0 {
 		logger := klog.FromContext(ctx)
@@ -1125,7 +1124,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			logger = klog.LoggerWithName(logger, "Score")
 		}
 		// Run Score method for each node in parallel.
-		f.Parallelizer().Until(ctx, len(nodes), func(index int) error {
+		if err := f.Parallelizer().Until(ctx, len(nodes), func(index int) error {
 			nodeName := nodes[index].Node().Name
 			logger := logger
 			if verboseLogs {
@@ -1140,8 +1139,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-					errCh.SendErrorWithCancel(err, cancel)
-					return nil
+					return err
 				}
 				pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
 					Name:  nodeName,
@@ -1149,14 +1147,13 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				}
 			}
 			return nil
-		}, metrics.Score)
-		if err := errCh.ReceiveError(); err != nil {
+		}, metrics.Score); err != nil {
 			return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 		}
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
-	f.Parallelizer().Until(ctx, len(plugins), func(index int) error {
+	if err := f.Parallelizer().Until(ctx, len(plugins), func(index int) error {
 		pl := plugins[index]
 		if pl.ScoreExtensions() == nil {
 			return nil
@@ -1165,18 +1162,16 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreList)
 		if !status.IsSuccess() {
 			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-			errCh.SendErrorWithCancel(err, cancel)
-			return nil
+			return err
 		}
 		return nil
-	}, metrics.Score)
-	if err := errCh.ReceiveError(); err != nil {
+	}, metrics.Score); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
 
 	// Apply score weight for each ScorePlugin in parallel,
 	// and then, build allNodePluginScores.
-	f.Parallelizer().Until(ctx, len(nodes), func(index int) error {
+	if err := f.Parallelizer().Until(ctx, len(nodes), func(index int) error {
 		nodePluginScores := framework.NodePluginScores{
 			Name:   nodes[index].Node().Name,
 			Scores: make([]framework.PluginScore, len(plugins)),
@@ -1189,8 +1184,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 
 			if score > framework.MaxNodeScore || score < framework.MinNodeScore {
 				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, framework.MinNodeScore, framework.MaxNodeScore)
-				errCh.SendErrorWithCancel(err, cancel)
-				return nil
+				return err
 			}
 			weightedScore := score * int64(weight)
 			nodePluginScores.Scores[i] = framework.PluginScore{
@@ -1201,8 +1195,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		}
 		allNodePluginScores[index] = nodePluginScores
 		return nil
-	}, metrics.Score)
-	if err := errCh.ReceiveError(); err != nil {
+	}, metrics.Score); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}
 

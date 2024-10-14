@@ -35,7 +35,6 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -346,7 +345,6 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
-	errCh := parallelize.NewErrorChannel()
 	preemptPod := func(index int) error {
 		victim := c.Victims().Pods[index]
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
@@ -366,14 +364,12 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			if updated {
 				if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
 					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-					errCh.SendErrorWithCancel(err, cancel)
-					return nil
+					return err
 				}
 			}
 			if err := util.DeletePod(ctx, cs, victim); err != nil {
 				logger.Error(err, "Preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-				errCh.SendErrorWithCancel(err, cancel)
-				return nil
+				return err
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(pod), "victim", klog.KObj(victim), "node", c.Name())
 		}
@@ -382,8 +378,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 		return nil
 	}
 
-	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), preemptPod, ev.PluginName)
-	if err := errCh.ReceiveError(); err != nil {
+	if err := fh.Parallelizer().Until(ctx, len(c.Victims().Pods), preemptPod, ev.PluginName); err != nil {
 		return framework.AsStatus(err)
 	}
 

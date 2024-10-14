@@ -37,7 +37,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
@@ -612,7 +611,6 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		return feasibleNodes, nil
 	}
 
-	errCh := parallelize.NewErrorChannel()
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -628,8 +626,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		nodeInfo := nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == framework.Error {
-			errCh.SendErrorWithCancel(status.AsError(), cancel)
-			return nil
+			return status.AsError()
 		}
 		if status.IsSuccess() {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
@@ -656,7 +653,10 @@ func (sched *Scheduler) findNodesThatPassFilters(
 
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
-	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
+	if err := fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter); err != nil {
+		statusCode = framework.Error
+		return feasibleNodes, err
+	}
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
 	for _, item := range result {
 		if item == nil {
@@ -664,10 +664,6 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		}
 		diagnosis.NodeToStatus.Set(item.node, item.status)
 		diagnosis.AddPluginStatus(item.status)
-	}
-	if err := errCh.ReceiveError(); err != nil {
-		statusCode = framework.Error
-		return feasibleNodes, err
 	}
 	return feasibleNodes, nil
 }
