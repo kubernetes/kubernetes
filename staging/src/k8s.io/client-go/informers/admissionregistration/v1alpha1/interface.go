@@ -24,6 +24,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// MutatingAdmissionPolicies returns a MutatingAdmissionPolicyInformer.
+	MutatingAdmissionPolicies() MutatingAdmissionPolicyInformer
+	// MutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindingInformer.
+	MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInformer
 	// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
 	ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInformer
 	// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
@@ -39,6 +43,16 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// MutatingAdmissionPolicies returns a MutatingAdmissionPolicyInformer.
+func (v *version) MutatingAdmissionPolicies() MutatingAdmissionPolicyInformer {
+	return &mutatingAdmissionPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// MutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindingInformer.
+func (v *version) MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInformer {
+	return &mutatingAdmissionPolicyBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
