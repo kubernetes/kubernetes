@@ -568,6 +568,7 @@ const (
 	// kep: http://kep.k8s.io/3960
 	// alpha: v1.29
 	// beta: v1.30
+	// GA: v1.32
 	//
 	// Enables SleepAction in container lifecycle hooks
 	PodLifecycleSleepAction featuregate.Feature = "PodLifecycleSleepAction"

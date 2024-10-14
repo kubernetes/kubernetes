@@ -1824,29 +1824,6 @@ func TestPodLifecycleSleepActionEnablement(t *testing.T) {
 		}
 	}
 
-	podWithoutHandler := func() *api.Pod {
-		return &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:       "default",
-				Name:            "foo",
-				ResourceVersion: "1",
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSDefault,
-				Containers: []api.Container{
-					{
-						Name:                     "container",
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-					},
-				},
-				TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
-			},
-		}
-	}
-
 	testCases := []struct {
 		description string
 		gateEnabled bool
@@ -1859,18 +1836,10 @@ func TestPodLifecycleSleepActionEnablement(t *testing.T) {
 			newPod:      podWithHandler(),
 			wantPod:     podWithHandler(),
 		},
-		{
-			description: "gate disabled, creating pods with sleep action",
-			gateEnabled: false,
-			newPod:      podWithHandler(),
-			wantPod:     podWithoutHandler(),
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)
-
 			newPod := tc.newPod
 
 			Strategy.PrepareForCreate(genericapirequest.NewContext(), newPod)
