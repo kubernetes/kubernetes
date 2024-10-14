@@ -233,6 +233,7 @@ var (
 		"Logging.Options.Text.OutputRoutingOptions.SplitStream",
 		"Logging.VModule[*].FilePattern",
 		"Logging.VModule[*].Verbosity",
+		"SingleProcessOOMKill",
 		"Logging.Verbosity",
 		"TLSCipherSuites[*]",
 		"TLSMinVersion",

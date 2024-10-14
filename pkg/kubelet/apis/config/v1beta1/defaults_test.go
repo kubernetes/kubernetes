@@ -31,10 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultsKubeletConfiguration(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		config   *v1beta1.KubeletConfiguration
@@ -130,6 +130,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				SingleProcessOOMKill:          nil,
 			},
 		},
 		{
@@ -261,6 +262,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                    utilpointer.Bool(false),
 				LocalStorageCapacityIsolation:   utilpointer.Bool(false),
 				PodLogsDir:                      "",
+				SingleProcessOOMKill:            ptr.To(false),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(false),
@@ -363,6 +365,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(false),
 				LocalStorageCapacityIsolation: utilpointer.Bool(false),
 				PodLogsDir:                    DefaultPodLogsDir,
+				SingleProcessOOMKill:          ptr.To(false),
 			},
 		},
 		{
@@ -516,6 +519,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
+				SingleProcessOOMKill:          ptr.To(true),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(true),
@@ -666,6 +670,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
+				SingleProcessOOMKill:          ptr.To(true),
 			},
 		},
 		{
@@ -759,6 +764,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				SingleProcessOOMKill:          nil,
 			},
 		},
 		{
@@ -852,6 +858,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				SingleProcessOOMKill:          nil,
 			},
 		},
 		{
@@ -945,6 +952,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				SingleProcessOOMKill:          nil,
 			},
 		},
 	}
