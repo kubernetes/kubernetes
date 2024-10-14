@@ -39,7 +39,7 @@ type cachingAuthorizer struct {
 	decisions  map[string]authzResult
 }
 
-// NewCachingAuthorizer returns and author that caches decisions for the duration
+// NewCachingAuthorizer returns an authorizer that caches decisions for the duration
 // of the authorizers use.  Intended to be used for short-lived operations such as
 // the handling of a request in the admission chain, and then discarded.
 func NewCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
