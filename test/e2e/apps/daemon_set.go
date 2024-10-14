@@ -184,8 +184,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, ds))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("Stop a daemon pod, check that the daemon pod is revived.")
 		podList := listDaemonPods(ctx, c, ns, label)
@@ -224,8 +224,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		gomega.Expect(daemonSetLabels).To(gomega.HaveLen(1))
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{newNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("Update the node label to green, and wait for daemons to be unscheduled")
 		nodeSelector[daemonsetColorLabel] = "green"
@@ -243,8 +243,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		gomega.Expect(daemonSetLabels).To(gomega.HaveLen(1))
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{greenNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 	})
 
 	// We defer adding this test to conformance pending the disposition of moving DaemonSet scheduling logic to the
@@ -287,8 +287,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		gomega.Expect(daemonSetLabels).To(gomega.HaveLen(1))
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{newNode.Name}))
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("Remove the node label and wait for daemons to be unscheduled")
 		_, err = setDaemonSetNodeLabels(ctx, c, node.Name, map[string]string{})
@@ -312,8 +312,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, ds))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("Set a daemon pod's phase to 'Failed', check that the daemon pod is revived.")
 		podList := listDaemonPods(ctx, c, ns, label)
@@ -863,8 +863,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, testDaemonset))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("listing all DaemonSets")
 		dsList, err := cs.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
@@ -911,8 +911,8 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkRunningOnAllNodes(f, testDaemonset))
 		framework.ExpectNoError(err, "error waiting for daemon pod to start")
-		err = e2edaemonset.CheckDaemonStatus(ctx, f, dsName)
-		framework.ExpectNoError(err)
+		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, dsName))
+		framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
 
 		ginkgo.By("Getting /status")
 		dsResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}
