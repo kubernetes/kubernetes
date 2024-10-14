@@ -662,6 +662,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ServiceAccountNodeAudienceRestriction: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ServiceAccountTokenJTI: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},

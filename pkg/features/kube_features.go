@@ -585,6 +585,13 @@ const (
 	// Decouples Taint Eviction Controller, performing taint-based Pod eviction, from Node Lifecycle Controller.
 	SeparateTaintEvictionController featuregate.Feature = "SeparateTaintEvictionController"
 
+	// owner: @aramase
+	// kep: https://kep.k8s.io/4412
+	//
+	// ServiceAccountNodeAudienceRestriction is used to restrict the audience for which the
+	// kubelet can request a service account token for.
+	ServiceAccountNodeAudienceRestriction featuregate.Feature = "ServiceAccountNodeAudienceRestriction"
+
 	// owner: @munnerz
 	// kep: http://kep.k8s.io/4193
 	//
