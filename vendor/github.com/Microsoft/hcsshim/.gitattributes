@@ -1,3 +1,0 @@
-* text=auto eol=lf
-vendor/** -text
-test/vendor/** -text
