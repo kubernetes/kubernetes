@@ -1538,7 +1538,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
 	containerStatuses := []*kubecontainer.Status{}
-	var timestamp time.Time
+	timestamp := time.Now()
 
 	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
@@ -1582,7 +1582,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			} else {
 				// Get the statuses of all containers visible to the pod and
 				// timestamp from sandboxStatus.
-				timestamp = time.Unix(resp.Timestamp, 0)
+				timestamp = time.Unix(0, resp.Timestamp)
 				for _, cs := range resp.ContainersStatuses {
 					cStatus := m.convertToKubeContainerStatus(cs)
 					containerStatuses = append(containerStatuses, cStatus)
