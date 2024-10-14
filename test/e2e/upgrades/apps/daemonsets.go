@@ -94,6 +94,8 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(ctx context.Context, f *
 
 	// DaemonSet resource itself should be good
 	ginkgo.By("confirming the DaemonSet resource is in a good state")
-	err = e2edaemonset.CheckDaemonStatus(ctx, f, t.daemonSet.Name)
-	framework.ExpectNoError(err)
+
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, t.daemonSet.Name))
+	framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
+
 }
