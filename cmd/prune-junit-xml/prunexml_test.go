@@ -28,7 +28,7 @@ import (
 func TestPruneXML(t *testing.T) {
 	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="3" failures="1" time="271.610000" name="k8s.io/kubernetes/test/integration/apiserver" timestamp="">
+	<testsuite tests="4" failures="2" time="271.610000" name="k8s.io/kubernetes/test/integration/apiserver" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
@@ -39,12 +39,15 @@ func TestPruneXML(t *testing.T) {
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestSchedulerInformers" time="-0.000000">
 			<failure message="Failed" type="">&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/transport/transport.go:169 +0x147&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/transport.(*transportReader).Read(0xc0e5f8edb0, {0xc0efe16f88?, 0xc1169d3a88?, 0x1804787?})&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/transport/transport.go:483 +0x32&#xA;io.ReadAtLeast({0x55c5720, 0xc0e5f8edb0}, {0xc0efe16f88, 0x5, 0x5}, 0x5)&#xA;&#x9;/usr/local/go/src/io/io.go:331 +0x9a&#xA;io.ReadFull(...)&#xA;&#x9;/usr/local/go/src/io/io.go:350&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/transport.(*Stream).Read(0xc0f3cd67e0, {0xc0efe16f88, 0x5, 0x5})&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/internal/transport/transport.go:467 +0xa5&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.(*parser).recvMsg(0xc0efe16f78, 0x7fffffff)&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/rpc_util.go:559 +0x47&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.recvAndDecompress(0xc1169d3c58?, 0xc0f3cd67e0, {0x0, 0x0}, 0x7fffffff, 0x0, {0x0, 0x0})&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/rpc_util.go:690 +0x66&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.recv(0x172b28f?, {0x7f837c291d58, 0x7f84350}, 0x6f5a274d6e8f284c?, {0x0?, 0x0?}, {0x4be7d40, 0xc0f8c01d50}, 0x0?, 0x0, ...)&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/rpc_util.go:758 +0x6e&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.(*csAttempt).recvMsg(0xc0eb72d800, {0x4be7d40?, 0xc0f8c01d50}, 0x2?)&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/stream.go:970 +0x2b0&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.(*clientStream).RecvMsg.func1(0x4be7d40?)&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/stream.go:821 +0x25&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.(*clientStream).withRetry(0xc0f3cd65a0, 0xc1169d3e78, 0xc1169d3e48)&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/stream.go:675 +0x2f6&#xA;k8s.io/kubernetes/vendor/google.golang.org/grpc.(*clientStream).RecvMsg(0xc0f3cd65a0, {0x4be7d40?, 0xc0f8c01d50?})&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/google.golang.org/grpc/stream.go:820 +0x11f&#xA;k8s.io/kubernetes/vendor/github.com/grpc-ecosystem/go-grpc-prometheus.(*monitoredClientStream).RecvMsg(0xc0efe16f90, {0x4be7d40?, 0xc0f8c01d50?})&#xA;&#x9;/home/prow/go/src/k8s.io/kubernetes/_output/local/go/src/k8s.io/kubernetes/vendor/github.com/grpc-ecosystem/go-grpc-prometheus/client_metrics.go:160</failure>
 		</testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestLog" time="-0.000000">
+			<failure message="Failed" type="">logparse_test.go:29: I1007 13:28:21.909085] klog output&#xA;FAIL: fake failure&#xA;</failure>
+		</testcase>
 	</testsuite>
 </testsuites>`
 
 	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="3" failures="1" time="271.610000" name="k8s.io/kubernetes/test/integration/apiserver" timestamp="">
+	<testsuite tests="4" failures="2" time="271.610000" name="k8s.io/kubernetes/test/integration/apiserver" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
@@ -54,6 +57,10 @@ func TestPruneXML(t *testing.T) {
 		</testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestSchedulerInformers" time="-0.000000">
 			<failure message="Failed" type="">&#xA;&#x9;/home/prow/go/[...clipped...]t_metrics.go:160</failure>
+		</testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery" name="TestLog" time="-0.000000">
+			<failure message="Failed" type="">FAIL: fake failure&#xA;</failure>
+			<system-out>logparse_test.go[...clipped...]L: fake failure&#xA;</system-out>
 		</testcase>
 	</testsuite>
 </testsuites>`
