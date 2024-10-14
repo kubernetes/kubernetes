@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -1188,7 +1187,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				util.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
+				"kubernetes.io/createdby": "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

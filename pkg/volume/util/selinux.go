@@ -17,11 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,7 +74,7 @@ func (l *translator) SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string,
 	if err != nil {
 		// In theory, this should be unreachable. InitLabels can fail only when args contain an unknown option,
 		// and all options returned by contextOptions are known.
-		return "", err
+		return "", &SELinuxLabelTranslationError{msg: err.Error()}
 	}
 	// InitLabels() may allocate a new unique SELinux label in kubelet memory. The label is *not* allocated
 	// in the container runtime. Clear it to avoid memory problems.
@@ -156,6 +159,19 @@ func (l *fakeTranslator) SELinuxEnabled() bool {
 	return true
 }
 
+type SELinuxLabelTranslationError struct {
+	msg string
+}
+
+func (e *SELinuxLabelTranslationError) Error() string {
+	return e.msg
+}
+
+func IsSELinuxLabelTranslationError(err error) bool {
+	var seLinuxError *SELinuxLabelTranslationError
+	return errors.As(err, &seLinuxError)
+}
+
 // SupportsSELinuxContextMount checks if the given volumeSpec supports with mount -o context
 func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
 	plugin, _ := volumePluginMgr.FindPluginBySpec(volumeSpec)
@@ -191,6 +207,24 @@ func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
 	return true
 }
 
+// MultipleSELinuxLabelsError tells that one volume in a pod is mounted in multiple containers and each has a different SELinux label.
+type MultipleSELinuxLabelsError struct {
+	labels []string
+}
+
+func (e *MultipleSELinuxLabelsError) Error() string {
+	return fmt.Sprintf("multiple SELinux labels found: %s", strings.Join(e.labels, ","))
+}
+
+func (e *MultipleSELinuxLabelsError) Labels() []string {
+	return e.labels
+}
+
+func IsMultipleSELinuxLabelsError(err error) bool {
+	var multiError *MultipleSELinuxLabelsError
+	return errors.As(err, &multiError)
+}
+
 // AddSELinuxMountOption adds -o context="XYZ" mount option to a given list
 func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
@@ -199,4 +233,77 @@ func AddSELinuxMountOption(options []string, seLinuxContext string) []string {
 	// Use double quotes to support a comma "," in the SELinux context string.
 	// For example: dirsync,context="system_u:object_r:container_file_t:s0:c15,c25",noatime
 	return append(options, fmt.Sprintf("context=%q", seLinuxContext))
+}
+
+// SELinuxLabelInfo contains information about SELinux labels that should be used to mount a volume for a Pod.
+type SELinuxLabelInfo struct {
+	// SELinuxMountLabel is the SELinux label that should be used to mount the volume.
+	// The volume plugin supports SELinuxMount and the Pod did not opt out via SELinuxChangePolicy.
+	// Empty string otherwise.
+	SELinuxMountLabel string
+	// SELinuxProcessLabel is the SELinux label that will the container runtime use for the Pod.
+	// Regardless if the volume plugin supports SELinuxMount or the Pod opted out via SELinuxChangePolicy.
+	SELinuxProcessLabel string
+	// PluginSupportsSELinuxContextMount is true if the volume plugin supports SELinux mount.
+	PluginSupportsSELinuxContextMount bool
+}
+
+// GetMountSELinuxLabel returns SELinux labels that should be used to mount the given volume volumeSpec and podSecurityContext.
+// It does not evaluate the volume access mode! It's up to the caller to check SELinuxMount feature gate,
+// it may need to bump different metrics based on feature gates / access modes / label anyway.
+func GetMountSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext, volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator SELinuxLabelTranslator) (SELinuxLabelInfo, error) {
+	info := SELinuxLabelInfo{}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		return info, nil
+	}
+
+	if !seLinuxTranslator.SELinuxEnabled() {
+		return info, nil
+	}
+
+	pluginSupportsSELinuxContextMount, err := SupportsSELinuxContextMount(volumeSpec, volumePluginMgr)
+	if err != nil {
+		return info, err
+	}
+
+	info.PluginSupportsSELinuxContextMount = pluginSupportsSELinuxContextMount
+
+	// Collect all SELinux options from all containers that use this volume.
+	labels := sets.New[string]()
+	for _, containerContext := range seLinuxContainerContexts {
+		lbl, err := seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
+		if err != nil {
+			fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %w", containerContext, err)
+			return info, fullErr
+		}
+		labels.Insert(lbl)
+	}
+
+	// Ensure that all containers use the same SELinux label.
+	if labels.Len() > 1 {
+		// This volume is used with more than one SELinux label in the pod.
+		return info, &MultipleSELinuxLabelsError{labels: labels.UnsortedList()}
+	}
+	if labels.Len() == 0 {
+		return info, nil
+	}
+
+	lbl, _ := labels.PopAny()
+	info.SELinuxProcessLabel = lbl
+	info.SELinuxMountLabel = lbl
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) &&
+		podSecurityContext != nil &&
+		podSecurityContext.SELinuxChangePolicy != nil &&
+		*podSecurityContext.SELinuxChangePolicy == v1.SELinuxChangePolicyRecursive {
+		// The pod has opted into recursive SELinux label changes. Do not mount with -o context.
+		info.SELinuxMountLabel = ""
+	}
+
+	if !pluginSupportsSELinuxContextMount {
+		// The volume plugin does not support SELinux mount. Do not mount with -o context.
+		info.SELinuxMountLabel = ""
+	}
+
+	return info, nil
 }
