@@ -277,7 +277,7 @@ func checkBadConfig(s *ProxyServer) error {
 		}
 	}
 
-	// Warn if NodePortAddresses does not limit connections on all IP families that
+	// Warn if NodeAddressHandler does not limit connections on all IP families that
 	// seem to be in use.
 	cidrsByFamily := proxyutil.MapCIDRsByIPFamily(s.Config.NodePortAddresses)
 	if len(s.Config.NodePortAddresses) == 0 {
@@ -347,7 +347,7 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		}
 	}
 
-	// Note that s.Config.NodePortAddresses gets checked as part of checkBadConfig()
+	// Note that s.Config.NodeAddressHandler gets checked as part of checkBadConfig()
 	// so it doesn't need to be checked here.
 
 	return utilerrors.NewAggregate(errors), fatal
