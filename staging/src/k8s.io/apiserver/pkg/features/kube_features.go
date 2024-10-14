@@ -264,6 +264,7 @@ const (
 
 	// owner: @p0lyn0mial
 	// alpha: v1.27
+	// beta: v1.32
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
@@ -447,6 +448,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	WatchList: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ZeroLimitedNominalConcurrencyShares: {
