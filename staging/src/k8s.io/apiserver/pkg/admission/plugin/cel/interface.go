@@ -63,6 +63,9 @@ type OptionalVariableDeclarations struct {
 	HasAuthorizer bool
 	// StrictCost specifies if the CEL cost limitation is strict for extended libraries as well as native libraries.
 	StrictCost bool
+	// HasPatchTypes specifies if JSONPatch, Object, Object.metadata and similar types are available in CEL. These can be used
+	// to initialize the typed objects in CEL required to create patches.
+	HasPatchTypes bool
 }
 
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
@@ -91,6 +94,26 @@ type Filter interface {
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 	// If cost budget is calculated, the filter should return the remaining budget.
 	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
+
+	// CompilationErrors returns a list of errors from the compilation of the evaluator
+	CompilationErrors() []error
+}
+
+// EvaluatorCompiler contains a function to assist with converting types and values to/from CEL-typed values.
+type EvaluatorCompiler interface {
+	// CompileEvaluator is used for the cel expression compilation
+	CompileEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Evaluator
+}
+
+// Evaluator contains the result of compiling a CEL expression.
+// It expects the inbound object to already have been converted to the version expected
+// by the underlying CEL code (which is indicated by the match criteria of a policy definition).
+// versionedParams may be nil.
+type Evaluator interface {
+	// ForInput converts compiled CEL-typed values into a CEL-typed value to be patched.
+	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
+	// If cost budget is calculated, the filter should return the remaining budget.
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) (EvaluationResult, int64, error)
 
 	// CompilationErrors returns a list of errors from the compilation of the evaluator
 	CompilationErrors() []error
