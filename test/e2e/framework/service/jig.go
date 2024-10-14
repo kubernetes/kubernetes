@@ -57,8 +57,11 @@ import (
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
+// It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
 
+// staticPortRange implements port allocation model described here
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3668-reserved-service-nodeport-range
 type staticPortRange struct {
 	sync.Mutex
 	baseport      int
@@ -66,21 +69,23 @@ type staticPortRange struct {
 	reservedPorts sets.Set[int]
 }
 
-func calculateRange(base int, size int) int {
+func calculateRange(size int) int {
 	minPort := 16
 	step := 32
 	maxPort := 128
 	return min(max(minPort, size/step), maxPort)
 }
 
+var staticPortAllocator *staticPortRange
+
 // Initialize only once per test
-var (
+func init() {
 	staticPortAllocator = &staticPortRange{
 		baseport:      NodePortRange.Base,
-		length:        calculateRange(NodePortRange.Base, NodePortRange.Size),
+		length:        calculateRange(NodePortRange.Size),
 		reservedPorts: sets.New[int](),
 	}
-)
+}
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {

@@ -1706,7 +1706,10 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 		nodePort := service.Spec.Ports[0].NodePort
-		e2eservice.ReserveStaticNodePort(int(nodePort))
+		ok := e2eservice.ReserveStaticNodePort(int(nodePort))
+		if !ok {
+			framework.Logf("Static node port allocator was not able to reserve nodeport: %d", nodePort)
+		}
 		defer e2eservice.ReleaseStaticNodePort(int(nodePort))
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
@@ -3976,11 +3979,13 @@ var _ = common.SIGDescribe("Services", func() {
 			return err
 		})
 
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", svc.Name, namespace)
 		gomega.Expect(svc).NotTo(gomega.BeNil(), "creating the service")
-		e2eservice.ReserveStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+		ok := e2eservice.ReserveStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+		if !ok {
+			framework.Logf("Static node port allocator was not able to reserve healthcheckNodePort: %d", svc.Spec.HealthCheckNodePort)
+		}
 		defer e2eservice.ReleaseStaticNodePort(int(svc.Spec.HealthCheckNodePort))
-
-		framework.ExpectNoError(err, "creating the service")
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
 		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)
