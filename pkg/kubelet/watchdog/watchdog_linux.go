@@ -75,6 +75,10 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
+	for _, o := range opts {
+		o(hc)
+	}
+
 	// get watchdog information
 	watchdogVal, err := hc.watchdog.SdWatchdogEnabled(false)
 	if err != nil {
@@ -103,10 +107,6 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	hc.checkers = checkers
 	hc.retryBackoff = retryBackoff
 	hc.interval = watchdogVal / 2
-
-	for _, o := range opts {
-		o(hc)
-	}
 
 	return hc, nil
 }
