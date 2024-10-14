@@ -197,7 +197,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	EventedPLEG: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Deprecated}, // for testing, we do not decide to deprecate it yet.
 	},
 
 	ExecProbeTimeout: {
