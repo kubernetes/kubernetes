@@ -157,8 +157,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 				continue
 			} else if _, err = versionedAttrAccessor.VersionedAttribute(matchGVK); err != nil {
 				// VersionedAttr result will be cached and reused later during parallel
-				// hook calls
-				//
+				// hook calls.
 				addConfigError(err, policyAccessor, nil)
 				continue
 			}
