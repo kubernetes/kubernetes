@@ -198,7 +198,10 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 
 	// We always filter by driver name, by node name only for node-local resources.
-	selector := fields.Set{resourceapi.ResourceSliceSelectorDriver: c.driver}
+	selector := fields.Set{
+		resourceapi.ResourceSliceSelectorDriver:   c.driver,
+		resourceapi.ResourceSliceSelectorNodeName: "",
+	}
 	if c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
