@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -60,6 +61,7 @@ type CSILimits struct {
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
+	vaLister      storagelisters.VolumeAttachmentLister
 
 	randomVolumeIDPrefix string
 
@@ -217,6 +219,12 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		attachedVolumeCount[driverName]++
 	}
 
+	// Get volume count from VolumeAttachments
+	volumeAttachments, err := pl.listVolumeAttachments(logger, node.Name)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+
 	// Count the new volumes count per driver
 	newVolumeCount := map[string]int{}
 	for _, driverName := range newVolumes {
@@ -227,6 +235,10 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		maxVolumeLimit, ok := nodeVolumeLimits[driverName]
 		if ok {
 			currentVolumeCount := attachedVolumeCount[driverName]
+			volumeAttachmentsCount := volumeAttachments[driverName]
+			if volumeAttachmentsCount > currentVolumeCount {
+				currentVolumeCount = volumeAttachmentsCount
+			}
 			logger.V(5).Info("Found plugin volume limits", "node", node.Name, "driverName", driverName,
 				"maxLimits", maxVolumeLimit, "currentVolumeCount", currentVolumeCount, "newVolumeCount", count,
 				"pod", klog.KObj(pod))
@@ -453,6 +465,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
+	vaLister := informerFactory.Storage().V1().VolumeAttachments().Lister()
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
@@ -460,6 +473,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 		pvLister:             pvLister,
 		pvcLister:            pvcLister,
 		scLister:             scLister,
+		vaLister:             vaLister,
 		randomVolumeIDPrefix: rand.String(32),
 		translator:           csiTranslator,
 	}, nil
@@ -479,4 +493,23 @@ func getVolumeLimits(csiNode *storagev1.CSINode) map[string]int64 {
 		}
 	}
 	return nodeVolumeLimits
+}
+
+// listVolumeAttachments returns a map of driver to volume attachments for the given node.
+func (pl *CSILimits) listVolumeAttachments(logger klog.Logger, nodeName string) (map[string]int, error) {
+	volumeAttachments := make(map[string]int)
+	vas, err := pl.vaLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	for _, va := range vas {
+		if va.Spec.NodeName == nodeName {
+			if va.Spec.Attacher == "" {
+				logger.V(5).Info("VolumeAttachment has no attacher", "VolumeAttachment", klog.KObj(va))
+				continue
+			}
+			volumeAttachments[va.Spec.Attacher]++
+		}
+	}
+	return volumeAttachments, nil
 }

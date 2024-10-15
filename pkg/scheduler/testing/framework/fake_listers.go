@@ -313,3 +313,27 @@ func (classes StorageClassLister) Get(name string) (*storagev1.StorageClass, err
 func (classes StorageClassLister) List(selector labels.Selector) ([]*storagev1.StorageClass, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+// VolumeAttachmentLister declares a []storagev1.VolumeAttachment type for testing.
+type VolumeAttachmentLister []storagev1.VolumeAttachment
+
+var _ storagelisters.VolumeAttachmentLister = VolumeAttachmentLister{}
+
+// List lists all VolumeAttachments in the indexer.
+func (val VolumeAttachmentLister) List(selector labels.Selector) (ret []*storagev1.VolumeAttachment, err error) {
+	var list []*storagev1.VolumeAttachment
+	for i := range val {
+		list = append(list, &val[i])
+	}
+	return list, nil
+}
+
+// Get returns a fake VolumeAttachment object from the fake VolumeAttachments by name.
+func (val VolumeAttachmentLister) Get(name string) (*storagev1.VolumeAttachment, error) {
+	for _, va := range val {
+		if va.Name == name {
+			return &va, nil
+		}
+	}
+	return nil, errors.NewNotFound(storagev1.Resource("volumeattachments"), name)
+}
