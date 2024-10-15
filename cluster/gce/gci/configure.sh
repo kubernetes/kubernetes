@@ -602,7 +602,7 @@ function install-auth-provider-gcp {
   mv "${KUBE_HOME}/${filename}" "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}"
   chmod a+x "${AUTH_PROVIDER_GCP_LINUX_BIN_DIR}/${filename}"
 
-  cat >> "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
+  cat > "${AUTH_PROVIDER_GCP_LINUX_CONF_FILE}" << EOF
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
