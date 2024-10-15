@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -605,170 +606,6 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	verifyDesiredSizeLimitInVolumeDsw(t, pod2Name, pod2DesiredSizeLimitMap, dsw)
 }
 
-// Calls AddPodToVolume() with a volume that support SELinux, but is ReadWriteMany.
-// Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: true,
-				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux := v1.SELinuxOptions{
-		User:  "system_u",
-		Role:  "object_r",
-		Type:  "container_t",
-		Level: "s0:c1,c2",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
-}
-
-// Calls AddPodToVolume() with a volume that does not support SELinux.
-// Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: false,
-				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux := v1.SELinuxOptions{
-		User:  "system_u",
-		Role:  "object_r",
-		Type:  "container_t",
-		Level: "s0:c1,c2",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
-}
-
 // Calls AddPodToVolume() twice to add two pods with the same SELinuxContext
 // to the same ReadWriteOncePod PV.
 // Verifies newly added pod/volume exists via PodExistsInVolume()
@@ -976,6 +813,160 @@ func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) 
 	}
 	// Verify the original SELinux context is still in DSW
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
+}
+
+// Calls AddPodToVolume() in an empty DSW with various SELinux settings / access modes.
+func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
+	completeSELinuxOpts := v1.SELinuxOptions{
+		User:  "system_u",
+		Role:  "object_r",
+		Type:  "container_t",
+		Level: "s0:c1,c2",
+	}
+	completeSELinuxLabel := "system_u:object_r:container_file_t:s0:c1,c2"
+
+	incompleteSELinuxOpts := v1.SELinuxOptions{
+		Level: "s0:c1,c2",
+	}
+
+	tests := []struct {
+		name                        string
+		featureGates                []featuregate.Feature
+		volumePluginSupportsSELinux bool
+		volumeAccessMode            v1.PersistentVolumeAccessMode
+		podSELinuxOptions           *v1.SELinuxOptions
+
+		expectError          bool
+		expectedSELinuxLabel string
+	}{
+		{
+			name:                        "ReadWriteOncePod with plugin that supports SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                        "ReadWriteOncePod incomplete SELinuxOptions",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &incompleteSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel, // kubelet files the missing SELinuxOptions fields
+		},
+		{
+			name:                        "ReadWriteOncePod with plugin that does not support SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: false,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The plugin does not support SELinux
+		},
+		{
+			name:                        "ReadWriteMany with plugin that supports SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The plugin does not support SELinux
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, feature := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
+			}
+			// Arrange
+			plugins := []volume.VolumePlugin{
+				&volumetesting.FakeDeviceMountableVolumePlugin{
+					FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+						Plugin: volumetesting.FakeVolumePlugin{
+							PluginName:      "basic",
+							SupportsSELinux: tc.volumePluginSupportsSELinux,
+						},
+					},
+				},
+			}
+			volumePluginMgr := volume.VolumePluginMgr{}
+			fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
+				"",  /* rootDir */
+				nil, /* kubeClient */
+				nil, /* plugins */
+			)
+			err := volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
+			if err != nil {
+				t.Fatalf("Failed to init volume plugins: %v", err)
+			}
+			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+			dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions: tc.podSELinuxOptions,
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "volume-name",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "myClaim",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			volumeSpec := &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "basicPV",
+					},
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{tc.volumeAccessMode},
+					},
+				},
+			}
+			podName := util.GetUniquePodName(pod)
+			seLinuxContainerContexts := []*v1.SELinuxOptions{tc.podSELinuxOptions}
+
+			// Act
+			generatedVolumeName, err := dsw.AddPodToVolume(
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
+
+			// Assert
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected AddPodToVolume to return error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: %v", err)
+			}
+
+			verifyVolumeExistsDsw(t, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsInVolumesToMount(
+				t, generatedVolumeName, false /* expectReportedInUse */, dsw)
+			verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+		})
+	}
 }
 
 func verifyVolumeExistsDsw(
