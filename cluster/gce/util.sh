@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for the local config.
+# A library of helper functions and constants for the local config.
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
