@@ -30,6 +30,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 // Calls AddPodToVolume() to add new pod to new volume
@@ -626,12 +627,13 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 		volumePluginSupportsSELinux bool
 		volumeAccessMode            v1.PersistentVolumeAccessMode
 		podSELinuxOptions           *v1.SELinuxOptions
+		podChangePolicy             *v1.PodSELinuxChangePolicy
 
 		expectError          bool
 		expectedSELinuxLabel string
 	}{
 		{
-			name:                        "ReadWriteOncePod with plugin that supports SELinux mount",
+			name:                        "RWOP: ReadWriteOncePod with plugin that supports SELinux mount",
 			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumePluginSupportsSELinux: true,
 			volumeAccessMode:            v1.ReadWriteOncePod,
@@ -641,7 +643,7 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 			expectedSELinuxLabel: completeSELinuxLabel,
 		},
 		{
-			name:                        "ReadWriteOncePod incomplete SELinuxOptions",
+			name:                        "RWOP: ReadWriteOncePod incomplete SELinuxOptions",
 			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumePluginSupportsSELinux: true,
 			volumeAccessMode:            v1.ReadWriteOncePod,
@@ -651,7 +653,17 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 			expectedSELinuxLabel: completeSELinuxLabel, // kubelet files the missing SELinuxOptions fields
 		},
 		{
-			name:                        "ReadWriteOncePod with plugin that does not support SELinux mount",
+			name:                        "RWOP: ReadWriteOncePod no SELinuxOptions",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           nil,
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                        "RWOP: ReadWriteOncePod with plugin that does not support SELinux mount",
 			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumePluginSupportsSELinux: false,
 			volumeAccessMode:            v1.ReadWriteOncePod,
@@ -661,14 +673,73 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 			expectedSELinuxLabel: "", // The plugin does not support SELinux
 		},
 		{
-			name:                        "ReadWriteMany with plugin that supports SELinux mount",
+			name:                        "RWOP: ReadWriteMany with plugin that supports SELinux mount",
 			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumePluginSupportsSELinux: true,
 			volumeAccessMode:            v1.ReadWriteMany,
 			podSELinuxOptions:           &completeSELinuxOpts,
 
 			expectError:          false,
-			expectedSELinuxLabel: "", // The plugin does not support SELinux
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with the default policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             nil, // emphasize the default value
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with Recursive policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with MountOption policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // still not supported for RWX
+		},
+		{
+			name:                        "RWOP+ChangePolicy: ReadWriteOncePod with Recursive policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // "Recursive" is applied to RWOP volumes
+		},
+		{
+			name:                        "RWOP+ChangePolicy: ReadWriteOncePod with MountOption policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			// This can happen when there is a version skew between kubelet and the API server
+			podChangePolicy: ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel, // the policy is ignored, but mounting with SELinux is the default
 		},
 	}
 
@@ -708,7 +779,8 @@ func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
 				},
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{
-						SELinuxOptions: tc.podSELinuxOptions,
+						SELinuxOptions:      tc.podSELinuxOptions,
+						SELinuxChangePolicy: tc.podChangePolicy,
 					},
 					Volumes: []v1.Volume{
 						{
@@ -782,14 +854,16 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 		volumeAccessMode        v1.PersistentVolumeAccessMode
 		firstPodSELinuxOptions  *v1.SELinuxOptions
 		secondPodSELinuxOptions *v1.SELinuxOptions
+		firstChangePolicy       *v1.PodSELinuxChangePolicy
+		secondChangePolicy      *v1.PodSELinuxChangePolicy
 
 		expectError          bool
 		expectedSELinuxLabel string
 	}{
 		{
-			// Note: this is not a realistic scenario, two Pods can't use the same RWOP volume.
+			// Note: RWOP with two pods is not a realistic scenario.
 			// But from AddPodToVolume perspective, it tests how SELinux is handled even for RWO / RWX volumes.
-			name:                    "ReadWriteOncePod with the same SELinux options",
+			name:                    "RWOP: ReadWriteOncePod with the same SELinux options",
 			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumeAccessMode:        v1.ReadWriteOncePod,
 			firstPodSELinuxOptions:  &completeSELinuxOpts,
@@ -799,9 +873,7 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 			expectedSELinuxLabel: completeSELinuxLabel,
 		},
 		{
-			// Note: this is not a realistic scenario, two Pods can't use the same RWOP volume.
-			// But from AddPodToVolume perspective, it tests how SELinux is handled even for RWO / RWX volumes.
-			name:                    "ReadWriteOncePod with conflicting SELinux options",
+			name:                    "RWOP: ReadWriteOncePod with conflicting SELinux options",
 			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumeAccessMode:        v1.ReadWriteOncePod,
 			firstPodSELinuxOptions:  &completeSELinuxOpts,
@@ -811,7 +883,7 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 			expectedSELinuxLabel: completeSELinuxLabel,
 		},
 		{
-			name:                    "ReadWriteMany with the same SELinux options",
+			name:                    "RWOP: ReadWriteMany with the same SELinux options",
 			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
 			volumeAccessMode:        v1.ReadWriteMany,
 			firstPodSELinuxOptions:  &completeSELinuxOpts,
@@ -819,6 +891,100 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 
 			expectError:          false,
 			expectedSELinuxLabel: "", // RWX does not support SELinux mount (yet)
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options and same Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // Recursive is applied to RWOP volumes
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options and conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      nil,
+
+			expectError:          true, // Conflicting policies with RWOP are an error
+			expectedSELinuxLabel: "",   // Recursive policy is applied to the first volume
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, but no mount is the default
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption), // This can happen when there is a version skew between kubelet and the API server
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, but no mount is the default
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, no error is raised
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with conflicting SELinux options and Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false, // Conflicting SELinux options are allowed with recursive policy
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with conflicting SELinux options and MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, no error is raised
 		},
 	}
 	for _, tc := range tests {
@@ -856,7 +1022,8 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 				},
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{
-						SELinuxOptions: tc.firstPodSELinuxOptions,
+						SELinuxOptions:      tc.firstPodSELinuxOptions,
+						SELinuxChangePolicy: tc.firstChangePolicy,
 					},
 					Volumes: []v1.Volume{
 						{
@@ -904,6 +1071,7 @@ func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
 			pod2.Name = "pod2"
 			pod2.UID = "pod2uid"
 			pod2.Spec.SecurityContext.SELinuxOptions = tc.secondPodSELinuxOptions
+			pod2.Spec.SecurityContext.SELinuxChangePolicy = tc.secondChangePolicy
 			pod2Name := util.GetUniquePodName(pod2)
 			seLinuxContainerContexts = []*v1.SELinuxOptions{tc.secondPodSELinuxOptions}
 
