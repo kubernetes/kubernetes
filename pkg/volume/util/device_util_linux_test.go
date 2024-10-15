@@ -204,14 +204,42 @@ func (fi *fakeFileInfo) Sys() interface{} {
 }
 
 func TestFindMultipathDeviceForDevice(t *testing.T) {
-	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
-	dev := mockDeviceUtil.FindMultipathDeviceForDevice("/dev/disk/by-path/127.0.0.1:3260-eui.02004567A425678D-lun-0")
-	if dev != "/dev/dm-1" {
-		t.Fatalf("mpio device not found dm-1 expected got [%s]", dev)
+	tests := []struct {
+		name           string
+		device         string
+		expectedResult string
+	}{
+		{
+			name:           "Device is already a dm device",
+			device:         "/dev/dm-1",
+			expectedResult: "/dev/dm-1",
+		},
+		{
+			name:           "Device has no multipath",
+			device:         "/dev/sdc",
+			expectedResult: "",
+		},
+		{
+			name:           "Device has multipath",
+			device:         "/dev/disk/by-path/127.0.0.1:3260-eui.02004567A425678D-lun-0",
+			expectedResult: "/dev/dm-1",
+		},
+		{
+			name:           "Invalid device path",
+			device:         "/dev/nonexistent",
+			expectedResult: "",
+		},
 	}
-	dev = mockDeviceUtil.FindMultipathDeviceForDevice("/dev/disk/by-path/empty")
-	if dev != "" {
-		t.Fatalf("mpio device not found '' expected got [%s]", dev)
+
+	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mockDeviceUtil.FindMultipathDeviceForDevice(tt.device)
+			if result != tt.expectedResult {
+				t.Errorf("FindMultipathDeviceForDevice(%s) = %s, want %s", tt.device, result, tt.expectedResult)
+			}
+		})
 	}
 }
 
