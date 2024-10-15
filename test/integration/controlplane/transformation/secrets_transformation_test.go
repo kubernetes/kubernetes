@@ -324,6 +324,7 @@ func (want wantNoError) verify(t *testing.T, err error) {
 type wantAPIStatusError struct {
 	reason          metav1.StatusReason
 	messageContains string
+	more            func(*testing.T, apierrors.APIStatus)
 }
 
 func (wantError wantAPIStatusError) verify(t *testing.T, err error) {
@@ -341,6 +342,9 @@ func (wantError wantAPIStatusError) verify(t *testing.T, err error) {
 		}
 		if want, got := wantError.messageContains, statusGot.Status().Message; !strings.Contains(got, want) {
 			t.Errorf("expected API status message to contain: %q, got err: %#v", want, statusGot)
+		}
+		if wantError.more != nil {
+			wantError.more(t, statusGot)
 		}
 	default:
 		t.Errorf("expected error: %v, but got none", err)
@@ -391,6 +395,174 @@ func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user,
 
 	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
 		user, namespace, verbs[0], "", schema.GroupResource{Resource: "secrets"}, true)
+}
+
+// TestListCorruptObjects is an integration test that verifies:
+// 1) if the feature AllowUnsafeMalformedObjectDeletion is enabled, LIST operation,
+// in its error response, should include information that identifies the objects
+// that it failed to read from the storage
+// 2) if the feature AllowUnsafeMalformedObjectDeletion is disabled, LIST should
+// abort as soon as it encounters the first error, to be backward compatible
+func TestListCorruptObjects(t *testing.T) {
+	// these are the secrets that the test will initially create, and
+	// are expected to become unreadable/corrupt after encryption breaks
+	secrets := []string{"corrupt-a", "corrupt-b", "corrupt-c"}
+
+	tests := []struct {
+		featureEnabled bool
+		// secrets that are created before encryption breaks
+		secrets []string
+		// whether encryption broke after the config change
+		encryptionBrokenFn func(t *testing.T, got apierrors.APIStatus) bool
+		// what we expect for LIST on the corrupt objects after encryption has broken
+		listAfter verifier
+	}{
+		{
+			secrets:        secrets,
+			featureEnabled: true,
+			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) bool {
+				// the new encryption config does not have the old key, so reading of resources
+				// created before the encryption change will fail with 'no matching prefix found'
+				return got.Status().Reason == metav1.StatusReasonInternalError &&
+					strings.Contains(got.Status().Message, "Internal error occurred: StorageError: corrupt object") &&
+					strings.Contains(got.Status().Message, "data from the storage is not transformable: no matching prefix found")
+			},
+			listAfter: wantAPIStatusError{
+				reason:          metav1.StatusReasonStoreReadError,
+				messageContains: "failed to read one or more secrets from the storage",
+				more: func(t *testing.T, err apierrors.APIStatus) {
+					t.Helper()
+
+					details := err.Status().Details
+					if details == nil {
+						t.Errorf("expected Details in APIStatus, but got: %#v", err)
+						return
+					}
+					if want, got := len(secrets), len(details.Causes); want != got {
+						t.Errorf("expected to have %d in APIStatus, but got: %d", want, got)
+					}
+					for _, cause := range details.Causes {
+						if want, got := metav1.CauseTypeUnexpectedServerResponse, cause.Type; want != got {
+							t.Errorf("expected to cause type to be %s, but got: %s", want, got)
+						}
+					}
+					for _, want := range secrets {
+						var found bool
+						for _, got := range details.Causes {
+							if strings.HasSuffix(got.Field, want) {
+								found = true
+								break
+							}
+						}
+						if !found {
+							t.Errorf("want key: %q in the Fields: %#v", want, details.Causes)
+						}
+					}
+				},
+			},
+		},
+		{
+			secrets:        secrets,
+			featureEnabled: false,
+			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) bool {
+				// the new encryption config does not have the old key, so reading of resources
+				// created before the encryption change will fail with 'no matching prefix found'
+				return got.Status().Reason == metav1.StatusReasonInternalError &&
+					strings.Contains(got.Status().Message, "Internal error occurred: no matching prefix found")
+			},
+			listAfter: wantAPIStatusError{
+				reason:          metav1.StatusReasonInternalError,
+				messageContains: "unable to transform key",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s/%t", string(genericfeatures.AllowUnsafeMalformedObjectDeletion), tc.featureEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, tc.featureEnabled)
+
+			test, err := newTransformTest(t, aesGCMConfigYAML, true, "", nil, tc.featureEnabled)
+			if err != nil {
+				t.Fatalf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
+			}
+			defer test.cleanUp()
+
+			// a) create a number of secrets in the test namespace
+			for _, name := range tc.secrets {
+				_, err = test.createSecret(name, testNamespace)
+				if err != nil {
+					t.Fatalf("Failed to create test secret, error: %v", err)
+				}
+			}
+
+			// b) list the secrets before we break encryption
+			result, err := test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("listing secrets failed unexpectedly with: %v", err)
+			}
+			if want, got := len(tc.secrets), len(result.Items); got < 3 {
+				t.Fatalf("expected at least %d secrets, but got: %d", want, got)
+			}
+
+			// c) override the config and break decryption of the old resources,
+			// the secret created in step a will be undecryptable
+			encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
+			body, _ := ioutil.ReadFile(encryptionConf)
+			t.Logf("file before write: %s", body)
+			// we replace the existing key with a new key from a different provider
+			if err := os.WriteFile(encryptionConf, []byte(aesCBCConfigYAML), 0o644); err != nil {
+				t.Fatalf("failed to write encryption config that's going to make decryption fail")
+			}
+			body, _ = ioutil.ReadFile(encryptionConf)
+			t.Logf("file after write: %s", body)
+
+			// d) wait for the breaking changes to take effect
+			testCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err = wait.PollUntilContextTimeout(testCtx, 1*time.Second, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+				_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(ctx, tc.secrets[0], metav1.GetOptions{})
+
+				if err != nil {
+					t.Logf("get returned error: %#v message: %s", err, err.Error())
+				}
+
+				var got apierrors.APIStatus
+				if !errors.As(err, &got) {
+					return false, nil
+				}
+				if done := tc.encryptionBrokenFn(t, got); done {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Fatalf("encryption never broke: %v", err)
+			}
+
+			// TODO: ConsistentListFromCache feature returns the list of objects
+			// from cache even though these objects are not readable from the
+			// store after encryption has broken; to work around this issue, let's
+			// create a new secret and retrieve it from the store to get a more
+			// recent ResourceVersion and invoke the list with:
+			//   ResourceVersionMatch: Exact
+			newSecretName := "new-a"
+			_, err = test.createSecret(newSecretName, testNamespace)
+			if err != nil {
+				t.Fatalf("expected no error while creating the new secret, but got: %d", err)
+			}
+			newSecret, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), newSecretName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("expected no error getting the new secret, but got: %d", err)
+			}
+
+			// e) list should return expected error
+			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{
+				ResourceVersion:      newSecret.ResourceVersion,
+				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+			})
+			tc.listAfter.verify(t, err)
+
+		})
+	}
 }
 
 // Baseline (no enveloping) - use to contrast with enveloping benchmarks.
