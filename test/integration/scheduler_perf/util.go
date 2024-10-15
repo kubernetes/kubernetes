@@ -30,6 +30,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -225,6 +226,27 @@ func makeBasePod() *v1.Pod {
 		Spec: testutils.MakePodSpec(),
 	}
 	return basePod
+}
+
+// makeBaseNode creates a Node object with given nodeNamePrefix to be used as a template.
+func makeBaseNode(nodeNamePrefix string) *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: nodeNamePrefix,
+		},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("32Gi"),
+			},
+			Phase: v1.NodeRunning,
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
+			},
+		},
+	}
+
 }
 
 func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
