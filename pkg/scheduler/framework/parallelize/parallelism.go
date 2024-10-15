@@ -57,18 +57,20 @@ func chunkSizeFor(n, parallelism int) int {
 func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece func(piece int) error, operation string) error {
 	goroutinesMetric := metrics.Goroutines.WithLabelValues(operation)
 	goroutinesDurationMetric := metrics.GoroutinesDuration.WithLabelValues(operation)
+	goroutinesExecutionSuccessMetric := metrics.GoroutinesExecutionTotal.WithLabelValues(operation, "success")
+	goroutinesExecutionErrorMetric := metrics.GoroutinesExecutionTotal.WithLabelValues(operation, "error")
 	errCh := newErrorChannel()
 	ctx, cancel := context.WithCancel(ctx)
 
 	withMetrics := func(piece int) {
 		startTime := time.Now()
-		result := "success"
 		goroutinesMetric.Inc()
 		if err := doWorkPiece(piece); err != nil {
-			result = "error"
 			errCh.sendErrorWithCancel(err, cancel)
+			goroutinesExecutionErrorMetric.Inc()
+		} else {
+			goroutinesExecutionSuccessMetric.Inc()
 		}
-		metrics.GoroutinesExecutionTotal.WithLabelValues(operation, result).Inc()
 		goroutinesMetric.Dec()
 		timeTaken := time.Since(startTime).Seconds()
 		goroutinesDurationMetric.Observe(timeTaken)
