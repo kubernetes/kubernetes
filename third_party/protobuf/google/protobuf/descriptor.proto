@@ -46,10 +46,6 @@ option java_outer_classname = "DescriptorProtos";
 option csharp_namespace = "Google.Protobuf.Reflection";
 option objc_class_prefix = "GPB";
 
-// descriptor.proto must be optimized for speed because reflection-based
-// algorithms don't work during bootstrapping.
-option optimize_for = SPEED;
-
 // The protocol compiler can output a FileDescriptorSet containing the .proto
 // files it parses.
 message FileDescriptorSet {
@@ -86,6 +82,10 @@ message FileDescriptorProto {
   // The syntax of the proto file.
   // The supported values are "proto2" and "proto3".
   optional string syntax = 12;
+
+  // descriptor.proto must be optimized for speed because reflection-based
+  // algorithms don't work during bootstrapping.
+  option optimize_for = LITE_RUNTIME;
 }
 
 // Describes a message type.
