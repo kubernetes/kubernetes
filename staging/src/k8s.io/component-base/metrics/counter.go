@@ -119,11 +119,6 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 	opts.StabilityLevel.setDefaults()
 
 	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
 
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
@@ -176,7 +171,17 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	} else {
+		v.initializeLabelAllowListsOnce.Do(func() {
+			allowListLock.RLock()
+			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+				v.LabelValueAllowLists = allowList
+				allowList.ConstrainToAllowedList(v.originalLabels, lvs)
+			}
+			allowListLock.RUnlock()
+		})
 	}
+
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
@@ -190,6 +195,15 @@ func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
+	} else {
+		v.initializeLabelAllowListsOnce.Do(func() {
+			allowListLock.RLock()
+			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+				v.LabelValueAllowLists = allowList
+				allowList.ConstrainLabelMap(labels)
+			}
+			allowListLock.RUnlock()
+		})
 	}
 	return v.CounterVec.With(labels)
 }
