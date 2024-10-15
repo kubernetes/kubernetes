@@ -1053,6 +1053,9 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
+	if len(src) == 0 {
+		return maps.Clone(overrides)
+	}
 	result := maps.Clone(src)
 	for feature, enabled := range overrides {
 		result[feature] = enabled
