@@ -24,8 +24,6 @@ BASE64_HELP=$(base64 --help)
 BASE64_INPUT_FLAG=""
 if [[ $BASE64_HELP =~ "--input" ]]; then
   BASE64_INPUT_FLAG="--input"
-else
-    BASE64_INPUT_FLAG=""
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
