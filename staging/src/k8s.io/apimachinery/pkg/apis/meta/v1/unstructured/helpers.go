@@ -20,6 +20,7 @@ import (
 	gojson "encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,10 +137,11 @@ func NestedNumberAsFloat64(obj map[string]interface{}, fields ...string) (float6
 	}
 	switch x := val.(type) {
 	case int64:
-		if x != int64(float64(x)) {
+		f, accuracy := big.NewInt(x).Float64()
+		if accuracy != big.Exact {
 			return 0, false, fmt.Errorf("%v accessor error: int64 value %v cannot be losslessly converted to float64", jsonPath(fields), x)
 		}
-		return float64(x), true, nil
+		return f, true, nil
 	case float64:
 		return x, true, nil
 	default:
