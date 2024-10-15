@@ -173,6 +173,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.HairpinMode == "" {
 		obj.HairpinMode = kubeletconfigv1beta1.PromiscuousBridge
 	}
+	if obj.ImagePullCredentialsVerificationPolicy == "" {
+		obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages
+	}
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
