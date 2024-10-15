@@ -41,6 +41,16 @@ const (
 	HairpinNone = "none"
 )
 
+// TODO: document all of the below
+type ImagePullCredentialsVerificationPolicy string
+
+const (
+	NeverVerify                  ImagePullCredentialsVerificationPolicy = "NeverVerify"
+	NeverVerifyPreloadedImages   ImagePullCredentialsVerificationPolicy = "NeverVerifyPreloadedImages"
+	NeverVerifyAllowlistedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyAllowlistedImages"
+	AlwaysVerify                 ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
+)
+
 // ResourceChangeDetectionStrategy denotes a mode in which internal
 // managers (secret, configmap) are discovering object changes.
 type ResourceChangeDetectionStrategy string
@@ -210,6 +220,10 @@ type KubeletConfiguration struct {
 	// Default: 10
 	// +optional
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
+	// +optional
+	ImagePullCredentialsVerificationPolicy ImagePullCredentialsVerificationPolicy `json:"imagePullCredentialsVerificationPolicy,omitempty"`
+	// +optional
+	PreloadedImagesVerificationAllowlist []string `json:"preloadImagesVerificationAllowlist,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced. The value cannot be a negative number.
 	// Default: 50
