@@ -184,6 +184,9 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 					},
 				},
 			},
+			Status: v1.PodStatus{
+				QOSClass: v1.PodQOSBestEffort,
+			},
 		}
 	}
 
@@ -281,6 +284,9 @@ func TestAPIServerMetricsPods(t *testing.T) {
 						Image: "image",
 					},
 				},
+			},
+			Status: v1.PodStatus{
+				QOSClass: v1.PodQOSBestEffort,
 			},
 		}
 	}

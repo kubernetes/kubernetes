@@ -159,7 +159,8 @@ func runControllersAndInformers(t *testing.T, rm *replicaset.ReplicaSetControlle
 // addPodConditionReady sets given pod status to ready at given time
 func addPodConditionReady(pod *v1.Pod, time metav1.Time) {
 	pod.Status = v1.PodStatus{
-		Phase: v1.PodRunning,
+		Phase:    v1.PodRunning,
+		QOSClass: pod.Status.QOSClass,
 		Conditions: []v1.PodCondition{
 			{
 				Type:               v1.PodReady,

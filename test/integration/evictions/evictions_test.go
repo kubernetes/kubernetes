@@ -87,7 +87,8 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		podName := fmt.Sprintf(podNameFormat, i)
 		pod := newPod(podName)
 
-		if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+		pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
 			t.Errorf("Failed to create pod: %v", err)
 		}
 		pod.Status.Phase = v1.PodRunning
@@ -195,7 +196,8 @@ func TestTerminalPodEviction(t *testing.T) {
 		GracePeriodSeconds: &gracePeriodSeconds,
 	}
 	pod := newPod("test-terminal-pod1")
-	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+	pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 
@@ -376,7 +378,8 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			pod := newPod("pod")
 			pod.ObjectMeta.Finalizers = []string{"test.k8s.io/finalizer"}
-			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{}); err != nil {
+			pod, err := clientSet.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{})
+			if err != nil {
 				t.Errorf("Failed to create pod: %v", err)
 			}
 
@@ -394,7 +397,7 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
 
-			err := clientSet.PolicyV1().Evictions(ns.Name).Evict(tCtx, eviction)
+			err = clientSet.PolicyV1().Evictions(ns.Name).Evict(tCtx, eviction)
 			if err != nil {
 				t.Fatalf("Eviction of pod failed %v", err)
 			}
@@ -450,7 +453,8 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 			go rm.Run(tCtx)
 
 			pod := newPod("pod")
-			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+			pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+			if err != nil {
 				t.Errorf("Failed to create pod: %v", err)
 			}
 
@@ -485,7 +489,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 
 			deleteOption := metav1.DeleteOptions{}
 			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
-			err := policyV1NoRetriesClient.Evictions(ns.Name).Evict(tCtx, eviction)
+			err = policyV1NoRetriesClient.Evictions(ns.Name).Evict(tCtx, eviction)
 			if err != nil {
 				t.Fatalf("Eviction of pod failed %v", err)
 			}
