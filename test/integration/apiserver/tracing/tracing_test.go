@@ -208,7 +208,7 @@ func TestAPIServerTracingWithEgressSelector(t *testing.T) {
 	defer os.Remove(egressSelectorConfigFile.Name())
 
 	if err := os.WriteFile(egressSelectorConfigFile.Name(), []byte(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
 egressSelections:
 - name: cluster
