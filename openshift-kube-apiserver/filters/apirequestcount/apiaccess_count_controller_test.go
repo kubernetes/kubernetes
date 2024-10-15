@@ -25,10 +25,10 @@ func TestRemovedRelease(t *testing.T) {
 	rr := removedRelease(
 		schema.GroupVersionResource{
 			Group:    "flowcontrol.apiserver.k8s.io",
-			Version:  "v1beta3",
+			Version:  "v1alpha1",
 			Resource: "flowschemas",
 		})
-	assert.Equal(t, "1.32", rr)
+	assert.Equal(t, "1.21", rr)
 }
 
 func TestLoggingResetRace(t *testing.T) {
