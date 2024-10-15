@@ -233,9 +233,6 @@ var _ = SIGDescribe("MirrorPod", func() {
 			ginkgo.By("Stopping the NFS server")
 			stopNfsServer(f, nfsServerPod)
 
-			ginkgo.By("Waiting for NFS server to stop...")
-			time.Sleep(30 * time.Second)
-
 			ginkgo.By(fmt.Sprintf("Deleting the static nfs test pod: %s", staticPodName))
 			err = deleteStaticPod(podPath, staticPodName, ns)
 			framework.ExpectNoError(err)
@@ -303,7 +300,7 @@ func restartNfsServer(f *framework.Framework, serverPod *v1.Pod) {
 // pod's (only) container. This command changes the number of nfs server threads to 0,
 // thus closing all open nfs connections.
 func stopNfsServer(f *framework.Framework, serverPod *v1.Pod) {
-	const stopcmd = "/usr/sbin/rpc.nfsd 0"
+	const stopcmd = "rpc.nfsd 0 && for i in $(seq 200); do rpcinfo -p | grep -q nfs || break; sleep 1; done"
 	_, _, err := e2evolume.PodExec(f, serverPod, stopcmd)
 	framework.ExpectNoError(err)
 }
