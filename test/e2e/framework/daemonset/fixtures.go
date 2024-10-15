@@ -18,6 +18,7 @@ package daemonset
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/format"
 )
 
 func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *appsv1.DaemonSet {
@@ -138,18 +140,20 @@ func checkDaemonPodStateOnNodes(ctx context.Context, c clientset.Interface, ds *
 	return len(nodesToPodCount) == len(nodeNames), nil
 }
 
-// CheckDaemonStatus returns false if not all desired pods are scheduled or not all of them are ready.
-func CheckDaemonStatus(ctx context.Context, f *framework.Framework, dsName string) func(ctx context.Context) (bool, error) {
-	return func(ctx context.Context) (bool, error) {
-		ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(ctx, dsName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
-		if desired == scheduled && scheduled == ready {
-			return true, nil
-		}
-		framework.Logf("error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
-		return false, nil
-	}
+// CheckDaemonStatus ensures that eventually the daemon set has the desired
+// number of pods scheduled and ready. It returns a descriptive error if that
+// state is not reached in the amount of time it takes to start
+// pods. f.Timeouts.PodStart can be changed to influence that timeout.
+func CheckDaemonStatus(ctx context.Context, f *framework.Framework, dsName string) error {
+	return framework.Gomega().Eventually(ctx, framework.GetObject(f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get, dsName, metav1.GetOptions{})).
+		WithTimeout(f.Timeouts.PodStart).
+		Should(framework.MakeMatcher(func(ds *appsv1.DaemonSet) (failure func() string, err error) {
+			desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
+			if desired == scheduled && scheduled == ready {
+				return nil, nil
+			}
+			return func() string {
+				return fmt.Sprintf("Expected daemon set to reach state where all desired pods are scheduled and ready. Got instead DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d\n%s", desired, scheduled, ready, format.Object(ds, 1))
+			}, nil
+		}))
 }
