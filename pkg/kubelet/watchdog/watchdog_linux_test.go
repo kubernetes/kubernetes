@@ -55,7 +55,10 @@ func (m *mockWatchdogClient) SdNotify(unsetEnvironment bool) (bool, error) {
 	return m.notifyAck, m.notifyErr
 }
 
-const interval = 1 * time.Second
+const (
+	interval      = 1 * time.Second
+	intervalSmall = 1 * time.Nanosecond
+)
 
 // TestNewHealthChecker tests the NewHealthChecker function.
 func TestNewHealthChecker(t *testing.T) {
@@ -69,7 +72,7 @@ func TestNewHealthChecker(t *testing.T) {
 		{"Watchdog enabled", interval, nil, false},
 		{"Watchdog not enabled", 0, nil, false},
 		{"Watchdog enabled with error", interval, errors.New("mock error"), true},
-		{"Custom WatchdogClient", interval, nil, false},
+		{"Watchdog timeout too small", intervalSmall, nil, true},
 	}
 
 	for _, tt := range tests {
@@ -107,12 +110,20 @@ func TestHealthCheckerStart(t *testing.T) {
 			expectedLogs:   []string{"Starting systemd watchdog with interval", "Watchdog plugin notified"},
 		},
 		{
-			name:           "Watchdog enabled and notify fails",
+			name:           "Watchdog enabled and notify fails, notification not supported",
+			enabledVal:     interval,
+			healthCheckErr: nil,
+			notifyAck:      false,
+			notifyErr:      nil,
+			expectedLogs:   []string{"Starting systemd watchdog with interval", "Failed to notify watchdog", "notification not supported"},
+		},
+		{
+			name:           "Watchdog enabled and notify fails, transmission failed",
 			enabledVal:     interval,
 			healthCheckErr: nil,
 			notifyAck:      false,
 			notifyErr:      errors.New("mock notify error"),
-			expectedLogs:   []string{"Starting systemd watchdog with interval", "Operation failed, retrying", "Failed to notify watchdog"},
+			expectedLogs:   []string{"Starting systemd watchdog with interval", "Failed to notify watchdog"},
 		},
 		{
 			name:           "Watchdog enabled and health check fails",
