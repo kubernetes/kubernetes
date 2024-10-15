@@ -939,6 +939,13 @@ const (
 	//
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
+
+	// owner: @ndixita
+	// key: https://kep.k8s.io/2837
+	// alpha: 1.32
+	//
+	// Allows specifying resources at pod-level.
+	PodLevelResources featuregate.Feature = "PodLevelResources"
 )
 
 func init() {

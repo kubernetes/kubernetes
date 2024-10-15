@@ -2770,7 +2770,7 @@ type ContainerStatus struct {
 	// enacted on the running container after it has been started or has been successfully resized.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
-	Resources *ResourceRequirements
+	Resources ResourceRequirements
 	// Status of volume mounts.
 	// +listType=atomic
 	// +optional
@@ -3554,6 +3554,13 @@ type PodSpec struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaims []PodResourceClaim
+
+	// Resources is the total amount of compute resources required by all
+	// containers in the pod. Currently, only CPU and Memory resources are
+	// supported.
+	// +featureGate=PodLevelResources
+	// +optional
+	Resources *ResourceRequirements
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

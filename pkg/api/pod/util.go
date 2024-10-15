@@ -670,6 +670,11 @@ func dropDisabledFields(
 		}
 	}
 
+	// If the feature is disabled and not in use, drop Resources at the pod-level in PodSpec.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && podLevelResourcesInUse(oldPodSpec) {
+		podSpec.Resources = nil
+	}
+
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
@@ -1074,6 +1079,15 @@ func supplementalGroupsPolicyInUse(podSpec *api.PodSpec) bool {
 		return true
 	}
 
+	return false
+}
+
+// podLevelResourcesInUse returns true if pod-spec is non-nil and Resources field at
+// pod-level is set.
+func podLevelResourcesInUse(podSpec *api.PodSpec) bool {
+	if podSpec != nil && podSpec.Resources != nil {
+		return true
+	}
 	return false
 }
 
