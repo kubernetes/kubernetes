@@ -198,6 +198,7 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 	assert.Equal(t, int32(0), totalErrors.Load())
 
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_, err := vpm.FindPluginBySpec(volumeSpec)
@@ -205,7 +206,6 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 				totalErrors.Add(1)
 			}
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 
