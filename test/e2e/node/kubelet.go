@@ -109,24 +109,6 @@ func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nod
 	})
 }
 
-// Restart the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 1` command in the
-// pod's (only) container. This command changes the number of nfs server threads from
-// (presumably) zero back to 1, and therefore allows nfs to open connections again.
-func restartNfsServer(serverPod *v1.Pod) {
-	const startcmd = "/usr/sbin/rpc.nfsd 1"
-	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
-}
-
-// Stop the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 0` command in the
-// pod's (only) container. This command changes the number of nfs server threads to 0,
-// thus closing all open nfs connections.
-func stopNfsServer(serverPod *v1.Pod) {
-	const stopcmd = "/usr/sbin/rpc.nfsd 0"
-	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
-}
-
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
 // will execute the passed in shell cmd. Waits for the pod to start.
 // Note: the nfs plugin is defined inline, no PV or PVC.
@@ -437,7 +419,7 @@ var _ = SIGDescribe("kubelet", func() {
 					pod = createPodUsingNfs(ctx, f, c, ns, nfsIP, t.podCmd)
 
 					ginkgo.By("Stop the NFS server")
-					stopNfsServer(nfsServerPod)
+					e2evolume.StopNFSServer(f, nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
@@ -448,7 +430,7 @@ var _ = SIGDescribe("kubelet", func() {
 					checkPodCleanup(ctx, c, pod, false)
 
 					ginkgo.By("Restart the nfs server")
-					restartNfsServer(nfsServerPod)
+					e2evolume.RestartNFSServer(f, nfsServerPod)
 
 					ginkgo.By("Verify that the deleted client pod is now cleaned up")
 					checkPodCleanup(ctx, c, pod, true)
