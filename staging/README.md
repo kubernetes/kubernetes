@@ -87,9 +87,6 @@ import (
   ./hack/update-vendor.sh
 ```
 
-8. Run [`./hack/update-go-workspace.sh`](/hack/update-go-workspace.sh) to add
-   the module to the workspace.
-
 ### Creating the published repository
 
 1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)
