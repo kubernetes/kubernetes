@@ -245,7 +245,8 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			SetLabelAllowListFromCLI(labelAllowValues)
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
+
 			registry := newKubeRegistry(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
@@ -253,7 +254,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewCounterVec(opts, labels)
 			registry.MustRegister(c)
-
+			SetLabelAllowListFromCLI(labelAllowValues)
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Inc()
 			}

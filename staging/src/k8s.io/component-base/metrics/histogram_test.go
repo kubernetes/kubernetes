@@ -271,7 +271,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			SetLabelAllowListFromCLI(labelAllowValues)
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
 			registry := newKubeRegistry(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
@@ -279,6 +279,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewHistogramVec(opts, labels)
 			registry.MustRegister(c)
+			SetLabelAllowListFromCLI(labelAllowValues)
 
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Observe(1.0)
