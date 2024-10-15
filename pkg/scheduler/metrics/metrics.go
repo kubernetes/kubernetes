@@ -210,7 +210,7 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "goroutines_duration_seconds",
-			Help:           "how long each preemption goroutine takes to complete",
+			Help:           "Duration in seconds for running goroutines split by the work they do such as binding.",
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -219,7 +219,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "goroutines_execution_total",
-			Help:           "how many preemption goroutines have executed",
+			Help:           "Number of goroutines executed split by the work they do such as binding and the result of the work.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation", "result"})
