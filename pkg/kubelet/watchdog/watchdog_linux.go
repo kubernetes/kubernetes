@@ -68,6 +68,8 @@ type healthChecker struct {
 
 var _ HealthChecker = &healthChecker{}
 
+const notifyInterval = time.Nanosecond
+
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
@@ -90,6 +92,9 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	if watchdogVal == 0 {
 		klog.InfoS("Systemd watchdog is not enabled")
 		return &healthChecker{}, nil
+	}
+	if watchdogVal <= notifyInterval {
+		return nil, fmt.Errorf("configure watchdog timeout too small: %v", watchdogVal)
 	}
 
 	// The health checks performed by checkers are the same as those for "/healthz".
@@ -127,14 +132,18 @@ func (hc *healthChecker) Start() {
 		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
-				klog.V(2).InfoS("Operation failed, retrying", "error", err)
+				klog.V(5).InfoS("Failed to notify systemd watchdog, retrying", "error", err)
 				return false, nil
 			}
+			if !ack {
+				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
+			}
+
 			klog.V(5).InfoS("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
 			return true, nil
 		})
 		if err != nil {
-			klog.ErrorS(err, "Failed to notify watchdog", "retries", hc.retryBackoff.Steps)
+			klog.ErrorS(err, "Failed to notify watchdog")
 		}
 	}, hc.interval)
 }
