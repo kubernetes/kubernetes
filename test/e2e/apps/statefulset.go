@@ -162,6 +162,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(e2estatefulset.CheckServiceName(ss, headlessSvcName))
 
+			ginkgo.By("checking the index label and value of all pods")
+			framework.ExpectNoError(e2estatefulset.CheckPodIndexLabel(ctx, c, ss))
+
 			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
