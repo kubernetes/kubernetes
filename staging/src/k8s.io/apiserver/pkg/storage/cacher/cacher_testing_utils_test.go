@@ -57,16 +57,20 @@ func newPodList() runtime.Object { return &example.PodList{} }
 
 func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	versioner := storage.APIObjectVersioner{}
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	storage := etcd3.New(
 		server.V3Client,
-		apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
+		codec,
 		newPod,
 		newPodList,
 		prefix,
 		"/pods",
 		schema.GroupResource{Resource: "pods"},
 		identity.NewEncryptCheckTransformer(),
-		etcd3.NewDefaultLeaseManagerConfig())
+		etcd3.NewDefaultLeaseManagerConfig(),
+		etcd3.NewDefaultDecoder(codec, versioner),
+		versioner)
 	return server, storage
 }
 
