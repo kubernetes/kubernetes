@@ -2275,10 +2275,11 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 // and updates the pod to the failed phase in the status manager.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
-	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
-		Phase:   v1.PodFailed,
-		Reason:  reason,
-		Message: "Pod was rejected: " + message})
+	status := pod.Status.DeepCopy()
+	status.Phase = v1.PodFailed
+	status.Reason = reason
+	status.Message = "Pod was rejected: " + message
+	kl.statusManager.SetPodStatus(pod, *status)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
