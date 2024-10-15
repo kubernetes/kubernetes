@@ -2446,7 +2446,9 @@ func BenchmarkFilter(b *testing.B) {
 					p.Filter(ctx, state, tt.pod, n)
 					return nil
 				}
-				p.parallelizer.Until(ctx, len(allNodes), filterNode, "")
+				if err := p.parallelizer.Until(ctx, len(allNodes), filterNode, ""); err != nil {
+					panic(err)
+				}
 			}
 		})
 		b.Run(tt.name+"/Clone", func(b *testing.B) {

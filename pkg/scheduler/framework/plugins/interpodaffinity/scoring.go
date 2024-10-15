@@ -210,7 +210,9 @@ func (pl *InterPodAffinity) PreScore(
 		}
 		return nil
 	}
-	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
+	if err := pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name()); err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
 
 	if index == -1 {
 		return framework.NewStatus(framework.Skip)

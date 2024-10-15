@@ -586,6 +586,8 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 		statusesLock.Unlock()
 		return nil
 	}
-	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
+	if err := fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName); err != nil {
+		errs = append(errs, err)
+	}
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
 }

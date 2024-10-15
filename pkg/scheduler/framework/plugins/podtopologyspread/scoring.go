@@ -180,7 +180,9 @@ func (pl *PodTopologySpread) PreScore(
 		}
 		return nil
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name())
+	if err := pl.parallelizer.Until(ctx, len(allNodes), processAllNode, pl.Name()); err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
 
 	cycleState.Write(preScoreStateKey, state)
 	return nil

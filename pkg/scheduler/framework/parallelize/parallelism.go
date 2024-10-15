@@ -57,7 +57,7 @@ func chunkSizeFor(n, parallelism int) int {
 func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece func(piece int) error, operation string) error {
 	goroutinesMetric := metrics.Goroutines.WithLabelValues(operation)
 	goroutinesDurationMetric := metrics.GoroutinesDuration.WithLabelValues(operation)
-	errCh := NewErrorChannel()
+	errCh := newErrorChannel()
 	ctx, cancel := context.WithCancel(ctx)
 
 	withMetrics := func(piece int) {
@@ -66,7 +66,7 @@ func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece func(pi
 		goroutinesMetric.Inc()
 		if err := doWorkPiece(piece); err != nil {
 			result = "error"
-			errCh.SendErrorWithCancel(err, cancel)
+			errCh.sendErrorWithCancel(err, cancel)
 		}
 		metrics.GoroutinesExecutionTotal.WithLabelValues(operation, result).Inc()
 		goroutinesMetric.Dec()
@@ -75,7 +75,7 @@ func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece func(pi
 	}
 
 	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, withMetrics, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)))
-	if err := errCh.ReceiveError(); err != nil {
+	if err := errCh.receiveError(); err != nil {
 		return err
 	}
 	return nil
