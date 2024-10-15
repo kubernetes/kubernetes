@@ -56,7 +56,7 @@ const (
 
 var (
 	scheme = runtime.NewScheme()
-	codecs = serializer.NewCodecFactory(scheme, serializer.EnableStrict)
+	codecs = serializer.NewCodecFactory(scheme)
 
 	apiVersions = map[string]schema.GroupVersion{
 		credentialproviderv1alpha1.SchemeGroupVersion.String(): credentialproviderv1alpha1.SchemeGroupVersion,

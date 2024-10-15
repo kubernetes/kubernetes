@@ -33,7 +33,7 @@ func Test_readCredentialProviderConfigFile(t *testing.T) {
 		name       string
 		configData string
 		config     *kubeletconfig.CredentialProviderConfig
-		expectErr  string
+		expectErr  bool
 	}{
 		{
 			name: "config with 1 plugin and 1 image matcher",
@@ -293,7 +293,7 @@ providers:
     - name: FOO
       value: BAR`,
 			config:    nil,
-			expectErr: `no kind "WrongKind" is registered for version "kubelet.config.k8s.io/v1alpha1"`,
+			expectErr: true,
 		},
 		{
 			name: "config with wrong apiversion",
@@ -312,27 +312,7 @@ providers:
     - name: FOO
       value: BAR`,
 			config:    nil,
-			expectErr: `no kind "CredentialProviderConfig" is registered for version "foobar/v1alpha1`,
-		},
-		{
-			name: "config with invalid typo",
-			configData: `---
-kind: CredentialProviderConfig
-apiVersion: kubelet.config.k8s.io/v1
-providers:
-  - name: test
-    matchImages:
-    - "registry.io/foobar"
-    defaultCacheDuration: 10m
-    unknownField: should not be here # this field should not be here
-    apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
-    args:
-    - --v=5
-    env:
-    - name: FOO
-      value: BAR`,
-			config:    nil,
-			expectErr: `strict decoding error: unknown field "providers[0].unknownField"`,
+			expectErr: true,
 		},
 	}
 
@@ -350,12 +330,12 @@ providers:
 			}
 
 			authConfig, err := readCredentialProviderConfigFile(file.Name())
-			if err != nil && len(testcase.expectErr) == 0 {
+			if err != nil && !testcase.expectErr {
 				t.Fatal(err)
 			}
 
-			if err == nil && len(testcase.expectErr) > 0 {
-				t.Fatalf("expected error %q but got none", testcase.expectErr)
+			if err == nil && testcase.expectErr {
+				t.Error("expected error but got none")
 			}
 
 			if !reflect.DeepEqual(authConfig, testcase.config) {
@@ -541,6 +521,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 				t.Errorf("expected error but got none")
 			} else if !testcase.shouldErr && len(errs) > 0 {
 				t.Errorf("expected no error but received errors: %v", errs.ToAggregate())
+
 			}
 		})
 	}
