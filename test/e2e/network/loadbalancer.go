@@ -1307,8 +1307,8 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	creationTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 	err = wait.PollUntilContextTimeout(ctx, framework.Poll, creationTimeout, true, e2edaemonset.CheckDaemonPodOnNodes(f, ds, nodeNames))
 	framework.ExpectNoError(err, "error waiting for daemon pods to start")
-	err = wait.PollUntilContextTimeout(ctx, framework.Poll, creationTimeout, true, e2edaemonset.CheckDaemonStatus(ctx, f, name))
-	framework.ExpectNoError(err, "error waiting for daemonset to report all pods are scheduled and ready")
+	err = e2edaemonset.CheckDaemonStatus(ctx, f, name)
+	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating a service %s with type=LoadBalancer externalTrafficPolicy=%s in namespace %s", name, externalTrafficPolicy, ns))
 	jig := e2eservice.NewTestJig(cs, ns, name)
