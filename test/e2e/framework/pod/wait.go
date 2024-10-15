@@ -856,3 +856,46 @@ func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, name
 		return false, nil
 	})
 }
+
+type podWatchedCondition func(previous *v1.Pod, current *v1.Pod) (bool, error)
+
+// WaitForPodChanged waits for the pod to change according to the given condition.
+// The condition takes two arguments: the previous and the current pod from the watch queue of the pod.
+// The condition callback may return an error to abort early.
+func WaitForPodChange(ctx context.Context, c clientset.Interface, namespace, podName string, timeout time.Duration, condition podWatchedCondition) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	w, err := c.CoreV1().Pods(namespace).Watch(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: podName}))
+	if err != nil {
+		return err
+	}
+	defer w.Stop()
+
+	var previous *v1.Pod
+	var current *v1.Pod
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for pod %s to change: \nGot:\n%s\nCompared with:\n%s", podName, format.Object(current, 1), format.Object(previous, 1))
+		case e, ok := <-w.ResultChan():
+			if !ok {
+				return fmt.Errorf("watch for pod %s closed", podName)
+			}
+			current, ok := e.Object.(*v1.Pod)
+			if !ok {
+				return fmt.Errorf("want *v1.Pod, but got %T", e.Object)
+			}
+			if previous != nil {
+				done, err := condition(previous.DeepCopy(), current.DeepCopy())
+				if err != nil {
+					return err
+				}
+				if done {
+					return nil
+				}
+			}
+			previous = current
+		}
+	}
+}

@@ -18,16 +18,22 @@ package node
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -36,7 +42,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
+		ginkgo.It("[LinuxOnly] should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
 			linuxNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err)
 			pod := &v1.Pod{
@@ -60,6 +66,71 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
 			// Check the pod is still not running
 			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
+			framework.ExpectNoError(err)
+		})
+	})
+})
+
+var _ = SIGDescribe("PodRejectionStatus", func() {
+	f := framework.NewDefaultFramework("pod-rejection-status")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	ginkgo.Context("Kubelet", func() {
+		ginkgo.It("should reject pod when the node didn't have enough resource", func(ctx context.Context) {
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
+
+			outOfCPUs := resource.MustParse("10")
+			outOfCPUs.Add(node.Status.Allocatable[v1.ResourceCPU])
+
+			// Create a pod that requests more CPU than the node has
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-out-of-cpu",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "pod-out-of-cpu",
+							Image: imageutils.GetPauseImageName(),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: outOfCPUs, // requests more CPU than the node has
+								},
+							},
+						},
+					},
+					NodeName: node.Name, // Set the node to an node which has less CPU
+				},
+			}
+
+			pod = e2epod.NewPodClient(f).Create(ctx, pod)
+
+			// Check the pod status after the pod is rejected
+			var condition = func(oldPod *v1.Pod, newPod *v1.Pod) (bool, error) {
+				switch newPod.Status.Phase {
+				case v1.PodSucceeded:
+					return true, errors.New("pod succeeded unexpectedly")
+				case v1.PodFailed:
+					if strings.HasPrefix(newPod.Status.Reason, "OutOf") {
+						expectedStatus := oldPod.Status
+						// overwriting all fields that we expect are overridden by kubelet.
+						// All other fields must stay the same as before kubelet touched them
+						expectedStatus.Phase = newPod.Status.Phase
+						expectedStatus.Reason = newPod.Status.Reason
+						expectedStatus.Message = newPod.Status.Message
+						expectedStatus.StartTime = newPod.Status.StartTime
+						if !reflect.DeepEqual(expectedStatus, newPod.Status) {
+							return true, fmt.Errorf("unexpected status change: \nExpected:\n%s\n But got:\n%v", format.Object(expectedStatus, 1), format.Object(newPod.Status, 1))
+						}
+						return true, nil
+					} else {
+						return true, fmt.Errorf("pod failed with reason %s", newPod.Status.Reason)
+					}
+				}
+				return false, nil
+			}
+			err = e2epod.WaitForPodChange(ctx, f.ClientSet, pod.Namespace, pod.Name, f.Timeouts.PodStartShort, condition)
 			framework.ExpectNoError(err)
 		})
 	})
