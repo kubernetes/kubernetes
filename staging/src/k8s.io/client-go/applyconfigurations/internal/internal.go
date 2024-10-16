@@ -7060,6 +7060,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: resources
+      type:
+        namedType: io.k8s.api.core.v1.ResourceRequirements
     - name: restartPolicy
       type:
         scalar: string
