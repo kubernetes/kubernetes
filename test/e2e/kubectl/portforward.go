@@ -696,7 +696,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 		})
 	})
 
-	ginkgo.Describe("With a server that never read request body", func() {
+	ginkgo.Describe("with a server that never read request body", func() {
 		ginkgo.It("port-forward service should be provided continuously", func(ctx context.Context) {
 			doTestConnectionNeverReadRequestBody(ctx, f)
 		})
@@ -705,6 +705,63 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 	ginkgo.Describe("with a server that sends RST upon accepting a connection", func() {
 		ginkgo.It("should connect, send data, and then connect again", func(ctx context.Context) {
 			doTestConnectionReset(ctx, f)
+		})
+	})
+
+	ginkgo.Describe("with a pod being removed", func() {
+		ginkgo.It("should stop port-forwarding", func(ctx context.Context) {
+			ginkgo.By("Creating the target pod")
+			pod := pfNeverReadRequestBodyPod()
+			if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+				framework.Failf("Couldn't create pod: %v", err)
+			}
+			if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+				framework.Failf("Pod did not start running: %v", err)
+			}
+
+			ginkgo.By("Running 'kubectl port-forward'")
+			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
+			defer cmd.Stop()
+
+			ginkgo.By("Running port-forward client")
+			reqChan := make(chan bool)
+			errorChan := make(chan error)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+
+				// try to mock a big request, which should take some time
+				for sentBodySize := 0; sentBodySize < 1024*1024*1024; {
+					size := rand.Intn(4 * 1024 * 1024)
+					url := fmt.Sprintf("http://localhost:%d/header", cmd.port)
+					_, err := post(url, strings.NewReader(strings.Repeat("x", size)), nil)
+					if err != nil {
+						errorChan <- err
+					}
+					ginkgo.By(fmt.Sprintf("Sent %d chunk of data", sentBodySize))
+					if sentBodySize == 0 {
+						close(reqChan)
+					}
+					sentBodySize += size
+				}
+			}()
+
+			ginkgo.By("Remove the forwarded pod after the first client request")
+			<-reqChan
+			e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
+
+			ginkgo.By("Wait for client being interrupted")
+			var err error
+			select {
+			case err = <-errorChan:
+			case <-time.After(e2epod.DefaultPodDeletionTimeout):
+			}
+
+			ginkgo.By("Check the client error")
+			gomega.Expect(err).ToNot(gomega.BeNil())
+			gomega.Expect(err.Error()).To(gomega.Or(gomega.ContainSubstring("connection reset by peer"), gomega.ContainSubstring("EOF")))
+
+			ginkgo.By("Check kubectl port-forward exit code")
+			gomega.Expect(cmd.cmd.ProcessState.ExitCode()).To(gomega.BeNumerically("<", 0), "kubectl port-forward should finish with non-zero exit code")
 		})
 	})
 
