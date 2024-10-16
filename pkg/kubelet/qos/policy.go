@@ -18,11 +18,14 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	resourceapimachinery "k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	schedulerutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -62,13 +65,44 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// which use more than their request will have an OOM score of 1000 and will be prime
 	// targets for OOM kills.
 	// Note that this is a heuristic, it won't work if a container has many small processes.
-	memoryRequest := container.Resources.Requests.Memory().Value()
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	containerMemoryRequest := container.Resources.Requests.Memory().Value()
+
+	isInPlacePodVerticalScaling := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
+	if isInPlacePodVerticalScaling {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			memoryRequest = cs.AllocatedResources.Memory().Value()
+			containerMemoryRequest = cs.AllocatedResources.Memory().Value()
 		}
 	}
-	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
+	oomScoreAdjust := 1000 - (1000*containerMemoryRequest)/memoryCapacity
+
+	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
+	// calculate the oom score adjustment based on: min-memory( currentSideCarContainer , min-memory(regular containers) ) .
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isSidecarContainer(pod, container) {
+		// check min resources with regular containers
+		minResourceList := resourcehelper.MinRegularContainerResourceList(*pod, resourcehelper.PodResourcesOptions{
+			InPlacePodVerticalScalingEnabled: isInPlacePodVerticalScaling,
+			NonMissingContainerRequests: map[v1.ResourceName]resourceapimachinery.Quantity{
+				v1.ResourceCPU:    *resourceapimachinery.NewMilliQuantity(schedulerutil.DefaultMilliCPURequest, resourceapimachinery.DecimalSI),
+				v1.ResourceMemory: *resourceapimachinery.NewQuantity(schedulerutil.DefaultMemoryRequest, resourceapimachinery.DecimalSI),
+			},
+		})
+		// check min resources with the current sidecarContainer
+		// inPlacePodVerticalScaling is not possible for the moment in InitContainers
+		minResourceList = resourcehelper.MinResourceList(container.Resources.Requests, minResourceList, resourcehelper.PodResourcesOptions{
+			NonMissingContainerRequests: map[v1.ResourceName]resourceapimachinery.Quantity{
+				v1.ResourceCPU:    *resourceapimachinery.NewMilliQuantity(schedulerutil.DefaultMilliCPURequest, resourceapimachinery.DecimalSI),
+				v1.ResourceMemory: *resourceapimachinery.NewQuantity(schedulerutil.DefaultMemoryRequest, resourceapimachinery.DecimalSI),
+			},
+		})
+		oomScoreAdjust = 1000 - (1000*minResourceList.Memory().Value())/memoryCapacity
+
+		// when OOM score adj currentSideCarContainer <= Oom score adj min-memory(regular containers)
+		// ==> add 1 to the sidecar container oom score adj (first to kill).
+		if minResourceList.Memory().Cmp(*container.Resources.Requests.Memory()) <= 0 {
+			oomScoreAdjust += 1
+		}
+	}
+
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
@@ -79,4 +113,13 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
+	for _, initContainer := range pod.Spec.InitContainers {
+		if initContainer.Name == container.Name {
+			return container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
+		}
+	}
+	return false
 }

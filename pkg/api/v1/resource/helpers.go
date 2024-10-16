@@ -248,6 +248,61 @@ func max(a v1.ResourceList, b v1.ResourceList) v1.ResourceList {
 	return result
 }
 
+// MinRegularContainerResourceList returns the minimum resource requests for each named resource
+// across all regular containers in pod.Spec.Containers.
+// It does not include initContainers (both restartable and non-restartable).
+func MinRegularContainerResourceList(pod v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	containerList := pod.Spec.Containers[0].Resources.Requests
+	var containerStatuses map[string]*v1.ContainerStatus
+	if opts.InPlacePodVerticalScalingEnabled {
+		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses))
+		for i := range pod.Status.ContainerStatuses {
+			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		containerReqs := container.Resources.Requests
+		if opts.InPlacePodVerticalScalingEnabled {
+			cs, found := containerStatuses[container.Name]
+			if found {
+				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+					containerReqs = cs.AllocatedResources.DeepCopy()
+				} else {
+					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
+				}
+			}
+		}
+
+		MinResourceList(containerList, containerReqs, opts)
+	}
+	return containerList
+}
+
+// MinResourceList returns the minimum value between 'a' and 'b' for each named resource.
+func MinResourceList(a v1.ResourceList, b v1.ResourceList, opts PodResourcesOptions) v1.ResourceList {
+	if len(opts.NonMissingContainerRequests) > 0 {
+		a = applyNonMissing(a, opts.NonMissingContainerRequests)
+		b = applyNonMissing(b, opts.NonMissingContainerRequests)
+	}
+
+	result := v1.ResourceList{}
+	for key, value := range a {
+		if other, found := b[key]; found {
+			if value.Cmp(other) > 0 {
+				result[key] = other.DeepCopy()
+				continue
+			}
+		}
+		result[key] = value.DeepCopy()
+	}
+	for key, value := range b {
+		if _, found := result[key]; !found {
+			result[key] = value.DeepCopy()
+		}
+	}
+	return result
+}
+
 // reuseOrClearResourceList is a helper for avoiding excessive allocations of
 // resource lists within the inner loop of resource calculations.
 func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
