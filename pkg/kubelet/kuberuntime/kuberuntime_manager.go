@@ -195,6 +195,7 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullPolicy images.ImagePullPolicyEnforcer,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	cpuCFSQuota bool,
@@ -268,12 +269,17 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 
-	nodeKeyring := credentialprovider.NewDockerKeyring()
+	imagePullManager, err := images.NewFileBasedImagePullManager(ctx, rootDirectory, imagePullPolicy, kubeRuntimeManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create image pull manager: %w", err)
+	}
 
+	nodeKeyring := credentialprovider.NewDockerKeyring()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		nodeKeyring,
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,

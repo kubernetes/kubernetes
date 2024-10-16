@@ -3206,6 +3206,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		images.NeverVerifyImagePullPolicy, // TODO: maybe we'll need to config this
 		"",
 		"",
 		kubeCfg.CPUCFSQuota,

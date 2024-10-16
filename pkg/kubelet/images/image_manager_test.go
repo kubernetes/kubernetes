@@ -381,7 +381,11 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 
 	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
 
-	puller = NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	pullManager, err := NewFileBasedImagePullManager(context.Background(), t.TempDir(), NeverVerifyImagePullPolicy, fakeRuntime)
+	if err != nil {
+		t.Fatalf("failed to setup a file-based image pull manager")
+	}
+	puller = NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 
