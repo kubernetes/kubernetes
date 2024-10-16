@@ -4395,6 +4395,17 @@ message PodSpec {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaim resourceClaims = 39;
+
+  // Resources is the total amount of compute resources required by all
+  // containers in the pod. Currently, only CPU and Memory resources are
+  // supported.
+  //
+  // This is an alpha field and requires enabling the PodLevelResources feature
+  // gate.
+  //
+  // +featureGate=PodLevelResources
+  // +optional
+  optional ResourceRequirements resources = 40;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
