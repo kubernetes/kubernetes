@@ -311,10 +311,21 @@ func TestPullWithSecrets(t *testing.T) {
 		_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 		require.NoError(t, err)
 
+		fsRecordAccessor, err := images.NewFSPullRecordsAccessor(t.TempDir())
+		if err != nil {
+			t.Fatal("failed to setup an file pull records accessor")
+		}
+
+		imagePullManager, err := images.NewImagePullManager(context.Background(), fsRecordAccessor, images.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+		if err != nil {
+			t.Fatal("failed to setup an image pull manager")
+		}
+
 		fakeManager.imagePuller = images.NewImageManager(
 			fakeManager.recorder,
 			builtInKeyRing,
 			fakeManager,
+			imagePullManager,
 			flowcontrol.NewBackOff(time.Second, 300*time.Second),
 			false,
 			ptr.To[int32](0), // No limit on max parallel image pulls,
@@ -374,10 +385,21 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
 			}
 
+			fsRecordAccessor, err := images.NewFSPullRecordsAccessor(t.TempDir())
+			if err != nil {
+				t.Fatal("failed to setup an file pull records accessor")
+			}
+
+			imagePullManager, err := images.NewImagePullManager(context.Background(), fsRecordAccessor, images.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+			if err != nil {
+				t.Fatal("failed to setup an image pull manager")
+			}
+
 			fakeManager.imagePuller = images.NewImageManager(
 				fakeManager.recorder,
 				&credentialprovider.BasicDockerKeyring{},
 				fakeManager,
+				imagePullManager,
 				flowcontrol.NewBackOff(time.Second, 300*time.Second),
 				false,
 				ptr.To[int32](0), // No limit on max parallel image pulls,

@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -67,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -204,6 +206,8 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullsCredentialVerificationPolicy string,
+	preloadedImagesCredentialVerificationWhitelist []string,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	singleProcessOOMKill *bool,
@@ -283,12 +287,33 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 
-	nodeKeyring := credentialprovider.NewDefaultDockerKeyring()
+	var imagePullManager images.ImagePullManager = &images.NoopImagePullManager{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		imagePullCredentialsVerificationPolicy, err := images.NewImagePullCredentialVerificationPolicy(
+			kubeletconfiginternal.ImagePullCredentialsVerificationPolicy(imagePullsCredentialVerificationPolicy),
+			preloadedImagesCredentialVerificationWhitelist)
 
+		if err != nil {
+			return nil, err
+		}
+
+		fsRecordAccessor, err := images.NewFSPullRecordsAccessor(rootDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup the FSPullRecordsAccessor: %w", err)
+		}
+
+		imagePullManager, err = images.NewImagePullManager(ctx, fsRecordAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, ptr.Deref(maxParallelImagePulls, 0))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create image pull manager: %w", err)
+		}
+	}
+
+	nodeKeyring := credentialprovider.NewDefaultDockerKeyring()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		nodeKeyring,
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,
