@@ -341,7 +341,7 @@
     resources matching the field selector. Delete and update some of the resources
     with field selectors; the lists, watches and informers MUST return only the custom
     resources matching custom resources.
-  release: v1.31, v1.32
+  release: v1.32
   file: test/e2e/apimachinery/crd_selectable_fields.go
 - testname: Custom Resource OpenAPI Publish, stop serving version
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
