@@ -299,12 +299,11 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 func doTestConnectionNeverReadRequestBody(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfNeverReadRequestBodyPod()
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-		framework.Failf("Couldn't create pod: %v", err)
-	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
-		framework.Failf("Pod did not start running: %v", err)
-	}
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "couldn't create pod")
+
+	err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+	framework.ExpectNoError(err, "pod did not start running")
 
 	ginkgo.By("Running 'kubectl port-forward'")
 	cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -335,9 +334,8 @@ func doTestConnectionNeverReadRequestBody(ctx context.Context, f *framework.Fram
 	))
 
 	ginkgo.By("Waiting for the target pod to stop running")
-	if err := WaitForTerminatedContainer(ctx, f, pod, "server"); err != nil {
-		framework.Failf("Container did not terminate: %v", err)
-	}
+	err = WaitForTerminatedContainer(ctx, f, pod, "server")
+	framework.ExpectNoError(err, "container did not terminate")
 }
 
 func doTestConnectSendDisconnect(ctx context.Context, bindAddress string, f *framework.Framework) {
@@ -392,12 +390,11 @@ func doTestConnectSendDisconnect(ctx context.Context, bindAddress string, f *fra
 func doTestConnectionReset(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfResetPod()
-	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-		framework.Failf("Couldn't create pod: %v", err)
-	}
-	if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
-		framework.Failf("Pod did not start running: %v", err)
-	}
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "couldn't create pod")
+
+	err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+	framework.ExpectNoError(err, "pod did not start running")
 
 	ginkgo.By("Running 'kubectl port-forward'")
 	func() {
@@ -437,10 +434,8 @@ func doTestConnectionReset(ctx context.Context, f *framework.Framework) {
 		ginkgo.By("Attempting connection #2")
 		func() {
 			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
-			if err != nil {
-				ginkgo.By("Connection couldn't connect to port")
-				framework.Failf("Connection couldn't connect to port %d: %v", cmd.port, err)
-			}
+			framework.ExpectNoError(err, "connection couldn't connect to port %d", cmd.port)
+
 			defer func() {
 				ginkgo.By("Closing the connection to the local port")
 				conn.Close() //nolint: errcheck
@@ -449,12 +444,11 @@ func doTestConnectionReset(ctx context.Context, f *framework.Framework) {
 	}()
 
 	ginkgo.By("Deleting the port forward pod")
-	if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
-		framework.Failf("Couldn't delete pod: %v", err)
-	}
-	if err := e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
-		framework.Failf("Pod did not terminate: %v", err)
-	}
+	err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Couldn't delete pod")
+
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+	framework.ExpectNoError(err, "Pod did not terminate")
 }
 
 func doTestMustConnectSendNothing(ctx context.Context, bindAddress string, f *framework.Framework) {
@@ -696,7 +690,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 		})
 	})
 
-	ginkgo.Describe("With a server that never read request body", func() {
+	ginkgo.Describe("with a server that never read request body", func() {
 		ginkgo.It("port-forward service should be provided continuously", func(ctx context.Context) {
 			doTestConnectionNeverReadRequestBody(ctx, f)
 		})
@@ -708,16 +702,70 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 		})
 	})
 
+	ginkgo.Describe("with a pod being removed", func() {
+		ginkgo.It("should stop port-forwarding", func(ctx context.Context) {
+			ginkgo.By("Creating the target pod")
+			pod := pfNeverReadRequestBodyPod()
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "couldn't create pod")
+
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "pod did not start running")
+
+			ginkgo.By("Running 'kubectl port-forward'")
+			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
+			defer cmd.Stop()
+
+			ginkgo.By("Running port-forward client")
+			reqChan := make(chan bool)
+			errorChan := make(chan error)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+
+				// try to mock a big request, which should take some time
+				for sentBodySize := 0; sentBodySize < 1024*1024*1024; {
+					size := rand.Intn(4 * 1024 * 1024)
+					url := fmt.Sprintf("http://localhost:%d/header", cmd.port)
+					_, err := post(url, strings.NewReader(strings.Repeat("x", size)), nil)
+					if err != nil {
+						errorChan <- err
+					}
+					ginkgo.By(fmt.Sprintf("Sent %d chunk of data", sentBodySize))
+					if sentBodySize == 0 {
+						close(reqChan)
+					}
+					sentBodySize += size
+				}
+			}()
+
+			ginkgo.By("Remove the forwarded pod after the first client request")
+			<-reqChan
+			e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
+
+			ginkgo.By("Wait for client being interrupted")
+			select {
+			case err = <-errorChan:
+			case <-time.After(e2epod.DefaultPodDeletionTimeout):
+			}
+
+			ginkgo.By("Check the client error")
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.Or(gomega.ContainSubstring("connection reset by peer"), gomega.ContainSubstring("EOF")))
+
+			ginkgo.By("Check kubectl port-forward exit code")
+			gomega.Expect(cmd.cmd.ProcessState.ExitCode()).To(gomega.BeNumerically("<", 0), "kubectl port-forward should finish with non-zero exit code")
+		})
+	})
+
 	ginkgo.Describe("Shutdown client connection while the remote stream is writing data to the port-forward connection", func() {
 		ginkgo.It("port-forward should keep working after detect broken connection", func(ctx context.Context) {
 			ginkgo.By("Creating the target pod")
 			pod := testWebServerPod()
-			if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
-				framework.Failf("Couldn't create pod: %v", err)
-			}
-			if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
-				framework.Failf("Pod did not start running: %v", err)
-			}
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "couldn't create pod")
+
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
+			framework.ExpectNoError(err, "pod did not start running")
 
 			ginkgo.By("Running 'kubectl port-forward'")
 			cmd := runPortForward(f.Namespace.Name, pod.Name, 80)
@@ -725,49 +773,36 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 			ginkgo.By("Send a http request to verify port-forward working")
 			client := http.Client{
-				Timeout: 5 * time.Second,
+				Timeout: 10 * time.Second,
 			}
 			resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
-			if err != nil {
-				framework.Failf("Couldn't get http response from port-forward: %v", err)
-			}
-			if resp.StatusCode != http.StatusOK {
-				framework.Failf("Expected status code %d, got %d", http.StatusOK, resp.StatusCode)
-			}
+			framework.ExpectNoError(err, "couldn't get http response from port-forward")
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
 
 			ginkgo.By("Dialing the local port")
 			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
-			if err != nil {
-				framework.Failf("Couldn't connect to port %d: %v", cmd.port, err)
-			}
+			framework.ExpectNoError(err, "couldn't connect to port %d", cmd.port)
 
 			// use raw tcp connection to emulate client close connection without reading response
-			ginkgo.By("Request agohost binary file (40MB+)")
+			ginkgo.By("Request agnhost binary file (40MB+)")
 			requestLines := []string{"GET /agnhost HTTP/1.1", "Host: localhost", ""}
 			for _, line := range requestLines {
-				if _, err := conn.Write(append([]byte(line), []byte("\r\n")...)); err != nil {
-					framework.Failf("Couldn't write http request to local connection: %v", err)
-				}
+				_, err := conn.Write(append([]byte(line), []byte("\r\n")...))
+				framework.ExpectNoError(err, "couldn't write http request to local connection")
 			}
 
 			ginkgo.By("Read only one byte from the connection")
-			if _, err := conn.Read(make([]byte, 1)); err != nil {
-				framework.Logf("Couldn't reading from the local connection: %v", err)
-			}
+			_, err = conn.Read(make([]byte, 1))
+			framework.ExpectNoError(err, "couldn't read from the local connection")
 
 			ginkgo.By("Close client connection without reading remain data")
-			if err := conn.Close(); err != nil {
-				framework.Failf("Couldn't close local connection: %v", err)
-			}
+			err = conn.Close()
+			framework.ExpectNoError(err, "couldn't close local connection")
 
 			ginkgo.By("Send another http request through port-forward again")
 			resp, err = client.Get(fmt.Sprintf("http://127.0.0.1:%d/", cmd.port))
-			if err != nil {
-				framework.Failf("Couldn't get http response from port-forward: %v", err)
-			}
-			if resp.StatusCode != http.StatusOK {
-				framework.Failf("Expected status code %d, got %d", http.StatusOK, resp.StatusCode)
-			}
+			framework.ExpectNoError(err, "couldn't get http response from port-forward")
+			gomega.Expect(resp.StatusCode).To(gomega.Equal(http.StatusOK), "unexpected status code")
 		})
 	})
 })
