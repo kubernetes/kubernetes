@@ -47,9 +47,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		expectedOptions   PolicyOptions
 	}{
 		{
-			description:       "return TopologyManagerOptions with PreferClosestNUMA set to true",
-			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			description: "return TopologyManagerOptions with PreferClosestNUMA set to true",
 			expectedOptions: PolicyOptions{
 				PreferClosestNUMA:     true,
 				MaxAllowableNUMANodes: 8,
@@ -74,8 +72,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			description: "fail to set option when TopologyManagerPolicyBetaOptions feature gate is not set",
 			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
 			policyOptions: map[string]string{
-				PreferClosestNUMANodes: "true",
-				MaxAllowableNUMANodes:  "8",
+				MaxAllowableNUMANodes: "8",
 			},
 			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
 		},
@@ -87,7 +84,6 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 		},
 		{
 			description:       "fail to parse options with error PreferClosestNUMANodes",
-			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: true,
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "not a boolean",
@@ -177,6 +173,10 @@ func TestPolicyDefaultsAvailable(t *testing.T) {
 			option:            PreferClosestNUMANodes,
 			expectedAvailable: true,
 		},
+		{
+			option:            MaxAllowableNUMANodes,
+			expectedAvailable: true,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
@@ -206,7 +206,7 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		{
 			option:            PreferClosestNUMANodes,
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			featureGateEnable: false,
 			expectedAvailable: true,
 		},
 		{
@@ -215,10 +215,40 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: false,
 			expectedAvailable: true,
 		},
+		{
+			option:            fancyAlphaOption,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            fancyAlphaOption,
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
+		{
+			option:            fancyBetaOption,
+			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
+		{
+			option:            fancyBetaOption,
+			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
 	}
+	betaOptions.Insert(fancyBetaOption)
+	alphaOptions.Insert(fancyAlphaOption)
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)
+			defer func() {
+				// reset feature flag
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, !testCase.featureGateEnable)
+			}()
 			err := CheckPolicyOptionAvailable(testCase.option)
 			isEnabled := (err == nil)
 			if isEnabled != testCase.expectedAvailable {
