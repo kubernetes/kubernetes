@@ -35,6 +35,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	crierrors "k8s.io/cri-api/pkg/errors"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -380,7 +381,7 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 
 	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
 
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	puller = NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 
