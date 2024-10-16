@@ -76,11 +76,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/component-base/flagz"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/tracing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -96,7 +97,8 @@ import (
 // To be used for testing purpose only, to simulate scenarios where multiple apiservers
 // exist. In such cases we want to ensure unique apiserver IDs which are a hash of hostnameFunc.
 var (
-	hostnameFunc = os.Hostname
+	hostnameFunc  = os.Hostname
+	componentName = "apiserver"
 )
 
 const (
@@ -191,7 +193,7 @@ type Config struct {
 	LivezChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
 	ReadyzChecks []healthz.HealthChecker
-	Flags        []*cliflag.NamedFlagSets
+	FlagSets     []*cliflag.NamedFlagSets
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -381,6 +383,7 @@ type AuthorizationInfo struct {
 
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // NewConfig returns a Config struct with the default values
@@ -970,12 +973,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 		s.AddHealthChecks(delegateCheck)
 	}
-
-	// TODO: We may need to append flags from all delegates.
-	/* for _, delegateFlagSet := range delegationTarget.Flags() {
-		s.AddFlags(delegateFlagSet)
-	} */
-
 	s.RegisterDestroyFunc(func() {
 		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
 			klog.Errorf("failed to shut down tracer provider: %v", err)
@@ -1092,7 +1089,6 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
 		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
-		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, c.Flags)
 	}
 	if s.UnprotectedDebugSocket != nil {
 		s.UnprotectedDebugSocket.InstallProfiling()
@@ -1110,6 +1106,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 			slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
+	}
+
+	if c.FeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, componentName, c.FlagSets)
 	}
 
 	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)

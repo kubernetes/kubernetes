@@ -119,7 +119,7 @@ func BuildGenericConfig(
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
-	genericConfig.Flags = []*cliflag.NamedFlagSets{&s.FlagSet}
+	genericConfig.FlagSets = []*cliflag.NamedFlagSets{&s.FlagSets}
 	genericConfig.MergedResourceConfig = resourceConfig
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
