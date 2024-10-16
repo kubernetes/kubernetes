@@ -113,7 +113,7 @@ var _ = SIGDescribe("CustomResourceFieldSelectors [Privileged:ClusterAdmin]", fu
 		})
 
 		/*
-			Release: v1.31, v1.32
+			Release: v1.32
 			Testname: custom-resource-definition-field-selectors-list-watch-register-informers
 			Description: Create a Custom Resource Definition with SelectableFields. Create a custom resource with
 			two versions and a conversion webhook that converts between the versions. Attempt to list, watch and register
