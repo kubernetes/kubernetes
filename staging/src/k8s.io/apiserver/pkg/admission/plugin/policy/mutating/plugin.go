@@ -89,7 +89,7 @@ var _ admission.MutationInterface = &Plugin{}
 
 // NewPlugin returns a generic admission webhook plugin.
 func NewPlugin(_ io.Reader) *Plugin {
-	// There is no request body to mutate for DELETE and CONNECT, so this plugin never handles those operations.
+	// There is no request body to mutate for DELETE, so this plugin never handles that operation.
 	handler := admission.NewHandler(admission.Create, admission.Update, admission.Connect)
 	res := &Plugin{}
 	res.Plugin = generic.NewPlugin(
