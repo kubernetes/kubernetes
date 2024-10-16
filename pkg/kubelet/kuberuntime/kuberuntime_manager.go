@@ -590,7 +590,9 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	// Note: cgroup doesn't support memory request today, so we don't compare that. If canAdmitPod called  during
 	// handlePodResourcesResize finds 'fit', then desiredMemoryRequest == currentMemoryRequest.
 	if desiredMemoryLimit == currentMemoryLimit && desiredCPULimit == currentCPULimit && desiredCPURequest == currentCPURequest {
-		return true
+		if m.Type() != "docker" {
+			return true
+		}
 	}
 
 	desiredResources := containerResources{
@@ -612,7 +614,11 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	}
 	determineContainerResize := func(rName v1.ResourceName, specValue, statusValue int64) (resize, restart bool) {
 		if specValue == statusValue {
-			return false, false
+			if m.Type() == "docker" {
+				return true, false
+			} else {
+				return false, false
+			}
 		}
 		if resizePolicy[rName] == v1.RestartContainer {
 			return true, true
@@ -634,6 +640,10 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 			changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], containerToUpdateInfo{})
 			copy(changes.ContainersToUpdate[rName][1:], changes.ContainersToUpdate[rName])
 			changes.ContainersToUpdate[rName][0] = cUpdateInfo
+		case specValue == statusValue:
+			if m.Type() == "docker" {
+				changes.ContainersToUpdate[rName] = append(changes.ContainersToUpdate[rName], cUpdateInfo)
+			}
 		}
 	}
 	resizeMemLim, restartMemLim := determineContainerResize(v1.ResourceMemory, desiredMemoryLimit, currentMemoryLimit)
