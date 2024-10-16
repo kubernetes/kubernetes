@@ -34,8 +34,8 @@ const (
 	// and removed when node has enough memory.
 	TaintNodeMemoryPressure = "node.kubernetes.io/memory-pressure"
 
-	// TaintNodeSwapPressure will be added when node has memory pressure
-	// and removed when node has enough memory.
+	// TaintNodeSwapPressure will be added when node has swap pressure
+	// and removed when node has enough swap.
 	TaintNodeSwapPressure = "node.kubernetes.io/swap-pressure"
 
 	// TaintNodeDiskPressure will be added when node has disk pressure
