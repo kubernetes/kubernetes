@@ -1881,3 +1881,75 @@
     params:
       nodes: 100
       measurePods: 1000 # Must be initNodes * 10
+
+# This test case is used to measure the performance of queuing hints when handling the AssignedPodAdd events.
+# First, two nodes are created. Then, one pod is created and scheduled on one of the nodes.
+# Next, group of topology spreading pods tries to be scheduled, but they can only fill one node,
+# because of the anti affinity to the pod on the second node.
+# Then, group of interpodaffinity pods is created and wait for pods with matching labels to be scheduled first.
+# Next, new pods are scheduled that unblock the previously unschedulable pods, by balancing the topology
+# and scheduling pods with matching labels to the intepodaffinity pods.
+# Plugins covered: InterPodAffinity and PodTopologySpread.
+- name: EventHandlingPodAdd
+  featureGates:
+    SchedulerQueueingHints: true
+  workloadTemplate:
+  # Create two nodes with enough capacity.
+  - opcode: createNodes
+    count: 2
+    nodeTemplatePath: config/event_handling/podadd-node.yaml
+  # Create one pod with label that will block topology spreading pods 
+  # from being scheduled on one node using pod anti affinity.
+  - opcode: createPods
+    count: 1
+    podTemplatePath: config/event_handling/podadd-pod-with-label.yaml
+    namespace: podtopologyspread
+  # Collect metrics for unsched pods created below.
+  - opcode: startCollectingMetrics
+    name: unschedPods
+    namespaces: [podtopologyspread, interpodaffinity]
+    labelSelector:
+      type: unsched
+  # Create pods blocked using PodTopologySpread plugin.
+  # Max skew is configured to 1, so more pods need to be created on the first node 
+  # (with the pod created above), to fill up the second node with these pods.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/podadd-pod-podtopologyspread.yaml
+    skipWaitToCompletion: true
+    namespace: podtopologyspread
+  # Create pods blocked using InterPodAffinity plugin.
+  # They don't have the affinity to themselves, 
+  # so have to wait for another pods with matching labels to be created at first.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/podadd-pod-interpodaffinity.yaml
+    skipWaitToCompletion: true
+    namespace: interpodaffinity
+  # Wait for unschedulable pods to be processed by the scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    labelSelector:
+      type: unsched
+  # Create pods that will get scheduled on the node with the first pod created with matching label.
+  # Their creation will gradually unblock topology spreading pods and make them schedulable on the second node.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/podadd-pod-unblocker-topology.yaml
+    namespace: podtopologyspread
+  # Create pods with matching labels to the affinity of previously created interpodaffinity pods.
+  # Each of them will unblock one pod and make it schedulable.
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/event_handling/podadd-pod-unblocker-affinity.yaml
+    namespace: interpodaffinity
+  # Wait for previously unschedulable pods to be scheduled.
+  - opcode: barrier
+    labelSelector:
+      type: unsched
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 1000Pods
+    labels: [performance, short]
+    params:
+      measurePods: 1000
