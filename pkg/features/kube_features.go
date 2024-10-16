@@ -768,6 +768,13 @@ const (
 	// unresponsive. The feature gate is enabled by default, but should only be used
 	// if the system supports the systemd watchdog feature and has it configured properly.
 	SystemdWatchdog = featuregate.Feature("SystemdWatchdog")
+
+	// owner: @ndixita
+	// key: https://kep.k8s.io/2837
+	// alpha: 1.32
+	//
+	// Enables specifying resources at pod-level.
+	PodLevelResources featuregate.Feature = "PodLevelResources"
 )
 
 func init() {
