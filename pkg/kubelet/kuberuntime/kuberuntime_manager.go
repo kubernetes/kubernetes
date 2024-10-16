@@ -194,6 +194,7 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullPolicy images.ImagePullPolicyEnforcer,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	cpuCFSQuota bool,
@@ -267,9 +268,15 @@ func NewKubeGenericRuntimeManager(
 		}
 	}
 
+	imagePullManager, err := images.NewFileBasedImagePullManager(rootDirectory, imagePullPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create image pull manager: %v", err)
+	}
+
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,
