@@ -21,6 +21,7 @@ package testing
 import (
 	context "context"
 
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
 
 	corev1 "k8s.io/api/core/v1"
@@ -991,8 +992,8 @@ func (_c *MockRuntime_ListPodSandboxMetrics_Call) RunAndReturn(run func(context.
 }
 
 // PullImage provides a mock function with given fields: ctx, image, pullSecrets, podSandboxConfig
-func (_m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, pullSecrets []corev1.Secret, podSandboxConfig *v1.PodSandboxConfig) (string, error) {
-	ret := _m.Called(ctx, image, pullSecrets, podSandboxConfig)
+func (_m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+	ret := _m.Called(ctx, image, credentials, podSandboxConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PullImage")
@@ -1000,22 +1001,22 @@ func (_m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec,
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) (string, error)); ok {
-		return rf(ctx, image, pullSecrets, podSandboxConfig)
+	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)); ok {
+		return rf(ctx, image, credentials, podSandboxConfig)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) string); ok {
-		r0 = rf(ctx, image, pullSecrets, podSandboxConfig)
+	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) string); ok {
+		r0 = rf(ctx, image, credentials, podSandboxConfig)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) error); ok {
-		r1 = rf(ctx, image, pullSecrets, podSandboxConfig)
+	if rf, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) error); ok {
+		r1 = rf(ctx, image, credentials, podSandboxConfig)
 	} else {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0, nil, r1 // FIXME: I don't know yet what this does
 }
 
 // MockRuntime_PullImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PullImage'
@@ -1026,10 +1027,10 @@ type MockRuntime_PullImage_Call struct {
 // PullImage is a helper method to define mock.On call
 //   - ctx context.Context
 //   - image container.ImageSpec
-//   - pullSecrets []corev1.Secret
+//   - credentials []credentialprovider.TrackedAuthConfig
 //   - podSandboxConfig *v1.PodSandboxConfig
-func (_e *MockRuntime_Expecter) PullImage(ctx interface{}, image interface{}, pullSecrets interface{}, podSandboxConfig interface{}) *MockRuntime_PullImage_Call {
-	return &MockRuntime_PullImage_Call{Call: _e.mock.On("PullImage", ctx, image, pullSecrets, podSandboxConfig)}
+func (_e *MockRuntime_Expecter) PullImage(ctx interface{}, image interface{}, credentials interface{}, podSandboxConfig interface{}) *MockRuntime_PullImage_Call {
+	return &MockRuntime_PullImage_Call{Call: _e.mock.On("PullImage", ctx, image, credentials, podSandboxConfig)}
 }
 
 func (_c *MockRuntime_PullImage_Call) Run(run func(ctx context.Context, image container.ImageSpec, pullSecrets []corev1.Secret, podSandboxConfig *v1.PodSandboxConfig)) *MockRuntime_PullImage_Call {
