@@ -2095,21 +2095,33 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			oldStatus.Resources = &v1.ResourceRequirements{}
 		}
 		// Convert Limits
+		// If limits are being removed, cStatus has limits while container spec does not.
+		workLimits := make(v1.ResourceList)
+		if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
+			workLimits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+		} else if container.Resources.Limits != nil {
+			// Only if limits is set in spec, restore limits to container sutatus from old status.
+			// Otherwise, assume limits are removed.
+			if _, found := container.Resources.Limits[v1.ResourceCPU]; found {
+				determineResource(v1.ResourceCPU, container.Resources.Limits, oldStatus.Resources.Limits, workLimits)
+			}
+		}
+		if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
+			workLimits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
+		} else if container.Resources.Limits != nil {
+			// Only if limits is set in spec, restore limits to container sutatus from old status.
+			// Otherwise, assume limits are removed.
+			if _, found := container.Resources.Limits[v1.ResourceMemory]; found {
+				determineResource(v1.ResourceMemory, container.Resources.Limits, oldStatus.Resources.Limits, workLimits)
+			}
+		}
 		if container.Resources.Limits != nil {
-			limits = make(v1.ResourceList)
-			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
-				limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
-			} else {
-				determineResource(v1.ResourceCPU, container.Resources.Limits, oldStatus.Resources.Limits, limits)
-			}
-			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
-				limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
-			} else {
-				determineResource(v1.ResourceMemory, container.Resources.Limits, oldStatus.Resources.Limits, limits)
-			}
 			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
-				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
+				workLimits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
+		}
+		if len(workLimits) > 0 {
+			limits = workLimits
 		}
 		// Convert Requests
 		if status.AllocatedResources != nil {
