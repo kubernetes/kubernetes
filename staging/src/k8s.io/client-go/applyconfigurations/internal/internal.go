@@ -512,6 +512,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.ApplyConfiguration
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
 - name: io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation
   map:
     fields:
@@ -534,6 +540,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.admissionregistration.v1alpha1.JSONPatch
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
 - name: io.k8s.api.admissionregistration.v1alpha1.MatchCondition
   map:
     fields:
@@ -570,6 +582,100 @@ var schemaYAML = typed.YAMLObject(`types:
             namedType: io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations
           elementRelationship: atomic
     elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicySpec
+      default: {}
+- name: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingSpec
+      default: {}
+- name: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingSpec
+  map:
+    fields:
+    - name: matchResources
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+    - name: paramRef
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ParamRef
+    - name: policyName
+      type:
+        scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicySpec
+  map:
+    fields:
+    - name: failurePolicy
+      type:
+        scalar: string
+    - name: matchConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.MatchCondition
+          elementRelationship: associative
+          keys:
+          - name
+    - name: matchConstraints
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+    - name: mutations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.Mutation
+          elementRelationship: atomic
+    - name: paramKind
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ParamKind
+    - name: reinvocationPolicy
+      type:
+        scalar: string
+    - name: variables
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.Variable
+          elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.Mutation
+  map:
+    fields:
+    - name: applyConfiguration
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ApplyConfiguration
+    - name: jsonPatch
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.JSONPatch
+    - name: patchType
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations
   map:
     fields:

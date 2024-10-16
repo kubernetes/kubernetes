@@ -36,15 +36,27 @@ import (
 
 const VariablesTypeName = "kubernetes.variables"
 
+// CompositedCompiler compiles expressions with variable composition.
 type CompositedCompiler struct {
 	Compiler
 	FilterCompiler
+	EvaluatorCompiler
 
 	CompositionEnv *CompositionEnv
 }
 
+// CompositedFilter provides evaluation of filter expressions with variable composition.
+// The expressions must return a boolean.
 type CompositedFilter struct {
 	Filter
+
+	compositionEnv *CompositionEnv
+}
+
+// CompositedEvaluator provides evaluation of a single expression with variable composition.
+// The types that may returned by the expression is determined at compilation time.
+type CompositedEvaluator struct {
+	Evaluator
 
 	compositionEnv *CompositionEnv
 }
@@ -64,11 +76,13 @@ func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompi
 		CompiledVariables: map[string]CompilationResult{},
 	}
 	compiler := NewCompiler(context.EnvSet)
-	filterCompiler := NewFilterCompiler(context.EnvSet)
+	filterCompiler := &filterCompiler{compiler}
+	evaluatorCompiler := &evaluatorCompiler{compiler}
 	return &CompositedCompiler{
-		Compiler:       compiler,
-		FilterCompiler: filterCompiler,
-		CompositionEnv: context,
+		Compiler:          compiler,
+		FilterCompiler:    filterCompiler,
+		EvaluatorCompiler: evaluatorCompiler,
+		CompositionEnv:    context,
 	}
 }
 
@@ -89,6 +103,15 @@ func (c *CompositedCompiler) Compile(expressions []ExpressionAccessor, optionalD
 	filter := c.FilterCompiler.Compile(expressions, optionalDecls, envType)
 	return &CompositedFilter{
 		Filter:         filter,
+		compositionEnv: c.CompositionEnv,
+	}
+}
+
+// CompileEvaluator compiles an evaluator for the given expression, options and environment.
+func (c *CompositedCompiler) CompileEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Evaluator {
+	evaluator := c.EvaluatorCompiler.CompileEvaluator(expression, optionalDecls, envType)
+	return &CompositedEvaluator{
+		Evaluator:      evaluator,
 		compositionEnv: c.CompositionEnv,
 	}
 }

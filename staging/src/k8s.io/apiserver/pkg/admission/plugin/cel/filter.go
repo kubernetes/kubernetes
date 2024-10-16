@@ -18,12 +18,8 @@ package cel
 
 import (
 	"context"
-	"fmt"
-	"math"
-	"reflect"
-	"time"
-
 	"github.com/google/cel-go/interpreter"
+	"reflect"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -32,9 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // filterCompiler implement the interface FilterCompiler.
@@ -134,122 +128,16 @@ func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.Versione
 	evaluations := make([]EvaluationResult, len(f.compilationResults))
 	var err error
 
-	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
+	activation, err := newActivation(ctx, versionedAttr, request, inputs, namespace)
 	if err != nil {
 		return nil, -1, err
-	}
-	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
-	if err != nil {
-		return nil, -1, err
-	}
-	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
-	if inputs.VersionedParams != nil {
-		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
-		if err != nil {
-			return nil, -1, err
-		}
-	}
-
-	if inputs.Authorizer != nil {
-		authorizerVal = library.NewAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer)
-		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
-	}
-
-	requestVal, err := convertObjectToUnstructured(request)
-	if err != nil {
-		return nil, -1, err
-	}
-	namespaceVal, err := objectToResolveVal(namespace)
-	if err != nil {
-		return nil, -1, err
-	}
-	va := &evaluationActivation{
-		object:                    objectVal,
-		oldObject:                 oldObjectVal,
-		params:                    paramsVal,
-		request:                   requestVal.Object,
-		namespace:                 namespaceVal,
-		authorizer:                authorizerVal,
-		requestResourceAuthorizer: requestResourceAuthorizerVal,
-	}
-
-	// composition is an optional feature that only applies for ValidatingAdmissionPolicy.
-	// check if the context allows composition
-	var compositionCtx CompositionContext
-	var ok bool
-	if compositionCtx, ok = ctx.(CompositionContext); ok {
-		va.variables = compositionCtx.Variables(va)
 	}
 
 	remainingBudget := runtimeCELCostBudget
 	for i, compilationResult := range f.compilationResults {
-		var evaluation = &evaluations[i]
-		if compilationResult.ExpressionAccessor == nil { // in case of placeholder
-			continue
-		}
-		evaluation.ExpressionAccessor = compilationResult.ExpressionAccessor
-		if compilationResult.Error != nil {
-			evaluation.Error = &cel.Error{
-				Type:   cel.ErrorTypeInvalid,
-				Detail: fmt.Sprintf("compilation error: %v", compilationResult.Error),
-				Cause:  compilationResult.Error,
-			}
-			continue
-		}
-		if compilationResult.Program == nil {
-			evaluation.Error = &cel.Error{
-				Type:   cel.ErrorTypeInternal,
-				Detail: fmt.Sprintf("unexpected internal error compiling expression"),
-			}
-			continue
-		}
-		t1 := time.Now()
-		evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, va)
-		// budget may be spent due to lazy evaluation of composited variables
-		if compositionCtx != nil {
-			compositionCost := compositionCtx.GetAndResetCost()
-			if compositionCost > remainingBudget {
-				return nil, -1, &cel.Error{
-					Type:   cel.ErrorTypeInvalid,
-					Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
-					Cause:  cel.ErrOutOfBudget,
-				}
-			}
-			remainingBudget -= compositionCost
-		}
-		elapsed := time.Since(t1)
-		evaluation.Elapsed = elapsed
-		if evalDetails == nil {
-			return nil, -1, &cel.Error{
-				Type:   cel.ErrorTypeInternal,
-				Detail: fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()),
-			}
-		} else {
-			rtCost := evalDetails.ActualCost()
-			if rtCost == nil {
-				return nil, -1, &cel.Error{
-					Type:   cel.ErrorTypeInvalid,
-					Detail: fmt.Sprintf("runtime cost could not be calculated for expression: %v, no further expression will be run", compilationResult.ExpressionAccessor.GetExpression()),
-					Cause:  cel.ErrOutOfBudget,
-				}
-			} else {
-				if *rtCost > math.MaxInt64 || int64(*rtCost) > remainingBudget {
-					return nil, -1, &cel.Error{
-						Type:   cel.ErrorTypeInvalid,
-						Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
-						Cause:  cel.ErrOutOfBudget,
-					}
-				}
-				remainingBudget -= int64(*rtCost)
-			}
-		}
+		evaluations[i], remainingBudget, err = evaluateWithActivation(ctx, activation, compilationResult, remainingBudget)
 		if err != nil {
-			evaluation.Error = &cel.Error{
-				Type:   cel.ErrorTypeInvalid,
-				Detail: fmt.Sprintf("expression '%v' resulted in error: %v", compilationResult.ExpressionAccessor.GetExpression(), err),
-			}
-		} else {
-			evaluation.EvalResult = evalResult
+			return nil, -1, err
 		}
 	}
 

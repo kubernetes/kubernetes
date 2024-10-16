@@ -31,6 +31,7 @@ import (
 
 func TestDefaultAdmissionPolicy(t *testing.T) {
 	fail := v1alpha1.Fail
+	never := v1alpha1.NeverReinvocationPolicy
 	equivalent := v1alpha1.Equivalent
 	allScopes := v1alpha1.AllScopes
 
@@ -100,6 +101,42 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 						},
 					},
 					FailurePolicy: &fail,
+				},
+			},
+		},
+		{
+			name: "MutatingAdmissionPolicy",
+			original: &v1alpha1.MutatingAdmissionPolicy{
+				Spec: v1alpha1.MutatingAdmissionPolicySpec{
+					MatchConstraints:   &v1alpha1.MatchResources{},
+					ReinvocationPolicy: never,
+					Mutations: []v1alpha1.Mutation{
+						{
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: "fake string",
+							},
+						},
+					},
+				},
+			},
+			expected: &v1alpha1.MutatingAdmissionPolicy{
+				Spec: v1alpha1.MutatingAdmissionPolicySpec{
+					MatchConstraints: &v1alpha1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+					FailurePolicy:      &fail,
+					ReinvocationPolicy: never,
+					Mutations: []v1alpha1.Mutation{
+						{
+							PatchType: v1alpha1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+								Expression: "fake string",
+							},
+						},
+					},
 				},
 			},
 		},

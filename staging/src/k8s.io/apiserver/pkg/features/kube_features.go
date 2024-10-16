@@ -129,9 +129,9 @@ const (
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
 
-	// owner: @alexzielenski, @cici37, @jiahuif
+	// owner: @alexzielenski, @cici37, @jiahuif, @jpbetz
 	// kep: https://kep.k8s.io/3962
-	// alpha: v1.30
+	// alpha: v1.32
 	//
 	// Enables the MutatingAdmissionPolicy in Admission Chain
 	MutatingAdmissionPolicy featuregate.Feature = "MutatingAdmissionPolicy"
@@ -369,7 +369,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	MutatingAdmissionPolicy: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	OpenAPIEnums: {
