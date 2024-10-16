@@ -54,6 +54,8 @@ const (
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
 	SignalPIDAvailable Signal = "pid.available"
+	// SignalSwapMemoryAvailable is amount of swap available on the node
+	SignalSwapMemoryAvailable Signal = "swapMemory.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
