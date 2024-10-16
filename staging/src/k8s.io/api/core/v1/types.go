@@ -4030,6 +4030,17 @@ type PodSpec struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
+	// Resources is the total amount of compute resources required by all
+	// containers in the pod. Currently, only CPU and Memory resources are
+	// supported.
+	//
+	// This is an alpha field and requires enabling the PodLevelResources feature
+	// gate.
+	//
+	//
+	// +featureGate=PodLevelResources
+	// +optional
+	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,40,opt,name=resources"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly
