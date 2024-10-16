@@ -64,6 +64,9 @@ type Manager interface {
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
 
+	// IsUnderSwapPressure returns true if the node is under swap pressure.
+	IsUnderSwapPressure() bool
+
 	// IsUnderDiskPressure returns true if the node is under disk pressure.
 	IsUnderDiskPressure() bool
 

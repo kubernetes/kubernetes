@@ -62,6 +62,19 @@ import (
 )
 
 func init() {
+	// TODO
+	// we want NodeSwapPressure to be put in the map below
+	// For now we will conditionally set based on feature gate.
+	// When Swap is stable (https://github.com/kubernetes/enhancements/issues/2400)
+	// this should be moved inline with the maps below.
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		nodeConditionToTaintKeyStatusMap[v1.NodeSwapPressure] = map[v1.ConditionStatus]string{
+			v1.ConditionTrue: v1.TaintNodeSwapPressure,
+		}
+		taintKeyToNodeConditionMap[v1.TaintNodeSwapPressure] = v1.NodeSwapPressure
+	}
+
 	// Register prometheus metrics
 	Register()
 }

@@ -25,7 +25,9 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -67,7 +69,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	})
 
 	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
-	// MemoryPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
+	// MemoryPressure, SwapPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      v1.TaintNodeDiskPressure,
 		Operator: v1.TolerationOpExists,
@@ -79,6 +81,14 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+			Key:      v1.TaintNodeSwapPressure,
+			Operator: v1.TolerationOpExists,
+			Effect:   v1.TaintEffectNoSchedule,
+		})
+	}
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      v1.TaintNodePIDPressure,

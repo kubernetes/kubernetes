@@ -1907,6 +1907,129 @@ func TestMemoryPressureCondition(t *testing.T) {
 	}
 }
 
+func TestSwapPressureCondition(t *testing.T) {
+	now := time.Now()
+	before := now.Add(-time.Second)
+	nowFunc := func() time.Time { return now }
+
+	insufficientSwap := "NodeHasInsufficientSwap"
+	sufficientSwap := "NodeHasSufficientSwap"
+	cases := []struct {
+		desc             string
+		node             *v1.Node
+		pressure         bool
+		expectConditions []v1.NodeCondition
+		expectEvents     []testEvent
+	}{
+		{
+			desc:             "new, no pressure",
+			node:             &v1.Node{},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     sufficientSwap,
+				},
+			},
+		},
+		{
+			desc:             "new, pressure",
+			node:             &v1.Node{},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     insufficientSwap,
+				},
+			},
+		},
+		{
+			desc: "transition to pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeSwapPressureCondition(false, before, before)},
+				},
+			},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(true, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     insufficientSwap,
+				},
+			},
+		},
+		{
+			desc: "transition to no pressure",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeSwapPressureCondition(true, before, before)},
+				},
+			},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(false, now, now)},
+			expectEvents: []testEvent{
+				{
+					eventType: v1.EventTypeNormal,
+					event:     sufficientSwap,
+				},
+			},
+		},
+		{
+			desc: "pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeSwapPressureCondition(true, before, before)},
+				},
+			},
+			pressure:         true,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(true, before, now)},
+			expectEvents:     []testEvent{},
+		},
+		{
+			desc: "no pressure, no transition",
+			node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{*makeSwapPressureCondition(false, before, before)},
+				},
+			},
+			pressure:         false,
+			expectConditions: []v1.NodeCondition{*makeSwapPressureCondition(false, before, now)},
+			expectEvents:     []testEvent{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			ctx := context.Background()
+			events := []testEvent{}
+			recordEventFunc := func(eventType, event string) {
+				events = append(events, testEvent{
+					eventType: eventType,
+					event:     event,
+				})
+			}
+			pressureFunc := func() bool {
+				return tc.pressure
+			}
+			// construct setter
+			setter := SwapPressureCondition(nowFunc, pressureFunc, recordEventFunc)
+			// call setter on node
+			if err := setter(ctx, tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// check expected condition
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
+			// check expected events
+			require.Equal(t, len(tc.expectEvents), len(events))
+			for i := range tc.expectEvents {
+				assert.Equal(t, tc.expectEvents[i], events[i])
+			}
+		})
+	}
+}
 func TestPIDPressureCondition(t *testing.T) {
 	now := time.Now()
 	before := now.Add(-time.Second)
@@ -2334,6 +2457,27 @@ func makeMemoryPressureCondition(pressure bool, transition, heartbeat time.Time)
 		Status:             v1.ConditionFalse,
 		Reason:             "KubeletHasSufficientMemory",
 		Message:            "kubelet has sufficient memory available",
+		LastTransitionTime: metav1.NewTime(transition),
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+	}
+}
+
+func makeSwapPressureCondition(pressure bool, transition, heartbeat time.Time) *v1.NodeCondition {
+	if pressure {
+		return &v1.NodeCondition{
+			Type:               v1.NodeSwapPressure,
+			Status:             v1.ConditionTrue,
+			Reason:             "KubeletHasInsufficientSwap",
+			Message:            "kubelet has insufficient swap available",
+			LastTransitionTime: metav1.NewTime(transition),
+			LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		}
+	}
+	return &v1.NodeCondition{
+		Type:               v1.NodeSwapPressure,
+		Status:             v1.ConditionFalse,
+		Reason:             "KubeletHasSufficientSwap",
+		Message:            "kubelet has sufficient swap available",
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
 	}

@@ -114,6 +114,14 @@ func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceLis
 	return pod, podStats
 }
 
+func makePodWithSwapStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, swapUsage string, swapAvailable string) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, priority, []v1.Container{
+		newContainer(name, requests, limits),
+	}, nil)
+	podStats := newPodSwapStats(pod, resource.MustParse(swapUsage), resource.MustParse(swapAvailable))
+	return pod, podStats
+}
+
 func makePodWithPIDStats(name string, priority int32, processCount uint64) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, nil, nil),
@@ -205,6 +213,26 @@ func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.Po
 	return result
 }
 
+func makeSwapStats(swapAvailable, swapUsage string, podStats map[*v1.Pod]statsapi.PodStats) *statsapi.Summary {
+	val := resource.MustParse(swapAvailable)
+	usage := resource.MustParse(swapUsage)
+	availableBytes := uint64(val.Value())
+	usageByes := uint64(usage.Value())
+	result := &statsapi.Summary{
+		Node: statsapi.NodeStats{
+			Swap: &statsapi.SwapStats{
+				SwapUsageBytes:     &usageByes,
+				SwapAvailableBytes: &availableBytes,
+			},
+		},
+		Pods: []statsapi.PodStats{},
+	}
+	for _, podStat := range podStats {
+		result.Pods = append(result.Pods, podStat)
+	}
+	return result
+}
+
 type diskStats struct {
 	rootFsAvailableBytes  string
 	imageFsAvailableBytes string
@@ -265,6 +293,8 @@ type podToMake struct {
 	rootFsInodesUsed         string
 	perLocalVolumeUsed       string
 	perLocalVolumeInodesUsed string
+	swapUsage                string
+	swapAvailable            string
 }
 
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
@@ -349,6 +379,115 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	podKiller.statusFn(&podKiller.pod.Status)
 	if diff := cmp.Diff(wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 		t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+	}
+}
+
+func TestSwapPressure_VerifyPodStatus(t *testing.T) {
+	testCases := map[string]struct {
+		wantPodStatus v1.PodStatus
+		swapFeature   bool
+	}{
+		"eviction due to swap pressure": {
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Evicted",
+				Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 50Mi. ",
+			},
+			swapFeature: true,
+		},
+		"swap disabled; no eviction due to swap": {
+			swapFeature: false,
+		},
+	}
+	for _, tc := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.swapFeature)
+
+		podMaker := makePodWithSwapStats
+		summaryStatsMaker := makeSwapStats
+		podsToMake := []podToMake{
+			{name: "below-pressure", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), swapUsage: "500Mi", swapAvailable: "2000Mi"},
+			{name: "above-pressure", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), swapUsage: "1.5Gi", swapAvailable: "100Mi"},
+		}
+		pods := []*v1.Pod{}
+		podStats := map[*v1.Pod]statsapi.PodStats{}
+		for _, podToMake := range podsToMake {
+			pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.swapUsage, podToMake.swapAvailable)
+			pods = append(pods, pod)
+			podStats[pod] = podStat
+		}
+		activePodsFunc := func() []*v1.Pod {
+			return pods
+		}
+
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		podKiller := &mockPodKiller{}
+		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+		diskGC := &mockDiskGC{err: nil}
+		nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+		config := Config{
+			PressureTransitionPeriod: time.Minute * 5,
+			Thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalSwapMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
+				},
+			},
+		}
+		summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("50Mi", "2000Mi", podStats)}
+		manager := &managerImpl{
+			clock:                        fakeClock,
+			killPodFunc:                  podKiller.killPodNow,
+			imageGC:                      diskGC,
+			containerGC:                  diskGC,
+			config:                       config,
+			recorder:                     &record.FakeRecorder{},
+			summaryProvider:              summaryProvider,
+			nodeRef:                      nodeRef,
+			nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+			thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		}
+
+		// synchronize to detect the memory pressure
+		_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+
+		if err != nil {
+			t.Fatalf("Manager expects no error but got %v", err)
+		}
+		// verify swap pressure is detected
+		if !tc.swapFeature {
+			if manager.IsUnderSwapPressure() {
+				t.Fatalf("Manager should not have swap pressure if feature is disabled")
+			}
+			// If feature gate is off the rest of the code is only valid for feature gate on
+			// skip the rest of the test.
+			continue
+		}
+		if !manager.IsUnderSwapPressure() {
+			t.Fatalf("Manager should have detected swap pressure")
+		}
+
+		// verify a pod is selected for eviction
+		if podKiller.pod == nil {
+			t.Fatalf("Manager should have selected a pod for eviction")
+		}
+
+		wantPodStatus := tc.wantPodStatus.DeepCopy()
+		wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+			Type:    "DisruptionTarget",
+			Status:  "True",
+			Reason:  "TerminationByKubelet",
+			Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 50Mi. ",
+		})
+
+		// verify the pod status after applying the status update function
+		podKiller.statusFn(&podKiller.pod.Status)
+		if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+			t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+		}
 	}
 }
 
@@ -848,6 +987,244 @@ func TestMemoryPressure(t *testing.T) {
 	// we should not have memory pressure (because transition period met)
 	if manager.IsUnderMemoryPressure() {
 		t.Errorf("Manager should not report memory pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+	}
+
+	// all pods should admit now
+	expected = []bool{true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+}
+
+// TestSwapPressure
+func TestSwapPressure(t *testing.T) {
+	// Swap capacity is 3 Gb
+	// Node Memory is 3 Gb
+	podMaker := makePodWithSwapStats
+	summaryStatsMaker := makeSwapStats
+	podsToMake := []podToMake{
+		{name: "burstable-above-swap-pressure", priority: defaultPriority, requests: newResourceList("100m", "1000Mi", ""), limits: newResourceList("200m", "2Gi", ""), swapUsage: "800Mi", swapAvailable: "200Mi"},
+		{name: "burstable-below-swap-pressure", priority: defaultPriority, requests: newResourceList("100m", "1000Mi", ""), limits: newResourceList("200m", "2Gi", ""), swapUsage: "200Mi", swapAvailable: "800Mi"},
+		{name: "guaranteed-no-swap", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), swapUsage: "0Mi", swapAvailable: "0Mi"},
+		{name: "best-effort-no-swap", priority: highPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), swapUsage: "0Mi", swapAvailable: "0Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.swapUsage, podToMake.swapAvailable)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	podToEvict := pods[0]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalSwapMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
+			},
+			{
+				Signal:   evictionapi.SignalSwapMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1000Mi"),
+				},
+				GracePeriod: time.Minute * 2,
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2.9Gi", ".1Gi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// create a best effort pod to test admission
+	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi")
+	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), "0Gi", "0Gi")
+
+	// synchronize
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should not have swap pressure
+	if manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should not report swap pressure")
+	}
+
+	// try to admit our pods (they should succeed)
+	expected := []bool{true, true}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+
+	// induce soft threshold
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("0.8Gi", "2.2Gi", podStats)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should have swap pressure
+	if !manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should report swap pressure since soft threshold was met")
+	}
+
+	// verify no pod was yet killed because there has not yet been enough time passed.
+	if podKiller.pod != nil {
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+	}
+
+	// step forward in time pass the grace period
+	fakeClock.Step(3 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("0.8Gi", "2.2Gi", podStats)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should have swap pressure
+	if !manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should report swap pressure since soft threshold was met")
+	}
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+	}
+	// reset state
+	podKiller.pod = nil
+	podKiller.gracePeriodOverride = nil
+
+	// remove swap pressure
+	fakeClock.Step(20 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2.5Gi", "0.5Gi", podStats)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should not have swap pressure
+	if manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should not report swap pressure")
+	}
+
+	// induce memory swap!
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("0.2Gi", "2.8Gi", podStats)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should have swap pressure
+	if !manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should report swap pressure")
+	}
+
+	// check the right pod was killed
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
+	}
+
+	// the best-effort pod should not admit, burstable should
+	expected = []bool{false, false}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+
+	// reduce swap pressure
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2.5Gi", "0.5Gi", podStats)
+	podKiller.pod = nil // reset state
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should have swap pressure (because transition period not yet met)
+	if !manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should report swap pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
+	}
+
+	expected = []bool{false, false}
+	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
+		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+	}
+
+	// move the clock past transition period to ensure that we stop reporting pressure
+	fakeClock.Step(5 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2.5Gi", "0.5Gi", podStats)
+	podKiller.pod = nil // reset state
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+
+	// we should not have swap pressure (because transition period met)
+	if manager.IsUnderSwapPressure() {
+		t.Errorf("Manager should not report swap pressure")
 	}
 
 	// no pod should have been killed

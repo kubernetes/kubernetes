@@ -54,6 +54,9 @@ const (
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
 	SignalPIDAvailable Signal = "pid.available"
+	// SignalSwapMemoryAvailable is amount of swap available on the node
+	// This is only valid when NodeSwap is on and the system has swap.
+	SignalSwapMemoryAvailable Signal = "swap.available"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
@@ -73,6 +76,7 @@ const (
 // operator in the Kubelet's public API. Instead, we internally map signal types to operators.
 var OpForSignal = map[Signal]ThresholdOperator{
 	SignalMemoryAvailable:            OpLessThan,
+	SignalSwapMemoryAvailable:        OpLessThan,
 	SignalNodeFsAvailable:            OpLessThan,
 	SignalNodeFsInodesFree:           OpLessThan,
 	SignalImageFsAvailable:           OpLessThan,
