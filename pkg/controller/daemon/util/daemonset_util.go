@@ -67,9 +67,15 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	})
 
 	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
-	// MemoryPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
+	// MemoryPressure, SwapPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      v1.TaintNodeDiskPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      v1.TaintNodeMemoryPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
