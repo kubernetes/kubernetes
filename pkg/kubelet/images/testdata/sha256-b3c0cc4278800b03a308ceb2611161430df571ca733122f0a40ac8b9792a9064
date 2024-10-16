@@ -1,0 +1,1 @@
+{"lastUpdatedTime":"2024-10-21T12:26:40Z","imageRef":"testimageref","credentialMapping":{"docker.io/testing/test":{"kubernetesSecretCoordinates":[{"uid":"testsecretuid","namespace":"default","name":"pull-secret","credentialHash":"testsecrethash"}]}}}
