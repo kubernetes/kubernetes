@@ -1257,12 +1257,11 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify the Job %s/%s status isn't updated by the built-in controller", job.Namespace, job.Name))
-		// Wait a little to give the built-in Job controller time to update the
-		// status (if it was enabled)
-		time.Sleep(time.Second)
-		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectNoError(err, "failed to get the latest object for the Job %s/%s", job.Namespace, job.Name)
-		gomega.Expect(job.Status).To(gomega.BeEquivalentTo(batchv1.JobStatus{}), "expected status for the Job %s/%s to be empty", job.Namespace, job.Name)
+		// This get function uses HandleRetry to retry on transient API errors
+		get := framework.GetObject(f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get, job.Name, metav1.GetOptions{})
+		gomega.Consistently(ctx, get).
+			WithPolling(time.Second).WithTimeout(3 * time.Second).
+			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 })
 
