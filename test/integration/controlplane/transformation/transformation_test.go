@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,7 +117,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
+	if e.kubeAPIServer, err = startTestServerLocked(
 		tb, nil,
 		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
@@ -145,6 +146,15 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 	}
 
 	return &e, nil
+}
+
+var startTestServerLock sync.Mutex
+
+// startTestServerLocked prevents parallel calls to kubeapiservertesting.StartTestServer because it messes with global state.
+func startTestServerLocked(t ktesting.TB, instanceOptions *kubeapiservertesting.TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result kubeapiservertesting.TestServer, err error) {
+	startTestServerLock.Lock()
+	defer startTestServerLock.Unlock()
+	return kubeapiservertesting.StartTestServer(t, instanceOptions, customFlags, storageConfig)
 }
 
 func (e *transformTest) cleanUp() {

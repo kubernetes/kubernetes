@@ -1851,7 +1851,7 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 }
 
 func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
-	defaultUseSeed := GetKDF()
+	defaultUseSeed := GetKDF("")
 
 	origNowFunc := envelopekmsv2.NowFunc
 	now := origNowFunc() // freeze time
@@ -2074,9 +2074,10 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				`encryptKeyIDHash="", stateKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35", expirationTimestamp=` + now.Format(time.RFC3339),
 		},
 	}
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer SetKDFForTests(tt.useSeed)()
+			kmsName := fmt.Sprintf("panda-%d", i)
+			defer SetKDFForTests(kmsName, tt.useSeed)()
 
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
@@ -2084,7 +2085,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			ctx := testContext(t)
 
 			h := &kmsv2PluginProbe{
-				name:    "panda",
+				name:    kmsName,
 				service: tt.service,
 			}
 			h.state.Store(&tt.state)
@@ -2133,7 +2134,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			if _, stateErr := h.getCurrentState(); stateErr == nil || err == nil {
 				transformer := envelopekmsv2.NewEnvelopeTransformer(
 					&testKMSv2EnvelopeService{err: fmt.Errorf("broken")}, // not called
-					"panda",
+					kmsName,
 					h.getCurrentState,
 					"",
 				)
