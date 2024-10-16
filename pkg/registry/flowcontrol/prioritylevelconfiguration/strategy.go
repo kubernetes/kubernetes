@@ -94,14 +94,7 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	// That means we should not allow 0 values to be introduced, either
 	// via v1 or v1beta3(with the roundtrip annotation) until we know
 	// all servers are at 1.29+ and will honor the zero value correctly.
-	//
-	// TODO(121510): 1.29: don't allow a zero value, either via v1 or
-	//  v1beta3 (with the roundtrip annotation) for the
-	//  'nominalConcurrencyShares' field of 'limited' for CREATE operation.
-	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
-	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: true,
-	}
+	opts := validation.PriorityLevelValidationOptions{}
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
 }
 
@@ -134,15 +127,7 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	// That means we should not allow 0 values to be introduced, either
 	// via v1 or v1beta3(with the roundtrip annotation) until we know
 	// all servers are at 1.29+ and will honor the zero value correctly.
-	//
-	// TODO(121510): 1.29: only allow a zero value, either via v1 or
-	//  v1beta3 (with the roundtrip annotation) for the
-	//  'nominalConcurrencyShares' field of 'limited' for UPDATE operation,
-	//  only if the existing object already contains a zero value.
-	//  1:30: lift this restriction, allow zero value via v1 or v1beta3
-	opts := validation.PriorityLevelValidationOptions{
-		AllowZeroLimitedNominalConcurrencyShares: true,
-	}
+	opts := validation.PriorityLevelValidationOptions{}
 	return validation.ValidatePriorityLevelConfiguration(newPL, getRequestGroupVersion(ctx), opts)
 }
 
