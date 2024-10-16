@@ -28,4 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-go run test/featuregates_linter/main.go feature-gates verify
+if ! go run test/featuregates_linter/main.go feature-gates verify; then
+  echo "Please run 'hack/update-featuregates.sh' to update the feature list."
+  exit 1
+fi
