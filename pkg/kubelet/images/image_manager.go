@@ -25,12 +25,17 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credentialproviderplugin "k8s.io/kubernetes/pkg/credentialprovider/plugin"
+	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -50,7 +55,8 @@ type imageManager struct {
 	prevPullErrMsg sync.Map
 
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
-	puller imagePuller
+	puller      imagePuller
+	nodeKeyring credentialprovider.DockerKeyring
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
 }
@@ -58,7 +64,7 @@ type imageManager struct {
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
+func NewImageManager(recorder record.EventRecorder, nodeKeyring credentialprovider.DockerKeyring, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
@@ -70,6 +76,7 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 	return &imageManager{
 		recorder:               recorder,
 		imageService:           imageService,
+		nodeKeyring:            nodeKeyring,
 		backOff:                imageBackOff,
 		puller:                 puller,
 		podPullingTimeRecorder: podPullingTimeRecorder,
@@ -153,7 +160,39 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return imageRef, msg, nil
 	}
 
-	backOffKey := fmt.Sprintf("%s_%s", pod.UID, imgRef)
+	img := spec.Image
+	repoToPull, _, _, err := parsers.ParseImageName(img)
+	if err != nil {
+		return "", err.Error(), err
+	}
+
+	// construct the dynamic keyring using the providers we have in the kubelet
+	var podName, podNamespace, podUID string
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
+		sandboxMetadata := podSandboxConfig.GetMetadata()
+
+		podName = sandboxMetadata.Name
+		podNamespace = sandboxMetadata.Namespace
+		podUID = sandboxMetadata.Uid
+	}
+
+	externalCredentialProviderKeyring := credentialproviderplugin.NewExternalCredentialProviderDockerKeyring(
+		podNamespace,
+		podName,
+		podUID,
+		pod.Spec.ServiceAccountName)
+
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, credentialprovider.UnionDockerKeyring{m.nodeKeyring, externalCredentialProviderKeyring})
+	if err != nil {
+		return "", err.Error(), err
+	}
+
+	pullCredentials, _ := keyring.Lookup(repoToPull)
+	return m.pullImage(ctx, logPrefix, objRef, pod.UID, imgRef, spec, pullCredentials, podSandboxConfig)
+}
+
+func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, imgRef string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
+	backOffKey := fmt.Sprintf("%s_%s", podUID, imgRef)
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", imgRef)
 		m.logIt(objRef, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
@@ -171,16 +210,16 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	// Ensure that the map cannot grow indefinitely.
 	m.prevPullErrMsg.Delete(backOffKey)
 
-	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
+	m.podPullingTimeRecorder.RecordImageStartedPulling(podUID)
 	m.logIt(objRef, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", imgRef), klog.Info)
 	startTime := time.Now()
+
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig, pod.Spec.ServiceAccountName)
+	m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", imgRef, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
-
 		msg, err := evalCRIPullErr(imgRef, imagePullResult.err)
 
 		// Store the actual pull error for providing that information during
@@ -189,12 +228,13 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 
 		return "", msg, err
 	}
-	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
+	m.podPullingTimeRecorder.RecordImageFinishedPulling(podUID)
 	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
 	m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
 		imgRef, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
+
 	return imagePullResult.imageRef, "", nil
 }
 

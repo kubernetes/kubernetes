@@ -107,9 +107,6 @@ type kubeGenericRuntimeManager struct {
 	// Container GC manager
 	containerGC *containerGC
 
-	// Keyring for pulling images
-	keyring credentialprovider.DockerKeyring
-
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
 
@@ -285,10 +282,12 @@ func NewKubeGenericRuntimeManager(
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDefaultDockerKeyring()
+
+	nodeKeyring := credentialprovider.NewDefaultDockerKeyring()
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
+		nodeKeyring,
 		kubeRuntimeManager,
 		imageBackOff,
 		serializeImagePulls,
