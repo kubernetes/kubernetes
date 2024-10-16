@@ -65,8 +65,8 @@ func TestDefaultStabilityLevel(t *testing.T) {
 
 func TestConstrainToAllowedList(t *testing.T) {
 	allowList := &MetricLabelAllowList{
-		labelToAllowList: map[string]sets.String{
-			"label_a": sets.NewString("allow_value1", "allow_value2"),
+		labelToAllowList: map[string]sets.Set[string]{
+			"label_a": sets.New[string]("allow_value1", "allow_value2"),
 		},
 	}
 	labelNameList := []string{"label_a", "label_b"}
@@ -98,8 +98,8 @@ func TestConstrainToAllowedList(t *testing.T) {
 
 func TestConstrainLabelMap(t *testing.T) {
 	allowList := &MetricLabelAllowList{
-		labelToAllowList: map[string]sets.String{
-			"label_a": sets.NewString("allow_value1", "allow_value2"),
+		labelToAllowList: map[string]sets.Set[string]{
+			"label_a": sets.New[string]("allow_value1", "allow_value2"),
 		},
 	}
 	var tests = []struct {
@@ -154,13 +154,13 @@ func TestSetLabelAllowListFromManifest(t *testing.T) {
 metric2,label2: v3`,
 			expectlabelValueAllowLists: map[string]*MetricLabelAllowList{
 				"metric1": {
-					labelToAllowList: map[string]sets.String{
-						"label1": sets.NewString("v1", "v2"),
+					labelToAllowList: map[string]sets.Set[string]{
+						"label1": sets.New[string]("v1", "v2"),
 					},
 				},
 				"metric2": {
-					labelToAllowList: map[string]sets.String{
-						"label2": sets.NewString("v3"),
+					labelToAllowList: map[string]sets.Set[string]{
+						"label2": sets.New[string]("v3"),
 					},
 				},
 			},
