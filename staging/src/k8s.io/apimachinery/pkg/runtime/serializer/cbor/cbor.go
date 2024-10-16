@@ -68,14 +68,27 @@ type Serializer interface {
 var _ Serializer = &serializer{}
 
 type options struct {
-	strict bool
+	strict    bool
+	transcode bool
 }
 
 type Option func(*options)
 
+// Strict configures a serializer to return a strict decoding error when it encounters map keys that
+// do not correspond to a field in the target object of a decode operation. This option is disabled
+// by default.
 func Strict(s bool) Option {
 	return func(opts *options) {
 		opts.strict = s
+	}
+}
+
+// Transcode configures a serializer to transcode the "raw" bytes of a decoded runtime.RawExtension
+// or metav1.FieldsV1 object to JSON. This is enabled by default to support existing programs that
+// depend on the assumption that objects of either type contain valid JSON.
+func Transcode(s bool) Option {
+	return func(opts *options) {
+		opts.transcode = s
 	}
 }
 
@@ -88,6 +101,8 @@ type serializer struct {
 
 func (serializer) private() {}
 
+// NewSerializer creates and returns a serializer configured with the provided options. The default
+// options are equivalent to explicitly passing Strict(false) and Transcode(true).
 func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper, options ...Option) Serializer {
 	return newSerializer(&defaultMetaFactory{}, creater, typer, options...)
 }
@@ -98,6 +113,7 @@ func newSerializer(metaFactory metaFactory, creater runtime.ObjectCreater, typer
 		creater:     creater,
 		typer:       typer,
 	}
+	s.options.transcode = true
 	for _, o := range options {
 		o(&s.options)
 	}
@@ -337,9 +353,10 @@ func (s *serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runt
 		return nil, actual, err
 	}
 
-	// TODO: Make possible to disable this behavior.
-	if err := transcodeRawTypes(obj); err != nil {
-		return nil, actual, err
+	if s.options.transcode {
+		if err := transcodeRawTypes(obj); err != nil {
+			return nil, actual, err
+		}
 	}
 
 	return obj, actual, strict
