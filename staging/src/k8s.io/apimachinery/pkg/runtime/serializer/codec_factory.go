@@ -89,6 +89,10 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 		},
 	}
 
+	for _, f := range options.serializers {
+		serializers = append(serializers, f(scheme, scheme))
+	}
+
 	return serializers
 }
 
@@ -108,6 +112,8 @@ type CodecFactoryOptions struct {
 	Strict bool
 	// Pretty includes a pretty serializer along with the non-pretty one
 	Pretty bool
+
+	serializers []func(runtime.ObjectCreater, runtime.ObjectTyper) runtime.SerializerInfo
 }
 
 // CodecFactoryOptionsMutator takes a pointer to an options struct and then modifies it.
@@ -132,6 +138,13 @@ func EnableStrict(options *CodecFactoryOptions) {
 // DisableStrict disables configuring all serializers in strict mode
 func DisableStrict(options *CodecFactoryOptions) {
 	options.Strict = false
+}
+
+// WithSerializer configures a serializer to be supported in addition to the default serializers.
+func WithSerializer(f func(runtime.ObjectCreater, runtime.ObjectTyper) runtime.SerializerInfo) CodecFactoryOptionsMutator {
+	return func(options *CodecFactoryOptions) {
+		options.serializers = append(options.serializers, f)
+	}
 }
 
 // NewCodecFactory provides methods for retrieving serializers for the supported wire formats
