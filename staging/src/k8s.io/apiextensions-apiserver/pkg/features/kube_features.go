@@ -27,21 +27,15 @@ const (
 	// Every feature gate should add method here following this template:
 	//
 	// // owner: @username
-	// // alpha: v1.4
 	// MyFeature() bool
 
 	// owner: @alexzielenski
-	// alpha: v1.28
-	// beta: v1.30
 	//
 	// Ignores errors raised on unchanged fields of Custom Resources
 	// across UPDATE/PATCH requests.
 	CRDValidationRatcheting featuregate.Feature = "CRDValidationRatcheting"
 
 	// owner: @jpbetz
-	// alpha: v1.30
-	// beta: v1.31
-	// ga: v1.32
 	//
 	// CustomResourceDefinitions may include SelectableFields to declare which fields
 	// may be used as field selectors.

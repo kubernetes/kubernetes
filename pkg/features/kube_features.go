@@ -28,7 +28,6 @@ const (
 	//
 	// // owner: @username
 	// // kep: https://kep.k8s.io/NNN
-	// // alpha: v1.X
 	// MyFeature featuregate.Feature = "MyFeature"
 	//
 	// Feature gates should be listed in alphabetical, case-sensitive
@@ -680,7 +679,6 @@ const (
 	WinDSR featuregate.Feature = "WinDSR"
 
 	// owner: @ksubrmnn
-
 	//
 	// Allows kube-proxy to run in Overlay mode for Windows
 	WinOverlay featuregate.Feature = "WinOverlay"

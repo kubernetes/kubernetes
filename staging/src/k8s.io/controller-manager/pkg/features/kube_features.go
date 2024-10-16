@@ -25,7 +25,6 @@ const (
 	// Every feature gate should add method here following this template:
 	//
 	// // owner: @username
-	// // alpha: v1.4
 	// MyFeature featuregate.Feature = "MyFeature"
 	//
 	// Feature gates should be listed in alphabetical, case-sensitive
@@ -35,7 +34,6 @@ const (
 
 	// owner: @nckturner
 	// kep:  http://kep.k8s.io/2699
-	// alpha: v1.27
 	// Enable webhook in cloud controller manager
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
 )
