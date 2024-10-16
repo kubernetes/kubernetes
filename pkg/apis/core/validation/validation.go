@@ -3990,7 +3990,7 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 			}
 		case core.TolerationOpExists:
 			if len(toleration.Value) > 0 {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration, "value must be empty when `operator` is 'Exists'"))
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
 			}
 		default:
 			validValues := []core.TolerationOperator{core.TolerationOpEqual, core.TolerationOpExists}
