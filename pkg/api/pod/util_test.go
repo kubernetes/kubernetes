@@ -3259,24 +3259,12 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 	}{
 		// nil -> nil
 		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    nil,
-			expectLifecycleHandler: nil,
-		},
-		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    nil,
 			newLifecycleHandler:    nil,
 			expectLifecycleHandler: nil,
 		},
 		// nil -> exec
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
 		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    nil,
@@ -3285,24 +3273,12 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 		},
 		// nil -> sleep
 		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    nil,
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: nil,
-		},
-		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    nil,
 			newLifecycleHandler:    makeSleepHandler(),
 			expectLifecycleHandler: makeSleepHandler(),
 		},
 		// exec -> exec
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
 		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    makeExecHandler(),
@@ -3311,24 +3287,12 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 		},
 		// exec -> http
 		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeHTTPGetHandler(),
-			expectLifecycleHandler: makeHTTPGetHandler(),
-		},
-		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    makeExecHandler(),
 			newLifecycleHandler:    makeHTTPGetHandler(),
 			expectLifecycleHandler: makeHTTPGetHandler(),
 		},
 		// exec -> sleep
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeExecHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: nil,
-		},
 		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    makeExecHandler(),
@@ -3337,24 +3301,12 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 		},
 		// sleep -> exec
 		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeExecHandler(),
-			expectLifecycleHandler: makeExecHandler(),
-		},
-		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    makeSleepHandler(),
 			newLifecycleHandler:    makeExecHandler(),
 			expectLifecycleHandler: makeExecHandler(),
 		},
 		// sleep -> sleep
-		{
-			gateEnabled:            false,
-			oldLifecycleHandler:    makeSleepHandler(),
-			newLifecycleHandler:    makeSleepHandler(),
-			expectLifecycleHandler: makeSleepHandler(),
-		},
 		{
 			gateEnabled:            true,
 			oldLifecycleHandler:    makeSleepHandler(),
@@ -3365,8 +3317,6 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, tc.gateEnabled)
-
 			// preStop
 			// container
 			{
