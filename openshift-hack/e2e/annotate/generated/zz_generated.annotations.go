@@ -931,9 +931,9 @@ var Annotations = map[string]string{
 
 	"[sig-cli] Kubectl exec should be able to execute 1000 times in a container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-cli] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from all pods based on default container": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-cli] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from all pods based on default container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-cli] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from each pod and each container in Deployment": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-cli] Kubectl logs all pod logs the Deployment has 2 replicas and each pod has 2 containers should get logs from each pod and each container in Deployment": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl logs default container logs the second container is the default-container by annotation should log default container if not specified": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
