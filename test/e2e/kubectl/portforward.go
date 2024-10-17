@@ -255,6 +255,90 @@ func doTestConnectSendDisconnect(ctx context.Context, bindAddress string, f *fra
 	))
 }
 
+// Reproduces issue #111825 (https://github.com/kubernetes/kubernetes/issues/111825)
+func doTestConnectionReset(ctx context.Context, f *framework.Framework) {
+	ginkgo.By("Creating the target pod")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   podName,
+			Labels: map[string]string{"name": podName},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "tcpreset",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"tcp-reset"},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+		framework.Failf("Couldn't create pod: %v", err)
+	}
+	if err := e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+		framework.Failf("Pod did not start running: %v", err)
+	}
+
+	ginkgo.By("Running 'kubectl port-forward'")
+	func() {
+		cmd := runPortForward(f.Namespace.Name, pod.Name, 8080)
+		defer cmd.Stop()
+
+		ginkgo.By("Attempting connection #1")
+		func() {
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
+			if err != nil {
+				ginkgo.By("Connection couldn't connect to port")
+				framework.Failf("Connection couldn't connect to port %d: %v", cmd.port, err)
+			}
+			defer func() {
+				ginkgo.By("Closing the connection to the local port")
+				conn.Close() //nolint: errcheck
+			}()
+
+			ginkgo.By("Sending data to connection's local port")
+			if _, err := conn.Write([]byte("test\n")); err != nil {
+				framework.Failf("Error writing data to the server: %v", err)
+			}
+		}()
+
+		ginkgo.By("Verifying logs")
+		gomega.Eventually(ctx, func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "tcpreset")
+		}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
+			gomega.ContainSubstring("Serving on port 8080"),
+			gomega.ContainSubstring("TCP request from"),
+		))
+
+		// Wait some time to ensure that the port-forward is still running.
+		time.Sleep(10 * time.Second)
+
+		// Now attempt to connect a second time. Kubectl port-forward should remain running and able to accept new connections.
+		ginkgo.By("Attempting connection #2")
+		func() {
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", cmd.port))
+			if err != nil {
+				ginkgo.By("Connection couldn't connect to port")
+				framework.Failf("Connection couldn't connect to port %d: %v", cmd.port, err)
+			}
+			defer func() {
+				ginkgo.By("Closing the connection to the local port")
+				conn.Close() //nolint: errcheck
+			}()
+		}()
+	}()
+
+	ginkgo.By("Deleting the port forward pod")
+	if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+		framework.Failf("Couldn't delete pod: %v", err)
+	}
+	if err := e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout); err != nil {
+		framework.Failf("Pod did not terminate: %v", err)
+	}
+}
+
 func doTestMustConnectSendNothing(ctx context.Context, bindAddress string, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
@@ -491,6 +575,12 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 		ginkgo.It("should support forwarding over websockets", func(ctx context.Context) {
 			doTestOverWebSockets(ctx, "localhost", f)
+		})
+	})
+
+	ginkgo.Describe("With a server that sends RST upon accepting a connection", func() {
+		ginkgo.It("should connect, send data, and then connect again", func(ctx context.Context) {
+			doTestConnectionReset(ctx, f)
 		})
 	})
 })
