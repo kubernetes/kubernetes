@@ -184,6 +184,7 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) error {
+	p.initialize(s)
 	if err := p.validateState(s); err != nil {
 		klog.ErrorS(err, "Static policy invalid state, please drain node and remove policy state file")
 		return err
@@ -191,22 +192,27 @@ func (p *staticPolicy) Start(s state.State) error {
 	return nil
 }
 
+func (p *staticPolicy) initialize(s state.State) {
+	if !s.GetDefaultCPUSet().IsEmpty() {
+		return
+	}
+	cpus := p.topology.CPUDetails.CPUs()
+	if p.options.StrictCPUReservation {
+		cpus = cpus.Difference(p.reservedCPUs)
+	}
+	s.SetDefaultCPUSet(cpus)
+	klog.InfoS("Static policy initialized", "defaultCPUSet", cpus)
+}
+
 func (p *staticPolicy) validateState(s state.State) error {
 	tmpAssignments := s.GetCPUAssignments()
 	tmpDefaultCPUset := s.GetDefaultCPUSet()
-
-	allCPUs := p.topology.CPUDetails.CPUs()
-	if p.options.StrictCPUReservation {
-		allCPUs = allCPUs.Difference(p.reservedCPUs)
-	}
 
 	// Default cpuset cannot be empty when assignments exist
 	if tmpDefaultCPUset.IsEmpty() {
 		if len(tmpAssignments) != 0 {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
-		// state is empty initialize
-		s.SetDefaultCPUSet(allCPUs)
 		return nil
 	}
 
