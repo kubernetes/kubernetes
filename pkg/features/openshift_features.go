@@ -14,4 +14,8 @@ func registerOpenshiftFeatures() {
 	defaultVersionedKubernetesFeatureGates[RouteExternalCertificate] = featuregate.VersionedSpecs{
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 	}
+	// Introduced in 4.19
+	defaultVersionedKubernetesFeatureGates[MinimumKubeletVersion] = featuregate.VersionedSpecs{
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	}
 }

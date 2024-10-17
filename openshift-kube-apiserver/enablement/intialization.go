@@ -87,6 +87,11 @@ func ForceGlobalInitializationForOpenShift() {
 	// we need to have the authorization chain place something before system:masters
 	// SkipSystemMastersAuthorizer disable implicitly added system/master authz, and turn it into another authz mode "SystemMasters", to be added via authorization-mode
 	authorizer.SkipSystemMastersAuthorizer()
+
+	// Set the minimum kubelet version
+	// If the OpenshiftConfig wasn't configured by this point, it's a programming error,
+	// and this should panic.
+	authorizer.SetMinimumKubeletVersion(OpenshiftConfig().MinimumKubeletVersion)
 }
 
 var SCCAdmissionPlugin = sccadmission.NewConstraint()
