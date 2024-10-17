@@ -277,7 +277,6 @@ func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRe
 			"Config":  gomega.BeNil(),
 		}),
 		"NodeSelector": matchNodeSelector(selector),
-		"Controller":   gomega.BeEmpty(),
 	}))
 }
 

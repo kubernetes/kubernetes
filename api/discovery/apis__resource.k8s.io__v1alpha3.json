@@ -21,34 +21,6 @@
       ]
     },
     {
-      "kind": "PodSchedulingContext",
-      "name": "podschedulingcontexts",
-      "namespaced": true,
-      "singularName": "podschedulingcontext",
-      "storageVersionHash": "SkSsa067T7g=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "PodSchedulingContext",
-      "name": "podschedulingcontexts/status",
-      "namespaced": true,
-      "singularName": "",
-      "verbs": [
-        "get",
-        "patch",
-        "update"
-      ]
-    },
-    {
       "kind": "ResourceClaim",
       "name": "resourceclaims",
       "namespaced": true,

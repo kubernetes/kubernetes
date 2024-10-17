@@ -73,6 +73,17 @@ type Nodes struct {
 	NodeNames []string
 }
 
+type Resources struct {
+	NodeLocal bool
+
+	// Nodes is a fixed list of node names on which resources are
+	// available. Mutually exclusive with NodeLabels.
+	Nodes []string
+
+	// Number of devices called "device-000", "device-001", ... on each node or in the cluster.
+	MaxAllocations int
+}
+
 //go:embed test-driver/deploy/example/plugin-permissions.yaml
 var pluginPermissions string
 
@@ -167,7 +178,7 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 // up after the test.
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
-func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *Driver {
 	d := NewDriverInstance(f)
 
 	ginkgo.BeforeEach(func() {
@@ -180,17 +191,16 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 // be started explicitly with Run. May be used inside ginkgo.It.
 func NewDriverInstance(f *framework.Framework) *Driver {
 	d := &Driver{
-		f:             f,
-		fail:          map[MethodInstance]bool{},
-		callCounts:    map[MethodInstance]int64{},
-		NodeV1alpha3:  true,
-		parameterMode: parameterModeStructured,
+		f:            f,
+		fail:         map[MethodInstance]bool{},
+		callCounts:   map[MethodInstance]int64{},
+		NodeV1alpha3: true,
 	}
 	d.initName()
 	return d
 }
 
-func (d *Driver) Run(nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+func (d *Driver) Run(nodes *Nodes, configureResources func() Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
 	resources := configureResources()
 	if len(resources.Nodes) == 0 {
 		// This always has to be set because the driver might
@@ -215,15 +225,13 @@ type Driver struct {
 	serviceAccountName string
 
 	NameSuffix string
-	Controller *app.ExampleController
 	Name       string
 
 	// Nodes contains entries for each node selected for a test when the test runs.
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
 
-	parameterMode parameterMode // empty == parameterModeStructured
-	NodeV1alpha3  bool
+	NodeV1alpha3 bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -235,22 +243,14 @@ type KubeletPlugin struct {
 	ClientSet kubernetes.Interface
 }
 
-type parameterMode string
-
-const (
-	parameterModeClassicDRA parameterMode = "classic"    // control plane controller
-	parameterModeStructured parameterMode = "structured" // allocation through scheduler
-)
-
 func (d *Driver) initName() {
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 }
 
-func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
 	d.initName()
 	ginkgo.By(fmt.Sprintf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames))
 	d.Nodes = make(map[string]KubeletPlugin)
-	resources.DriverName = d.Name
 
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := klog.FromContext(ctx)
@@ -259,58 +259,47 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
-	switch d.parameterMode {
-	case parameterModeClassicDRA:
-		// The controller is easy: we simply connect to the API server.
-		d.Controller = app.NewController(d.f.ClientSet, resources)
-		d.wg.Add(1)
-		go func() {
-			defer d.wg.Done()
-			d.Controller.Run(d.ctx, 5 /* workers */)
-		}()
-	case parameterModeStructured:
-		if !resources.NodeLocal {
-			// Publish one resource pool with "network-attached" devices.
-			slice := &resourceapi.ResourceSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: d.Name, // globally unique
+	if !resources.NodeLocal {
+		// Publish one resource pool with "network-attached" devices.
+		slice := &resourceapi.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: d.Name, // globally unique
+			},
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver: d.Name,
+				Pool: resourceapi.ResourcePool{
+					Name:               "network",
+					Generation:         1,
+					ResourceSliceCount: 1,
 				},
-				Spec: resourceapi.ResourceSliceSpec{
-					Driver: d.Name,
-					Pool: resourceapi.ResourcePool{
-						Name:               "network",
-						Generation:         1,
-						ResourceSliceCount: 1,
-					},
-					NodeSelector: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{{
-							MatchFields: []v1.NodeSelectorRequirement{{
-								Key:      "metadata.name",
-								Operator: v1.NodeSelectorOpIn,
-								Values:   nodes.NodeNames,
-							}},
+				NodeSelector: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   nodes.NodeNames,
 						}},
-					},
+					}},
 				},
-			}
-			maxAllocations := resources.MaxAllocations
-			if maxAllocations <= 0 {
-				// Cannot be empty, otherwise nothing runs.
-				maxAllocations = 10
-			}
-			for i := 0; i < maxAllocations; i++ {
-				slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
-					Name:  fmt.Sprintf("device-%d", i),
-					Basic: &resourceapi.BasicDevice{},
-				})
-			}
-
-			_, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(func(ctx context.Context) {
-				framework.ExpectNoError(d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
+			},
+		}
+		maxAllocations := resources.MaxAllocations
+		if maxAllocations <= 0 {
+			// Cannot be empty, otherwise nothing runs.
+			maxAllocations = 10
+		}
+		for i := 0; i < maxAllocations; i++ {
+			slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+				Name:  fmt.Sprintf("device-%d", i),
+				Basic: &resourceapi.BasicDevice{},
 			})
 		}
+
+		_, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			framework.ExpectNoError(d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
+		})
 	}
 
 	manifests := []string{
@@ -319,13 +308,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
 	var numDevices = -1 // disabled
-	if d.parameterMode != parameterModeClassicDRA && resources.NodeLocal {
+	if resources.NodeLocal {
 		numDevices = resources.MaxAllocations
-	}
-	switch d.parameterMode {
-	case parameterModeClassicDRA, parameterModeStructured:
-	default:
-		framework.Failf("unknown test driver parameter mode: %s", d.parameterMode)
 	}
 
 	// Create service account and corresponding RBAC rules.

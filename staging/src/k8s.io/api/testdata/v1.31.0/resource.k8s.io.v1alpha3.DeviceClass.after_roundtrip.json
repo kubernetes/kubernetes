@@ -1,5 +1,5 @@
 {
-  "kind": "PodSchedulingContext",
+  "kind": "DeviceClass",
   "apiVersion": "resource.k8s.io/v1alpha3",
   "metadata": {
     "name": "nameValue",
@@ -44,18 +44,28 @@
     ]
   },
   "spec": {
-    "selectedNode": "selectedNodeValue",
-    "potentialNodes": [
-      "potentialNodesValue"
-    ]
-  },
-  "status": {
-    "resourceClaims": [
+    "selectors": [
       {
-        "name": "nameValue",
-        "unsuitableNodes": [
-          "unsuitableNodesValue"
-        ]
+        "cel": {
+          "expression": "expressionValue"
+        }
+      }
+    ],
+    "config": [
+      {
+        "opaque": {
+          "driver": "driverValue",
+          "parameters": {
+            "apiVersion": "example.com/v1",
+            "kind": "CustomType",
+            "spec": {
+              "replicas": 1
+            },
+            "status": {
+              "available": 1
+            }
+          }
+        }
       }
     ]
   }

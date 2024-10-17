@@ -25,11 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
-	podschedulingcontextsstore "k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
+
+// The REST storage registers resource kinds also without the corresponding
+// feature gate because it might be useful to provide access to these resources
+// while their feature is off to allow cleaning them up.
 
 type RESTStorageProvider struct{}
 
@@ -73,19 +76,6 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 			return nil, err
 		}
 		storage[resource] = resourceClaimTemplateStorage
-	}
-
-	// Registered also without the corresponding DRAControlPlaneController feature gate for the
-	// same reasons as registering the other types without a feature gate check: it might be
-	// useful to provide access to these resources while their feature is off to allow cleaning
-	// them up.
-	if resource := "podschedulingcontexts"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingcontextsstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = podSchedulingStorage
-		storage[resource+"/status"] = podSchedulingStatusStorage
 	}
 
 	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {

@@ -569,55 +569,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
-		"invalid-reserved-deallocation-requested": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
-					{
-						Resource: "pods",
-						Name:     "foo",
-						UID:      "1",
-					},
-				}
-				return claim
-			},
-		},
-		"add-deallocation-requested": {
-			oldClaim: validAllocatedClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"remove-allocation": {
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = false
-				claim.Status.Allocation = nil
-				return claim
-			},
-		},
-		"invalid-deallocation-requested-removal": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may not be cleared when `allocation` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = false
-				return claim
-			},
-		},
 		"invalid-allocation-modification": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status.allocation"), func() *resource.AllocationResult {
 				claim := validAllocatedClaim.DeepCopy()
@@ -627,44 +578,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			oldClaim: validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation.Devices.Results[0].Driver += "-2"
-				return claim
-			},
-		},
-		"invalid-deallocation-requested-in-use": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
-					{
-						Resource: "pods",
-						Name:     "foo",
-						UID:      "1",
-					},
-				}
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"invalid-deallocation-not-allocated": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
-			oldClaim:     validClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"invalid-allocation-removal-not-reset": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.Allocation = nil
 				return claim
 			},
 		},

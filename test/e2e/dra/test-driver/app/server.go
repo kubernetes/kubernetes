@@ -19,8 +19,6 @@ limitations under the License.
 package app
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -32,7 +30,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/metrics"
@@ -48,7 +45,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
-	"k8s.io/dynamic-resource-allocation/leaderelection"
 	"k8s.io/klog/v2"
 )
 
@@ -57,7 +53,6 @@ func NewCommand() *cobra.Command {
 	o := logsapi.NewLoggingConfiguration()
 	var clientset kubernetes.Interface
 	var config *rest.Config
-	ctx := context.Background()
 	logger := klog.Background()
 
 	cmd := &cobra.Command{
@@ -73,7 +68,6 @@ func NewCommand() *cobra.Command {
 	kubeconfig := fs.String("kubeconfig", "", "Absolute path to the kube.config file. Either this or KUBECONFIG need to be set if the driver is being run out of cluster.")
 	kubeAPIQPS := fs.Float32("kube-api-qps", 50, "QPS to use while communicating with the kubernetes apiserver.")
 	kubeAPIBurst := fs.Int("kube-api-burst", 100, "Burst to use while communicating with the kubernetes apiserver.")
-	workers := fs.Int("workers", 10, "Concurrency to process multiple claims")
 
 	fs = sharedFlagSets.FlagSet("http server")
 	httpEndpoint := fs.String("http-endpoint", "",
@@ -84,7 +78,6 @@ func NewCommand() *cobra.Command {
 	fs = sharedFlagSets.FlagSet("CDI")
 	driverNameFlagName := "drivername"
 	driverName := fs.String(driverNameFlagName, "test-driver.cdi.k8s.io", "Resource driver name.")
-	driverNameFlag := fs.Lookup(driverNameFlagName)
 
 	fs = sharedFlagSets.FlagSet("other")
 	featureGate := featuregate.NewFeatureGate()
@@ -177,89 +170,6 @@ func NewCommand() *cobra.Command {
 		return nil
 	}
 
-	controller := &cobra.Command{
-		Use:   "controller",
-		Short: "run as resource controller",
-		Long:  "cdi-test-driver controller runs as a resource driver controller.",
-		Args:  cobra.ExactArgs(0),
-	}
-	controllerFlagSets := cliflag.NamedFlagSets{}
-	fs = controllerFlagSets.FlagSet("leader election")
-	enableLeaderElection := fs.Bool("leader-election", false,
-		"Enables leader election. If leader election is enabled, additional RBAC rules are required.")
-	leaderElectionNamespace := fs.String("leader-election-namespace", "",
-		"Namespace where the leader election resource lives. Defaults to the pod namespace if not set.")
-	leaderElectionLeaseDuration := fs.Duration("leader-election-lease-duration", 15*time.Second,
-		"Duration, in seconds, that non-leader candidates will wait to force acquire leadership.")
-	leaderElectionRenewDeadline := fs.Duration("leader-election-renew-deadline", 10*time.Second,
-		"Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
-	leaderElectionRetryPeriod := fs.Duration("leader-election-retry-period", 5*time.Second,
-		"Duration, in seconds, the LeaderElector clients should wait between tries of actions.")
-	fs = controllerFlagSets.FlagSet("controller")
-	resourceConfig := fs.String("resource-config", "", "A JSON file containing a Resources struct. Defaults are unshared, network-attached resources.")
-	fs = controller.Flags()
-	for _, f := range controllerFlagSets.FlagSets {
-		fs.AddFlagSet(f)
-	}
-
-	controller.RunE = func(cmd *cobra.Command, args []string) error {
-		resources := Resources{}
-		if *resourceConfig != "" {
-			file, err := os.Open(*resourceConfig)
-			if err != nil {
-				return fmt.Errorf("open resource config: %w", err)
-			}
-			decoder := json.NewDecoder(file)
-			decoder.DisallowUnknownFields()
-			if err := decoder.Decode(&resources); err != nil {
-				return fmt.Errorf("parse resource config %q: %w", *resourceConfig, err)
-			}
-		}
-		if resources.DriverName == "" || driverNameFlag.Changed {
-			resources.DriverName = *driverName
-		}
-
-		run := func() {
-			controller := NewController(clientset, resources)
-			controller.Run(ctx, *workers)
-		}
-
-		if !*enableLeaderElection {
-			run()
-			return nil
-		}
-
-		// This must not change between releases.
-		lockName := *driverName
-
-		// Create a new clientset for leader election
-		// to avoid starving it when the normal traffic
-		// exceeds the QPS+burst limits.
-		leClientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			return fmt.Errorf("create leaderelection client: %w", err)
-		}
-
-		le := leaderelection.New(leClientset, lockName,
-			func(ctx context.Context) {
-				run()
-			},
-			leaderelection.LeaseDuration(*leaderElectionLeaseDuration),
-			leaderelection.RenewDeadline(*leaderElectionRenewDeadline),
-			leaderelection.RetryPeriod(*leaderElectionRetryPeriod),
-			leaderelection.Namespace(*leaderElectionNamespace),
-		)
-		if *httpEndpoint != "" {
-			le.PrepareHealthCheck(mux)
-		}
-		if err := le.Run(); err != nil {
-			return fmt.Errorf("leader election failed: %w", err)
-		}
-
-		return nil
-	}
-	cmd.AddCommand(controller)
-
 	kubeletPlugin := &cobra.Command{
 		Use:   "kubelet-plugin",
 		Short: "run as kubelet plugin",
@@ -324,7 +234,6 @@ func NewCommand() *cobra.Command {
 		children = append(children, child.Use)
 	}
 	cmd.Use += " [shared flags] " + strings.Join(children, "|")
-	cliflag.SetUsageAndHelpFunc(controller, controllerFlagSets, cols)
 	cliflag.SetUsageAndHelpFunc(kubeletPlugin, kubeletPluginFlagSets, cols)
 
 	return cmd

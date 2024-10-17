@@ -23,11 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // deviceClassStrategy implements behavior for DeviceClass objects
@@ -89,21 +87,6 @@ func (deviceClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// dropDisabledFields removes fields which are covered by the optional DRAControlPlaneController feature gate.
+// dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClass, oldClass *resource.DeviceClass) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
-		// No need to drop anything.
-		return
-	}
-
-	if oldClass == nil {
-		// Always drop on create.
-		newClass.Spec.SuitableNodes = nil
-		return
-	}
-
-	// Drop on update only if not already set.
-	if oldClass.Spec.SuitableNodes == nil {
-		newClass.Spec.SuitableNodes = nil
-	}
 }

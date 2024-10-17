@@ -12247,9 +12247,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.AllocationResult
   map:
     fields:
-    - name: controller
-      type:
-        scalar: string
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceAllocationResult
@@ -12404,9 +12401,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
           elementRelationship: atomic
-    - name: suitableNodes
-      type:
-        namedType: io.k8s.api.core.v1.NodeSelector
 - name: io.k8s.api.resource.v1alpha3.DeviceConstraint
   map:
     fields:
@@ -12481,50 +12475,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: parameters
       type:
         namedType: __untyped_atomic_
-- name: io.k8s.api.resource.v1alpha3.PodSchedulingContext
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: io.k8s.api.resource.v1alpha3.PodSchedulingContextSpec
-      default: {}
-    - name: status
-      type:
-        namedType: io.k8s.api.resource.v1alpha3.PodSchedulingContextStatus
-      default: {}
-- name: io.k8s.api.resource.v1alpha3.PodSchedulingContextSpec
-  map:
-    fields:
-    - name: potentialNodes
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: selectedNode
-      type:
-        scalar: string
-- name: io.k8s.api.resource.v1alpha3.PodSchedulingContextStatus
-  map:
-    fields:
-    - name: resourceClaims
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha3.ResourceClaimSchedulingStatus
-          elementRelationship: associative
-          keys:
-          - name
 - name: io.k8s.api.resource.v1alpha3.ResourceClaim
   map:
     fields:
@@ -12564,25 +12514,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.resource.v1alpha3.ResourceClaimSchedulingStatus
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: unsuitableNodes
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.ResourceClaimSpec
   map:
     fields:
-    - name: controller
-      type:
-        scalar: string
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceClaim
@@ -12593,9 +12527,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: allocation
       type:
         namedType: io.k8s.api.resource.v1alpha3.AllocationResult
-    - name: deallocationRequested
-      type:
-        scalar: boolean
     - name: reservedFor
       type:
         list:

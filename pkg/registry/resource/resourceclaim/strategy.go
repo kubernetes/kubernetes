@@ -28,11 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -172,35 +170,6 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	return fields
 }
 
-// dropDisabledFields removes fields which are covered by the optional DRAControlPlaneController feature gate.
+// dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
-		// No need to drop anything.
-		return
-	}
-
-	if oldClaim == nil {
-		// Always drop on create. There's no status yet, so nothing to do there.
-		newClaim.Spec.Controller = ""
-		return
-	}
-
-	// Drop on (status) update only if not already set.
-	if oldClaim.Spec.Controller == "" {
-		newClaim.Spec.Controller = ""
-	}
-	// If the claim is handled by a control plane controller, allow
-	// setting it also in the status. Stripping that field would be bad.
-	if oldClaim.Spec.Controller == "" &&
-		newClaim.Status.Allocation != nil &&
-		oldClaim.Status.Allocation == nil &&
-		(oldClaim.Status.Allocation == nil || oldClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.Allocation.Controller = ""
-	}
-	// If there is an existing allocation which used a control plane controller, then
-	// allow requesting its deallocation.
-	if !oldClaim.Status.DeallocationRequested &&
-		(newClaim.Status.Allocation == nil || newClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.DeallocationRequested = false
-	}
 }

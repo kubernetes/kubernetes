@@ -18,16 +18,11 @@ limitations under the License.
 
 package v1alpha3
 
-import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
-)
-
 // DeviceClassSpecApplyConfiguration represents a declarative configuration of the DeviceClassSpec type for use
 // with apply.
 type DeviceClassSpecApplyConfiguration struct {
-	Selectors     []DeviceSelectorApplyConfiguration           `json:"selectors,omitempty"`
-	Config        []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
-	SuitableNodes *v1.NodeSelectorApplyConfiguration           `json:"suitableNodes,omitempty"`
+	Selectors []DeviceSelectorApplyConfiguration           `json:"selectors,omitempty"`
+	Config    []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -59,13 +54,5 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 		}
 		b.Config = append(b.Config, *values[i])
 	}
-	return b
-}
-
-// WithSuitableNodes sets the SuitableNodes field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SuitableNodes field is set to the value of the last call.
-func (b *DeviceClassSpecApplyConfiguration) WithSuitableNodes(value *v1.NodeSelectorApplyConfiguration) *DeviceClassSpecApplyConfiguration {
-	b.SuitableNodes = value
 	return b
 }
