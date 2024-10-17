@@ -1602,18 +1602,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("PodSchedulingContext"):
-		return &resourcev1alpha3.PodSchedulingContextApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):
-		return &resourcev1alpha3.PodSchedulingContextSpecApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("PodSchedulingContextStatus"):
-		return &resourcev1alpha3.PodSchedulingContextStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaim"):
 		return &resourcev1alpha3.ResourceClaimApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
 		return &resourcev1alpha3.ResourceClaimConsumerReferenceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
-		return &resourcev1alpha3.ResourceClaimSchedulingStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
 		return &resourcev1alpha3.ResourceClaimSpecApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimStatus"):

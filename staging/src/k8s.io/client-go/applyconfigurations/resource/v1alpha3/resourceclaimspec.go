@@ -21,8 +21,7 @@ package v1alpha3
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
-	Devices    *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
-	Controller *string                        `json:"controller,omitempty"`
+	Devices *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimSpec type for use with
@@ -36,13 +35,5 @@ func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 // If called multiple times, the Devices field is set to the value of the last call.
 func (b *ResourceClaimSpecApplyConfiguration) WithDevices(value *DeviceClaimApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
 	b.Devices = value
-	return b
-}
-
-// WithController sets the Controller field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Controller field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithController(value string) *ResourceClaimSpecApplyConfiguration {
-	b.Controller = &value
 	return b
 }

@@ -132,7 +132,6 @@ const (
 	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
 	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
 	ResourceSlice         GVK = "ResourceSlice"
 	DeviceClass           GVK = "DeviceClass"
@@ -227,7 +226,6 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
 		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
-		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: DeviceClass, ActionType: All}},
 	}

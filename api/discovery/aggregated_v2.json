@@ -1967,41 +1967,6 @@
               ]
             },
             {
-              "resource": "podschedulingcontexts",
-              "responseKind": {
-                "group": "",
-                "kind": "PodSchedulingContext",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "podschedulingcontext",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "PodSchedulingContext",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",

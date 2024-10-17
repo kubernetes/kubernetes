@@ -30,6 +30,7 @@ import (
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 // ClaimLister returns a subset of the claims that a
@@ -46,25 +47,28 @@ type ClaimLister interface {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator struct {
-	claimsToAllocate []*resourceapi.ResourceClaim
-	claimLister      ClaimLister
-	classLister      resourcelisters.DeviceClassLister
-	sliceLister      resourcelisters.ResourceSliceLister
+	adminAccessEnabled bool
+	claimsToAllocate   []*resourceapi.ResourceClaim
+	claimLister        ClaimLister
+	classLister        resourcelisters.DeviceClassLister
+	sliceLister        resourcelisters.ResourceSliceLister
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
 // some problem was detected which makes it impossible to allocate claims.
 func NewAllocator(ctx context.Context,
+	adminAccessEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	claimLister ClaimLister,
 	classLister resourcelisters.DeviceClassLister,
 	sliceLister resourcelisters.ResourceSliceLister,
 ) (*Allocator, error) {
 	return &Allocator{
-		claimsToAllocate: claimsToAllocate,
-		claimLister:      claimLister,
-		classLister:      classLister,
-		sliceLister:      sliceLister,
+		adminAccessEnabled: adminAccessEnabled,
+		claimsToAllocate:   claimsToAllocate,
+		claimLister:        claimLister,
+		classLister:        classLister,
+		sliceLister:        sliceLister,
 	}, nil
 }
 
@@ -158,6 +162,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					// Unknown future selector type!
 					return nil, fmt.Errorf("claim %s, request %s, selector #%d: CEL expression empty (unsupported selector type?)", klog.KObj(claim), request.Name, i)
 				}
+			}
+
+			if !a.adminAccessEnabled && request.AdminAccess {
+				return nil, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.Name)
 			}
 
 			// Should be set. If it isn't, something changed and we should refuse to proceed.
@@ -269,6 +277,15 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			continue
 		}
 		for _, result := range claim.Status.Allocation.Devices.Results {
+			// Kubernetes 1.31 did not set this, 1.32 always does.
+			// Supporting 1.31 is not worth the additional code that
+			// would have to be written (= looking up in request) because
+			// it is extremely unlikely that there really is a result
+			// that still exists in a cluster from 1.31 where this matters.
+			if ptr.Deref(result.AdminAccess, false) {
+				// Ignore, it's not considered allocated.
+				continue
+			}
 			deviceID := DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
 			alloc.allocated[deviceID] = true
 			numAllocated++
@@ -729,10 +746,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 		alloc.allocated[deviceID] = true
 	}
 	result := resourceapi.DeviceRequestAllocationResult{
-		Request: request.Name,
-		Driver:  deviceID.Driver,
-		Pool:    deviceID.Pool,
-		Device:  deviceID.Device,
+		Request:     request.Name,
+		Driver:      deviceID.Driver,
+		Pool:        deviceID.Pool,
+		Device:      deviceID.Device,
+		AdminAccess: &request.AdminAccess,
 	}
 	previousNumResults := len(alloc.result[r.claimIndex].Devices.Results)
 	alloc.result[r.claimIndex].Devices.Results = append(alloc.result[r.claimIndex].Devices.Results, result)

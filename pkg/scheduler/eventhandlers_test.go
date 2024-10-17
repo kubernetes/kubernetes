@@ -244,7 +244,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 		name                   string
 		gvkMap                 map[framework.GVK]framework.ActionType
 		enableDRA              bool
-		enableClassicDRA       bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
@@ -261,10 +260,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		{
 			name: "DRA events disabled",
 			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -274,12 +272,11 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "some DRA events enabled",
+			name: "all DRA events enabled",
 			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
@@ -289,27 +286,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-			},
-			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
-		},
-		{
-			name: "all DRA events enabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
-			},
-			enableDRA:        true,
-			enableClassicDRA: true,
-			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                           true,
-				reflect.TypeOf(&v1.Node{}):                          true,
-				reflect.TypeOf(&v1.Namespace{}):                     true,
-				reflect.TypeOf(&resourceapi.PodSchedulingContext{}): true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -372,7 +348,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDRA)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tt.enableClassicDRA)
+
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

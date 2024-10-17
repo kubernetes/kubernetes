@@ -26,8 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
@@ -365,16 +368,20 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		Allocation: &resource.AllocationResult{
 			Devices: resource.DeviceAllocationResult{
 				Results: []resource.DeviceRequestAllocationResult{{
-					Request: goodName,
-					Driver:  goodName,
-					Pool:    goodName,
-					Device:  goodName,
+					Request:     goodName,
+					Driver:      goodName,
+					Pool:        goodName,
+					Device:      goodName,
+					AdminAccess: ptr.To(false), // Required for new allocations.
 				}},
 			},
 		},
 	}
+	validAllocatedClaimOld := validAllocatedClaim.DeepCopy()
+	validAllocatedClaimOld.Status.Allocation.Devices.Results[0].AdminAccess = nil // Not required in 1.31.
 
 	scenarios := map[string]struct {
+		adminAccess  bool
 		oldClaim     *resource.ResourceClaim
 		update       func(claim *resource.ResourceClaim) *resource.ResourceClaim
 		wantFailures field.ErrorList
@@ -396,10 +403,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status.Allocation = &resource.AllocationResult{
 					Devices: resource.DeviceAllocationResult{
 						Results: []resource.DeviceRequestAllocationResult{{
-							Request: goodName,
-							Driver:  goodName,
-							Pool:    goodName,
-							Device:  goodName,
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: ptr.To(false),
 						}},
 					},
 				}
@@ -416,10 +424,50 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status.Allocation = &resource.AllocationResult{
 					Devices: resource.DeviceAllocationResult{
 						Results: []resource.DeviceRequestAllocationResult{{
-							Request: badName,
-							Driver:  goodName,
-							Pool:    goodName,
-							Device:  goodName,
+							Request:     badName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: ptr.To(false),
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-add-allocation-missing-admin-access": {
+			adminAccess: true,
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("adminAccess"), ""),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: nil, // Intentionally not set.
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"okay-add-allocation-missing-admin-access": {
+			adminAccess: false,
+			oldClaim:    validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: nil, // Intentionally not set.
 						}},
 					},
 				}
@@ -440,6 +488,20 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"add-reservation": {
 			oldClaim: validAllocatedClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
+					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
+						resource.ResourceClaimConsumerReference{
+							Resource: "pods",
+							Name:     fmt.Sprintf("foo-%d", i),
+							UID:      types.UID(fmt.Sprintf("%d", i)),
+						})
+				}
+				return claim
+			},
+		},
+		"add-reservation-old-claim": {
+			oldClaim: validAllocatedClaimOld,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
@@ -569,55 +631,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
-		"invalid-reserved-deallocation-requested": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
-					{
-						Resource: "pods",
-						Name:     "foo",
-						UID:      "1",
-					},
-				}
-				return claim
-			},
-		},
-		"add-deallocation-requested": {
-			oldClaim: validAllocatedClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"remove-allocation": {
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = false
-				claim.Status.Allocation = nil
-				return claim
-			},
-		},
-		"invalid-deallocation-requested-removal": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may not be cleared when `allocation` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = false
-				return claim
-			},
-		},
 		"invalid-allocation-modification": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status.allocation"), func() *resource.AllocationResult {
 				claim := validAllocatedClaim.DeepCopy()
@@ -627,44 +640,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			oldClaim: validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation.Devices.Results[0].Driver += "-2"
-				return claim
-			},
-		},
-		"invalid-deallocation-requested-in-use": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
-					{
-						Resource: "pods",
-						Name:     "foo",
-						UID:      "1",
-					},
-				}
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"invalid-deallocation-not-allocated": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
-			oldClaim:     validClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.DeallocationRequested = true
-				return claim
-			},
-		},
-		"invalid-allocation-removal-not-reset": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.Allocation = nil
 				return claim
 			},
 		},
@@ -696,6 +671,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, scenario.adminAccess)
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
 			assert.Equal(t, scenario.wantFailures, errs)
