@@ -183,15 +183,16 @@ type KubeProxyConfiguration struct {
 	// primary IP is. Note that the name is a historical artifact, and kube-proxy does
 	// not actually bind any sockets to this IP.
 	BindAddress string
-	// healthzBindAddress is the IP address and port for the health check server to
-	// serve on, defaulting to "0.0.0.0:10256" (if bindAddress is unset or IPv4), or
-	// "[::]:10256" (if bindAddress is IPv6).
-	HealthzBindAddress string
-	// metricsBindAddress is the IP address and port for the metrics server to serve
-	// on, defaulting to "127.0.0.1:10249" (if bindAddress is unset or IPv4), or
-	// "[::1]:10249" (if bindAddress is IPv6). (Set to "0.0.0.0:10249" / "[::]:10249"
-	// to bind on all interfaces.)
-	MetricsBindAddress string
+	// healthzBindAddresses is a list of CIDR ranges that contains a valid node IP on which
+	// the healthz server will be served on, defaulting to [ "0.0.0.0/0", "::/0" ].
+	HealthzBindAddresses []string
+	// healthzBindPort is the port on which healthz server will be exposed, defaulting to 10256.
+	HealthzBindPort int32
+	// metricsBindAddresses is a list of CIDR ranges that contains a valid node IP on which
+	// the metrics server will be served on, defaulting to [ "127.0.0.0/8", "::1/128" ].
+	MetricsBindAddresses []string
+	// metricsBindPort is the port on which metrics server will be exposed, defaulting to 10249.
+	MetricsBindPort int32
 	// bindAddressHardFail, if true, tells kube-proxy to treat failure to bind to a
 	// port as fatal and exit
 	BindAddressHardFail bool

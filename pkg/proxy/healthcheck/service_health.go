@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -57,17 +58,17 @@ type proxierHealthChecker interface {
 	IsHealthy() bool
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodeAddressHandler *proxyutil.NodeAddressHandler, healthzServer proxierHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
 
-	if !nodePortAddresses.MatchAll() {
-		ips, err := nodePortAddresses.GetNodeIPs(proxyutil.RealNetwork{})
+	if !nodeAddressHandler.MatchAll() {
+		ips, err := nodeAddressHandler.GetNodeIPs(proxyutil.RealNetwork{})
 		if err == nil {
 			nodeIPs = ips
 		} else {
-			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodeAddresses", nodeAddressHandler)
 		}
 	}
 
@@ -83,7 +84,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodeAddressHandler, healthzServer proxierHealthChecker) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 
@@ -170,9 +171,9 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 	for _, ip := range hcs.nodeIPs {
 		addr := net.JoinHostPort(ip.String(), fmt.Sprint(hcI.port))
 		// create http server
-		httpSrv := hcs.httpFactory.New(addr, hcHandler{name: hcI.nsn, hcs: hcs})
+		httpSrv := hcs.httpFactory.New(hcHandler{name: hcI.nsn, hcs: hcs})
 		// start listener
-		listener, err = hcs.listener.Listen(addr)
+		listener, err = hcs.listener.Listen(context.TODO(), addr)
 		if err != nil {
 			// must close whatever have been previously opened
 			// to allow a retry/or port ownership change as needed
