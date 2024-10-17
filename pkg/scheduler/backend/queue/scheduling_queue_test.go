@@ -1622,13 +1622,13 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 		},
 		{
 			name:      "QueueHintFunction is called when Pod is gated by a plugin other than SchedulingGates",
-			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
+			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo"), GatingPlugin: "foo"}),
 			hint:      queueHintReturnQueue,
 			expectedQ: activeQ,
 		},
 		{
 			name:      "Pod that experienced a scheduling failure before should be queued to backoffQ after un-gated",
-			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), Attempts: 1, UnschedulablePlugins: sets.New("foo")}),
+			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), Attempts: 1, UnschedulablePlugins: sets.New("foo"), GatingPlugin: "foo"}),
 			hint:      queueHintReturnQueue,
 			expectedQ: backoffQ,
 		},
