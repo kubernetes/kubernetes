@@ -547,14 +547,14 @@ func getSidecarPodWithHook(name string, image string, lifecycle *v1.Lifecycle) *
 	}
 }
 
+func validDuration(duration time.Duration, low, high int64) bool {
+	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
+}
+
 var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
-
-	validDuration := func(duration time.Duration, low, high int64) bool {
-		return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
-	}
 
 	ginkgo.Context("when create a pod with lifecycle hook using sleep action", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -623,6 +623,39 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
 			if !validDuration(cost, 0, 15) {
+				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			}
+		})
+
+	})
+})
+
+var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
+	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	var podClient *e2epod.PodClient
+
+	ginkgo.Context("when create a pod with lifecycle hook using sleep action with a duration of zero seconds", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			podClient = e2epod.NewPodClient(f)
+		})
+		ginkgo.It("prestop hook using sleep action with zero duration", func(ctx context.Context) {
+			lifecycle := &v1.Lifecycle{
+				PreStop: &v1.LifecycleHandler{
+					Sleep: &v1.SleepAction{Seconds: 0},
+				},
+			}
+			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook-zero-duration", imageutils.GetPauseImageName(), lifecycle)
+			ginkgo.By("create the pod with lifecycle hook using sleep action with zero duration")
+			podClient.CreateSync(ctx, podWithHook)
+			ginkgo.By("delete the pod with lifecycle hook using sleep action with zero duration")
+			start := time.Now()
+			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			cost := time.Since(start)
+			// cost should be
+			// longer than 0 seconds (pod shouldn't sleep and the handler should return immediately)
+			// shorter than gracePeriodSeconds (default 30 seconds here)
+			if !validDuration(cost, 0, 30) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
