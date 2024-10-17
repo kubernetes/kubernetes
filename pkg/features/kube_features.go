@@ -264,6 +264,8 @@ const (
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
+	// alpha: v1.30
+	// beta: v1.32
 	//
 	// Allows to delegate reconciliation of a Job object to an external controller.
 	JobManagedBy featuregate.Feature = "JobManagedBy"

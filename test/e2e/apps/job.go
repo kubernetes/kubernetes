@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1236,6 +1237,32 @@ done`}
 		ginkgo.By("Ensure the job controller updates the status.ready field")
 		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](0))
 		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+	})
+
+	/*
+		Testname: Jobs, managed-by mechanism
+		Description: This test verifies the built-in Job controller does not
+		reconcile the Job, allowing to delegate the reconciliation to an
+		external controller.
+	*/
+	ginkgo.It("should allow to delegate reconciliation to external controller", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6)
+
+		ginkgo.By("Creating a job with a custom managed-by field")
+		job := e2ejob.NewTestJob("succeed", "managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.ManagedBy = ptr.To("example.com/custom-job-controller")
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+		ginkgo.By(fmt.Sprintf("Verify the Job %s/%s status isn't updated by the built-in controller", job.Namespace, job.Name))
+		// Wait a little to give the built-in Job controller time to update the
+		// status (if it was enabled)
+		time.Sleep(time.Second)
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get the latest object for the Job %s/%s", job.Namespace, job.Name)
+		gomega.Expect(job.Status).To(gomega.BeEquivalentTo(batchv1.JobStatus{}), "expected status for the Job %s/%s to be empty", job.Namespace, job.Name)
 	})
 })
 
