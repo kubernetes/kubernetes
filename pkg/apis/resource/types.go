@@ -528,10 +528,7 @@ type CELDeviceSelector struct {
 	//
 	// The length of the expression must be smaller or equal to 10 Ki. The
 	// cost of evaluating it is also limited based on the estimated number
-	// of logical steps. Validation against those limits happens only when
-	// setting an expression for the first time or when changing it. If the
-	// limits are changed in a future Kubernetes release, existing users
-	// are guaranteed that existing expressions will continue to be valid.
+	// of logical steps.
 	//
 	// +required
 	Expression string
@@ -544,6 +541,12 @@ type CELDeviceSelector struct {
 // required for that is proportional to the number of CEL selectors and how
 // often they need to be evaluated, which can vary depending on several factors
 // (number of devices, cluster utilization, additional constraints).
+//
+// Validation against this limit and [CELSelectorExpressionMaxLength] happens
+// only when setting an expression for the first time or when changing it. If
+// the limits are changed in a future Kubernetes release, existing users are
+// guaranteed that existing expressions will continue to be valid and won't be
+// interrupted at runtime after an up- or downgrade.
 //
 // According to
 // https://github.com/kubernetes/kubernetes/blob/4aeaf1e99e82da8334c0d6dddd848a194cd44b4f/staging/src/k8s.io/apiserver/pkg/apis/cel/config.go#L20-L22,
