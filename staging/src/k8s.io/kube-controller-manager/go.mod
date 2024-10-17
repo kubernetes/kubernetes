@@ -45,5 +45,4 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
-	k8s.io/kube-controller-manager => ../kube-controller-manager
 )

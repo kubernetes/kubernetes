@@ -38,7 +38,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace (
-	k8s.io/api => ../api
-	k8s.io/apimachinery => ../apimachinery
-)
+replace k8s.io/apimachinery => ../apimachinery
