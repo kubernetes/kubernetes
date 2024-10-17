@@ -62,6 +62,7 @@ type NamingConditionController struct {
 }
 
 func NewNamingConditionController(
+	ctx context.Context,
 	crdInformer informers.CustomResourceDefinitionInformer,
 	crdClient client.CustomResourceDefinitionsGetter,
 ) *NamingConditionController {
@@ -76,7 +77,7 @@ func NewNamingConditionController(
 	}
 
 	informerIndexer := crdInformer.Informer().GetIndexer()
-	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(informerIndexer, informerIndexer, 60*time.Second, false)
+	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(ctx, informerIndexer, informerIndexer, 60*time.Second, false)
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
