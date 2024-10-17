@@ -25,7 +25,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
@@ -172,7 +172,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							Port: 27444,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					AllocateLoadBalancerNodePorts: ptr.To(false),
 				},
 			},
 			usage: corev1.ResourceList{
@@ -218,7 +218,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							Port: 27444,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+					AllocateLoadBalancerNodePorts: ptr.To(true),
 				},
 			},
 			usage: corev1.ResourceList{
@@ -242,7 +242,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							NodePort: 32002,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					AllocateLoadBalancerNodePorts: ptr.To(false),
 				},
 			},
 			usage: corev1.ResourceList{
