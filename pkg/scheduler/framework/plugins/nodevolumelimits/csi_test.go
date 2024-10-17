@@ -265,6 +265,7 @@ func TestCSILimits(t *testing.T) {
 		extraClaims         []v1.PersistentVolumeClaim
 		filterName          string
 		maxVols             int32
+		vaCount             int
 		driverNames         []string
 		test                string
 		migrationEnabled    bool
@@ -273,6 +274,38 @@ func TestCSILimits(t *testing.T) {
 		wantStatus          *framework.Status
 		wantPreFilterStatus *framework.Status
 	}{
+		{
+			newPod:       csiEBSOneVolPod,
+			existingPods: []*v1.Pod{},
+			filterName:   "csi",
+			maxVols:      10,
+			vaCount:      10,
+			driverNames:  []string{ebsCSIDriverName},
+			test:         "should take volume attachments count when pod spec volume count is lesser",
+			limitSource:  "csinode",
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:       csiEBSOneVolPod,
+			existingPods: []*v1.Pod{runningPod, csiEBSTwoVolPod},
+			filterName:   "csi",
+			maxVols:      2,
+			vaCount:      1,
+			driverNames:  []string{ebsCSIDriverName},
+			test:         "should take pod spec count when volume attachments count is lesser",
+			limitSource:  "csinode",
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:       csiEBSOneVolPod,
+			existingPods: []*v1.Pod{runningPod, csiEBSTwoVolPod},
+			filterName:   "csi",
+			maxVols:      4,
+			vaCount:      2,
+			driverNames:  []string{ebsCSIDriverName},
+			test:         "should schedule when volume attachments count and pod spec count are less than limit",
+			limitSource:  "csinode",
+		},
 		{
 			newPod:       csiEBSOneVolPod,
 			existingPods: []*v1.Pod{runningPod, csiEBSTwoVolPod},
@@ -609,6 +642,7 @@ func TestCSILimits(t *testing.T) {
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
+				vaLister:             getFakeVolumeAttachmentLister(test.vaCount, test.driverNames...),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csiTranslator,
 			}
@@ -767,6 +801,25 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getFakeVolumeAttachmentLister(count int, driverNames ...string) tf.VolumeAttachmentLister {
+	vaLister := tf.VolumeAttachmentLister{}
+	for _, driver := range driverNames {
+		for j := 0; j < count; j++ {
+			va := storagev1.VolumeAttachment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("va-%s-%d", driver, j),
+				},
+				Spec: storagev1.VolumeAttachmentSpec{
+					NodeName: "node-for-max-pd-test-1",
+					Attacher: driver,
+				},
+			}
+			vaLister = append(vaLister, va)
+		}
+	}
+	return vaLister
 }
 
 func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
