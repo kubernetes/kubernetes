@@ -222,7 +222,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
-			keyring.Add(cfg)
+			keyring.Add(CredentialSource{}, cfg) // FIXME: add CredentialSource to test data?
 		}
 
 		creds, ok := keyring.Lookup(test.targetURL + "/foo/bar")

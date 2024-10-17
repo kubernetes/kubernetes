@@ -40,6 +40,7 @@ func NewSchemeAndCodecs(mutators ...serializer.CodecFactoryOptionsMutator) (*run
 	if err := kubeletconfigv1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
+	// TODO: we may need to add the image pull manager API to the scheme here
 	codecs := serializer.NewCodecFactory(scheme, mutators...)
 	return scheme, &codecs, nil
 }

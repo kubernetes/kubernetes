@@ -67,6 +67,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	kubeletconfig1betav1 "k8s.io/kubelet/config/v1beta1"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -659,6 +660,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.podCache,
 	)
 
+	imagePullCredentialsVerificationPolicy, err := images.NewImagePullCredentialVerificationPolicy(
+		kubeletconfig1betav1.ImagePullCredentialsVerificationPolicy(kubeCfg.ImagePullCredentialsVerificationPolicy),
+		kubeCfg.PreloadedImagesVerificationAllowlist)
+
+	if err != nil {
+		return nil, err
+	}
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -676,6 +685,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		imagePullCredentialsVerificationPolicy,
 		imageCredentialProviderConfigFile,
 		imageCredentialProviderBinDir,
 		kubeCfg.CPUCFSQuota,

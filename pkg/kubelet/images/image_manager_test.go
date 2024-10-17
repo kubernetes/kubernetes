@@ -347,7 +347,11 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 
 	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
 
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+	pullManager, err := NewFileBasedImagePullManager(t.TempDir(), NeverVerifyImagePullPolicy)
+	if err != nil {
+		t.Fatalf("TODO: error")
+	}
+	puller = NewImageManager(fakeRecorder, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 

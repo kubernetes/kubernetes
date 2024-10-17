@@ -20,19 +20,19 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-// fakeKeyring is a fake docker auth config keyring
-type fakeKeyring struct {
-	auth []credentialprovider.AuthConfig
+// FakeKeyring a fake config credentials
+type FakeKeyring struct {
+	auth []credentialprovider.TrackedAuthConfig
 	ok   bool
 }
 
-// Lookup implements the DockerKeyring method for fetching credentials based on image name.
-// Returns fake results based on the auth and ok fields in fakeKeyring
-func (f *fakeKeyring) Lookup(image string) ([]credentialprovider.AuthConfig, bool) {
+// Lookup implements the DockerKeyring method for fetching credentials based on image name
+// return fake auth and ok
+func (f *FakeKeyring) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
 	return f.auth, f.ok
 }
 
@@ -46,9 +46,8 @@ func Test_MakeDockerKeyring(t *testing.T) {
 		found          bool
 	}{
 		{
-			name:           "with .dockerconfigjson and auth field",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfigjson and auth field",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockerConfigJson,
@@ -66,9 +65,8 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			found: true,
 		},
 		{
-			name:           "with .dockerconfig and auth field",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfig and auth field",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockercfg,
@@ -86,9 +84,8 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			found: true,
 		},
 		{
-			name:           "with .dockerconfigjson and username/password fields",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfigjson and username/password fields",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockerConfigJson,
@@ -106,9 +103,8 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			found: true,
 		},
 		{
-			name:           "with .dockerconfig and username/password fields",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfig and username/password fields",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockercfg,
@@ -126,9 +122,8 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			found: true,
 		},
 		{
-			name:           "with .dockerconfigjson but with wrong Secret Type",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfigjson but with wrong Secret Type",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockercfg,
@@ -137,13 +132,12 @@ func Test_MakeDockerKeyring(t *testing.T) {
 					},
 				},
 			},
-			authConfigs: nil,
+			authConfigs: []credentialprovider.AuthConfig{},
 			found:       false,
 		},
 		{
-			name:           "with .dockerconfig but with wrong Secret Type",
-			image:          "test.registry.io",
-			defaultKeyring: &fakeKeyring{},
+			name:  "with .dockerconfig but with wrong Secret Type",
+			image: "test.registry.io",
 			pullSecrets: []v1.Secret{
 				{
 					Type: v1.SecretTypeDockerConfigJson,
@@ -152,17 +146,19 @@ func Test_MakeDockerKeyring(t *testing.T) {
 					},
 				},
 			},
-			authConfigs: nil,
+			authConfigs: []credentialprovider.AuthConfig{},
 			found:       false,
 		},
 		{
 			name:  "with not matcing .dockerconfigjson and default keyring",
 			image: "test.registry.io",
-			defaultKeyring: &fakeKeyring{
-				auth: []credentialprovider.AuthConfig{
+			defaultKeyring: &FakeKeyring{
+				auth: []credentialprovider.TrackedAuthConfig{
 					{
-						Username: "default-user",
-						Password: "default-password",
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "default-user",
+							Password: "default-password",
+						},
 					},
 				},
 			},
@@ -185,11 +181,13 @@ func Test_MakeDockerKeyring(t *testing.T) {
 		{
 			name:  "with not matching .dockerconfig and default keyring",
 			image: "test.registry.io",
-			defaultKeyring: &fakeKeyring{
-				auth: []credentialprovider.AuthConfig{
+			defaultKeyring: &FakeKeyring{
+				auth: []credentialprovider.TrackedAuthConfig{
 					{
-						Username: "default-user",
-						Password: "default-password",
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "default-user",
+							Password: "default-password",
+						},
 					},
 				},
 			},
@@ -212,11 +210,13 @@ func Test_MakeDockerKeyring(t *testing.T) {
 		{
 			name:  "with no pull secrets but has default keyring",
 			image: "test.registry.io",
-			defaultKeyring: &fakeKeyring{
-				auth: []credentialprovider.AuthConfig{
+			defaultKeyring: &FakeKeyring{
+				auth: []credentialprovider.TrackedAuthConfig{
 					{
-						Username: "default-user",
-						Password: "default-password",
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "default-user",
+							Password: "default-password",
+						},
 					},
 				},
 			},
@@ -232,11 +232,13 @@ func Test_MakeDockerKeyring(t *testing.T) {
 		{
 			name:  "with pull secrets and has default keyring",
 			image: "test.registry.io",
-			defaultKeyring: &fakeKeyring{
-				auth: []credentialprovider.AuthConfig{
+			defaultKeyring: &FakeKeyring{
+				auth: []credentialprovider.TrackedAuthConfig{
 					{
-						Username: "default-user",
-						Password: "default-password",
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "default-user",
+							Password: "default-password",
+						},
 					},
 				},
 			},

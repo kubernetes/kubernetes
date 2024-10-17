@@ -48,7 +48,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -105,9 +104,6 @@ type kubeGenericRuntimeManager struct {
 
 	// Container GC manager
 	containerGC *containerGC
-
-	// Keyring for pulling images
-	keyring credentialprovider.DockerKeyring
 
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
@@ -198,6 +194,7 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullPolicy images.ImagePullPolicyEnforcer,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	cpuCFSQuota bool,
@@ -270,11 +267,16 @@ func NewKubeGenericRuntimeManager(
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
+
+	imagePullManager, err := images.NewFileBasedImagePullManager(rootDirectory, imagePullPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create image pull manager: %v", err)
+	}
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,
