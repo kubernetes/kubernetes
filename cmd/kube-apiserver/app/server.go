@@ -69,7 +69,8 @@ func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
 
 	cmd := &cobra.Command{
-		Use: "kube-apiserver",
+		Use:   "kube-apiserver",
+		Short: "Services REST operations and provides the frontend to the cluster",
 		Long: `The Kubernetes API server validates and configures data
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the

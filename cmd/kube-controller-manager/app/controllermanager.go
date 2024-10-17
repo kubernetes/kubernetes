@@ -117,7 +117,8 @@ func NewControllerManagerCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: "kube-controller-manager",
+		Use:   "kube-controller-manager",
+		Short: "A daemon that embeds the core control loops shipped with Kubernetes",
 		Long: `The Kubernetes controller manager is a daemon that embeds
 the core control loops shipped with Kubernetes. In applications of robotics and
 automation, a control loop is a non-terminating loop that regulates the state of
