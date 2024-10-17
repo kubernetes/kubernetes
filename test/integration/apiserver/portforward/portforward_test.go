@@ -49,6 +49,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
 )
 
 const remotePort = "8765"
@@ -59,7 +60,7 @@ func TestPortforward(t *testing.T) {
 
 	var podName string
 	var podUID types.UID
-	backendServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	backendServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		t.Logf("backend saw request: %v", req.URL.String())
 		kubeletportforward.ServePortForward(
 			w,
@@ -68,11 +69,15 @@ func TestPortforward(t *testing.T) {
 			podName,
 			podUID,
 			&kubeletportforward.V4Options{},
-			wait.ForeverTestTimeout, // idle timeout
+			wait.ForeverTestTimeout,                    // idle timeout
 			remotecommand.DefaultStreamCreationTimeout, // stream creation timeout
 			[]string{kubeletportforward.ProtocolV1Name},
 		)
 	}))
+	var err error
+	backendServer.Listener, err = net.Listen("tcp", net.JoinHostPort(util.GlobalUnicastHostIP(t).String(), remotePort))
+	require.NoError(t, err)
+	backendServer.StartTLS()
 	defer backendServer.Close()
 	backendURL, _ := url.Parse(backendServer.URL)
 	backendHost := backendURL.Hostname()
