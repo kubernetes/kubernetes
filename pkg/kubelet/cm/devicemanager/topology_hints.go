@@ -17,7 +17,9 @@ limitations under the License.
 package devicemanager
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -30,7 +32,7 @@ import (
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
-func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *ManagerImpl) GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
@@ -86,7 +88,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
-func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *ManagerImpl) GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
