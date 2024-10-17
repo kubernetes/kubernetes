@@ -23,20 +23,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -115,13 +115,7 @@ func removeExtendedResource(clientSet clientset.Interface, nodeName, extendedRes
 	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
 }
 
-func doPodResizeTests() {
-	f := framework.NewDefaultFramework("pod-resize-test")
-	var podClient *e2epod.PodClient
-	ginkgo.BeforeEach(func() {
-		podClient = e2epod.NewPodClient(f)
-	})
-
+func doPodResizeTests(f *framework.Framework) {
 	type testCase struct {
 		name                string
 		containers          []e2epod.ResizableContainerInfo
@@ -861,13 +855,7 @@ func doPodResizeTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
-			ginkgo.By("check if in place pod vertical scaling is supported", func() {
-				node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
-				if !e2epod.IsInPlacePodVerticalScalingSupportedByRuntime(node) || framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
-					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
-				}
-			})
+			podClient := e2epod.NewPodClient(f)
 			var testPod, patchedPod *v1.Pod
 			var pErr error
 
@@ -945,12 +933,7 @@ func doPodResizeTests() {
 	}
 }
 
-func doPodResizeErrorTests() {
-	f := framework.NewDefaultFramework("pod-resize-errors")
-	var podClient *e2epod.PodClient
-	ginkgo.BeforeEach(func() {
-		podClient = e2epod.NewPodClient(f)
-	})
+func doPodResizeErrorTests(f *framework.Framework) {
 
 	type testCase struct {
 		name        string
@@ -985,13 +968,7 @@ func doPodResizeErrorTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
-			ginkgo.By("check if in place pod vertical scaling is supported", func() {
-				node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
-				if !e2epod.IsInPlacePodVerticalScalingSupportedByRuntime(node) || framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
-					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
-				}
-			})
+			podClient := e2epod.NewPodClient(f)
 			var testPod, patchedPod *v1.Pod
 			var pErr error
 
@@ -1043,7 +1020,17 @@ func doPodResizeErrorTests() {
 //       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
 //       in test/e2e/node/pod_resize.go
 
-var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, func() {
-	doPodResizeTests()
-	doPodResizeErrorTests()
+var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, "[NodeAlphaFeature:InPlacePodVerticalScaling]", func() {
+	f := framework.NewDefaultFramework("pod-resize-tests")
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+
+	doPodResizeTests(f)
+	doPodResizeErrorTests(f)
 })

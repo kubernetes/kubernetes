@@ -20,22 +20,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
-	semver "github.com/blang/semver/v4"
-	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -102,21 +100,6 @@ type patchSpec struct {
 	Spec struct {
 		Containers []containerPatch `json:"containers"`
 	} `json:"spec"`
-}
-
-func IsInPlacePodVerticalScalingSupportedByRuntime(node *v1.Node) bool {
-	re := regexp.MustCompile("containerd://(.*)")
-	match := re.FindStringSubmatch(node.Status.NodeInfo.ContainerRuntimeVersion)
-	if len(match) != 2 {
-		return false
-	}
-	if ver, verr := semver.ParseTolerant(match[1]); verr == nil {
-		if ver.Compare(semver.MustParse(MinContainerRuntimeVersion)) < 0 {
-			return false
-		}
-		return true
-	}
-	return false
 }
 
 func getTestResourceInfo(tcInfo ResizableContainerInfo) (v1.ResourceRequirements, v1.ResourceList, []v1.ContainerResizePolicy) {
@@ -237,6 +220,7 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 
 func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
+	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
 	for i, wantCtr := range wantCtrs {
 		gotCtr := &gotPod.Spec.Containers[i]
 		ctr, _ := makeResizableContainer(wantCtr)
@@ -247,6 +231,7 @@ func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 
 func VerifyPodResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
+	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
 	for i, wantCtr := range wantCtrs {
 		gotCtr := &gotPod.Spec.Containers[i]
 		ctr, _ := makeResizableContainer(wantCtr)
@@ -257,6 +242,7 @@ func VerifyPodResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 
 func VerifyPodAllocations(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
+	gomega.Expect(gotPod.Status.ContainerStatuses).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
 	for i, wantCtr := range wantCtrs {
 		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
 		if wantCtr.Allocations == nil {
@@ -280,6 +266,7 @@ func VerifyPodAllocations(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) err
 
 func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
+	gomega.Expect(gotPod.Status.ContainerStatuses).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
 	for i, wantCtr := range wantCtrs {
 		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
 		ctr, _ := makeResizableContainer(wantCtr)
@@ -288,9 +275,10 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo)
 	}
 }
 
+// isPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
+// TODO: Deduplicate this function with NPD cluster e2e test:
+// https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
 func isPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
-	// Determine if pod is running on cgroupv2 or cgroupv1 node
-	//TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
 	cmd := "mount -t cgroup2"
 	out, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 	if err != nil {

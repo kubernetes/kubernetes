@@ -22,37 +22,26 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-func doPodResizeResourceQuotaTests() {
-	f := framework.NewDefaultFramework("pod-resize-resource-quota")
-	var podClient *e2epod.PodClient
-	ginkgo.BeforeEach(func() {
-		podClient = e2epod.NewPodClient(f)
-	})
+func doPodResizeResourceQuotaTests(f *framework.Framework) {
 	timeouts := framework.NewTimeoutContext()
 
 	ginkgo.It("pod-resize-resource-quota-test", func(ctx context.Context) {
-		ginkgo.By("check if in place pod vertical scaling is supported", func() {
-			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
-			if !e2epod.IsInPlacePodVerticalScalingSupportedByRuntime(node) || framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
-				e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
-			}
-		})
+		podClient := e2epod.NewPodClient(f)
 		resourceQuota := v1.ResourceQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "resize-resource-quota",
@@ -166,21 +155,9 @@ func doPodResizeResourceQuotaTests() {
 	})
 }
 
-func doPodResizeSchedulerTests() {
-	f := framework.NewDefaultFramework("pod-resize-scheduler")
-	var podClient *e2epod.PodClient
-	ginkgo.BeforeEach(func() {
-		podClient = e2epod.NewPodClient(f)
-	})
-
+func doPodResizeSchedulerTests(f *framework.Framework) {
 	ginkgo.It("pod-resize-scheduler-tests", func(ctx context.Context) {
-		ginkgo.By("check if in place pod vertical scaling is supported", func() {
-			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
-			if !e2epod.IsInPlacePodVerticalScalingSupportedByRuntime(node) || framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
-				e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
-			}
-		})
+		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err, "failed to get running nodes")
 		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
@@ -342,9 +319,25 @@ func doPodResizeSchedulerTests() {
 }
 
 var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", feature.InPlacePodVerticalScaling, func() {
-	doPodResizeSchedulerTests()
+	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+	doPodResizeSchedulerTests(f)
 })
 
 var _ = SIGDescribe("Pod InPlace Resize Container", feature.InPlacePodVerticalScaling, func() {
-	doPodResizeResourceQuotaTests()
+	f := framework.NewDefaultFramework("pod-resize-tests")
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
+		}
+	})
+	doPodResizeResourceQuotaTests(f)
 })
