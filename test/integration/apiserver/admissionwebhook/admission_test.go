@@ -725,7 +725,7 @@ func testResourcePatch(c *testContext) {
 }
 
 func testResourceDelete(c *testContext) {
-	// Verify that an immediate delete triggers the webhook and populates the admisssionRequest.oldObject.
+	// Verify that an immediate delete triggers the webhook and populates the admissionRequest.oldObject.
 	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
@@ -758,7 +758,7 @@ func testResourceDelete(c *testContext) {
 		return
 	}
 
-	// Verify that an update-on-delete triggers the webhook and populates the admisssionRequest.oldObject.
+	// Verify that an update-on-delete triggers the webhook and populates the admissionRequest.oldObject.
 	obj, err = createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
