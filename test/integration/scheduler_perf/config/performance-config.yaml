@@ -731,49 +731,42 @@
       initPods: 20000
       measurePods: 5000
 
+# Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 100/s rate.
 - name: Unschedulable
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-  - opcode: createPods
-    countParam: $initPods
-    podTemplatePath: config/templates/pod-large-cpu.yaml
-    skipWaitToCompletion: true
+  - opcode: churn
+    mode: create
+    templatePaths:
+    - config/templates/pod-large-cpu.yaml
+    intervalMilliseconds: 10
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/templates/pod-default.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes/2InitPods
+  - name: 5Nodes/10Pods
     labels: [integration-test, performance, short]
     params:
       initNodes: 5
-      initPods: 2
       measurePods: 10
-  - name: 500Nodes/200InitPods
+  - name: 500Nodes/1kPods
     labels: [performance, short]
     params:
       initNodes: 500
-      initPods: 200
       measurePods: 1000
-  - name: 5000Nodes/200InitPods
+  - name: 5kNodes/1kPods
     labels: [performance, short]
     params:
       initNodes: 5000
-      initPods: 200
-      measurePods: 5000
-  - name: 5000Nodes/200InitPods/10000Pods
+      measurePods: 1000
+  - name: 5kNodes/10kPods
     labels: [performance]
-    threshold: 300
+    threshold: 400
     params:
       initNodes: 5000
-      initPods: 200
       measurePods: 10000
-  - name: 5000Nodes/2000InitPods
-    params:
-      initNodes: 5000
-      initPods: 2000
-      measurePods: 5000
 
 - name: SchedulingWithMixedChurn
   workloadTemplate:
