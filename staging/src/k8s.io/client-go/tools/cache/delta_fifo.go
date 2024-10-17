@@ -259,7 +259,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 }
 
 var (
-	_ = Queue(&DeltaFIFO{}) // DeltaFIFO is a Queue
+	_ Queue = (*DeltaFIFO)(nil) // DeltaFIFO is a Queue
 )
 
 var (
