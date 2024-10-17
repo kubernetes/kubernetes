@@ -124,26 +124,37 @@ type CommonToken struct {
 	BaseToken
 }
 
+// Define EMPTY_SOURCE at the top of the file
+var EMPTY_SOURCE = &TokenSourceCharStreamPair{
+    tokenSource: nil,
+    charStream:  nil,
+}
+
 func NewCommonToken(source *TokenSourceCharStreamPair, tokenType, channel, start, stop int) *CommonToken {
 
-	t := &CommonToken{
-		BaseToken: BaseToken{
-			source:     source,
-			tokenType:  tokenType,
-			channel:    channel,
-			start:      start,
-			stop:       stop,
-			tokenIndex: -1,
-		},
-	}
+    // Use EMPTY_SOURCE if source is nil to prevent nil dereference
+    if source == nil {
+        source = EMPTY_SOURCE
+    }
 
-	if t.source.tokenSource != nil {
-		t.line = source.tokenSource.GetLine()
-		t.column = source.tokenSource.GetCharPositionInLine()
-	} else {
-		t.column = -1
-	}
-	return t
+    t := &CommonToken{
+        BaseToken: BaseToken{
+            source:     source,
+            tokenType:  tokenType,
+            channel:    channel,
+            start:      start,
+            stop:       stop,
+            tokenIndex: -1,
+        },
+    }
+
+    if t.source.tokenSource != nil {
+        t.line = source.tokenSource.GetLine()
+        t.column = source.tokenSource.GetCharPositionInLine()
+    } else {
+        t.column = -1
+    }
+    return t
 }
 
 // An empty {@link Pair} which is used as the default value of
