@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
+
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -107,10 +109,13 @@ type RuntimeHandlerResolver interface {
 func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper, rcManager RuntimeHandlerResolver) (*runtimeapi.NamespaceOption, error) {
 	runtimeHandler := ""
 	if pod != nil && rcManager != nil {
-		var err error
-		runtimeHandler, err = rcManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
-		if err != nil {
-			return nil, err
+		val := reflect.ValueOf(rcManager)
+		if val.Kind() != reflect.Ptr || val.Kind() == reflect.Ptr && !val.IsNil() {
+			var err error
+			runtimeHandler, err = rcManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	userNs, err := runtimeHelper.GetOrCreateUserNamespaceMappings(pod, runtimeHandler)
