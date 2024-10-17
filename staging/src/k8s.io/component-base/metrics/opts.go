@@ -315,7 +315,7 @@ func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
 }
 
 type MetricLabelAllowList struct {
-	labelToAllowList map[string]sets.String
+	labelToAllowList map[string]sets.Set[string]
 }
 
 func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, labelValueList []string) {
@@ -347,13 +347,13 @@ func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
 	for metricLabelName, labelValues := range allowListMapping {
 		metricName := strings.Split(metricLabelName, ",")[0]
 		labelName := strings.Split(metricLabelName, ",")[1]
-		valueSet := sets.NewString(strings.Split(labelValues, ",")...)
+		valueSet := sets.New[string](strings.Split(labelValues, ",")...)
 
 		allowList, ok := labelValueAllowLists[metricName]
 		if ok {
 			allowList.labelToAllowList[labelName] = valueSet
 		} else {
-			labelToAllowList := make(map[string]sets.String)
+			labelToAllowList := make(map[string]sets.Set[string])
 			labelToAllowList[labelName] = valueSet
 			labelValueAllowLists[metricName] = &MetricLabelAllowList{
 				labelToAllowList,
@@ -363,8 +363,6 @@ func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
 }
 
 func SetLabelAllowListFromManifest(manifest string) {
-	allowListLock.Lock()
-	defer allowListLock.Unlock()
 	allowListMapping := make(map[string]string)
 	data, err := os.ReadFile(filepath.Clean(manifest))
 	if err != nil {
