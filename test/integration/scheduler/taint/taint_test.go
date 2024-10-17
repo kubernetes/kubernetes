@@ -83,7 +83,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 		externalInformers.Coordination().V1().Leases(),
 		externalInformers.Core().V1().Pods(),
 		externalInformers.Core().V1().Nodes(),
-		externalInformers.Apps().V1().DaemonSets(),
 		cs,
 		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
