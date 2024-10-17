@@ -135,6 +135,7 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
 		Spec: v1.PodSpec{
+			HostUsers:     &falseVar,
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
