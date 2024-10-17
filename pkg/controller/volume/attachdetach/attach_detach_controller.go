@@ -546,24 +546,13 @@ func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) 
 		return
 	}
 	nodeName := types.NodeName(node.Name)
-	adc.nodeUpdate(logger, nil, obj)
-	// kubernetes/kubernetes/issues/37586
-	// This is to workaround the case when a node add causes to wipe out
-	// the attached volumes field. This function ensures that we sync with
-	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
-}
-
-func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj interface{}) {
-	node, ok := newObj.(*v1.Node)
-	// TODO: investigate if nodeName is empty then if we can return
-	if node == nil || !ok {
-		return
-	}
-
-	nodeName := types.NodeName(node.Name)
 	adc.addNodeToDswp(node, nodeName)
 	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
+}
+
+func (adc *attachDetachController) nodeUpdate(logger klog.Logger, _, newObj interface{}) {
+	// The flow for update is the same as add.
+	adc.nodeAdd(logger, newObj)
 }
 
 func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{}) {
