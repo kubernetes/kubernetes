@@ -136,7 +136,6 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		// This call here should override that. In practice it shouldn't
 		// matter because the limits are the same.
 		cel.CostLimit(resourceapi.CELSelectorExpressionMaxCost),
-		cel.CostTracking(estimator),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
