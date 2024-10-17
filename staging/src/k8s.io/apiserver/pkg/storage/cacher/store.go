@@ -35,6 +35,7 @@ type storeIndexer interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	Replace([]interface{}, string) error
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
+	Count() int64
 }
 
 func newStoreIndexer(indexers *cache.Indexers) storeIndexer {
