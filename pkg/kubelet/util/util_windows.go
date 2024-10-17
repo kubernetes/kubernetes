@@ -25,6 +25,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Microsoft/hcsshim/hcn"
 )
 
 const npipeProtocol = "npipe"
@@ -72,4 +74,14 @@ func NormalizePath(path string) string {
 		path = "c:" + path
 	}
 	return path
+}
+
+// IsIPv6Supported determines whether the host supports ipv6.
+func IsIPv6Supported() (bool, error) {
+	supportedFeatures, err := hcn.GetCachedSupportedFeatures()
+	if err != nil {
+		return false, err
+	}
+
+	return supportedFeatures.IPv6DualStack, nil
 }
