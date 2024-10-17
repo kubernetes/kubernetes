@@ -146,9 +146,6 @@ type manager struct {
 	// allocatableCPUs is the set of online CPUs as reported by the system,
 	// and available for allocation, minus the reserved set
 	allocatableCPUs cpuset.CPUSet
-
-	// pendingAdmissionPod contain the pod during the admission phase
-	pendingAdmissionPod *v1.Pod
 }
 
 var _ Manager = &manager{}
@@ -254,10 +251,6 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 }
 
 func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(p)
-
 	// Garbage collect any stranded resources before allocating CPUs.
 	m.removeStaleState()
 
@@ -326,9 +319,6 @@ func (m *manager) State() state.Reader {
 }
 
 func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
@@ -336,9 +326,6 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 }
 
 func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
@@ -375,14 +362,11 @@ func (m *manager) removeStaleState() {
 	defer m.Unlock()
 
 	// Get the list of active pods.
-	activeAndAdmittedPods := m.activePods()
-	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
-	}
+	activePods := m.activePods()
 
 	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
 	activeContainers := make(map[string]map[string]struct{})
-	for _, pod := range activeAndAdmittedPods {
+	for _, pod := range activePods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
@@ -553,11 +537,4 @@ func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *manager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	return m.state.GetCPUSetOrDefault(podUID, containerName)
-}
-
-func (m *manager) setPodPendingAdmission(pod *v1.Pod) {
-	m.Lock()
-	defer m.Unlock()
-
-	m.pendingAdmissionPod = pod
 }
