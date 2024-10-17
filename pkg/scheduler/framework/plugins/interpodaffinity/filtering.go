@@ -170,7 +170,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 		return nil
 	}
 	if err := pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name()); err != nil {
-		logger.Error(err, "get an error during getExistingAntiAffinityCounts")
+		logger.Error(err, "Failed to processing nodes in getExistingAntiAffinityCounts")
 	}
 
 	result := make(topologyToMatchedTermCount)
@@ -217,7 +217,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 		return nil
 	}
 	if err := pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name()); err != nil {
-		logger.Error(err, "get an error during getIncomingAffinityAntiAffinityCounts")
+		logger.Error(err, "Failed to processing nodes in getIncomingAffinityAntiAffinityCounts")
 	}
 
 	for i := 0; i <= int(index); i++ {
