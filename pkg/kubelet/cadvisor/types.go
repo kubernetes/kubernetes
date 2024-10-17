@@ -31,17 +31,17 @@ type Interface interface {
 
 	VersionInfo() (*cadvisorapi.VersionInfo, error)
 
-	// Returns usage information about the filesystem holding container images.
+	// ImagesFsInfo returns usage information about the filesystem holding container images.
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 
-	// Returns usage information about the root filesystem.
+	// RootFsInfo returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 
-	// Returns usage information about the writeable layer.
+	// ContainerFsInfo returns usage information about the writeable layer.
 	// KEP 4191 can separate the image filesystem
 	ContainerFsInfo() (cadvisorapiv2.FsInfo, error)
 
-	// Get filesystem information for the filesystem that contains the given file.
+	// GetDirFsInfo returns filesystem information for the filesystem that contains the given file.
 	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
 }
 
@@ -49,6 +49,6 @@ type Interface interface {
 type ImageFsInfoProvider interface {
 	// ImageFsInfoLabel returns the label cAdvisor should use to find the filesystem holding container images.
 	ImageFsInfoLabel() (string, error)
-	// In split image filesystem this will be different from ImageFsInfoLabel
+	// ContainerFsInfoLabel returns in split image filesystem this will be different from ImageFsInfoLabel.
 	ContainerFsInfoLabel() (string, error)
 }
