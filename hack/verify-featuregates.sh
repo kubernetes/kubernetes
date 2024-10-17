@@ -28,4 +28,14 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-go run test/featuregates_linter/main.go feature-gates verify
+if ! output=$(go run test/featuregates_linter/main.go feature-gates verify 2>&1)
+then
+	echo "$output"
+	echo
+	echo "FAILURE: please execute hack/update-featuregates.sh."
+	exit 1
+else
+	echo "$output"
+	echo
+  echo "SUCCESS"
+fi
