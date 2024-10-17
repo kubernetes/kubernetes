@@ -198,7 +198,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume's file system resize request is finished.
-	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) bool
+	MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) bool
 
 	// GetDeviceMountState returns mount state of the device in global path
 	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
@@ -277,9 +277,9 @@ type ActualStateOfWorldAttacherUpdater interface {
 	AddVolumeToReportAsAttached(logger klog.Logger, volumeName v1.UniqueVolumeName, nodeName types.NodeName)
 
 	// InitializeClaimSize sets pvc claim size by reading pvc.Status.Capacity
-	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity)
+	InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize resource.Quantity)
 
-	GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity
+	GetClaimSize(volumeName v1.UniqueVolumeName) resource.Quantity
 }
 
 // VolumeLogger defines a set of operations for generating volume-related logging and error msgs
