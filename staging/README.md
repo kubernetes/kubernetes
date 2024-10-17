@@ -87,7 +87,7 @@ import (
   ./hack/update-vendor.sh
 ```
 
-8. Run [`./hack/update-go-workspace.sh`](/hack/update-go-workspace.sh) to add
+8. Run [`./hack/update-vendor.sh`](/hack/update-vendor.sh) to add
    the module to the workspace.
 
 ### Creating the published repository
