@@ -99,7 +99,7 @@ func isRunningOnArm64() bool {
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.19"
+	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.20"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage
