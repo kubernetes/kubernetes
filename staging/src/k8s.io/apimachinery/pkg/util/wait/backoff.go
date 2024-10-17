@@ -337,20 +337,20 @@ type exponentialBackoffManagerImpl struct {
 //
 // Instead of:
 //
-//	bm := wait.NewExponentialBackoffManager(init, max, reset, factor, jitter, clock)
+//	bm := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
 //	...
 //	wait.BackoffUntil(..., bm.Backoff, ...)
 //
 // Use:
 //
 //	delayFn := wait.Backoff{
-//	  Duration: init,
-//	  Cap:      max,
+//	  Duration: initBackoff,
+//	  Cap:      maxBackoff,
 //	  Steps:    int(math.Ceil(float64(max) / float64(init))), // now a required argument
-//	  Factor:   factor,
+//	  Factor:   backoffFactor,
 //	  Jitter:   jitter,
-//	}.DelayWithReset(reset, clock)
-//	wait.BackoffUntil(..., delayFn.Timer(), ...)
+//	}.DelayWithReset(clock, resetDuration)
+//	delayFn.Until(...)
 func NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration time.Duration, backoffFactor, jitter float64, c clock.Clock) BackoffManager {
 	return &exponentialBackoffManagerImpl{
 		backoff: &Backoff{
