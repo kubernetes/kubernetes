@@ -688,6 +688,90 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	}
 }
 
+func TestTakeByTopologyUnCoreCachePacked(t *testing.T) {
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		opts          StaticPolicyOptions
+		availableCPUs cpuset.CPUSet
+		numCPUs       int
+		expErr        string
+		expResult     cpuset.CPUSet
+	}{
+		{
+			"take one cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			1,
+			"",
+			cpuset.New(2),
+		},
+		{
+			"take first available UncoreCache from first socket",
+			topoUncoreDualSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			mustParseCPUSet(t, "0-15"),
+			4,
+			"",
+			cpuset.New(0, 1, 2, 3),
+		},
+		{
+			"take first available UncoreCache from second socket",
+			topoUncoreDualSocketNoSMT,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			mustParseCPUSet(t, "8-15"),
+			4,
+			"",
+			cpuset.New(8, 9, 10, 11),
+		},
+		{
+			"take first available UncoreCache from available NUMA",
+			topoUncoreSingleSocketMultiNuma,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			mustParseCPUSet(t, "3,4-8,12"),
+			2,
+			"",
+			cpuset.New(4, 5),
+		},
+		{
+			"take cpus from best available UncoreCache group of multi uncore cache single socket - SMT disabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			mustParseCPUSet(t, "2-3,10-11,4-7,12-15"),
+			6,
+			"",
+			cpuset.New(4, 5, 6, 12, 13, 14),
+		},
+		{
+			"take cpus from multiple UncoreCache of single socket - SMT disabled",
+			topoUncoreSingleSocketSMT,
+			StaticPolicyOptions{PreferAlignByUnCoreCacheOption: true},
+			mustParseCPUSet(t, "1-7,9-15"),
+			10,
+			"",
+			mustParseCPUSet(t, "4-7,12-15,1,9"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			strategy := CPUSortingStrategyPacked
+			if tc.opts.DistributeCPUsAcrossCores {
+				strategy = CPUSortingStrategySpread
+			}
+
+			result, err := takeByTopologyUnCoreCachePacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy)
+			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
+				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			}
+			if !result.Equals(tc.expResult) {
+				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
+			}
+		})
+	}
+}
+
 func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 	testCases := []struct {
 		description   string
