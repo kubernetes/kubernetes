@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiservercel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/apiserver/pkg/cel/environment"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -100,7 +99,10 @@ func TestCompileCELExpression(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, tc.authorizeWithSelectorsEnabled)
-			compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+
+			// create new compiler because it depends on the feature gate
+			compiler := NewDefaultCompiler()
+
 			_, err := compiler.CompileCELExpression(&SubjectAccessReviewMatchCondition{
 				Expression: tc.expression,
 			})
