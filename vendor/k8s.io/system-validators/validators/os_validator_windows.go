@@ -1,5 +1,8 @@
+//go:build windows
+// +build windows
+
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +20,9 @@ limitations under the License.
 package system
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var _ Validator = &OSValidator{}
@@ -37,9 +39,10 @@ func (o *OSValidator) Name() string {
 
 // Validate is part of the system.Validator interface.
 func (o *OSValidator) Validate(spec SysSpec) ([]error, []error) {
-	os, err := exec.Command("uname").CombinedOutput()
+	args := []string{`(Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').ProductName`}
+	os, err := exec.Command("powershell", args...).Output()
 	if err != nil {
-		return nil, []error{errors.Wrap(err, "failed to get os name")}
+		return nil, []error{fmt.Errorf("failed to get OS name: %w", err)}
 	}
 	if err = o.validateOS(strings.TrimSpace(string(os)), spec.OS); err != nil {
 		return nil, []error{err}
@@ -47,10 +50,12 @@ func (o *OSValidator) Validate(spec SysSpec) ([]error, []error) {
 	return nil, nil
 }
 
+// validateOS would check if the reported string such as 'Windows Server 2019' contains
+// the required OS prefix from the spec 'Windows Server'.
 func (o *OSValidator) validateOS(os, specOS string) error {
-	if os != specOS {
+	if !strings.HasPrefix(os, specOS) {
 		o.Reporter.Report("OS", os, bad)
-		return errors.Errorf("unsupported operating system: %s", os)
+		return fmt.Errorf("unsupported operating system: %s", os)
 	}
 	o.Reporter.Report("OS", os, good)
 	return nil
