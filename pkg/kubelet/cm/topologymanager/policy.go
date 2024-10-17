@@ -30,6 +30,14 @@ type Policy interface {
 	Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool)
 }
 
+// IsAlignmentGuaranteed return true if the given policy guarantees that either
+// the compute resources will be allocated within a NUMA boundary, or the allocation will fail at all.
+func IsAlignmentGuaranteed(p Policy) bool {
+	// TODO: should we add another field to the Policy interface to explicitly convey the alignment promise?
+	// Thing is, atm this matches almost 1:1 the policy name so we are sparing the addition for now
+	return p.Name() == PolicySingleNumaNode
+}
+
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
