@@ -812,7 +812,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
 	require.NoError(t, err)
-	fakeRuntime.StopContainer(ctx, initID0, 0)
+	fakeRuntime.StopContainer(ctx, initID0, 0, initContainers[0].StopSignal)
 	// Sync again.
 	podStatus, err = m.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)

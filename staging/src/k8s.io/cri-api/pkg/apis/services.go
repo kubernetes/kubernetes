@@ -37,7 +37,7 @@ type ContainerManager interface {
 	// StartContainer starts the container.
 	StartContainer(ctx context.Context, containerID string) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
-	StopContainer(ctx context.Context, containerID string, timeout int64) error
+	StopContainer(ctx context.Context, containerID string, timeout int64, stopSignal string) error
 	// RemoveContainer removes the container.
 	RemoveContainer(ctx context.Context, containerID string) error
 	// ListContainers lists all containers by filters.

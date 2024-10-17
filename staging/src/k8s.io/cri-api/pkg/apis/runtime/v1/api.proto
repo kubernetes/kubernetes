@@ -1183,6 +1183,8 @@ message StopContainerRequest {
     // Timeout in seconds to wait for the container to stop before forcibly
     // terminating it. Default: 0 (forcibly terminate the container immediately)
     int64 timeout = 2;
+
+    string stop_signal = 3;
 }
 
 message StopContainerResponse {}

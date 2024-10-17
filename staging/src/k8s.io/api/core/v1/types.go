@@ -2865,6 +2865,8 @@ type Container struct {
 	// +optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
+	// +optional
+	StopSignal string `json:"stopSignal,omitempty" protobuf:"bytes,25,opt,name=stopSignal"`
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
 
@@ -3100,6 +3102,8 @@ type ContainerStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	AllocatedResourcesStatus []ResourceStatus `json:"allocatedResourcesStatus,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,14,rep,name=allocatedResourcesStatus"`
+	// +optional
+	StopSignal string `json:"stopSignal,omitempty" protobuf:"bytes,15,opt,name=stopSignal"`
 }
 
 type ResourceStatus struct {
@@ -4670,6 +4674,8 @@ type EphemeralContainerCommon struct {
 	// +optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
+	// +optional
+	StopSignal string `json:"stopSignal,omitempty" protobuf:"bytes,25,opt,name=stopSignal"`
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
 

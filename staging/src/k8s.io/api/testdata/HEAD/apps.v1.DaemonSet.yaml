@@ -399,6 +399,7 @@ spec:
           timeoutSeconds: 3
         stdin: true
         stdinOnce: true
+        stopSignal: stopSignalValue
         terminationMessagePath: terminationMessagePathValue
         terminationMessagePolicy: terminationMessagePolicyValue
         tty: true
@@ -615,6 +616,7 @@ spec:
           timeoutSeconds: 3
         stdin: true
         stdinOnce: true
+        stopSignal: stopSignalValue
         targetContainerName: targetContainerNameValue
         terminationMessagePath: terminationMessagePathValue
         terminationMessagePolicy: terminationMessagePolicyValue
@@ -833,6 +835,7 @@ spec:
           timeoutSeconds: 3
         stdin: true
         stdinOnce: true
+        stopSignal: stopSignalValue
         terminationMessagePath: terminationMessagePathValue
         terminationMessagePolicy: terminationMessagePolicyValue
         tty: true

@@ -388,6 +388,7 @@ template:
         timeoutSeconds: 3
       stdin: true
       stdinOnce: true
+      stopSignal: stopSignalValue
       terminationMessagePath: terminationMessagePathValue
       terminationMessagePolicy: terminationMessagePolicyValue
       tty: true
@@ -604,6 +605,7 @@ template:
         timeoutSeconds: 3
       stdin: true
       stdinOnce: true
+      stopSignal: stopSignalValue
       targetContainerName: targetContainerNameValue
       terminationMessagePath: terminationMessagePathValue
       terminationMessagePolicy: terminationMessagePolicyValue
@@ -822,6 +824,7 @@ template:
         timeoutSeconds: 3
       stdin: true
       stdinOnce: true
+      stopSignal: stopSignalValue
       terminationMessagePath: terminationMessagePathValue
       terminationMessagePolicy: terminationMessagePolicyValue
       tty: true

@@ -4965,6 +4965,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stdinOnce
       type:
         scalar: boolean
+    - name: stopSignal
+      type:
+        scalar: string
     - name: terminationMessagePath
       type:
         scalar: string
@@ -5141,6 +5144,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: stopSignal
+      type:
+        scalar: string
     - name: user
       type:
         namedType: io.k8s.api.core.v1.ContainerUser
@@ -5407,6 +5413,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stdinOnce
       type:
         scalar: boolean
+    - name: stopSignal
+      type:
+        scalar: string
     - name: targetContainerName
       type:
         scalar: string
