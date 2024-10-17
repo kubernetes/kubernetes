@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 )
 
@@ -74,6 +75,13 @@ func runKubeletStart(c workflow.RunData) error {
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+	}
+
+	// Write the instance kubelet configuration file to disk.
+	if features.Enabled(data.Cfg().FeatureGates, features.NodeLocalCRISocket) {
+		if err := kubeletphase.WriteInstanceConfigToDisk(data.Cfg().NodeRegistration.CRISocket, data.KubeletDir()); err != nil {
+			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+		}
 	}
 
 	// Write the kubelet configuration file to disk.

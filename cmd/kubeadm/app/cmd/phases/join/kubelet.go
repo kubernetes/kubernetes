@@ -323,9 +323,11 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
-	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "error uploading crisocket")
+	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
+		klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
+		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+			return errors.Wrap(err, "error uploading crisocket")
+		}
 	}
 
 	return nil
