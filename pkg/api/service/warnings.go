@@ -64,12 +64,11 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 }
 
 func getWarningsForIP(fieldPath *field.Path, address string) []string {
-	// IPv4 addresses with leading zeros CVE-2021-29923 are not valid in golang since 1.17
-	// This will also warn about possible future changes on the golang std library
-	// xref: https://issues.k8s.io/108074
+	// Validation blocks new IPv4 addresses with leading 0s, but we can still warn
+	// about unfixed pre-existing ones.
 	ip, err := netip.ParseAddr(address)
 	if err != nil {
-		return []string{fmt.Sprintf("%s: IP address was accepted, but will be invalid in a future Kubernetes release: %v", fieldPath, err)}
+		return []string{fmt.Sprintf("%s: IP address uses deprecated form: %v", fieldPath, err)}
 	}
 	// A Recommendation for IPv6 Address Text Representation
 	//
@@ -85,12 +84,11 @@ func getWarningsForIP(fieldPath *field.Path, address string) []string {
 }
 
 func getWarningsForCIDR(fieldPath *field.Path, cidr string) []string {
-	// IPv4 addresses with leading zeros CVE-2021-29923 are not valid in golang since 1.17
-	// This will also warn about possible future changes on the golang std library
-	// xref: https://issues.k8s.io/108074
+	// Validation blocks new IPv4 addresses with leading 0s, but we can still warn
+	// about unfixed pre-existing ones.
 	prefix, err := netip.ParsePrefix(cidr)
 	if err != nil {
-		return []string{fmt.Sprintf("%s: IP prefix was accepted, but will be invalid in a future Kubernetes release: %v", fieldPath, err)}
+		return []string{fmt.Sprintf("%s: IP prefix uses deprecated form: %v", fieldPath, err)}
 	}
 	// A Recommendation for IPv6 Address Text Representation
 	//
