@@ -72,9 +72,16 @@ func (f *managedFieldsUpdater) Apply(liveObj, appliedObj runtime.Object, managed
 	if err != nil {
 		return object, managed, err
 	}
+
+	_, managerInFields := managed.Fields()[fieldManager]
+	_, managerInTimes := managed.Times()[fieldManager]
 	if object != nil {
 		managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
 	} else {
+		if managerInFields && !managerInTimes {
+			// It's possible that fieldManager applied the same configuration to co-own the fields
+			managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
+		}
 		object = liveObj.DeepCopyObject()
 		RemoveObjectManagedFields(object)
 	}
