@@ -248,6 +248,9 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				}
 				return
 			}
+			if scenario.expectCompileError != "" {
+				t.Fatalf("expected compile error %q, got none", scenario.expectCompileError)
+			}
 			if expect, actual := scenario.expectCost, result.MaxCost; expect != actual {
 				t.Errorf("expected CEL cost %d, got %d instead", expect, actual)
 			}
@@ -261,6 +264,9 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 					t.Fatalf("expected evaluation error to contain %q, but got instead: %v", scenario.expectMatchError, err)
 				}
 				return
+			}
+			if scenario.expectMatchError != "" {
+				t.Fatalf("expected match error %q, got none", scenario.expectMatchError)
 			}
 			if match != scenario.expectMatch {
 				t.Fatalf("expected result %v, got %v", scenario.expectMatch, match)
