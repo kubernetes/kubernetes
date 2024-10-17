@@ -52,6 +52,7 @@ const (
 )
 
 type PodGCController struct {
+	name       string
 	kubeClient clientset.Interface
 
 	podLister        corelisters.PodLister
@@ -67,14 +68,15 @@ type PodGCController struct {
 }
 
 func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
-	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, controllerName string) *PodGCController {
+	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime, controllerName)
 }
 
 // This function is only intended for integration tests
 func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration, controllerName string) *PodGCController {
 	gcc := &PodGCController{
+		name:                   controllerName,
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		podLister:              podInformer.Lister(),
@@ -96,11 +98,11 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 
 	defer utilruntime.HandleCrash()
 
-	logger.Info("Starting GC controller")
+	logger.Info("Starting", "controller", gcc.name)
 	defer gcc.nodeQueue.ShutDown()
-	defer logger.Info("Shutting down GC controller")
+	defer logger.Info("Shutting down controller", gcc.name)
 
-	if !cache.WaitForNamedCacheSync("GC", ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync(gcc.name, ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 

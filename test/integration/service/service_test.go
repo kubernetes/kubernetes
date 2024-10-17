@@ -321,6 +321,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 		int32(100),
 		client,
 		1*time.Second,
+		"endpointslice-controller",
 	)
 
 	informers.Start(ctx.Done())

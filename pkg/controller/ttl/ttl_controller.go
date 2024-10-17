@@ -54,6 +54,7 @@ import (
 
 // Controller sets ttl annotations on nodes, based on cluster size.
 type Controller struct {
+	name       string
 	kubeClient clientset.Interface
 
 	// nodeStore is a local cache of nodes.
@@ -78,8 +79,9 @@ type Controller struct {
 }
 
 // NewTTLController creates a new TTLController
-func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface, controllerName string) *Controller {
 	ttlc := &Controller{
+		name:       controllerName,
 		kubeClient: kubeClient,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
@@ -124,10 +126,10 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer ttlc.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting TTL controller")
-	defer logger.Info("Shutting down TTL controller")
+	logger.Info("Starting", "controller", ttlc.name)
+	defer logger.Info("Shutting down controller", "controller", ttlc.name)
 
-	if !cache.WaitForNamedCacheSync("TTL", ctx.Done(), ttlc.hasSynced) {
+	if !cache.WaitForNamedCacheSync(ttlc.name, ctx.Done(), ttlc.hasSynced) {
 		return
 	}
 

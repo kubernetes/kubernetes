@@ -36,6 +36,7 @@ func startClusterRoleAggregationController(ctx context.Context, controllerContex
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
+		controllerName,
 	).Run(ctx, 5)
 	return nil, true, nil
 }

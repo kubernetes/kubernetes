@@ -52,6 +52,7 @@ func startValidatingAdmissionPolicyStatusController(ctx context.Context, control
 		controllerContext.InformerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 		typeChecker,
+		controllerName,
 	)
 
 	go c.Run(ctx, int(controllerContext.ComponentConfig.ValidatingAdmissionPolicyStatusController.ConcurrentPolicySyncs))

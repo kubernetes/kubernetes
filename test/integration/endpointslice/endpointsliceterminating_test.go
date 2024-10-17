@@ -125,7 +125,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				informers.Discovery().V1().EndpointSlices(),
 				int32(100),
 				client,
-				1*time.Second)
+				1*time.Second,
+				"endpointslice-controller")
 
 			// Start informer and controllers
 			informers.Start(tCtx.Done())

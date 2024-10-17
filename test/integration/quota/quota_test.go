@@ -85,6 +85,7 @@ func TestQuota(t *testing.T) {
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
+		"replicationcontroller-controller",
 	)
 	go rm.Run(ctx, 3)
 
@@ -314,6 +315,7 @@ plugins:
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
+		"replicationcontroller-controller",
 	)
 	go rm.Run(tCtx, 3)
 
@@ -440,6 +442,7 @@ plugins:
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
 		replicationcontroller.BurstReplicas,
+		"replicationcontroller-controller",
 	)
 	go rm.Run(tCtx, 3)
 

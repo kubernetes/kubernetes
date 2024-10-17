@@ -210,7 +210,7 @@ func TestPVProtectionController(t *testing.T) {
 
 		// Create the controller
 		logger, _ := ktesting.NewTestContext(t)
-		ctrl := NewPVProtectionController(logger, pvInformer, client)
+		ctrl := NewPVProtectionController(logger, pvInformer, client, "persistentvolume-protection-controller")
 
 		// Start the test by simulating an event
 		if test.updatedPV != nil {

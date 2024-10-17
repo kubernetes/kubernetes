@@ -364,6 +364,7 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		5*time.Second,
 		false,
 		timers,
+		"persistentvolume-attach-detach-controller",
 	)
 
 	if err != nil {

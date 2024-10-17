@@ -60,7 +60,8 @@ func newController(ctx context.Context, batchPeriod time.Duration) (*fake.Client
 		informerFactory.Core().V1().Services(),
 		int32(1000),
 		client,
-		batchPeriod)
+		batchPeriod,
+		"endpointslice-mirroring-controller")
 
 	// The event processing pipeline is normally started via Run() method.
 	// However, since we don't start it in unit tests, we explicitly start it here.

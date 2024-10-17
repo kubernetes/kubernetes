@@ -410,6 +410,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		informers.Core().V1().Namespaces(),
 		rootClientset,
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
+		"serviceaccount-controller",
 	)
 	if err != nil {
 		return rootClientset, clientConfig, stop, informers, err

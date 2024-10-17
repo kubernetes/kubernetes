@@ -202,7 +202,8 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 		discoverResourcesFn,
 		informers.Core().V1().Namespaces(),
 		10*time.Hour,
-		corev1.FinalizerKubernetes)
+		corev1.FinalizerKubernetes,
+		"namespace-controller")
 
 	return ctx, server.TearDownFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(config)
 }

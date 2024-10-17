@@ -133,7 +133,7 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 	schedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), clientSet, podInformer, schedulingInformer, claimInformer, claimTemplateInformer)
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), "resourceclaim-controller", clientSet, podInformer, schedulingInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
@@ -210,6 +210,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 		garbagecollector.DefaultIgnoredResources(),
 		informerfactory.NewInformerFactory(informerSet, metadataInformers),
 		alwaysStarted,
+		"garbage-collector-controller",
 	)
 	if err != nil {
 		tb.Fatalf("Failed creating garbage collector")
@@ -243,7 +244,8 @@ func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig r
 		discoverResourcesFn,
 		informerSet.Core().V1().Namespaces(),
 		10*time.Hour,
-		v1.FinalizerKubernetes)
+		v1.FinalizerKubernetes,
+		"namespace-controller")
 	return func() {
 		go controller.Run(ctx, 5)
 	}
@@ -683,7 +685,8 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 		testCtx.ClientSet,
 		mapper,
 		scaleClient,
-		testCtx.ClientSet.Discovery())
+		testCtx.ClientSet.Discovery(),
+		"disruption-controller")
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)

@@ -118,11 +118,13 @@ func NewAttachDetachController(
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
 	disableForceDetachOnTimeout bool,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+	controllerName string) (AttachDetachController, error) {
 
 	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
+		name:        controllerName,
 		kubeClient:  kubeClient,
 		pvcLister:   pvcInformer.Lister(),
 		pvcsSynced:  pvcInformer.Informer().HasSynced,
@@ -153,7 +155,7 @@ func NewAttachDetachController(
 	}
 
 	adc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
-	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
+	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
@@ -239,6 +241,8 @@ func NewAttachDetachController(
 }
 
 type attachDetachController struct {
+	// name is the name of the controller
+	name string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -335,12 +339,12 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	defer adc.broadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting attach detach controller")
-	defer logger.Info("Shutting down attach detach controller")
+	logger.Info("Starting", "controller", adc.name)
+	defer logger.Info("Shutting down controller", "controller", adc.name)
 
 	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced,
 		adc.csiNodeSynced, adc.csiDriversSynced, adc.volumeAttachmentSynced}
-	if !kcache.WaitForNamedCacheSync("attach detach", ctx.Done(), synced...) {
+	if !kcache.WaitForNamedCacheSync(adc.name, ctx.Done(), synced...) {
 		return
 	}
 

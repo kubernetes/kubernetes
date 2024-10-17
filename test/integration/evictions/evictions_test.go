@@ -692,6 +692,7 @@ func rmSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 		mapper,
 		scaleClient,
 		client.Discovery(),
+		"disruption-controller",
 	)
 	return server.TearDownFn, rm, informers, config, clientSet
 }

@@ -58,7 +58,8 @@ func TestEndpointUpdates(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		0)
+		0,
+		"endpoint-controller")
 
 	// Start informer and controllers
 	informers.Start(tCtx.Done())
@@ -182,7 +183,8 @@ func TestEndpointWithMultiplePodUpdates(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		0)
+		0,
+		"endpoint-controller")
 
 	// Process 10 services in parallel to increase likelihood of outdated informer cache.
 	concurrency := 10
@@ -325,7 +327,8 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		0)
+		0,
+		"endpoint-controller")
 
 	// Start informer and controllers
 	informers.Start(tCtx.Done())
@@ -434,7 +437,8 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		0)
+		0,
+		"endpoint-controller")
 
 	// Start informer and controllers
 	informers.Start(tCtx.Done())
@@ -627,7 +631,8 @@ func TestEndpointTruncate(t *testing.T) {
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
 		client,
-		0)
+		0,
+		"endpoint-controller")
 
 	// Start informer and controllers
 	informers.Start(tCtx.Done())

@@ -927,6 +927,7 @@ func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		client,
+		"statufset-controller",
 	)
 	ssh := history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady

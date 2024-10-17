@@ -135,6 +135,7 @@ func startNodeIpamController(ctx context.Context, initContext app.ControllerInit
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
 		ipam.CIDRAllocatorType(ccmConfig.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
+		initContext.ClientName,
 	)
 	if err != nil {
 		return nil, true, err

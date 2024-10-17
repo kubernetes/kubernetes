@@ -80,6 +80,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		informers1.Networking().V1beta1().ServiceCIDRs(),
 		informers1.Networking().V1beta1().IPAddresses(),
 		client1,
+		"service-cidr-controller",
 	).Run(tCtx, 5)
 	informers1.Start(tCtx.Done())
 	informers1.WaitForCacheSync(tCtx.Done())
@@ -219,6 +220,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		informers2.Networking().V1beta1().ServiceCIDRs(),
 		informers2.Networking().V1beta1().IPAddresses(),
 		client2,
+		"service-cidr-controller",
 	).Run(tCtx2, 5)
 	informers2.Start(tCtx2.Done())
 	informers2.WaitForCacheSync(tCtx.Done())

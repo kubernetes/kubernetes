@@ -109,6 +109,7 @@ func TestTypeChecking(t *testing.T) {
 				informerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 				client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 				typeChecker,
+				"validatingadmissionpolicy-status-controller",
 			)
 			if err != nil {
 				t.Fatalf("cannot create controller: %v", err)
