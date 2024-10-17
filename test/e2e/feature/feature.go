@@ -325,6 +325,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SidecarContainers = framework.WithFeature(framework.ValidFeatures.Add("SidecarContainers"))
 
+	// Owner: sig-node
+	// Marks tests that require a cluster with SplitStdoutAndStderr
+	// (used for testing specific log stream <https://kep.k8s.io/3288>)
+	SplitStdoutAndStderr = framework.WithFeature(framework.ValidFeatures.Add("SplitStdoutAndStderr"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
 
