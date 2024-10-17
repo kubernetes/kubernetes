@@ -421,8 +421,16 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
 	}
-	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
-	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
+	_ = h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
+	_ = h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
+
+	podCertificateRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "PodName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
+	}
+	_ = h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequest)
+	_ = h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequestList)
 
 	leaseColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -2233,6 +2241,26 @@ func printClusterTrustBundleList(list *certificates.ClusterTrustBundleList, opti
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printClusterTrustBundle(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPodCertificateRequest(obj *certificates.PodCertificateRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.PodName, obj.Spec.SignerName)
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodCertificateRequestList(list *certificates.PodCertificateRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodCertificateRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

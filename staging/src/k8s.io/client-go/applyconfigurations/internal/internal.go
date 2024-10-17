@@ -4228,6 +4228,94 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.certificates.v1alpha1.PodCertificateRequest
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.certificates.v1alpha1.PodCertificateRequestSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.certificates.v1alpha1.PodCertificateRequestStatus
+      default: {}
+- name: io.k8s.api.certificates.v1alpha1.PodCertificateRequestSpec
+  map:
+    fields:
+    - name: expirationSeconds
+      type:
+        scalar: numeric
+      default: 0
+    - name: nodeName
+      type:
+        scalar: string
+      default: ""
+    - name: nodeUID
+      type:
+        scalar: string
+      default: ""
+    - name: pkixPublicKey
+      type:
+        scalar: string
+    - name: podName
+      type:
+        scalar: string
+      default: ""
+    - name: podUID
+      type:
+        scalar: string
+      default: ""
+    - name: proofOfPossession
+      type:
+        scalar: string
+    - name: serviceAccountName
+      type:
+        scalar: string
+      default: ""
+    - name: serviceAccountUID
+      type:
+        scalar: string
+      default: ""
+    - name: signerName
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.certificates.v1alpha1.PodCertificateRequestStatus
+  map:
+    fields:
+    - name: beginRefreshAt
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: certificateChain
+      type:
+        scalar: string
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: issuedAt
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: notAfter
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: notBefore
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
 - name: io.k8s.api.certificates.v1beta1.CertificateSigningRequest
   map:
     fields:
@@ -6795,6 +6883,27 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.PodAffinityTerm
           elementRelationship: atomic
+- name: io.k8s.api.core.v1.PodCertificateProjection
+  map:
+    fields:
+    - name: certificateChainPath
+      type:
+        scalar: string
+    - name: credentialBundlePath
+      type:
+        scalar: string
+    - name: keyPath
+      type:
+        scalar: string
+    - name: keyType
+      type:
+        scalar: string
+    - name: maxExpirationSeconds
+      type:
+        scalar: numeric
+    - name: signerName
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.PodCondition
   map:
     fields:
@@ -8423,6 +8532,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: downwardAPI
       type:
         namedType: io.k8s.api.core.v1.DownwardAPIProjection
+    - name: podCertificate
+      type:
+        namedType: io.k8s.api.core.v1.PodCertificateProjection
     - name: secret
       type:
         namedType: io.k8s.api.core.v1.SecretProjection

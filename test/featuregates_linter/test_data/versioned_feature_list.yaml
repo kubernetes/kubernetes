@@ -794,6 +794,24 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.23"
+- name: PodCertificateAPIClientCertificates
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
+- name: PodCertificateProjection
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
+- name: PodCertificateRequest
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: PodDeletionCost
   versionedSpecs:
   - default: false

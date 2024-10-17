@@ -751,6 +751,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "podcertificaterequests",
+              "responseKind": {
+                "group": "",
+                "kind": "PodCertificateRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podcertificaterequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodCertificateRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1alpha1"

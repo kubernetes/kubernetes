@@ -368,6 +368,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/certificates/v1alpha1.ClusterTrustBundle":                                                   schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundle(ref),
 		"k8s.io/api/certificates/v1alpha1.ClusterTrustBundleList":                                               schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleList(ref),
 		"k8s.io/api/certificates/v1alpha1.ClusterTrustBundleSpec":                                               schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleSpec(ref),
+		"k8s.io/api/certificates/v1alpha1.PodCertificateRequest":                                                schema_k8sio_api_certificates_v1alpha1_PodCertificateRequest(ref),
+		"k8s.io/api/certificates/v1alpha1.PodCertificateRequestList":                                            schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestList(ref),
+		"k8s.io/api/certificates/v1alpha1.PodCertificateRequestSpec":                                            schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestSpec(ref),
+		"k8s.io/api/certificates/v1alpha1.PodCertificateRequestStatus":                                          schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestStatus(ref),
 		"k8s.io/api/certificates/v1beta1.CertificateSigningRequest":                                             schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref),
 		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestCondition":                                    schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(ref),
 		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestList":                                         schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref),
@@ -516,6 +520,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.PodAffinityTerm":                                                                    schema_k8sio_api_core_v1_PodAffinityTerm(ref),
 		"k8s.io/api/core/v1.PodAntiAffinity":                                                                    schema_k8sio_api_core_v1_PodAntiAffinity(ref),
 		"k8s.io/api/core/v1.PodAttachOptions":                                                                   schema_k8sio_api_core_v1_PodAttachOptions(ref),
+		"k8s.io/api/core/v1.PodCertificateProjection":                                                           schema_k8sio_api_core_v1_PodCertificateProjection(ref),
 		"k8s.io/api/core/v1.PodCondition":                                                                       schema_k8sio_api_core_v1_PodCondition(ref),
 		"k8s.io/api/core/v1.PodDNSConfig":                                                                       schema_k8sio_api_core_v1_PodDNSConfig(ref),
 		"k8s.io/api/core/v1.PodDNSConfigOption":                                                                 schema_k8sio_api_core_v1_PodDNSConfigOption(ref),
@@ -18425,6 +18430,265 @@ func schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleSpec(ref common.Re
 	}
 }
 
+func schema_k8sio_api_certificates_v1alpha1_PodCertificateRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequest encodes a pod requesting a certificate from a given signer.\n\nKubelets use this API to implement podCertificate projected volumes",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec contains the details about the certificate being requested.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/certificates/v1alpha1.PodCertificateRequestSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "status contains the issued certificate, and a standard set of conditions.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/certificates/v1alpha1.PodCertificateRequestStatus"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/certificates/v1alpha1.PodCertificateRequestSpec", "k8s.io/api/certificates/v1alpha1.PodCertificateRequestStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequestList is a collection of PodCertificateRequest objects",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is a collection of PodCertificateRequest objects",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/certificates/v1alpha1.PodCertificateRequest"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/certificates/v1alpha1.PodCertificateRequest", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateRequestSpec describes the certificate request.  All fields are immutable after creation.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"signerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName is the requested signer.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podName is the name of the pod into which the certificate will be mounted.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"podUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podUID is the UID of the pod into which the certificate will be mounted.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serviceAccountName is the name of the service account the pod is running as.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"serviceAccountUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "serviceAccountUID is the UID of the service account the pod is running as.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeName is the name of the node the pod is assigned to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nodeUID is the UID of the node the pod is assigned to.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"expirationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "maxExpirationSeconds is the maximum lifetime permitted for the certificate.\n\nIf this field is set to 0 during creation of the PodCertificateRequest, then kube-apiserver will set it to 86400(24 hours).  kube-apiserver will reject values shorter than 3600 (1 hour).\n\nkube-apiserver will then shorten the value to the maximum expiration configured for the requested signer.\n\nThe signer implementation is then free to issue a certificate with any lifetime *shorter* than MaxExpirationSeconds.  This constraint is enforced by kube-apiserver.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"pkixPublicKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "pkixPublicKey is the PKIX-serialized public key the signer should issue the certificate to.\n\nThe key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, or ED25519. Note that this list may be expanded in the future.\n\nSigner implementations do not need to support all key types supported by kube-apiserver and kubelet.  If a signer does not support the key type used for a given PodCertificateRequest, it should deny the request, with a reason of UnsupportedKeyType.  It may also suggest a key type that it does support by attaching an additional SuggestedKeyType condition, with its reason field set to the suggested key type identifier.",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+					"proofOfPossession": {
+						SchemaProps: spec.SchemaProps{
+							Description: "proofOfPossession proves that the requesting kubelet holds the private key corresponding to pkixPublicKey.\n\nIt is contructed by signing the ASCII bytes of the pod's UID using pkixPublicKey.\n\nkube-apiserver validates the proof of possession during creation of the PodCertificateRequest.\n\nIf the key is an RSA key, then the signature is over the ASCII bytes of the pod UID, using RSASSA-PKCS1-V1_5-SIGN from RSA PKCS #1 v1.5 (as implemented by the golang function crypto/rsa.SignPKCS1v15).\n\nIf the key is an ECDSA key, then the signature is as described by [SEC 1, Version 2.0](https://www.secg.org/sec1-v2.pdf) (as implemented by the golang library function crypto/ecdsa.SignASN1)\n\nIf the key is an ED25519 key, the the signature is as described by the [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the golang library crypto/ed25519.Sign).",
+							Type:        []string{"string"},
+							Format:      "byte",
+						},
+					},
+				},
+				Required: []string{"signerName", "podName", "podUID", "serviceAccountName", "serviceAccountUID", "nodeName", "nodeUID", "expirationSeconds", "pkixPublicKey", "proofOfPossession"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_certificates_v1alpha1_PodCertificateRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "conditions applied to the request. Known conditions are \"Denied\", \"Failed\", and \"SuggestedKeyType\".\n\nIf the request is denied with `Reason=UnsupportedKeyType`, the signer may have suggested a key type that will work in the `Reason` field of a `SuggestedKeyType` condition.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+									},
+								},
+							},
+						},
+					},
+					"certificateChain": {
+						SchemaProps: spec.SchemaProps{
+							Description: "certificateChain is populated with an issued certificate by the signer. This field is set via the /status subresource. Once populated, this field is immutable.\n\nIf the certificate signing request is denied, a condition of type \"Denied\" is added and this field remains empty. If the signer cannot issue the certificate, a condition of type \"Failed\" is added and this field remains empty.\n\nValidation requirements:\n 1. certificateChain must consist of one or more PEM-formatted certificates.\n 2. Each entry must be a valid PEM-wrapped, DER-encoded ASN.1 Certificate as\n    described in section 4 of RFC5280.\n\nIf more than one block is present, and the definition of the requested spec.signerName does not indicate otherwise, the first block is the issued certificate, and subsequent blocks should be treated as intermediate certificates and presented in TLS handshakes.  When projecting the chain into a pod volume, kubelet will preserve the exact contents of certificateChain.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"issuedAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "issuedAt is the time at which the signer issued the certificate.  This field is set via the /status subresource.  Once populated, it is immutable.  The signer must set this field at the same time it sets certificateChain.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"notBefore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "notBefore is the time at which the certificate becomes valid.  This field is set via the /status subresource.  Once populated, it is immutable. The signer must set this field at the same time it sets certificateChain.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"beginRefreshAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "beginRefreshAt is the time at which the kubelet should begin trying to refresh the certificate.  This field is set via the /status subresource, and must be set at the same time as certificateChain.  Once populated, this field is immutable.\n\nThis field is only a hint.  Kubelet may start refreshing before or after this time if necessary.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"notAfter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "notAfter is the time at which the certificate expires.  This field is set via the /status subresource.  Once populated, it is immutable.  The signer must set this field at the same time it sets certificateChain.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
 func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -26892,6 +27156,61 @@ func schema_k8sio_api_core_v1_PodAttachOptions(ref common.ReferenceCallback) com
 	}
 }
 
+func schema_k8sio_api_core_v1_PodCertificateProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodCertificateProjection provides a private key and X.509 certificate in the pod filesystem.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"signerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kubelet's generated CSRs will be addressed to this signer.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"keyType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", and \"ED25519\".  If left empty, Kubelet defaults to \"ECDSAP256\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"maxExpirationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "What is the maximum lifetime of the cert that should be issued?  The actual issued certificate may have any lifetime *less* than maxExpirationSeconds.\n\nThis value is copied into the PodCertificateRequest that kubelet creates to request the certificate.\n\nIf omitted or left at 0, kube-apiserver will set a default value of 86400 (1 day).\n\nkube-apiserver can additionally override this with a shorter value based on a per-signer configuration, and it will reject values less than 3600 (1 hour).\n\nThe signer implementation is then free to issue a certificate with any lifetime *less* than maxExpirationSeconds.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"credentialBundlePath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Write the credential bundle at this path in the projected volume.\n\nThe credential bundle is a single file that contains multiple PEM blocks. The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private key.\n\nThe remaining blocks are CERTIFICATE blocks, containing the issued certificate chain from the signer (leaf and any intermediates).\n\nUsing credentialBundlePath lets your Pod's application code make a single atomic read that retrieves a consistent key and certificate chain.  If you project them to separate files, your application code will need to additionally check that the leaf certificate was issued to the key.\n\nMutually exclusive with keyPath and certificateChainPath.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"keyPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Write the key at this path in the projected volume.\n\nMutually exclusive with credentialBundlePath.\n\nWhen using keyPath and certificateChainPath, your application needs to check that the key and leaf certificate are consistent, because it is possible to read the files mid-rotation.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"certificateChainPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Write the certificate chain at this path in the projected volume.\n\nMutually exclusive with credentialBundlePath.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -32256,11 +32575,17 @@ func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback) com
 							Ref:         ref("k8s.io/api/core/v1.ClusterTrustBundleProjection"),
 						},
 					},
+					"podCertificate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Projects an auto-rotating credential bundle (private key and certificate chain) that the pod can use either as a TLS client or server.\n\nKubelet generates a private key and uses it to send a PodCertificateRequest to the named signer.  Once the signer approves the request and issues a certificate chain, Kubelet writes the key and certificate chain to the pod filesystem.  The pod does not start until certificates have been issued for each podCertificate projected volume source in its spec.\n\nKubelet will begin trying to rotate the certificate at the time indicated by the signer using the PodCertificateRequest.Status.BeginRefreshAt timestamp.\n\nKubelet can write a single file, indicated by the credentialBundlePath field, or separate files, indicated by the keyPath and certificateChainPath fields.\n\nThe credential bundle is a single file in PEM format.  The first PEM entry is the private key (in PKCS#8 format), and the remaining PEM entries are the certificate chain issued by the signer (typically, signers will return their certificate chain in leaf-to-root order).\n\nPrefer using the credential bundle format, since your application code can read it atomically.  If you use keyPath and certificateChainPath, your application must make two separate file reads. If these coincide with a certificate rotation, it is possible that the private key and leaf certificate you read may not correspond to each other.  Your application will need to check for this condition, and re-read until they are consistent.\n\nThe named signer controls chooses the format of the certificate it issues; consult the signer implementation's documentation to learn how to use the certificates it issues.",
+							Ref:         ref("k8s.io/api/core/v1.PodCertificateProjection"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ClusterTrustBundleProjection", "k8s.io/api/core/v1.ConfigMapProjection", "k8s.io/api/core/v1.DownwardAPIProjection", "k8s.io/api/core/v1.SecretProjection", "k8s.io/api/core/v1.ServiceAccountTokenProjection"},
+			"k8s.io/api/core/v1.ClusterTrustBundleProjection", "k8s.io/api/core/v1.ConfigMapProjection", "k8s.io/api/core/v1.DownwardAPIProjection", "k8s.io/api/core/v1.PodCertificateProjection", "k8s.io/api/core/v1.SecretProjection", "k8s.io/api/core/v1.ServiceAccountTokenProjection"},
 	}
 }
 
