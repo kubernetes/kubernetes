@@ -83,7 +83,7 @@ func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCou
 
 // WorkEstimatorFunc returns the estimated work of a given request.
 // This function will be used by the Priority & Fairness filter to
-// estimate the work of of incoming requests.
+// estimate the work of incoming requests.
 type WorkEstimatorFunc func(request *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate
 
 func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
