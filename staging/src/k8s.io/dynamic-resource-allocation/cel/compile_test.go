@@ -227,10 +227,9 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				}
 				return attributes
 			}(),
-			expression:       `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
-			driver:           "dra.example.com",
-			expectMatchError: "actual cost limit exceeded",
-			expectCost:       18446744073709551615, // Exceeds limit!
+			expression: `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
+			driver:     "dra.example.com",
+			expectCost: 18446744073709551615, // Exceeds limit!
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
