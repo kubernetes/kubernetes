@@ -177,12 +177,20 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
+	numOfPysicalCores, numOfSockets, topology, err := processorInfo(RelationAll)
+	if err != nil {
+		return nil, err
+	}
+
 	return &cadvisorapi.MachineInfo{
-		NumCores:       ProcessorCount(),
-		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
-		MachineID:      hostname,
-		SystemUUID:     systemUUID,
-		BootID:         bootId,
+		NumCores:         ProcessorCount(),
+		NumSockets:       numOfSockets,
+		NumPhysicalCores: numOfPysicalCores,
+		MemoryCapacity:   p.nodeInfo.memoryPhysicalCapacityBytes,
+		MachineID:        hostname,
+		SystemUUID:       systemUUID,
+		BootID:           bootId,
+		Topology:         topology,
 	}, nil
 }
 
