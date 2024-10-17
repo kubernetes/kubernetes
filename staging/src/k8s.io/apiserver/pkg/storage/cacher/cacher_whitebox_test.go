@@ -2943,3 +2943,149 @@ func forceRequestWatchProgressSupport(t *testing.T) {
 		t.Fatalf("failed to wait for required %v storage feature to initialize", storage.RequestWatchProgress)
 	}
 }
+
+func TestListIndexer(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	tests := []struct {
+		name               string
+		requestedNamespace string
+		recursive          bool
+		fieldSelector      fields.Selector
+		indexFields        []string
+		expectIndex        string
+	}{
+		{
+			name:          "request without namespace, without field selector",
+			recursive:     true,
+			fieldSelector: fields.Everything(),
+		},
+		{
+			name:          "request without namespace, field selector with metadata.namespace",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=t2-ns1"),
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=t3-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			expectIndex:   "f:spec.nodeName",
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename to filter out",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName!=t4-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, without field selector",
+			requestedNamespace: "t5-ns1",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "t6-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t6-ns1"),
+		},
+		{
+			name:               "request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "t7-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t7-ns2"),
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename",
+			requestedNamespace: "t8-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName=t8-bar2"),
+			indexFields:        []string{"spec.nodeName"},
+			expectIndex:        "f:spec.nodeName",
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename to filter out",
+			requestedNamespace: "t9-ns2",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=t9-bar1"),
+			indexFields:        []string{"spec.nodeName"},
+		},
+		{
+			name:          "request without namespace, field selector with metadata.name",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=t10-foo1"),
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t11-foo1",
+				"metadata.namespace": "t11-ns1",
+			}),
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and spec.nodeName",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name": "t12-foo1",
+				"spec.nodeName": "t12-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			recursive: true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t15-bar1"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t15-foo1"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name",
+			requestedNamespace: "t16-ns1",
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=t16-foo1"),
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
+			requestedNamespace: "t17-ns1",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t17-foo1",
+				"metadata.namespace": "t17-ns1",
+			}),
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedNamespace: "t18-ns2",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t18-foo2",
+				"metadata.namespace": "t18-ns2",
+				"spec.nodeName":      "t18-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "t19-ns2",
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t19-bar2"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t19-foo1", "metadata.namespace": "t19-ns2"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
+			_, _, usedIndex, err := cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, pred, tt.recursive)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if usedIndex != tt.expectIndex {
+				t.Errorf("Index doesn't match, expected: %q, got: %q", tt.expectIndex, usedIndex)
+			}
+		})
+	}
+}
