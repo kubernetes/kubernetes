@@ -43,7 +43,8 @@ const (
 	// systemdSuffix is the cgroup name suffix for systemd
 	systemdSuffix string = ".slice"
 	// Cgroup2MemoryMin is memory.min for cgroup v2
-	Cgroup2MemoryMin string = "memory.min"
+	Cgroup2MemoryMin       string  = "memory.min"
+	Cgroup2MemoryMinFactor float64 = 0.9
 	// Cgroup2MemoryHigh is memory.high for cgroup v2
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
