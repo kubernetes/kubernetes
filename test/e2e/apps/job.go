@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1236,6 +1237,31 @@ done`}
 		ginkgo.By("Ensure the job controller updates the status.ready field")
 		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](0))
 		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+	})
+
+	/*
+		Testname: Jobs, managed-by mechanism
+		Description: This test verifies the built-in Job controller does not
+		reconcile the Job, allowing to delegate the reconciliation to an
+		external controller.
+	*/
+	ginkgo.It("should allow to delegate reconciliation to external controller", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6)
+
+		ginkgo.By("Creating a job with a custom managed-by field")
+		job := e2ejob.NewTestJob("succeed", "managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.ManagedBy = ptr.To("example.com/custom-job-controller")
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+		ginkgo.By(fmt.Sprintf("Verify the Job %s/%s status isn't updated by the built-in controller", job.Namespace, job.Name))
+		// This get function uses HandleRetry to retry on transient API errors
+		get := framework.GetObject(f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get, job.Name, metav1.GetOptions{})
+		gomega.Consistently(ctx, get).
+			WithPolling(time.Second).WithTimeout(3 * time.Second).
+			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 })
 
