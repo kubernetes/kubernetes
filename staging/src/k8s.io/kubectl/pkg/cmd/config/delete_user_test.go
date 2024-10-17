@@ -34,11 +34,6 @@ func TestDeleteUserComplete(t *testing.T) {
 		err  string
 	}{
 		{
-			name: "no args",
-			args: []string{},
-			err:  "user to delete is required",
-		},
-		{
 			name: "user provided",
 			args: []string{"minikube"},
 			err:  "",
@@ -75,6 +70,54 @@ func TestDeleteUserComplete(t *testing.T) {
 
 			if options.configFile != pathOptions.GlobalFile {
 				t.Fatalf("expected configFile to be %v, got %v", pathOptions.GlobalFile, options.configFile)
+			}
+		})
+	}
+}
+
+func TestDeleteUserCompleteWithoutArgs(t *testing.T) {
+	var tests = []struct {
+		name string
+		args []string
+		err  string
+	}{
+		{
+			name: "no args",
+			args: []string{},
+			err:  "",
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
+			pathOptions, err := tf.PathOptionsWithConfig(clientcmdapi.Config{})
+			if err != nil {
+				t.Fatalf("unexpected error executing command: %v", err)
+			}
+
+			cmd := NewCmdConfigDeleteUser(ioStreams, pathOptions)
+			cmd.SetOut(out)
+			options := NewDeleteUserOptions(ioStreams, pathOptions)
+
+			if err := options.Complete(cmd, test.args); err != nil {
+				if test.err == "" {
+					t.Fatalf("unexpected error executing command: %v", err)
+				}
+
+				if !strings.Contains(err.Error(), test.err) {
+					t.Fatalf("expected error to contain %v, got %v", test.err, err.Error())
+				}
+
+				return
+			}
+
+			if options.configFile != "" {
+				t.Fatalf("expected configFile not to be set, got %v", options.configFile)
 			}
 		})
 	}
