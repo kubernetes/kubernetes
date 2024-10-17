@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -32,14 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -59,10 +62,7 @@ const (
 )
 
 var (
-	podOnCgroupv2Node bool   = IsCgroup2UnifiedMode()
-	cgroupMemLimit    string = Cgroupv2MemLimit
-	cgroupCPULimit    string = Cgroupv2CPULimit
-	cgroupCPURequest  string = Cgroupv2CPURequest
+	podOnCgroupv2Node *bool
 )
 
 type ContainerResources struct {
@@ -114,16 +114,19 @@ type patchSpec struct {
 	} `json:"spec"`
 }
 
-func supportsInPlacePodVerticalScaling(ctx context.Context, f *framework.Framework) bool {
-	node := getLocalNode(ctx, f)
+func isInPlacePodVerticalScalingSupportedByRuntime(ctx context.Context, c clientset.Interface) bool {
+	node, err := e2enode.GetRandomReadySchedulableNode(ctx, c)
+	framework.ExpectNoError(err)
 	re := regexp.MustCompile("containerd://(.*)")
 	match := re.FindStringSubmatch(node.Status.NodeInfo.ContainerRuntimeVersion)
 	if len(match) != 2 {
 		return false
 	}
-	// TODO(InPlacePodVerticalScaling): Update when RuntimeHandlerFeature for pod resize have been implemented
 	if ver, verr := semver.ParseTolerant(match[1]); verr == nil {
-		return ver.Compare(semver.MustParse(MinContainerRuntimeVersion)) >= 0
+		if ver.Compare(semver.MustParse(MinContainerRuntimeVersion)) < 0 {
+			return false
+		}
+		return true
 	}
 	return false
 }
@@ -222,15 +225,11 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 
 func makeTestPod(ns, name, timeStamp string, tcInfo []TestContainerInfo) *v1.Pod {
 	var testContainers []v1.Container
-	var podOS *v1.PodOS
 
 	for _, ci := range tcInfo {
 		tc, _ := makeTestContainer(ci)
 		testContainers = append(testContainers, tc)
 	}
-
-	podOS = &v1.PodOS{Name: v1.Linux}
-
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -240,7 +239,7 @@ func makeTestPod(ns, name, timeStamp string, tcInfo []TestContainerInfo) *v1.Pod
 			},
 		},
 		Spec: v1.PodSpec{
-			OS:            podOS,
+			OS:            &v1.PodOS{Name: v1.Linux},
 			Containers:    testContainers,
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
@@ -248,89 +247,95 @@ func makeTestPod(ns, name, timeStamp string, tcInfo []TestContainerInfo) *v1.Pod
 	return pod
 }
 
-func verifyPodResizePolicy(pod *v1.Pod, tcInfo []TestContainerInfo) {
+func verifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []TestContainerInfo) {
 	ginkgo.GinkgoHelper()
-	cMap := make(map[string]*v1.Container)
-	for i, c := range pod.Spec.Containers {
-		cMap[c.Name] = &pod.Spec.Containers[i]
-	}
-	for _, ci := range tcInfo {
-		gomega.Expect(cMap).Should(gomega.HaveKey(ci.Name))
-		c := cMap[ci.Name]
-		tc, _ := makeTestContainer(ci)
-		gomega.Expect(tc.ResizePolicy).To(gomega.Equal(c.ResizePolicy))
+	for i, wantCtr := range wantCtrs {
+		gotCtr := &gotPod.Spec.Containers[i]
+		ctr, _ := makeTestContainer(wantCtr)
+		gomega.Expect(gotCtr.Name).To(gomega.Equal(ctr.Name))
+		gomega.Expect(gotCtr.ResizePolicy).To(gomega.Equal(ctr.ResizePolicy))
 	}
 }
 
-func verifyPodResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
+func verifyPodResources(gotPod *v1.Pod, wantCtrs []TestContainerInfo) {
 	ginkgo.GinkgoHelper()
-	cMap := make(map[string]*v1.Container)
-	for i, c := range pod.Spec.Containers {
-		cMap[c.Name] = &pod.Spec.Containers[i]
-	}
-	for _, ci := range tcInfo {
-		gomega.Expect(cMap).Should(gomega.HaveKey(ci.Name))
-		c := cMap[ci.Name]
-		tc, _ := makeTestContainer(ci)
-		gomega.Expect(tc.Resources).To(gomega.Equal(c.Resources))
+	for i, wantCtr := range wantCtrs {
+		gotCtr := &gotPod.Spec.Containers[i]
+		ctr, _ := makeTestContainer(wantCtr)
+		gomega.Expect(gotCtr.Name).To(gomega.Equal(ctr.Name))
+		gomega.Expect(gotCtr.Resources).To(gomega.Equal(ctr.Resources))
 	}
 }
 
-func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo) error {
+func verifyPodAllocations(gotPod *v1.Pod, wantCtrs []TestContainerInfo) error {
 	ginkgo.GinkgoHelper()
-	cStatusMap := make(map[string]*v1.ContainerStatus)
-	for i, c := range pod.Status.ContainerStatuses {
-		cStatusMap[c.Name] = &pod.Status.ContainerStatuses[i]
-	}
-
-	for _, ci := range tcInfo {
-		gomega.Expect(cStatusMap).Should(gomega.HaveKey(ci.Name))
-		cStatus := cStatusMap[ci.Name]
-		if ci.Allocations == nil {
-			if ci.Resources != nil {
-				alloc := &ContainerAllocations{CPUAlloc: ci.Resources.CPUReq, MemAlloc: ci.Resources.MemReq}
-				ci.Allocations = alloc
+	for i, wantCtr := range wantCtrs {
+		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
+		if wantCtr.Allocations == nil {
+			if wantCtr.Resources != nil {
+				alloc := &ContainerAllocations{CPUAlloc: wantCtr.Resources.CPUReq, MemAlloc: wantCtr.Resources.MemReq}
+				wantCtr.Allocations = alloc
 				defer func() {
-					ci.Allocations = nil
+					wantCtr.Allocations = nil
 				}()
 			}
 		}
 
-		_, tcStatus := makeTestContainer(ci)
-		if !cmp.Equal(cStatus.AllocatedResources, tcStatus.AllocatedResources) {
+		_, ctrStatus := makeTestContainer(wantCtr)
+		gomega.Expect(gotCtrStatus.Name).To(gomega.Equal(ctrStatus.Name))
+		if !cmp.Equal(gotCtrStatus.AllocatedResources, ctrStatus.AllocatedResources) {
 			return fmt.Errorf("failed to verify Pod allocations, allocated resources not equal to expected")
 		}
 	}
 	return nil
 }
 
-func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
+func verifyPodStatusResources(gotPod *v1.Pod, wantCtrs []TestContainerInfo) {
 	ginkgo.GinkgoHelper()
-	csMap := make(map[string]*v1.ContainerStatus)
-	for i, c := range pod.Status.ContainerStatuses {
-		csMap[c.Name] = &pod.Status.ContainerStatuses[i]
+	for i, wantCtr := range wantCtrs {
+		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
+		ctr, _ := makeTestContainer(wantCtr)
+		gomega.Expect(gotCtrStatus.Name).To(gomega.Equal(ctr.Name))
+		gomega.Expect(ctr.Resources).To(gomega.Equal(*gotCtrStatus.Resources))
 	}
-	for _, ci := range tcInfo {
-		gomega.Expect(csMap).Should(gomega.HaveKey(ci.Name))
-		cs := csMap[ci.Name]
-		tc, _ := makeTestContainer(ci)
-		gomega.Expect(tc.Resources).To(gomega.Equal(*cs.Resources))
+}
+
+func isPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
+	// Determine if pod is running on cgroupv2 or cgroupv1 node
+	//TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
+	cmd := "mount -t cgroup2"
+	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+	if err != nil {
+		return false
 	}
+	return len(out) != 0
 }
 
 func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []TestContainerInfo) error {
 	ginkgo.GinkgoHelper()
+	if podOnCgroupv2Node == nil {
+		value := isPodOnCgroupv2Node(f, pod)
+		podOnCgroupv2Node = &value
+	}
+	cgroupMemLimit := Cgroupv2MemLimit
+	cgroupCPULimit := Cgroupv2CPULimit
+	cgroupCPURequest := Cgroupv2CPURequest
+	if !*podOnCgroupv2Node {
+		cgroupMemLimit = CgroupMemLimit
+		cgroupCPULimit = CgroupCPUQuota
+		cgroupCPURequest = CgroupCPUShares
+	}
 	verifyCgroupValue := func(cName, cgPath, expectedCgValue string) error {
-		mycmd := fmt.Sprintf("head -n 1 %s", cgPath)
-		cgValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", mycmd)
+		cmd := fmt.Sprintf("head -n 1 %s", cgPath)
 		framework.Logf("Namespace %s Pod %s Container %s - looking for cgroup value %s in path %s",
 			pod.Namespace, pod.Name, cName, expectedCgValue, cgPath)
+		cgValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 		if err != nil {
-			return fmt.Errorf("failed to find expected value '%s' in container cgroup '%s'", expectedCgValue, cgPath)
+			return fmt.Errorf("failed to find expected value %q in container cgroup %q", expectedCgValue, cgPath)
 		}
 		cgValue = strings.Trim(cgValue, "\n")
 		if cgValue != expectedCgValue {
-			return fmt.Errorf("cgroup value '%s' not equal to expected '%s'", cgValue, expectedCgValue)
+			return fmt.Errorf("cgroup value %q not equal to expected %q", cgValue, expectedCgValue)
 		}
 		return nil
 	}
@@ -356,7 +361,7 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			}
 			expectedCPULimitString = strconv.FormatInt(cpuQuota, 10)
 			expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
-			if podOnCgroupv2Node {
+			if *podOnCgroupv2Node {
 				if expectedCPULimitString == "-1" {
 					expectedCPULimitString = "max"
 				}
@@ -387,10 +392,17 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	return nil
 }
 
-func waitForContainerRestart(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []TestContainerInfo) error {
+func waitForContainerRestart(ctx context.Context, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []TestContainerInfo, initialContainers []TestContainerInfo, isRollback bool) error {
 	ginkgo.GinkgoHelper()
 	var restartContainersExpected []string
-	for _, ci := range expectedContainers {
+
+	restartContainers := expectedContainers
+	// if we're rolling back, extract restart counts from test case "expected" containers
+	if isRollback {
+		restartContainers = initialContainers
+	}
+
+	for _, ci := range restartContainers {
 		if ci.RestartCount > 0 {
 			restartContainersExpected = append(restartContainersExpected, ci.Name)
 		}
@@ -398,6 +410,7 @@ func waitForContainerRestart(ctx context.Context, f *framework.Framework, podCli
 	if len(restartContainersExpected) == 0 {
 		return nil
 	}
+
 	pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -420,14 +433,14 @@ func waitForContainerRestart(ctx context.Context, f *framework.Framework, podCli
 	}
 }
 
-func waitForPodResizeActuation(ctx context.Context, f *framework.Framework, c clientset.Interface, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo) *v1.Pod {
+func waitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo, initialContainers []TestContainerInfo, isRollback bool) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	var resizedPod *v1.Pod
 	var pErr error
 	timeouts := framework.NewTimeoutContext()
 	// Wait for container restart
 	gomega.Eventually(ctx, waitForContainerRestart, timeouts.PodStartShort, timeouts.Poll).
-		WithArguments(f, podClient, pod, expectedContainers).
+		WithArguments(podClient, pod, expectedContainers, initialContainers, isRollback).
 		ShouldNot(gomega.HaveOccurred(), "failed waiting for expected container restart")
 		// Verify Pod Containers Cgroup Values
 	gomega.Eventually(ctx, verifyPodContainersCgroupValues, timeouts.PodStartShort, timeouts.Poll).
@@ -1285,13 +1298,12 @@ func doPodResizeTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
-			ginkgo.By("waiting for the node to be ready", func() {
-				if !supportsInPlacePodVerticalScaling(ctx, f) || framework.NodeOSDistroIs("windows") || isRunningOnArm64() {
+			ginkgo.By("check if in place pod vertical scaling is supported", func() {
+				if !isInPlacePodVerticalScalingSupportedByRuntime(ctx, f.ClientSet) || framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 				}
 			})
-			var testPod *v1.Pod
-			var patchedPod *v1.Pod
+			var testPod, patchedPod *v1.Pod
 			var pErr error
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
@@ -1322,9 +1334,8 @@ func doPodResizeTests() {
 			ginkgo.By("verifying initial pod resize policy is as expected")
 			verifyPodResizePolicy(newPod, tc.containers)
 
-			ginkgo.By("verifying initial pod status resources")
+			ginkgo.By("verifying initial pod status resources are as expected")
 			verifyPodStatusResources(newPod, tc.containers)
-
 			ginkgo.By("verifying initial cgroup config are as expected")
 			framework.ExpectNoError(verifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
 
@@ -1409,8 +1420,8 @@ func doPodResizeErrorTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
-			ginkgo.By("waiting for the node to be ready", func() {
-				if !supportsInPlacePodVerticalScaling(ctx, f) || framework.NodeOSDistroIs("windows") || isRunningOnArm64() {
+			ginkgo.By("check if in place pod vertical scaling is supported", func() {
+				if !isInPlacePodVerticalScalingSupportedByRuntime(ctx, f.ClientSet) || framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 				}
 			})
@@ -1425,10 +1436,6 @@ func doPodResizeErrorTests() {
 
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
-
-			perr := e2epod.WaitForPodCondition(ctx, f.ClientSet, newPod.Namespace, newPod.Name, "Ready", timeouts.PodStartSlow, testutils.PodRunningReady)
-			framework.ExpectNoError(perr, "pod %s/%s did not go running", newPod.Namespace, newPod.Name)
-			framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
 
 			ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
 			verifyPodResources(newPod, tc.containers)
@@ -1469,12 +1476,7 @@ func doPodResizeErrorTests() {
 //       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
 //       in test/e2e/node/pod_resize.go
 
-var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, "[NodeAlphaFeature:InPlacePodVerticalScaling]", func() {
-	if !podOnCgroupv2Node {
-		cgroupMemLimit = CgroupMemLimit
-		cgroupCPULimit = CgroupCPUQuota
-		cgroupCPURequest = CgroupCPUShares
-	}
+var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, func() {
 	doPodResizeTests()
 	doPodResizeErrorTests()
 })
