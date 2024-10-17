@@ -22,7 +22,7 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	defer ResetForTest(nil)
+	defer ResetForTest()
 	defaultCap := Capabilities{
 		AllowPrivileged: false,
 		PrivilegedSources: PrivilegedSources{
@@ -42,7 +42,8 @@ func TestGet(t *testing.T) {
 			HostNetworkSources: []string{"A", "B"},
 		},
 	}
-	ResetForTest(&cap)
+	ResetForTest()
+	Initialize(cap)
 
 	res = Get()
 	if !reflect.DeepEqual(cap, res) {
@@ -50,6 +51,7 @@ func TestGet(t *testing.T) {
 	}
 }
 func TestSetup(t *testing.T) {
+	defer ResetForTest()
 	testCases := []struct {
 		name                     string
 		allowPrivileged          bool
@@ -78,21 +80,13 @@ func TestSetup(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ResetForTest(nil)
+			ResetForTest()
 
 			Setup(tc.allowPrivileged, tc.perConnectionBytesPerSec)
 			res := Get()
-			if !compareCapabilities(tc.expectedCapabilities, res) {
+			if !reflect.DeepEqual(tc.expectedCapabilities, res) {
 				t.Fatalf("expected Capabilities: %#v, got: %#v", tc.expectedCapabilities, res)
 			}
 		})
 	}
-}
-
-// compareCapabilities compares two Capabilities instances
-func compareCapabilities(a, b Capabilities) bool {
-	if a.AllowPrivileged != b.AllowPrivileged {
-		return false
-	}
-	return a.PerConnectionBandwidthLimitBytesPerSec == b.PerConnectionBandwidthLimitBytesPerSec
 }

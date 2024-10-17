@@ -70,10 +70,10 @@ func Setup(allowPrivileged bool, perConnectionBytesPerSec int64) {
 
 // ResetForTest resets the capabilities to a given state for testing purposes.
 // This function should only be called from tests.
-func ResetForTest(c *Capabilities) {
+func ResetForTest() {
 	capInstance.lock.Lock()
 	defer capInstance.lock.Unlock()
-	capInstance.capabilities = c
+	capInstance.capabilities = nil
 	capInstance.once = sync.Once{}
 }
 
