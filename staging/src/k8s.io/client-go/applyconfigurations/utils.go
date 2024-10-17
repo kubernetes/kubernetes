@@ -37,6 +37,7 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -89,6 +90,7 @@ import (
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
 	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	applyconfigurationscoordinationv1alpha1 "k8s.io/client-go/applyconfigurations/coordination/v1alpha1"
+	coordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
 	applyconfigurationscoordinationv1beta1 "k8s.io/client-go/applyconfigurations/coordination/v1beta1"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	applyconfigurationsdiscoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
@@ -620,6 +622,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscoordinationv1alpha1.LeaseCandidateApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("LeaseCandidateSpec"):
 		return &applyconfigurationscoordinationv1alpha1.LeaseCandidateSpecApplyConfiguration{}
+
+		// Group=coordination.k8s.io, Version=v1alpha2
+	case v1alpha2.SchemeGroupVersion.WithKind("LeaseCandidate"):
+		return &coordinationv1alpha2.LeaseCandidateApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("LeaseCandidateSpec"):
+		return &coordinationv1alpha2.LeaseCandidateSpecApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1beta1
 	case coordinationv1beta1.SchemeGroupVersion.WithKind("Lease"):

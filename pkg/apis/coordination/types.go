@@ -134,19 +134,15 @@ type LeaseCandidateSpec struct {
 	// This field is required when strategy is "OldestEmulationVersion"
 	// +optional
 	EmulationVersion string
-	// PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election.
-	// The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated
-	// leader election to make a decision about the final election strategy. This follows as
-	// - If all clients have strategy X as the first element in this list, strategy X will be used.
-	// - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y
-	//   will be used.
-	// - If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader
-	//   election will not operate the Lease until resolved.
+	// Strategy is the strategy that coordinated leader election will use for picking the leader.
+	// If multiple candidates for the same Lease return different strategies, the strategy provided
+	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
+	// Coordinated Leader Election will not elect and return an error.
 	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
 	// +featureGate=CoordinatedLeaderElection
 	// +listType=atomic
 	// +required
-	PreferredStrategies []CoordinatedLeaseStrategy
+	Strategy CoordinatedLeaseStrategy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

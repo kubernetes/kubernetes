@@ -71,6 +71,8 @@ import (
 	fakecoordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1/fake"
 	coordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
 	fakecoordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1/fake"
+	coordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
+	fakecoordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2/fake"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -328,6 +330,11 @@ func (c *Clientset) CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1al
 // CoordinationV1alpha1 retrieves the CoordinationV1alpha1Client
 func (c *Clientset) CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface {
 	return &fakecoordinationv1alpha1.FakeCoordinationV1alpha1{Fake: &c.Fake}
+}
+
+// CoordinationV1alpha2 retrieves the CoordinationV1alpha2Client
+func (c *Clientset) CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface {
+	return &fakecoordinationv1alpha2.FakeCoordinationV1alpha2{Fake: &c.Fake}
 }
 
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
