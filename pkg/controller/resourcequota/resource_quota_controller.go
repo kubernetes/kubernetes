@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -88,6 +87,8 @@ type Controller struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 	// missingUsageQueue holds objects that are missing the initial usage information
 	missingUsageQueue workqueue.TypedRateLimitingInterface[string]
+	// fullSyncQueue holds objects that need to be fully resynced periodically
+	fullSyncQueue workqueue.TypedRateLimitingInterface[string]
 	// To allow injection of syncUsage for testing.
 	syncHandler func(ctx context.Context, key string) error
 	// function that controls full recalculation of quota usage
@@ -116,6 +117,10 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 		missingUsageQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_priority"},
+		),
+		fullSyncQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_full_sync"},
 		),
 		resyncPeriod: options.ResyncPeriod,
 		registry:     options.Registry,
@@ -205,7 +210,7 @@ func (rq *Controller) enqueueAll(ctx context.Context) {
 			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", rqs[i], err))
 			continue
 		}
-		rq.queue.Add(key)
+		rq.fullSyncQueue.Add(key)
 	}
 }
 
@@ -294,6 +299,7 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
 	defer rq.missingUsageQueue.ShutDown()
+	defer rq.fullSyncQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 
@@ -312,6 +318,7 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, rq.worker(rq.queue), time.Second)
 		go wait.UntilWithContext(ctx, rq.worker(rq.missingUsageQueue), time.Second)
+		go wait.UntilWithContext(ctx, rq.worker(rq.fullSyncQueue), time.Second)
 	}
 	// the timer for how often we do a full recalculation across all quotas
 	if rq.resyncPeriod() > 0 {
