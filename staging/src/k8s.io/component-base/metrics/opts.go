@@ -44,16 +44,17 @@ var (
 // Name must be set to a non-empty string. DeprecatedVersion is defined only
 // if the metric for which this options applies is, in fact, deprecated.
 type KubeOpts struct {
-	Namespace            string
-	Subsystem            string
-	Name                 string
-	Help                 string
-	ConstLabels          map[string]string
-	DeprecatedVersion    string
-	deprecateOnce        sync.Once
-	annotateOnce         sync.Once
-	StabilityLevel       StabilityLevel
-	LabelValueAllowLists *MetricLabelAllowList
+	Namespace                     string
+	Subsystem                     string
+	Name                          string
+	Help                          string
+	ConstLabels                   map[string]string
+	DeprecatedVersion             string
+	deprecateOnce                 sync.Once
+	annotateOnce                  sync.Once
+	StabilityLevel                StabilityLevel
+	initializeLabelAllowListsOnce sync.Once
+	LabelValueAllowLists          *MetricLabelAllowList
 }
 
 // BuildFQName joins the given three name components by "_". Empty name
@@ -160,17 +161,18 @@ func (o *GaugeOpts) toPromGaugeOpts() prometheus.GaugeOpts {
 // and can safely be left at their zero value, although it is strongly
 // encouraged to set a Help string.
 type HistogramOpts struct {
-	Namespace            string
-	Subsystem            string
-	Name                 string
-	Help                 string
-	ConstLabels          map[string]string
-	Buckets              []float64
-	DeprecatedVersion    string
-	deprecateOnce        sync.Once
-	annotateOnce         sync.Once
-	StabilityLevel       StabilityLevel
-	LabelValueAllowLists *MetricLabelAllowList
+	Namespace                     string
+	Subsystem                     string
+	Name                          string
+	Help                          string
+	ConstLabels                   map[string]string
+	Buckets                       []float64
+	DeprecatedVersion             string
+	deprecateOnce                 sync.Once
+	annotateOnce                  sync.Once
+	StabilityLevel                StabilityLevel
+	initializeLabelAllowListsOnce sync.Once
+	LabelValueAllowLists          *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -206,18 +208,19 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 // and can safely be left at their zero value, although it is strongly
 // encouraged to set a Help string.
 type TimingHistogramOpts struct {
-	Namespace            string
-	Subsystem            string
-	Name                 string
-	Help                 string
-	ConstLabels          map[string]string
-	Buckets              []float64
-	InitialValue         float64
-	DeprecatedVersion    string
-	deprecateOnce        sync.Once
-	annotateOnce         sync.Once
-	StabilityLevel       StabilityLevel
-	LabelValueAllowLists *MetricLabelAllowList
+	Namespace                     string
+	Subsystem                     string
+	Name                          string
+	Help                          string
+	ConstLabels                   map[string]string
+	Buckets                       []float64
+	InitialValue                  float64
+	DeprecatedVersion             string
+	deprecateOnce                 sync.Once
+	annotateOnce                  sync.Once
+	StabilityLevel                StabilityLevel
+	initializeLabelAllowListsOnce sync.Once
+	LabelValueAllowLists          *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
@@ -255,20 +258,21 @@ func (o *TimingHistogramOpts) toPromHistogramOpts() promext.TimingHistogramOpts 
 // a help string and to explicitly set the Objectives field to the desired value
 // as the default value will change in the upcoming v0.10 of the library.
 type SummaryOpts struct {
-	Namespace            string
-	Subsystem            string
-	Name                 string
-	Help                 string
-	ConstLabels          map[string]string
-	Objectives           map[float64]float64
-	MaxAge               time.Duration
-	AgeBuckets           uint32
-	BufCap               uint32
-	DeprecatedVersion    string
-	deprecateOnce        sync.Once
-	annotateOnce         sync.Once
-	StabilityLevel       StabilityLevel
-	LabelValueAllowLists *MetricLabelAllowList
+	Namespace                     string
+	Subsystem                     string
+	Name                          string
+	Help                          string
+	ConstLabels                   map[string]string
+	Objectives                    map[float64]float64
+	MaxAge                        time.Duration
+	AgeBuckets                    uint32
+	BufCap                        uint32
+	DeprecatedVersion             string
+	deprecateOnce                 sync.Once
+	annotateOnce                  sync.Once
+	StabilityLevel                StabilityLevel
+	initializeLabelAllowListsOnce sync.Once
+	LabelValueAllowLists          *MetricLabelAllowList
 }
 
 // Modify help description on the metric description.
