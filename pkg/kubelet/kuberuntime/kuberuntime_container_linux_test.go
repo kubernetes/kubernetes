@@ -1085,7 +1085,8 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			if len(tc.cStatus) > 0 {
 				pod.Status.ContainerStatuses = tc.cStatus
 			}
-			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
+			resources, err := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
+			assert.NoError(t, err)
 			tc.expected.HugepageLimits = resources.HugepageLimits
 			if !cmp.Equal(resources, tc.expected) {
 				t.Errorf("Test %s: expected resources %+v, but got %+v", tc.name, tc.expected, resources)
@@ -1401,8 +1402,10 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				assert.True(t, types.IsCriticalPod(pod), "pod is expected to be critical")
 			}
 
-			resourcesC1 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
-			resourcesC2 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[1], false)
+			resourcesC1, err := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
+			assert.NoError(t, err)
+			resourcesC2, err := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[1], false)
+			assert.NoError(t, err)
 
 			if tc.swapDisabledOnNode {
 				expectSwapDisabled(tc.cgroupVersion, resourcesC1, resourcesC2)
