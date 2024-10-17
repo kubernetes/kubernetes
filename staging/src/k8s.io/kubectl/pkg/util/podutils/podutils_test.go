@@ -29,6 +29,7 @@ func TestActivePods(t *testing.T) {
 	time1 := metav1.Now()
 	time2 := metav1.NewTime(time1.Add(1 * time.Second))
 	time3 := metav1.NewTime(time1.Add(2 * time.Second))
+	restartAlways := corev1.ContainerRestartPolicyAlways
 
 	tests := []struct {
 		name string
@@ -359,6 +360,81 @@ func TestActivePods(t *testing.T) {
 							Type:               corev1.PodReady,
 							Status:             corev1.ConditionTrue,
 							LastTransitionTime: time1,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "higher sidecar restart count should sort before lower restart count",
+			pod1: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podWithMoreRestarts",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node1",
+					InitContainers: []corev1.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: &restartAlways,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionTrue,
+							LastTransitionTime: time1,
+						},
+					},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							RestartCount: 3,
+						},
+					},
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:         "sidecar",
+							RestartCount: 3,
+						},
+					},
+				},
+			},
+			pod2: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "podWithLessRestarts",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "node1",
+					InitContainers: []corev1.Container{
+						{
+							Name:          "sidecar",
+							RestartPolicy: &restartAlways,
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionTrue,
+							LastTransitionTime: time1,
+						},
+					},
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							RestartCount: 3,
+						},
+					},
+					InitContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:         "sidecar",
+							RestartCount: 2,
 						},
 					},
 				},
