@@ -18,12 +18,13 @@ package scale
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -87,7 +88,7 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 			*updatedResourceVersion = rv
 		}
 		// Retry only on update conflicts.
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -204,7 +205,8 @@ func WaitForScaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.
 		return fmt.Errorf("waitForReplicas parameter cannot be nil")
 	}
 	err := wait.PollUntilContextTimeout(context.Background(), waitForReplicas.Interval, waitForReplicas.Timeout, true, scaleHasDesiredReplicas(sClient, gr, resourceName, namespace, int32(newSize)))
-	if err == context.DeadlineExceeded {
+
+	if errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("timed out waiting for %q to be synced", resourceName)
 	}
 	return err
