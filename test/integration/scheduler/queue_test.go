@@ -205,6 +205,14 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		initialPVCs []*v1.PersistentVolumeClaim
 		// initialPVs are the list of PersistentVolume to be created at first.
 		initialPVs []*v1.PersistentVolume
+		// initialStorageClasses are the list of StorageClass to be created at first.
+		initialStorageClasses []*storagev1.StorageClass
+		// initialCSINodes are the list of CSINode to be created at first.
+		initialCSINodes []*storagev1.CSINode
+		// initialCSIDrivers are the list of CSIDriver to be created at first.
+		initialCSIDrivers []*storagev1.CSIDriver
+		// initialStorageCapacities are the list of CSIStorageCapacity to be created at first.
+		initialStorageCapacities []*storagev1.CSIStorageCapacity
 		// pods are the list of Pods to be created.
 		// All of them are expected to be unschedulable at first.
 		pods []*v1.Pod
@@ -1329,6 +1337,640 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.New("pod2"),
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("wait-sc")).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				node := st.MakeNode().Name("fake-node2").Label("node", "fake-node").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("wait-sc")).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				node := st.MakeNode().Name("fake-node").Label("node", "fake-node2").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create node: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.NodeLabelChange: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				pv2 := st.MakePersistentVolume().Name("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Create(testCtx.Ctx, pv2, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create pv: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.PvAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				pv1 := st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumes().Update(testCtx.Ctx, pv1, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create pv: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.PvUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+				st.MakePersistentVolumeClaim().
+					Name("pvc2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				if err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Delete(testCtx.Ctx, "pvc1", metav1.DeleteOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to delete pvc1: %w", err)
+				}
+				pvc1 := st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj()
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc1, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create pvc: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.PvcAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+				st.MakePersistentVolumeClaim().
+					Name("pvc2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				pvc1 := st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj()
+
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Update(testCtx.Ctx, pvc1, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update pvc: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.PvcUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				sc1 := st.MakeStorageClass().
+					Name("sc1").
+					VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+					Provisioner("p").
+					Obj()
+				if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Create(testCtx.Ctx, sc1, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create storageclass: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.StorageClassAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass is udpated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			initialStorageClasses: []*storagev1.StorageClass{
+				st.MakeStorageClass().
+					Name("sc1").
+					VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+					Provisioner("p").
+					AllowedTopologies([]v1.TopologySelectorTerm{
+						{
+							MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+								{Key: v1.LabelTopologyZone, Values: []string{"us-west1-a"}},
+							},
+						},
+					}).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				sc1 := st.MakeStorageClass().
+					Name("sc1").
+					VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+					Provisioner("p").
+					AllowedTopologies([]v1.TopologySelectorTerm{
+						{
+							MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+								{Key: v1.LabelTopologyZone, Values: []string{"us-east1-a"}},
+							},
+						},
+					}).
+					Obj()
+				if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Update(testCtx.Ctx, sc1, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update storageclass: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.StorageClassUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the StorageClass is updated but the AllowedTopologies is same",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().
+					Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			initialStorageClasses: []*storagev1.StorageClass{
+				st.MakeStorageClass().
+					Name("sc1").
+					Label("key", "value").
+					VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+					Provisioner("p").
+					AllowedTopologies([]v1.TopologySelectorTerm{
+						{
+							MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+								{Key: v1.LabelTopologyZone, Values: []string{"us-west1-a"}},
+							},
+						},
+					}).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				sc1 := st.MakeStorageClass().
+					Name("sc1").
+					Label("key", "updated").
+					VolumeBindingMode(storagev1.VolumeBindingWaitForFirstConsumer).
+					Provisioner("p").
+					AllowedTopologies([]v1.TopologySelectorTerm{
+						{
+							MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+								{Key: v1.LabelTopologyZone, Values: []string{"us-west1-a"}},
+							},
+						},
+					}).
+					Obj()
+				if _, err := testCtx.ClientSet.StorageV1().StorageClasses().Update(testCtx.Ctx, sc1, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update storageclass: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.StorageClassUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.Set[string]{},
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().
+					Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				csinode1 := st.MakeCSINode().Name("csinode").Obj()
+
+				if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(testCtx.Ctx, csinode1, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create CSINode: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSINodeAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode is udpated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			initialCSINodes: []*storagev1.CSINode{
+				st.MakeCSINode().Name("csinode").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// When updating CSINodes by using MakeCSINode, an error occurs because the resourceVersion is not specified. Therefore, the actual CSINode is retrieved.
+				csinode, err := testCtx.ClientSet.StorageV1().CSINodes().Get(testCtx.Ctx, "csinode", metav1.GetOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get CSINode: %w", err)
+				}
+
+				metav1.SetMetaDataAnnotation(&csinode.ObjectMeta, v1.MigratedPluginsAnnotationKey, "value")
+				if _, err := testCtx.ClientSet.StorageV1().CSINodes().Update(testCtx.Ctx, csinode, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update CSINode: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSINodeUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIDriver is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			initialCSIDrivers: []*storagev1.CSIDriver{
+				st.MakeCSIDriver().Name("csidriver").StorageCapacity(ptr.To(true)).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Volume(
+					v1.Volume{
+						Name: "volume",
+						VolumeSource: v1.VolumeSource{
+							CSI: &v1.CSIVolumeSource{
+								Driver: "csidriver",
+							},
+						},
+					},
+				).Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// When updating CSIDrivers by using MakeCSIDriver, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIDrivers is retrieved.
+				csidriver, err := testCtx.ClientSet.StorageV1().CSIDrivers().Get(testCtx.Ctx, "csidriver", metav1.GetOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get CSIDriver: %w", err)
+				}
+				csidriver.Spec.StorageCapacity = ptr.To(false)
+
+				if _, err := testCtx.ClientSet.StorageV1().CSIDrivers().Update(testCtx.Ctx, csidriver, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update CSIDriver: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSIDriverUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIDriver is updated but the storage capacity is enabled",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			initialCSIDrivers: []*storagev1.CSIDriver{
+				st.MakeCSIDriver().Name("csidriver").StorageCapacity(ptr.To(false)).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Volume(
+					v1.Volume{
+						Name: "volume",
+						VolumeSource: v1.VolumeSource{
+							CSI: &v1.CSIVolumeSource{
+								Driver: "csidriver",
+							},
+						},
+					},
+				).Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// When updating CSIDrivers by using MakeCSIDriver, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIDrivers is retrieved.
+				csidriver, err := testCtx.ClientSet.StorageV1().CSIDrivers().Get(testCtx.Ctx, "csidriver", metav1.GetOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get CSIDriver: %w", err)
+				}
+				csidriver.Spec.StorageCapacity = ptr.To(true)
+
+				if _, err := testCtx.ClientSet.StorageV1().CSIDrivers().Update(testCtx.Ctx, csidriver, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update CSIDriver: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSIDriverUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.Set[string]{},
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is created",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				csc := st.MakeCSIStorageCapacity().Name("csc").StorageClassName("sc1").Capacity(resource.NewQuantity(10, resource.BinarySI)).Obj()
+				if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Create(testCtx.Ctx, csc, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create CSIStorageCapacity: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSIStorageCapacityAdd: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is updated",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					StorageClassName("sc1").
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					StorageClassName(ptr.To("sc1")).
+					Obj(),
+			},
+			initialStorageCapacities: []*storagev1.CSIStorageCapacity{
+				st.MakeCSIStorageCapacity().Name("csc").StorageClassName("sc1").Capacity(resource.NewQuantity(10, resource.BinarySI)).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// When updating CSIStorageCapacities by using MakeCSIStorageCapacity, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIStorageCapacities is retrieved.
+				csc, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Get(testCtx.Ctx, "csc", metav1.GetOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get CSIStorageCapacity: %w", err)
+				}
+				csc.Capacity = resource.NewQuantity(20, resource.BinarySI)
+
+				if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Update(testCtx.Ctx, csc, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update CSIStorageCapacity: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSIStorageCapacityUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIDriver is updated but the volumelimit is not increased",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
+					Obj(),
+			},
+			initialStorageCapacities: []*storagev1.CSIStorageCapacity{
+				st.MakeCSIStorageCapacity().Name("csc").StorageClassName("sc1").Capacity(resource.NewQuantity(10, resource.BinarySI)).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				// When updating CSIStorageCapacities by using MakeCSIStorageCapacity, an error occurs because the resourceVersion is not specified. Therefore, the actual CSIStorageCapacities is retrieved.
+				csc, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Get(testCtx.Ctx, "csc", metav1.GetOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get CSIStorageCapacity: %w", err)
+				}
+				csc.Capacity = resource.NewQuantity(5, resource.BinarySI)
+
+				if _, err := testCtx.ClientSet.StorageV1().CSIStorageCapacities(testCtx.NS.Name).Update(testCtx.Ctx, csc, metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to update CSIStorageCapacity: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.CSIStorageCapacityUpdate: 1}, nil
+			},
+			wantRequeuedPods:          sets.Set[string]{},
+			enableSchedulingQueueHint: []bool{true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1360,6 +2002,30 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				for _, node := range tt.initialNodes {
 					if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
 						t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
+					}
+				}
+
+				for _, csinode := range tt.initialCSINodes {
+					if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(ctx, csinode, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create a CSINode %q: %v", csinode.Name, err)
+					}
+				}
+
+				for _, csc := range tt.initialStorageCapacities {
+					if _, err := cs.StorageV1().CSIStorageCapacities(ns).Create(ctx, csc, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create a CSIStorageCapacity %q: %v", csc.Name, err)
+					}
+				}
+
+				for _, csidriver := range tt.initialCSIDrivers {
+					if _, err := cs.StorageV1().CSIDrivers().Create(ctx, csidriver, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create a CSIDriver %q: %v", csidriver.Name, err)
+					}
+				}
+
+				for _, sc := range tt.initialStorageClasses {
+					if _, err := cs.StorageV1().StorageClasses().Create(testCtx.Ctx, sc, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create a StorageClass %q: %v", sc.Name, err)
 					}
 				}
 
