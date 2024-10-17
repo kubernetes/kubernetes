@@ -874,6 +874,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		volumepathhandler.NewBlockVolumePathHandler())
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	klet.staticBackOff = flowcontrol.NewBackOff(time.Second*3, time.Second*10)
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
@@ -1261,6 +1262,8 @@ type Kubelet struct {
 
 	// Container restart Backoff
 	backOff *flowcontrol.Backoff
+	// static pod Backoff
+	staticBackOff *flowcontrol.Backoff
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
@@ -1960,7 +1963,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Use WithoutCancel instead of a new context.TODO() to propagate trace context
 	// Call the container runtime's SyncPod callback
 	sctx := context.WithoutCancel(ctx)
-	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.backOff)
+	backOff := kl.backOff
+	if pod.Annotations != nil && pod.Annotations[kubetypes.ConfigSourceAnnotationKey] == "file" {
+		klog.V(5).InfoS("use static backOff for pod. ", "pod", klog.KObj(pod))
+		backOff = kl.staticBackOff
+	} else {
+		klog.V(5).InfoS("use normal backOff for pod. ", "pod", klog.KObj(pod))
+	}
+	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
