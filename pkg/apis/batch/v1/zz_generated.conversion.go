@@ -459,7 +459,15 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.Job
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.PodFailurePolicy = (*batch.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
+	if in.PodFailurePolicy != nil {
+		in, out := &in.PodFailurePolicy, &out.PodFailurePolicy
+		*out = new(batch.PodFailurePolicy)
+		if err := Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodFailurePolicy = nil
+	}
 	out.SuccessPolicy = (*batch.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
 	out.BackoffLimitPerIndex = (*int32)(unsafe.Pointer(in.BackoffLimitPerIndex))
@@ -480,7 +488,15 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.Job
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.PodFailurePolicy = (*batchv1.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
+	if in.PodFailurePolicy != nil {
+		in, out := &in.PodFailurePolicy, &out.PodFailurePolicy
+		*out = new(batchv1.PodFailurePolicy)
+		if err := Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodFailurePolicy = nil
+	}
 	out.SuccessPolicy = (*batchv1.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
@@ -566,7 +582,17 @@ func Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSp
 }
 
 func autoConvert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batch.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]batch.PodFailurePolicyRule, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	return nil
 }
 
@@ -576,7 +602,17 @@ func Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailur
 }
 
 func autoConvert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *batchv1.PodFailurePolicy, s conversion.Scope) error {
-	out.Rules = *(*[]batchv1.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]batchv1.PodFailurePolicyRule, len(*in))
+		for i := range *in {
+			if err := Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	return nil
 }
 
@@ -635,6 +671,7 @@ func autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batch
 	out.Action = batch.PodFailurePolicyAction(in.Action)
 	out.OnExitCodes = (*batch.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
 	out.OnPodConditions = *(*[]batch.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
+	out.Name = (*string)(unsafe.Pointer(in.Name))
 	return nil
 }
 
@@ -644,6 +681,7 @@ func Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batchv1.P
 }
 
 func autoConvert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *batchv1.PodFailurePolicyRule, s conversion.Scope) error {
+	out.Name = (*string)(unsafe.Pointer(in.Name))
 	out.Action = batchv1.PodFailurePolicyAction(in.Action)
 	out.OnExitCodes = (*batchv1.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
 	out.OnPodConditions = *(*[]batchv1.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
