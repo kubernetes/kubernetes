@@ -37,8 +37,8 @@ const (
 )
 
 func RetryErrorCondition(condition wait.ConditionWithContextFunc) wait.ConditionWithContextFunc {
-	return func(context.Context) (bool, error) {
-		done, err := condition(context.Background())
+	return func(ctx context.Context) (bool, error) {
+		done, err := condition(ctx)
 		return done, err
 	}
 }
