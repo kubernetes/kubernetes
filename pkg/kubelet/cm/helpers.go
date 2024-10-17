@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -27,6 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
+
+// for typecheck across platforms
+var _ func(int64, int64) int64 = MilliCPUToQuota
+var _ func(int64) uint64 = MilliCPUToShares
+var _ func(*v1.Pod, bool, uint64, bool) *ResourceConfig = ResourceConfigForPod
+var _ func() (*CgroupSubsystems, error) = GetCgroupSubsystems
+var _ func(string) ([]int, error) = getCgroupProcs
+var _ func(types.UID) string = GetPodCgroupNameSuffix
+var _ func(string, bool, string) string = NodeAllocatableRoot
+var _ func(string) (string, error) = GetKubeletContainer
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
