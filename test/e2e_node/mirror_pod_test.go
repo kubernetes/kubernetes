@@ -231,7 +231,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}
 
 			ginkgo.By("Stopping the NFS server")
-			stopNfsServer(f, nfsServerPod)
+			e2evolume.StopNFSServer(f, nfsServerPod)
 
 			ginkgo.By(fmt.Sprintf("Deleting the static nfs test pod: %s", staticPodName))
 			err = deleteStaticPod(podPath, staticPodName, ns)
@@ -243,7 +243,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 5*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("pod volume should exist while nfs server is stopped"))
 
 			ginkgo.By("Start the NFS server")
-			restartNfsServer(f, nfsServerPod)
+			e2evolume.RestartNFSServer(f, nfsServerPod)
 
 			ginkgo.By("Waiting for the pod volume to deleted after the NFS server is started")
 			gomega.Eventually(func() bool {
@@ -284,25 +284,6 @@ func podVolumeDirectoryExists(uid types.UID) bool {
 	}
 
 	return podVolumeDirectoryExists
-}
-
-// Restart the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 1` command in the
-// pod's (only) container. This command changes the number of nfs server threads from
-// (presumably) zero back to 1, and therefore allows nfs to open connections again.
-func restartNfsServer(f *framework.Framework, serverPod *v1.Pod) {
-	const startcmd = "/usr/sbin/rpc.nfsd 1"
-	_, _, err := e2evolume.PodExec(f, serverPod, startcmd)
-	framework.ExpectNoError(err)
-
-}
-
-// Stop the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 0` command in the
-// pod's (only) container. This command changes the number of nfs server threads to 0,
-// thus closing all open nfs connections.
-func stopNfsServer(f *framework.Framework, serverPod *v1.Pod) {
-	const stopcmd = "rpc.nfsd 0 && for i in $(seq 200); do rpcinfo -p | grep -q nfs || break; sleep 1; done"
-	_, _, err := e2evolume.PodExec(f, serverPod, stopcmd)
-	framework.ExpectNoError(err)
 }
 
 func createStaticPodUsingNfs(nfsIP string, nodeName string, cmd string, dir string, name string, ns string) error {
