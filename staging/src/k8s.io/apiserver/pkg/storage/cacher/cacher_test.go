@@ -93,6 +93,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateWithTTL(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreateWithTTL(ctx, t, cacher)
@@ -105,6 +106,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGet(ctx, t, cacher)
@@ -261,6 +263,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
@@ -361,12 +364,14 @@ func TestNamespaceScopedWatch(t *testing.T) {
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
