@@ -42,7 +42,7 @@ If you want to build Kubernetes right away there are two options:
 
 ##### You have a working [Go environment].
 
-```
+```shell
 git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 make
@@ -50,7 +50,7 @@ make
 
 ##### You have a working [Docker environment].
 
-```
+```shell
 git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 make quick-release
