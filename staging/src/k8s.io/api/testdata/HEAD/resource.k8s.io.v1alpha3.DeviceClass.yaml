@@ -46,15 +46,3 @@ spec:
   selectors:
   - cel:
       expression: expressionValue
-  suitableNodes:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: keyValue
-        operator: operatorValue
-        values:
-        - valuesValue
-      matchFields:
-      - key: keyValue
-        operator: operatorValue
-        values:
-        - valuesValue

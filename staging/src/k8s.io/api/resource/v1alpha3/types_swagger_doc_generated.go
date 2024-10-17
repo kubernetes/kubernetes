@@ -31,7 +31,6 @@ var map_AllocationResult = map[string]string{
 	"":             "AllocationResult contains attributes of an allocated resource.",
 	"devices":      "Devices is the result of allocating devices.",
 	"nodeSelector": "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
-	"controller":   "Controller is the name of the DRA driver which handled the allocation. That driver is also responsible for deallocating the claim. It is empty when the claim can be deallocated without involving a driver.\n\nA driver may allocate devices provided by other drivers, so this driver name here can be different from the driver names listed for the results.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
 }
 
 func (AllocationResult) SwaggerDoc() map[string]string {
@@ -148,10 +147,9 @@ func (DeviceClassList) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceClassSpec = map[string]string{
-	"":              "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
-	"selectors":     "Each selector must be satisfied by a device which is claimed via this class.",
-	"config":        "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
-	"suitableNodes": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a claim that has not been allocated yet *and* that claim gets allocated through a control plane controller. It is ignored when the claim does not use a control plane controller for allocation.\n\nSetting this field is optional. If unset, all Nodes are candidates.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+	"":          "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
+	"selectors": "Each selector must be satisfied by a device which is claimed via this class.",
+	"config":    "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
 }
 
 func (DeviceClassSpec) SwaggerDoc() map[string]string {
@@ -184,7 +182,7 @@ var map_DeviceRequest = map[string]string{
 	"selectors":       "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
 	"allocationMode":  "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 	"count":           "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
-	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.",
+	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
 }
 
 func (DeviceRequest) SwaggerDoc() map[string]string {
@@ -192,11 +190,12 @@ func (DeviceRequest) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceRequestAllocationResult = map[string]string{
-	"":        "DeviceRequestAllocationResult contains the allocation result for one request.",
-	"request": "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
-	"driver":  "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"pool":    "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-	"device":  "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"":            "DeviceRequestAllocationResult contains the allocation result for one request.",
+	"request":     "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"adminAccess": "AdminAccess is a copy of the AdminAccess value in the request which caused this device to be allocated.\n\nNew allocations are required to have this set when the DRAAdminAccess feature gate is enabled. Old allocations made by Kubernetes 1.31 do not have it yet. Clients which want to support Kubernetes 1.31 need to look up the request and retrieve the value from there if this field is not set.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
@@ -220,46 +219,6 @@ var map_OpaqueDeviceConfiguration = map[string]string{
 
 func (OpaqueDeviceConfiguration) SwaggerDoc() map[string]string {
 	return map_OpaqueDeviceConfiguration
-}
-
-var map_PodSchedulingContext = map[string]string{
-	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DRAControlPlaneController feature gate.",
-	"metadata": "Standard object metadata",
-	"spec":     "Spec describes where resources for the Pod are needed.",
-	"status":   "Status describes where resources for the Pod can be allocated.",
-}
-
-func (PodSchedulingContext) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContext
-}
-
-var map_PodSchedulingContextList = map[string]string{
-	"":         "PodSchedulingContextList is a collection of Pod scheduling objects.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of PodSchedulingContext objects.",
-}
-
-func (PodSchedulingContextList) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextList
-}
-
-var map_PodSchedulingContextSpec = map[string]string{
-	"":               "PodSchedulingContextSpec describes where resources for the Pod are needed.",
-	"selectedNode":   "SelectedNode is the node for which allocation of ResourceClaims that are referenced by the Pod and that use \"WaitForFirstConsumer\" allocation is to be attempted.",
-	"potentialNodes": "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
-}
-
-func (PodSchedulingContextSpec) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextSpec
-}
-
-var map_PodSchedulingContextStatus = map[string]string{
-	"":               "PodSchedulingContextStatus describes where resources for the Pod can be allocated.",
-	"resourceClaims": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
-}
-
-func (PodSchedulingContextStatus) SwaggerDoc() map[string]string {
-	return map_PodSchedulingContextStatus
 }
 
 var map_ResourceClaim = map[string]string{
@@ -295,20 +254,9 @@ func (ResourceClaimList) SwaggerDoc() map[string]string {
 	return map_ResourceClaimList
 }
 
-var map_ResourceClaimSchedulingStatus = map[string]string{
-	"":                "ResourceClaimSchedulingStatus contains information about one particular ResourceClaim with \"WaitForFirstConsumer\" allocation mode.",
-	"name":            "Name matches the pod.spec.resourceClaims[*].Name field.",
-	"unsuitableNodes": "UnsuitableNodes lists nodes that the ResourceClaim cannot be allocated for.\n\nThe size of this field is limited to 128, the same as for PodSchedulingSpec.PotentialNodes. This may get increased in the future, but not reduced.",
-}
-
-func (ResourceClaimSchedulingStatus) SwaggerDoc() map[string]string {
-	return map_ResourceClaimSchedulingStatus
-}
-
 var map_ResourceClaimSpec = map[string]string{
-	"":           "ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.",
-	"devices":    "Devices defines how to request devices.",
-	"controller": "Controller is the name of the DRA driver that is meant to handle allocation of this claim. If empty, allocation is handled by the scheduler while scheduling a pod.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+	"":        "ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.",
+	"devices": "Devices defines how to request devices.",
 }
 
 func (ResourceClaimSpec) SwaggerDoc() map[string]string {
@@ -316,10 +264,9 @@ func (ResourceClaimSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClaimStatus = map[string]string{
-	"":                      "ResourceClaimStatus tracks whether the resource has been allocated and what the result of that was.",
-	"allocation":            "Allocation is set once the claim has been allocated successfully.",
-	"reservedFor":           "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
-	"deallocationRequested": "Indicates that a claim is to be deallocated. While this is set, no new consumers may be added to ReservedFor.\n\nThis is only used if the claim needs to be deallocated by a DRA driver. That driver then must deallocate this claim and reset the field together with clearing the Allocation field.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+	"":            "ResourceClaimStatus tracks whether the resource has been allocated and what the result of that was.",
+	"allocation":  "Allocation is set once the claim has been allocated successfully.",
+	"reservedFor": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
 }
 
 func (ResourceClaimStatus) SwaggerDoc() map[string]string {

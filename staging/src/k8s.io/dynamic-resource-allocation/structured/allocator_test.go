@@ -20,6 +20,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -181,17 +183,6 @@ func claimWithDeviceConfig(name, request, class, driver, attribute string) *reso
 	return claim
 }
 
-// generate allocated ResourceClaim object
-func allocatedClaim(name, request, class string, results ...resourceapi.DeviceRequestAllocationResult) *resourceapi.ResourceClaim {
-	claim := claim(name, request, class)
-	claim.Status.Allocation = &resourceapi.AllocationResult{
-		Devices: resourceapi.DeviceAllocationResult{
-			Results: results,
-		},
-	}
-	return claim
-}
-
 // generate a Device object with the given name, capacity and attributes.
 func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) resourceapi.Device {
 	return resourceapi.Device{
@@ -240,13 +231,15 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 	return slice
 }
 
-func deviceAllocationResult(request, driver, pool, device string) resourceapi.DeviceRequestAllocationResult {
-	return resourceapi.DeviceRequestAllocationResult{
+func deviceAllocationResult(request, driver, pool, device string, adminAccess bool) resourceapi.DeviceRequestAllocationResult {
+	r := resourceapi.DeviceRequestAllocationResult{
 		Request: request,
 		Driver:  driver,
 		Pool:    pool,
 		Device:  device,
 	}
+	r.AdminAccess = &adminAccess
+	return r
 }
 
 // nodeLabelSelector creates a node selector with a label match for "key" in "values".
@@ -271,14 +264,13 @@ func localNodeSelector(nodeName string) *v1.NodeSelector {
 // allocationResult returns a matcher for one AllocationResult pointer with a list of
 // embedded device allocation results. The order of those results doesn't matter.
 func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRequestAllocationResult) types.GomegaMatcher {
-	return gstruct.PointTo(gstruct.MatchFields(0, gstruct.Fields{
+	return gstruct.MatchFields(0, gstruct.Fields{
 		"Devices": gstruct.MatchFields(0, gstruct.Fields{
 			"Results": gomega.ConsistOf(results), // Order is irrelevant.
 			"Config":  gomega.BeNil(),
 		}),
 		"NodeSelector": matchNodeSelector(selector),
-		"Controller":   gomega.BeEmpty(),
-	}))
+	})
 }
 
 // matchNodeSelector returns a matcher for a node selector. The order
@@ -321,8 +313,8 @@ func matchNodeSelectorRequirement(requirement v1.NodeSelectorRequirement) types.
 	})
 }
 
-func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source resourceapi.AllocationConfigSource, attribute string, results ...resourceapi.DeviceRequestAllocationResult) *resourceapi.AllocationResult {
-	return &resourceapi.AllocationResult{
+func allocationResultWithConfig(selector *v1.NodeSelector, driver string, source resourceapi.AllocationConfigSource, attribute string, results ...resourceapi.DeviceRequestAllocationResult) resourceapi.AllocationResult {
+	return resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: results,
 			Config: []resourceapi.DeviceAllocationConfiguration{
@@ -349,15 +341,16 @@ func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *re
 }
 
 func TestAllocator(t *testing.T) {
-	nonExistentAttribute := resourceapi.FullyQualifiedName("NonExistentAttribute")
-	boolAttribute := resourceapi.FullyQualifiedName("boolAttribute")
-	stringAttribute := resourceapi.FullyQualifiedName("stringAttribute")
-	versionAttribute := resourceapi.FullyQualifiedName("driverVersion")
-	intAttribute := resourceapi.FullyQualifiedName("numa")
+	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
+	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
+	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
+	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
+	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
 
 	testcases := map[string]struct {
+		adminAccess      bool
 		claimsToAllocate []*resourceapi.ResourceClaim
-		allocatedClaims  []*resourceapi.ResourceClaim
+		allocatedDevices []DeviceID
 		classes          []*resourceapi.DeviceClass
 		slices           []*resourceapi.ResourceSlice
 		node             *v1.Node
@@ -375,7 +368,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"other-node": {
@@ -389,7 +382,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node2),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"small-and-large": {
@@ -418,8 +411,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"small-and-large-backtrack-requests": {
@@ -451,8 +444,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"small-and-large-backtrack-claims": {
@@ -487,8 +480,8 @@ func TestAllocator(t *testing.T) {
 			node: node(node1, region1),
 
 			expectResults: []any{
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverA, pool1, device2)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverA, pool1, device2, false)),
 			},
 		},
 		"devices-split-across-different-slices": {
@@ -507,8 +500,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"obsolete-slice": {
@@ -527,7 +520,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"no-slices": {
@@ -595,7 +588,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"all-devices-of-the-incomplete-pool": {
@@ -627,7 +620,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				nodeLabelSelector(regionKey, region1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"unsuccessful-allocation-network-attached-device": {
@@ -663,10 +656,10 @@ func TestAllocator(t *testing.T) {
 						},
 					}},
 				},
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
-				deviceAllocationResult(req0, driverA, pool3, device1),
-				deviceAllocationResult(req0, driverA, pool4, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
+				deviceAllocationResult(req0, driverA, pool3, device1, false),
+				deviceAllocationResult(req0, driverA, pool4, device1, false),
 			)},
 		},
 		"local-and-network-attached-devices": {
@@ -681,8 +674,8 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{allocationResult(
 				// Once there is any node-local device, the selector is for that node.
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"several-different-drivers": {
@@ -698,23 +691,54 @@ func TestAllocator(t *testing.T) {
 			node: node(node1, region1),
 
 			expectResults: []any{
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverB, pool1, device1)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverB, pool1, device1, false)),
 			},
 		},
 		"already-allocated-devices": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
-			allocatedClaims: objects(
-				allocatedClaim(claim0, req0, classA,
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req1, driverA, pool1, device2),
-				),
-			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
 
 			expectResults: nil,
+		},
+		"admin-access-disabled": {
+			adminAccess: false,
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = true
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
+		},
+		"admin-access-enabled": {
+			adminAccess: true,
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = true
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+			},
 		},
 		"with-constraint": {
 			claimsToAllocate: objects(claimWithRequests(
@@ -748,8 +772,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"with-constraint-non-existent-attribute": {
@@ -850,7 +874,7 @@ func TestAllocator(t *testing.T) {
 					driverA,
 					resourceapi.AllocationConfigSourceClass,
 					"classAttribute",
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 			},
 		},
@@ -866,7 +890,7 @@ func TestAllocator(t *testing.T) {
 					driverA,
 					resourceapi.AllocationConfigSourceClaim,
 					"deviceAttribute",
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 			},
 		},
@@ -880,23 +904,15 @@ func TestAllocator(t *testing.T) {
 			// Listing objects is deterministic and returns them in the same
 			// order as in the test case. That makes the allocation result
 			// also deterministic.
-			var allocated, toAllocate claimLister
 			var classLister informerLister[resourceapi.DeviceClass]
-			var sliceLister informerLister[resourceapi.ResourceSlice]
-			for _, claim := range tc.claimsToAllocate {
-				toAllocate.claims = append(toAllocate.claims, claim.DeepCopy())
-			}
-			for _, claim := range tc.allocatedClaims {
-				allocated.claims = append(allocated.claims, claim.DeepCopy())
-			}
-			for _, slice := range tc.slices {
-				sliceLister.objs = append(sliceLister.objs, slice.DeepCopy())
-			}
 			for _, class := range tc.classes {
 				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
+			claimsToAllocate := slices.Clone(tc.claimsToAllocate)
+			allocatedDevices := slices.Clone(tc.allocatedDevices)
+			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, toAllocate.claims, allocated, classLister, sliceLister)
+			allocator, err := NewAllocator(ctx, tc.adminAccess, claimsToAllocate, sets.New(allocatedDevices...), classLister, slices, NewCELCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)
@@ -908,21 +924,12 @@ func TestAllocator(t *testing.T) {
 			g.Expect(results).To(gomega.ConsistOf(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
-			g.Expect(toAllocate.claims).To(gomega.HaveExactElements(tc.claimsToAllocate))
-			g.Expect(allocated.claims).To(gomega.HaveExactElements(tc.allocatedClaims))
-			g.Expect(sliceLister.objs).To(gomega.ConsistOf(tc.slices))
+			g.Expect(claimsToAllocate).To(gomega.HaveExactElements(tc.claimsToAllocate))
+			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
+			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
 		})
 	}
-}
-
-type claimLister struct {
-	claims []*resourceapi.ResourceClaim
-	err    error
-}
-
-func (l claimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	return l.claims, l.err
 }
 
 type informerLister[T any] struct {

@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -952,8 +953,8 @@ func (p *PersistentVolumeWrapper) Label(k, v string) *PersistentVolumeWrapper {
 type ResourceClaimWrapper struct{ resourceapi.ResourceClaim }
 
 // MakeResourceClaim creates a ResourceClaim wrapper.
-func MakeResourceClaim(controller string) *ResourceClaimWrapper {
-	return &ResourceClaimWrapper{resourceapi.ResourceClaim{Spec: resourceapi.ResourceClaimSpec{Controller: controller}}}
+func MakeResourceClaim() *ResourceClaimWrapper {
+	return &ResourceClaimWrapper{}
 }
 
 // FromResourceClaim creates a ResourceClaim wrapper from some existing object.
@@ -1014,6 +1015,9 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 
 // Allocation sets the allocation of the inner object.
 func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
+	if !slices.Contains(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer) {
+		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
+	}
 	wrapper.ResourceClaim.Status.Allocation = allocation
 	return wrapper
 }
@@ -1021,24 +1025,6 @@ func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.Allocati
 // Deleting sets the deletion timestamp of the inner object.
 func (wrapper *ResourceClaimWrapper) Deleting(time metav1.Time) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.DeletionTimestamp = &time
-	return wrapper
-}
-
-// Structured turns a "normal" claim into one which was allocated via structured parameters.
-// The only difference is that there is no controller name and the special finalizer
-// gets added.
-func (wrapper *ResourceClaimWrapper) Structured() *ResourceClaimWrapper {
-	wrapper.Spec.Controller = ""
-	if wrapper.ResourceClaim.Status.Allocation != nil {
-		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
-		wrapper.ResourceClaim.Status.Allocation.Controller = ""
-	}
-	return wrapper
-}
-
-// DeallocationRequested sets that field of the inner object.
-func (wrapper *ResourceClaimWrapper) DeallocationRequested(deallocationRequested bool) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Status.DeallocationRequested = deallocationRequested
 	return wrapper
 }
 
@@ -1051,86 +1037,6 @@ func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourceapi.Resour
 // ReservedForPod sets that field of the inner object given information about one pod.
 func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types.UID) *ResourceClaimWrapper {
 	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
-}
-
-// PodSchedulingWrapper wraps a PodSchedulingContext inside.
-type PodSchedulingWrapper struct {
-	resourceapi.PodSchedulingContext
-}
-
-// MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
-func MakePodSchedulingContexts() *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{resourceapi.PodSchedulingContext{}}
-}
-
-// FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
-func FromPodSchedulingContexts(other *resourceapi.PodSchedulingContext) *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{*other.DeepCopy()}
-}
-
-// Obj returns the inner object.
-func (wrapper *PodSchedulingWrapper) Obj() *resourceapi.PodSchedulingContext {
-	return &wrapper.PodSchedulingContext
-}
-
-// Name sets `s` as the name of the inner object.
-func (wrapper *PodSchedulingWrapper) Name(s string) *PodSchedulingWrapper {
-	wrapper.SetName(s)
-	return wrapper
-}
-
-// UID sets `s` as the UID of the inner object.
-func (wrapper *PodSchedulingWrapper) UID(s string) *PodSchedulingWrapper {
-	wrapper.SetUID(types.UID(s))
-	return wrapper
-}
-
-// Namespace sets `s` as the namespace of the inner object.
-func (wrapper *PodSchedulingWrapper) Namespace(s string) *PodSchedulingWrapper {
-	wrapper.SetNamespace(s)
-	return wrapper
-}
-
-// OwnerReference updates the owning controller of the inner object.
-func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema.GroupVersionKind) *PodSchedulingWrapper {
-	wrapper.OwnerReferences = []metav1.OwnerReference{
-		{
-			APIVersion:         gvk.GroupVersion().String(),
-			Kind:               gvk.Kind,
-			Name:               name,
-			UID:                types.UID(uid),
-			Controller:         ptr.To(true),
-			BlockOwnerDeletion: ptr.To(true),
-		},
-	}
-	return wrapper
-}
-
-// Label applies a {k,v} label pair to the inner object
-func (wrapper *PodSchedulingWrapper) Label(k, v string) *PodSchedulingWrapper {
-	if wrapper.Labels == nil {
-		wrapper.Labels = make(map[string]string)
-	}
-	wrapper.Labels[k] = v
-	return wrapper
-}
-
-// SelectedNode sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) SelectedNode(s string) *PodSchedulingWrapper {
-	wrapper.Spec.SelectedNode = s
-	return wrapper
-}
-
-// PotentialNodes sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedulingWrapper {
-	wrapper.Spec.PotentialNodes = nodes
-	return wrapper
-}
-
-// ResourceClaims sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourceapi.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
-	wrapper.Status.ResourceClaims = statuses
-	return wrapper
 }
 
 type ResourceSliceWrapper struct {

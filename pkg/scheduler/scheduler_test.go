@@ -639,9 +639,6 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.PodSchedulingContext, ActionType: framework.All}: {
-					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
-				},
 				{Resource: framework.ResourceClaim, ActionType: framework.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
@@ -806,7 +803,6 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolume:      framework.All,
 				framework.PersistentVolumeClaim: framework.All,
 				framework.StorageClass:          framework.All,
-				framework.PodSchedulingContext:  framework.All,
 				framework.ResourceClaim:         framework.All,
 				framework.DeviceClass:           framework.All,
 			},

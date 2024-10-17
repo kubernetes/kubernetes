@@ -23,7 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/utils/ptr"
 )
@@ -174,30 +173,6 @@ func TestValidateClass(t *testing.T) {
 				return class
 			}(),
 		},
-		"invalid-node-selector": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("suitableNodes", "nodeSelectorTerms"), "must have at least one node selector term")},
-			class: func() *resource.DeviceClass {
-				class := testClass(goodName)
-				class.Spec.SuitableNodes = &core.NodeSelector{
-					// Must not be empty.
-				}
-				return class
-			}(),
-		},
-		"valid-node-selector": {
-			class: func() *resource.DeviceClass {
-				class := testClass(goodName)
-				class.Spec.SuitableNodes = &core.NodeSelector{
-					NodeSelectorTerms: []core.NodeSelectorTerm{{
-						MatchExpressions: []core.NodeSelectorRequirement{{
-							Key:      "foo",
-							Operator: core.NodeSelectorOpDoesNotExist,
-						}},
-					}},
-				}
-				return class
-			}(),
-		},
 	}
 
 	for name, scenario := range scenarios {
@@ -219,21 +194,6 @@ func TestValidateClassUpdate(t *testing.T) {
 		"valid-no-op-update": {
 			oldClass: validClass,
 			update:   func(class *resource.DeviceClass) *resource.DeviceClass { return class },
-		},
-		"update-node-selector": {
-			oldClass: validClass,
-			update: func(class *resource.DeviceClass) *resource.DeviceClass {
-				class = class.DeepCopy()
-				class.Spec.SuitableNodes = &core.NodeSelector{
-					NodeSelectorTerms: []core.NodeSelectorTerm{{
-						MatchExpressions: []core.NodeSelectorRequirement{{
-							Key:      "foo",
-							Operator: core.NodeSelectorOpDoesNotExist,
-						}},
-					}},
-				}
-				return class
-			},
 		},
 	}
 

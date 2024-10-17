@@ -21,34 +21,25 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/utils/pointer"
 )
 
@@ -646,118 +637,4 @@ func TestNodeEvents(t *testing.T) {
 		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
 	}
 
-}
-
-// TestPodSchedulingContextSSA checks that the dynamicresources plugin falls
-// back to SSA successfully when the normal Update call encountered
-// a conflict.
-//
-// This is an integration test because:
-//   - Unit testing does not cover RBAC rules.
-//   - Triggering this particular race is harder in E2E testing
-//     and harder to verify (needs apiserver metrics and there's
-//     no standard API for those).
-func TestPodSchedulingContextSSA(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, true)
-
-	testCtx := testutils.InitTestAPIServer(t, "podschedulingcontext-ssa", nil)
-	testCtx.DisableEventSink = true
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0)
-	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
-
-	// Set up enough objects that the scheduler will start trying to
-	// schedule the pod and create the PodSchedulingContext.
-	nodeRes := map[v1.ResourceName]string{
-		v1.ResourcePods:   "32",
-		v1.ResourceCPU:    "30m",
-		v1.ResourceMemory: "30",
-	}
-	for _, name := range []string{"node-a", "node-b"} {
-		if _, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name(name).Capacity(nodeRes).Obj()); err != nil {
-			t.Fatalf("Failed to create node: %v", err)
-		}
-	}
-
-	claim := &resourceapi.ResourceClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-claim",
-			Namespace: testCtx.NS.Name,
-		},
-		Spec: resourceapi.ResourceClaimSpec{
-			Controller: "dra.example.com",
-		},
-	}
-	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create claim: %v", err)
-	}
-
-	podConf := testutils.PausePodConfig{
-		Name:      "testpod",
-		Namespace: testCtx.NS.Name,
-	}
-	pod := testutils.InitPausePod(&podConf)
-	podClaimName := "myclaim"
-	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
-	pod.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: podClaimName, ResourceClaimName: &claim.Name}}
-	if _, err := testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create pod: %v", err)
-	}
-
-	// Check that the PodSchedulingContext exists and has a selected node.
-	var schedulingCtx *resourceapi.PodSchedulingContext
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, 30*time.Second, true,
-		func(context.Context) (bool, error) {
-			var err error
-			schedulingCtx, err = testCtx.ClientSet.ResourceV1alpha3().PodSchedulingContexts(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
-			if err == nil && schedulingCtx.Spec.SelectedNode != "" {
-				return true, nil
-			}
-			return false, err
-		}); err != nil {
-		t.Fatalf("Failed while waiting for PodSchedulingContext with selected node: %v\nLast PodSchedulingContext:\n%s", err, format.Object(schedulingCtx, 1))
-	}
-
-	// Force the plugin to use SSA.
-	var podSchedulingContextPatchCounter atomic.Int64
-	roundTrip := testutils.RoundTripWrapper(func(transport http.RoundTripper, req *http.Request) (*http.Response, error) {
-		if strings.HasPrefix(req.URL.Path, "/apis/resource.k8s.io/") &&
-			strings.HasSuffix(req.URL.Path, "/podschedulingcontexts/"+pod.Name) {
-			switch req.Method {
-			case http.MethodPut, http.MethodPost:
-				return &http.Response{
-					Status:     fmt.Sprintf("%d %s", http.StatusConflict, metav1.StatusReasonConflict),
-					StatusCode: http.StatusConflict,
-				}, nil
-			case http.MethodPatch:
-				podSchedulingContextPatchCounter.Add(1)
-			}
-		}
-		return transport.RoundTrip(req)
-	})
-	testCtx.RoundTrip.Store(&roundTrip)
-
-	// Now force the scheduler to update the PodSchedulingContext by setting UnsuitableNodes so that
-	// the selected node is not suitable.
-	schedulingCtx.Status.ResourceClaims = []resourceapi.ResourceClaimSchedulingStatus{{
-		Name:            podClaimName,
-		UnsuitableNodes: []string{schedulingCtx.Spec.SelectedNode},
-	}}
-
-	if _, err := testCtx.ClientSet.ResourceV1alpha3().PodSchedulingContexts(pod.Namespace).UpdateStatus(testCtx.Ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Unexpected PodSchedulingContext status update error: %v", err)
-	}
-
-	// We know that the scheduler has to use SSA because above we inject a conflict
-	// error whenever it tries to use a plain update. We just need to wait for it...
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, time.Minute, true,
-		func(context.Context) (bool, error) {
-			return podSchedulingContextPatchCounter.Load() > 0, nil
-		}); err != nil {
-		t.Fatalf("Failed while waiting for PodSchedulingContext Patch: %v", err)
-	}
 }

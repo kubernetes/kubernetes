@@ -1,5 +1,5 @@
 apiVersion: resource.k8s.io/v1alpha3
-kind: PodSchedulingContext
+kind: DeviceClass
 metadata:
   annotations:
     annotationsKey: annotationsValue
@@ -33,11 +33,16 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  potentialNodes:
-  - potentialNodesValue
-  selectedNode: selectedNodeValue
-status:
-  resourceClaims:
-  - name: nameValue
-    unsuitableNodes:
-    - unsuitableNodesValue
+  config:
+  - opaque:
+      driver: driverValue
+      parameters:
+        apiVersion: example.com/v1
+        kind: CustomType
+        spec:
+          replicas: 1
+        status:
+          available: 1
+  selectors:
+  - cel:
+      expression: expressionValue

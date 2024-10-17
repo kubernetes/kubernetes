@@ -92,16 +92,16 @@ var (
 	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
 
 	// owning-sig: sig-node
-	// kep: https://kep.k8s.io/3063
+	// kep: https://kep.k8s.io/4381
 	// test-infra jobs:
-	// - "classic-dra" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	// - "dra-alpha" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
 	//
 	// This label is used for tests which need:
-	// - the DynamicResourceAllocation *and* DRAControlPlaneController feature gates
+	// - the DynamicResourceAllocation *and* DRAAdminAccess feature gates
 	// - the resource.k8s.io API group
 	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
-	DRAControlPlaneController = framework.WithFeature(framework.ValidFeatures.Add("DRAControlPlaneController"))
+	DRAAdminAccess = framework.WithFeature(framework.ValidFeatures.Add("DRAAdminAccess"))
 
 	// owning-sig: sig-node
 	// kep: https://kep.k8s.io/4381

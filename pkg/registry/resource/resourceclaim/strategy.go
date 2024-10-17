@@ -172,35 +172,40 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	return fields
 }
 
-// dropDisabledFields removes fields which are covered by the optional DRAControlPlaneController feature gate.
+// dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
+	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
+}
+
+func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
 		// No need to drop anything.
 		return
 	}
 
-	if oldClaim == nil {
-		// Always drop on create. There's no status yet, so nothing to do there.
-		newClaim.Spec.Controller = ""
-		return
+	for i := range newClaim.Spec.Devices.Requests {
+		if oldClaim == nil || i >= len(oldClaim.Spec.Devices.Requests) || !oldClaim.Spec.Devices.Requests[i].AdminAccess {
+			newClaim.Spec.Devices.Requests[i].AdminAccess = false
+		}
 	}
 
-	// Drop on (status) update only if not already set.
-	if oldClaim.Spec.Controller == "" {
-		newClaim.Spec.Controller = ""
+	if newClaim.Status.Allocation == nil {
+		return
 	}
-	// If the claim is handled by a control plane controller, allow
-	// setting it also in the status. Stripping that field would be bad.
-	if oldClaim.Spec.Controller == "" &&
-		newClaim.Status.Allocation != nil &&
-		oldClaim.Status.Allocation == nil &&
-		(oldClaim.Status.Allocation == nil || oldClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.Allocation.Controller = ""
+	for i := range newClaim.Status.Allocation.Devices.Results {
+		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil &&
+			(oldClaim == nil || oldClaim.Status.Allocation == nil || i >= len(oldClaim.Status.Allocation.Devices.Results) || oldClaim.Status.Allocation.Devices.Results[i].AdminAccess == nil) &&
+			!requestHasAdminAccess(newClaim, newClaim.Status.Allocation.Devices.Results[i].Request) {
+			newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
+		}
 	}
-	// If there is an existing allocation which used a control plane controller, then
-	// allow requesting its deallocation.
-	if !oldClaim.Status.DeallocationRequested &&
-		(newClaim.Status.Allocation == nil || newClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.DeallocationRequested = false
+}
+
+func requestHasAdminAccess(claim *resource.ResourceClaim, requestName string) bool {
+	for _, request := range claim.Spec.Devices.Requests {
+		if request.Name == requestName && request.AdminAccess {
+			return true
+		}
 	}
+	return false
 }
