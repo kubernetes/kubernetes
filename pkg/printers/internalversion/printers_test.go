@@ -1828,7 +1828,58 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					},
 				},
 			},
-			[]metav1.TableRow{{Cells: []interface{}{"test4", "0/2", "Init:0/2", "0", "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test4", "0/2", "Init:1/2", "0", "<unknown>"}}},
+		},
+		{
+			// Test pod has container statuses for non-existent initContainers that has restart count
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test5"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "init1", Image: "initimage"},
+						{Name: "sidecar1", Image: "sidecarimage", RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways)},
+					},
+					Containers: []api.Container{{Name: "container1", Image: "containerimage"}},
+				},
+				Status: api.PodStatus{
+					Phase: "Running",
+					InitContainerStatuses: []api.ContainerStatus{
+						{Name: "initinvalid", RestartCount: 3},
+						{Name: "init1"},
+						{Name: "sidecar1"},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "containerinvalid"},
+						{Name: "container1"},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test5", "0/2", "Init:1/2", "0", "<unknown>"}}},
+		},
+		{
+			// Test pod has container statuses for non-existent containers that has restart count
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test6"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "init1", Image: "initimage"},
+						{Name: "sidecar1", Image: "sidecarimage", RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways)},
+					},
+					Containers: []api.Container{{Name: "container1", Image: "containerimage"}},
+				},
+				Status: api.PodStatus{
+					Phase: "Running",
+					InitContainerStatuses: []api.ContainerStatus{
+						{Name: "init1"},
+						{Name: "sidecar1"},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "containerinvalid", RestartCount: 3},
+						{Name: "container1"},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test6", "0/2", "Init:0/2", "0", "<unknown>"}}},
 		},
 	}
 
