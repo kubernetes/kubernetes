@@ -123,8 +123,8 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 				return nil, fmt.Errorf("last cannot be used on type: %T", list)
 			}
 		},
-		"indent": func(amount int, str string) string {
-			pad := strings.Repeat(" ", amount)
+		"indent": func(amount int, spaceString, str string) string {
+			pad := strings.Repeat(spaceString, amount)
 			return pad + strings.Replace(str, "\n", "\n"+pad, -1)
 		},
 		"dict": func(keysAndValues ...any) (map[string]any, error) {
