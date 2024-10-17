@@ -245,6 +245,9 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+
+	// Set to true in order to avoid TLS transports created with this Config to be cached
+	DisableTransportCaching bool
 }
 
 var _ fmt.Stringer = TLSClientConfig{}
@@ -607,11 +610,12 @@ func AnonymousClientConfig(config *Config) *Config {
 		APIPath:       config.APIPath,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.Insecure,
-			ServerName: config.ServerName,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:                config.Insecure,
+			ServerName:              config.ServerName,
+			CAFile:                  config.TLSClientConfig.CAFile,
+			CAData:                  config.TLSClientConfig.CAData,
+			NextProtos:              config.TLSClientConfig.NextProtos,
+			DisableTransportCaching: config.DisableTransportCaching,
 		},
 		RateLimiter:        config.RateLimiter,
 		WarningHandler:     config.WarningHandler,
@@ -645,15 +649,16 @@ func CopyConfig(config *Config) *Config {
 		AuthConfigPersister: config.AuthConfigPersister,
 		ExecProvider:        config.ExecProvider,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.TLSClientConfig.Insecure,
-			ServerName: config.TLSClientConfig.ServerName,
-			CertFile:   config.TLSClientConfig.CertFile,
-			KeyFile:    config.TLSClientConfig.KeyFile,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CertData:   config.TLSClientConfig.CertData,
-			KeyData:    config.TLSClientConfig.KeyData,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:                config.TLSClientConfig.Insecure,
+			ServerName:              config.TLSClientConfig.ServerName,
+			CertFile:                config.TLSClientConfig.CertFile,
+			KeyFile:                 config.TLSClientConfig.KeyFile,
+			CAFile:                  config.TLSClientConfig.CAFile,
+			CertData:                config.TLSClientConfig.CertData,
+			KeyData:                 config.TLSClientConfig.KeyData,
+			CAData:                  config.TLSClientConfig.CAData,
+			NextProtos:              config.TLSClientConfig.NextProtos,
+			DisableTransportCaching: config.TLSClientConfig.DisableTransportCaching,
 		},
 		UserAgent:          config.UserAgent,
 		DisableCompression: config.DisableCompression,
