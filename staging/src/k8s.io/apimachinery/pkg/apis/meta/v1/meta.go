@@ -63,6 +63,38 @@ type Object interface {
 	SetManagedFields(managedFields []ManagedFieldsEntry)
 }
 
+// ObjectApplyConfiguration interface must be supported by all typesafe Go representations of the apply
+// configurations that are used to constructs Server-Side Apply requests.
+type ObjectApplyConfiguration[T any] interface {
+	GetNamespace() *string
+	WithNamespace(value string) T
+	GetName() *string
+	WithName(value string) T
+	GetGenerateName() *string
+	WithGenerateName(value string) T
+	GetUID() *types.UID
+	WithUID(value types.UID) T
+	GetResourceVersion() *string
+	WithResourceVersion(value string) T
+	GetGeneration() *int64
+	WithGeneration(value int64) T
+	GetCreationTimestamp() *Time
+	WithCreationTimestamp(value Time) T
+	GetDeletionTimestamp() *Time
+	WithDeletionTimestamp(value Time) T
+	GetDeletionGracePeriodSeconds() *int64
+	WithDeletionGracePeriodSeconds(value int64) T
+	GetLabels() map[string]string
+	WithLabels(entries map[string]string) T
+	GetAnnotations() map[string]string
+	WithAnnotations(entries map[string]string) T
+	GetFinalizers() []string
+	WithFinalizers(values ...string) T
+	// TODO: OwnerReferenceApplyConfiguration is an unwanted dependency in this package
+	// GetOwnerReferences() []OwnerReferenceApplyConfiguration
+	// WithOwnerReferences(values ...*OwnerReferenceApplyConfiguration) T
+}
+
 // ListMetaAccessor retrieves the list interface from an object
 type ListMetaAccessor interface {
 	GetListMeta() ListInterface

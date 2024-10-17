@@ -338,6 +338,17 @@ type Object interface {
 	DeepCopyObject() Object
 }
 
+// ObjectApplyConfiguration interface must be supported by all typesafe Go representations of the apply
+// configurations that are used to constructs Server-Side Apply requests.
+type ObjectApplyConfiguration[T any, O Object] interface {
+	GetObjectKind() schema.ObjectKind
+	SetGroupVersionKind(kind schema.GroupVersionKind)
+	WithAPIVersion(value string) T
+	WithKind(value string) T
+
+	Object() O
+}
+
 // CacheableObject allows an object to cache its different serializations
 // to avoid performing the same serialization multiple times.
 type CacheableObject interface {
