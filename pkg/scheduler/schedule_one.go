@@ -654,8 +654,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
 	if err := fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter); err != nil {
-		statusCode = framework.Error
-		return feasibleNodes, err
+		return nil, err
 	}
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
 	for _, item := range result {
