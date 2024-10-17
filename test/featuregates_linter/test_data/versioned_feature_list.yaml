@@ -1320,6 +1320,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.32"
 - name: WindowsHostNetwork
   versionedSpecs:
   - default: true
