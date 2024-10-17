@@ -240,7 +240,7 @@ func WaitForNamespacesDeleted(ctx context.Context, c clientset.Interface, namesp
 	for _, ns := range namespaces {
 		nsMap[ns] = true
 	}
-	//Now POLL until all namespaces have been eradicated.
+	// Now POLL until all namespaces have been eradicated.
 	return wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, false,
 		func(ctx context.Context) (bool, error) {
 			nsList, err := c.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})

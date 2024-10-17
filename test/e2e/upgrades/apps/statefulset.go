@@ -69,7 +69,7 @@ func (StatefulSetUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	return false
 }
 
-// Setup creates a StatefulSet and a HeadlessService. It verifies the basic SatefulSet properties
+// Setup creates a StatefulSet and a HeadlessService. It verifies the basic StatefulSet properties
 func (t *StatefulSetUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ssName := "ss"
 	labels := map[string]string{

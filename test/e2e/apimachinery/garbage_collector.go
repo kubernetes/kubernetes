@@ -70,7 +70,7 @@ func estimateMaximumPods(ctx context.Context, c clientset.Interface, min, max in
 		// one core.
 		availablePods += 10
 	}
-	//avoid creating exactly max pods
+	// avoid creating exactly max pods
 	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {
@@ -302,7 +302,7 @@ func newCronJob(name, schedule string) *batchv1.CronJob {
 	}
 }
 
-// getUniqLabel returns a UniqLabel based on labeLkey and labelvalue.
+// getUniqLabel returns a UniqLabel based on labelkey and labelvalue.
 func getUniqLabel(labelkey, labelvalue string) map[string]string {
 	count := atomic.AddInt64(&lablecount, 1)
 	uniqlabelkey := fmt.Sprintf("%s-%05d", labelkey, count)
