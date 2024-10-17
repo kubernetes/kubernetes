@@ -61,5 +61,5 @@ func TestCSIImageConfigs(t *testing.T) {
 		assert.NotEmpty(t, config.version, "version")
 		actualImages.Insert(config.name)
 	}
-	assert.ElementsMatch(t, expectedImages, actualImages.UnsortedList(), "found these images: %+v", configs)
+	assert.ElementsMatchf(t, expectedImages, actualImages.UnsortedList(), "found these images: %+v", configs)
 }
