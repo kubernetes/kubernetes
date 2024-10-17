@@ -6,25 +6,25 @@ package label
 // InitLabels returns the process label and file labels to be used within
 // the container.  A list of options can be passed into this function to alter
 // the labels.
-func InitLabels(options []string) (string, string, error) {
+func InitLabels([]string) (string, string, error) {
 	return "", "", nil
 }
 
 // Deprecated: The GenLabels function is only to be used during the transition
 // to the official API. Use InitLabels(strings.Fields(options)) instead.
-func GenLabels(options string) (string, string, error) {
+func GenLabels(string) (string, string, error) {
 	return "", "", nil
 }
 
-func SetFileLabel(path string, fileLabel string) error {
+func SetFileLabel(string, string) error {
 	return nil
 }
 
-func SetFileCreateLabel(fileLabel string) error {
+func SetFileCreateLabel(string) error {
 	return nil
 }
 
-func Relabel(path string, fileLabel string, shared bool) error {
+func Relabel(string, string, bool) error {
 	return nil
 }
 
@@ -35,16 +35,16 @@ func DisableSecOpt() []string {
 }
 
 // Validate checks that the label does not include unexpected options
-func Validate(label string) error {
+func Validate(string) error {
 	return nil
 }
 
 // RelabelNeeded checks whether the user requested a relabel
-func RelabelNeeded(label string) bool {
+func RelabelNeeded(string) bool {
 	return false
 }
 
 // IsShared checks that the label includes a "shared" mark
-func IsShared(label string) bool {
+func IsShared(string) bool {
 	return false
 }
