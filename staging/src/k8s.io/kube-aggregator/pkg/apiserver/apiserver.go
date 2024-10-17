@@ -443,7 +443,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 				// All apiservers (aggregator-apiserver, kube-apiserver, apiextensions-apiserver)
 				// share the same generic apiserver config. The same StorageVersion manager is used
 				// to register all built-in resources when the generic apiservers install APIs.
-				s.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(hookContext.LoopbackClientConfig, s.GenericAPIServer.APIServerID)
+				s.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(context.TODO(), hookContext.LoopbackClientConfig, s.GenericAPIServer.APIServerID)
 				return false, nil
 			}, hookContext.Done())
 			// Once the storage version updater finishes the first round of update,
