@@ -172,7 +172,6 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 	if err != nil {
 		metrics.ForceCleanedFailedVolumeOperationsErrorsTotal.Inc()
 		klog.ErrorS(err, mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
-		return
 	}
 }
 
