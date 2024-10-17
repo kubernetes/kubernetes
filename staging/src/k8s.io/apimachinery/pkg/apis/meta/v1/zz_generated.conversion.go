@@ -339,6 +339,13 @@ func autoConvert_url_Values_To_v1_DeleteOptions(in *url.Values, out *DeleteOptio
 	} else {
 		out.DryRun = nil
 	}
+	if values, ok := map[string][]string(*in)["ignoreStoreReadErrorWithClusterBreakingPotential"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_Pointer_bool(&values, &out.IgnoreStoreReadErrorWithClusterBreakingPotential, s); err != nil {
+			return err
+		}
+	} else {
+		out.IgnoreStoreReadErrorWithClusterBreakingPotential = nil
+	}
 	return nil
 }
 

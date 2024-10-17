@@ -272,7 +272,7 @@ func (s *store) Delete(
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 
-	skipTransformDecode := false
+	skipTransformDecode := opts.IgnoreStoreReadError
 	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, skipTransformDecode)
 }
 
@@ -768,7 +768,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
+				switch {
+				case opts.AggregateErrFn != nil:
+					if done := opts.AggregateErrFn(string(kv.Key), err); done {
+						return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
+					}
+					continue
+				default:
+					return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
+				}
 			}
 
 			// Check if the request has already timed out before decode object
@@ -782,7 +790,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 			if err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				switch {
+				case opts.AggregateErrFn != nil:
+					if done := opts.AggregateErrFn(string(kv.Key), err); done {
+						return err
+					}
+					continue
+				default:
+					return err
+				}
 			}
 
 			// being unable to set the version does not prevent the object from being extracted

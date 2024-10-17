@@ -37,6 +37,7 @@ const (
 	ErrCodeInvalidObj
 	ErrCodeUnreachable
 	ErrCodeTimeout
+	ErrCodeCorruptObj
 )
 
 var errCodeToMessage = map[int]string{
@@ -46,6 +47,7 @@ var errCodeToMessage = map[int]string{
 	ErrCodeInvalidObj:               "invalid object",
 	ErrCodeUnreachable:              "server unreachable",
 	ErrCodeTimeout:                  "request timeout",
+	ErrCodeCorruptObj:               "corrupt object",
 }
 
 func NewKeyNotFoundError(key string, rv int64) *StorageError {
@@ -96,16 +98,32 @@ func NewInvalidObjError(key, msg string) *StorageError {
 	}
 }
 
+// NewCorruptObjError returns a new StorageError, it represents a corrupt object:
+// a) object data retrieved from the storage failed to transform with the given err.
+// b) the given object failed to decode with the given err
+func NewCorruptObjError(key string, err error) *StorageError {
+	return &StorageError{
+		Code: ErrCodeCorruptObj,
+		Key:  key,
+		err:  err,
+	}
+}
+
 type StorageError struct {
 	Code               int
 	Key                string
 	ResourceVersion    int64
 	AdditionalErrorMsg string
+
+	// inner error
+	err error
 }
 
+func (e *StorageError) Unwrap() error { return e.err }
+
 func (e *StorageError) Error() string {
-	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d, AdditionalErrorMsg: %s",
-		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion, e.AdditionalErrorMsg)
+	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d, AdditionalErrorMsg: %s, err: %v",
+		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion, e.AdditionalErrorMsg, e.err)
 }
 
 // IsNotFound returns true if and only if err is "key" not found error.
@@ -136,6 +154,21 @@ func IsRequestTimeout(err error) bool {
 // IsInvalidObj returns true if and only if err is invalid error
 func IsInvalidObj(err error) bool {
 	return isErrCode(err, ErrCodeInvalidObj)
+}
+
+// IsCorruptObject returns true if and only if:
+// a) the given object data retrieved from the storage is not transformable, or
+// b) the given object failed to decode properly
+func IsCorruptObject(err error) bool {
+	if err == nil {
+		return false
+	}
+	var storageErr *StorageError
+	if !errors.As(err, &storageErr) {
+		return false
+	}
+
+	return storageErr.Code == ErrCodeCorruptObj
 }
 
 func isErrCode(err error, code int) bool {

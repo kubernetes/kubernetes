@@ -234,6 +234,23 @@ type Store struct {
 	// If set, DestroyFunc has to be implemented in thread-safe way and
 	// be prepared for being called more than once.
 	DestroyFunc func()
+
+	// CorruptObjDeleter, if initialized, will make an attempt to
+	// perform the normal deletion flow, but if either of the below occurs:
+	// a) the data (associated with the resource being deleted) retrieved
+	// from the storage failed to transform properly (eg. decryption failure)
+	// b) the data (associated with the resource being deleted) failed to
+	// decode properly (eg. corrupt data)
+	// it will disregard these errors, bypass the finalzer constraints,
+	// deletion hook(s) and go ahead with the deletion of the object.
+	//
+	// WARNING: This may break the cluster if the resource has
+	// dependencies. Use when the cluster is broken, and there is no
+	// other viable option to repair the cluster.
+	//
+	// TODO: it's located here for convenience so we can wire it
+	// from inside the handler.DeleteResource function
+	CorruptObjDeleter rest.GracefulDeleter
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -1631,7 +1648,15 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.ReadinessCheckFunc = e.Storage.Storage.ReadinessCheck
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		e.CorruptObjDeleter = NewCorruptObjectDeleter(e)
+	}
+
 	return nil
+}
+
+func (e *Store) GetCorruptObjDeleter() rest.GracefulDeleter {
+	return e.CorruptObjDeleter
 }
 
 // startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
