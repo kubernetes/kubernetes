@@ -1519,6 +1519,10 @@ func TestDescribers(t *testing.T) {
 	}
 }
 
+func TestDescribeResource(t *testing.T) {
+	// TODO(ndixita): Add test before creating PR
+}
+
 func TestDefaultDescribers(t *testing.T) {
 	out, err := DefaultObjectDescriber.DescribeObject(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	if err != nil {
