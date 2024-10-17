@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
@@ -49,7 +50,8 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 	klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	if !admit {
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-		return admission.GetPodAdmitResult(&TopologyAffinityError{})
+		err := fmt.Errorf(ErrorNoPreference)
+		return admission.GetPodAdmitResult(&TopologyAffinityError{err})
 	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
@@ -59,7 +61,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-			return admission.GetPodAdmitResult(err)
+			return admission.GetPodAdmitResult(&AllocateResourceError{err})
 		}
 	}
 	return admission.GetPodAdmitResult(nil)

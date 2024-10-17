@@ -85,7 +85,7 @@ func (e *endpointImpl) setStopTime(t time.Time) {
 // getPreferredAllocation issues GetPreferredAllocation gRPC call to the device plugin.
 func (e *endpointImpl) getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
 	if e.isStopped() {
-		return nil, fmt.Errorf(errEndpointStopped, e)
+		return nil, fmt.Errorf(ErrEndpointStopped, e)
 	}
 	return e.api.GetPreferredAllocation(context.Background(), &pluginapi.PreferredAllocationRequest{
 		ContainerRequests: []*pluginapi.ContainerPreferredAllocationRequest{
@@ -101,7 +101,7 @@ func (e *endpointImpl) getPreferredAllocation(available, mustInclude []string, s
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	if e.isStopped() {
-		return nil, fmt.Errorf(errEndpointStopped, e)
+		return nil, fmt.Errorf(ErrEndpointStopped, e)
 	}
 	return e.api.Allocate(context.Background(), &pluginapi.AllocateRequest{
 		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
@@ -113,7 +113,7 @@ func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, err
 // preStartContainer issues PreStartContainer gRPC call to the device plugin.
 func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
 	if e.isStopped() {
-		return nil, fmt.Errorf(errEndpointStopped, e)
+		return nil, fmt.Errorf(ErrEndpointStopped, e)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
 	defer cancel()
