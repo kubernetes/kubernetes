@@ -749,4 +749,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WindowsHostNetwork: {
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Alpha},
 	},
+	PodUnreadyOnKubeletRestart: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Deprecated},
+	},
 }

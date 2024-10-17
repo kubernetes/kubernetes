@@ -23,9 +23,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -276,18 +278,92 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
-	// if there is a startup probe which hasn't run yet, the container is not
-	// started.
-	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
+	started := false
+	containerStartTime := containerStatus.State.Running.StartedAt.Time
+	// Check if the container was started before the probe manager.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnreadyOnKubeletRestart) && !containerStartTime.IsZero() && containerStartTime.Before(m.start) {
+		// Check if this container has a startup probe.
+		hasStartupProbe := false
+		for _, container := range pod.Spec.Containers {
+			if container.Name == containerStatus.Name {
+				hasStartupProbe = container.StartupProbe != nil
+				break
+			}
+		}
+		if hasStartupProbe {
+			// If the container has a startup probe, check the 'Started' field.
+			if containerStatus.Started != nil {
+				started = *containerStatus.Started
+			} else {
+				klog.V(3).InfoS("Early created container is running, started is nil")
+				started = false
+			}
+		} else {
+			// If no startup probe is defined, consider the container as started.
+			started = true
+		}
+	} else {
+		// if there is a startup probe which hasn't run yet, the container is not
+		// started.
+		_, exists := m.getWorker(pod.UID, containerStatus.Name, startup)
+		started = !exists
+	}
+	return started
+}
+
+func (m *manager) isContainerReady(pod *v1.Pod, containerStatus *v1.ContainerStatus) bool {
+	if containerStatus.State.Running == nil {
 		return false
 	}
+	if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(containerStatus.ContainerID)); ok {
+		return result == results.Success
+	}
 
-	// there is no startup probe, so the container is started.
-	return true
+	ready := false
+	containerStartTime := containerStatus.State.Running.StartedAt.Time
+	w, exists := m.getWorker(pod.UID, containerStatus.Name, readiness)
+	// Check if the container was started before the manager's start time.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodUnreadyOnKubeletRestart) && !containerStartTime.IsZero() && containerStartTime.Before(m.start) {
+		// Check if this container has a readiness probe.
+		hasReadinessProbe := false
+		for _, container := range pod.Spec.Containers {
+			if container.Name == containerStatus.Name {
+				hasReadinessProbe = container.ReadinessProbe != nil
+				break
+			}
+		}
+		if hasReadinessProbe {
+			// If the state of pod is not Ready, but that of container may still be Eeady.
+			// Set this container as not Ready for the readiness probe to check it further.
+			podIsReady := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+					podIsReady = true
+					break
+				}
+			}
+			ready = podIsReady
+		} else {
+			// Consider the container as ready when no readiness probe defined.
+			ready = true
+		}
+	} else {
+		// Check if there is an active ready probe worker for this container.
+		ready = !exists
+	}
+	if exists {
+		// Trigger an immediate run of the readinessProbe to update ready state
+		select {
+		case w.manualTriggerCh <- struct{}{}:
+		default: // Non-blocking.
+			klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
+		}
+	}
+	return ready
 }
 
 func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
-	for i, c := range podStatus.ContainerStatuses {
+	for i := range podStatus.ContainerStatuses {
 		started := m.isContainerStarted(pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
 
@@ -295,24 +371,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 			continue
 		}
 
-		var ready bool
-		if c.State.Running == nil {
-			ready = false
-		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
-			ready = true
-		} else {
-			// The check whether there is a probe which hasn't run yet.
-			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
-			if exists {
-				// Trigger an immediate run of the readinessProbe to update ready state
-				select {
-				case w.manualTriggerCh <- struct{}{}:
-				default: // Non-blocking.
-					klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
-				}
-			}
-		}
+		ready := m.isContainerReady(pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Ready = ready
 	}
 
@@ -336,24 +395,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 			continue
 		}
 
-		var ready bool
-		if c.State.Running == nil {
-			ready = false
-		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
-			ready = true
-		} else {
-			// The check whether there is a probe which hasn't run yet.
-			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
-			if exists {
-				// Trigger an immediate run of the readinessProbe to update ready state
-				select {
-				case w.manualTriggerCh <- struct{}{}:
-				default: // Non-blocking.
-					klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
-				}
-			}
-		}
+		ready := m.isContainerReady(pod, &podStatus.InitContainerStatuses[i])
 		podStatus.InitContainerStatuses[i].Ready = ready
 	}
 }
