@@ -68,7 +68,7 @@ type healthChecker struct {
 
 var _ HealthChecker = &healthChecker{}
 
-const notifyInterval = time.Nanosecond
+const minimalNotifyInterval = time.Second
 
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
@@ -93,7 +93,7 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		klog.InfoS("Systemd watchdog is not enabled")
 		return &healthChecker{}, nil
 	}
-	if watchdogVal <= notifyInterval {
+	if watchdogVal <= minimalNotifyInterval {
 		return nil, fmt.Errorf("configure watchdog timeout too small: %v", watchdogVal)
 	}
 
