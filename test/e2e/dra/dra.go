@@ -33,21 +33,19 @@ import (
 	"github.com/onsi/gomega/types"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -62,16 +60,16 @@ const (
 var adminAccessPolicyYAML string
 
 // networkResources can be passed to NewDriver directly.
-func networkResources() app.Resources {
-	return app.Resources{}
+func networkResources() Resources {
+	return Resources{}
 }
 
 // perNode returns a function which can be passed to NewDriver. The nodes
 // parameter has be instantiated, but not initialized yet, so the returned
 // function has to capture it and use it when being called.
-func perNode(maxAllocations int, nodes *Nodes) func() app.Resources {
-	return func() app.Resources {
-		return app.Resources{
+func perNode(maxAllocations int, nodes *Nodes) func() Resources {
+	return func() Resources {
+		return Resources{
 			NodeLocal:      true,
 			MaxAllocations: maxAllocations,
 			Nodes:          nodes.NodeNames,
@@ -351,7 +349,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "wait for pod to finish")
 			ginkgo.By("waiting for claim to be unreserved")
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
-				return f.ClientSet.ResourceV1alpha3().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				return f.ClientSet.ResourceV1beta1().ResourceClaims(pod.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.ReservedFor", gomega.BeEmpty()), "reservation should have been removed")
 		})
 
@@ -364,7 +362,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "wait for pod to finish")
 			ginkgo.By("waiting for claim to be deleted")
 			gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceClaim, error) {
-				claims, err := f.ClientSet.ResourceV1alpha3().ResourceClaims(pod.Namespace).List(ctx, metav1.ListOptions{})
+				claims, err := f.ClientSet.ResourceV1beta1().ResourceClaims(pod.Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return nil, err
 				}
@@ -382,9 +380,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(ctx, func(ctx context.Context) (*v1.Pod, error) {
 				return f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodStartSlow).Should(gomega.HaveField("Status.ContainerStatuses", gomega.ContainElements(gomega.HaveField("RestartCount", gomega.BeNumerically(">=", 2)))))
-			if driver.Controller != nil {
-				gomega.Expect(driver.Controller.GetNumAllocations()).To(gomega.Equal(int64(1)), "number of allocations")
-			}
 		})
 
 		ginkgo.It("must deallocate after use", func(ctx context.Context) {
@@ -393,7 +388,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, claim, pod)
 
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
-				return b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				return b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 
 			b.testPod(ctx, f.ClientSet, pod)
@@ -403,21 +398,20 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			ginkgo.By("waiting for claim to get deallocated")
 			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
-				return b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				return b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 		})
 	}
 
-	singleNodeTests := func(parameterMode parameterMode) {
+	singleNodeTests := func() {
 		nodes := NewNodes(f, 1, 1)
 		maxAllocations := 1
 		numPods := 10
-		generateResources := func() app.Resources {
+		generateResources := func() Resources {
 			resources := perNode(maxAllocations, nodes)()
 			return resources
 		}
 		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
-		driver.parameterMode = parameterMode
 		b := newBuilder(f, driver)
 		// We have to set the parameters *before* creating the class.
 		b.classParameters = `{"x":"y"}`
@@ -527,7 +521,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			var objects []klog.KMetadata
 			pod, template := b.podInline()
 			deviceClassName := template.Spec.Spec.Devices.Requests[0].DeviceClassName
-			class, err := f.ClientSet.ResourceV1alpha3().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
+			class, err := f.ClientSet.ResourceV1beta1().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			deviceClassName += "-b"
 			template.Spec.Spec.Devices.Requests[0].DeviceClassName = deviceClassName
@@ -550,34 +544,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// First modify the class so that it matches no nodes (for classic DRA) and no devices (structured parameters).
 			deviceClassName := template.Spec.Spec.Devices.Requests[0].DeviceClassName
-			class, err := f.ClientSet.ResourceV1alpha3().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
+			class, err := f.ClientSet.ResourceV1beta1().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			originalClass := class.DeepCopy()
-			switch driver.parameterMode {
-			case parameterModeClassicDRA:
-				class.Spec.SuitableNodes = &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "no-such-label",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"no-such-value"},
-								},
-							},
-						},
-					},
-				}
-			case parameterModeStructured:
-				class.Spec.Selectors = []resourceapi.DeviceSelector{{
-					CEL: &resourceapi.CELDeviceSelector{
-						Expression: "false",
-					},
-				}}
-			default:
-				framework.Failf("unexpected mode: %s", driver.parameterMode)
-			}
-			class, err = f.ClientSet.ResourceV1alpha3().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			class.Spec.Selectors = []resourceapi.DeviceSelector{{
+				CEL: &resourceapi.CELDeviceSelector{
+					Expression: "false",
+				},
+			}}
+			class, err = f.ClientSet.ResourceV1beta1().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
 			// Now create the pod.
@@ -587,9 +562,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
 
 			// Unblock the pod.
-			class.Spec.SuitableNodes = originalClass.Spec.SuitableNodes
 			class.Spec.Selectors = originalClass.Spec.Selectors
-			_, err = f.ClientSet.ResourceV1alpha3().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
+			_, err = f.ClientSet.ResourceV1beta1().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
 			b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
@@ -616,313 +590,93 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		claimTests(b, driver)
 	}
 
-	// These tests depend on having more than one node and a DRA driver controller.
-	multiNodeDRAControllerTests := func(nodes *Nodes) {
-		driver := NewDriver(f, nodes, networkResources)
-		driver.parameterMode = parameterModeClassicDRA
-		b := newBuilder(f, driver)
+	// The following tests only make sense when there is more than one node.
+	// They get skipped when there's only one node.
+	multiNodeTests := func() {
+		nodes := NewNodes(f, 2, 8)
 
-		ginkgo.It("schedules onto different nodes", func(ctx context.Context) {
-			label := "app.kubernetes.io/instance"
-			instance := f.UniqueName + "-test-app"
-			antiAffinity := &v1.Affinity{
-				PodAntiAffinity: &v1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-						{
-							TopologyKey: "kubernetes.io/hostname",
-							LabelSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									label: instance,
-								},
-							},
-						},
+		ginkgo.Context("with different ResourceSlices", func() {
+			firstDevice := "pre-defined-device-01"
+			secondDevice := "pre-defined-device-02"
+			devicesPerNode := []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				// First node:
+				{
+					firstDevice: {
+						"healthy": {BoolValue: ptr.To(true)},
+						"exists":  {BoolValue: ptr.To(true)},
+					},
+				},
+				// Second node:
+				{
+					secondDevice: {
+						"healthy": {BoolValue: ptr.To(false)},
+						// Has no "exists" attribute!
 					},
 				},
 			}
-			createPod := func() *v1.Pod {
-				pod := b.podExternal()
-				pod.Labels[label] = instance
-				pod.Spec.Affinity = antiAffinity
-				return pod
-			}
-			pod1 := createPod()
-			pod2 := createPod()
-			claim := b.externalClaim()
-			b.create(ctx, claim, pod1, pod2)
+			driver := NewDriver(f, nodes, perNode(-1, nodes), devicesPerNode...)
+			b := newBuilder(f, driver)
 
-			for _, pod := range []*v1.Pod{pod1, pod2} {
-				err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-				framework.ExpectNoError(err, "start pod")
-			}
-		})
+			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
+				// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
+				// it should still not schedule the pod because there is something wrong with it.
+				// Scheduling it would make it harder to detect that there is a problem.
+				//
+				// This matches the "CEL-runtime-error-for-subset-of-nodes" unit test, except that
+				// here we try it in combination with the actual scheduler and can extend it with
+				// other checks, like event handling (future extension).
 
-		// This test covers aspects of non graceful node shutdown by DRA controller
-		// More details about this can be found in the KEP:
-		// https://github.com/kubernetes/enhancements/tree/master/keps/sig-storage/2268-non-graceful-shutdown
-		// NOTE: this test depends on kind. It will only work with kind cluster as it shuts down one of the
-		// nodes by running `docker stop <node name>`, which is very kind-specific.
-		f.It(f.WithSerial(), f.WithDisruptive(), f.WithSlow(), "must deallocate on non graceful node shutdown", func(ctx context.Context) {
-			ginkgo.By("create test pod")
-			label := "app.kubernetes.io/instance"
-			instance := f.UniqueName + "-test-app"
-			pod := b.podExternal()
-			pod.Labels[label] = instance
-			claim := b.externalClaim()
-			b.create(ctx, claim, pod)
-
-			ginkgo.By("wait for test pod " + pod.Name + " to run")
-			labelSelector := labels.SelectorFromSet(labels.Set(pod.Labels))
-			pods, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, f.ClientSet, pod.Namespace, labelSelector, 1, framework.PodStartTimeout)
-			framework.ExpectNoError(err, "start pod")
-			runningPod := &pods.Items[0]
-
-			nodeName := runningPod.Spec.NodeName
-			// Prevent builder tearDown to fail waiting for unprepared resources
-			delete(b.driver.Nodes, nodeName)
-			ginkgo.By("stop node " + nodeName + " non gracefully")
-			_, stderr, err := framework.RunCmd("docker", "stop", nodeName)
-			gomega.Expect(stderr).To(gomega.BeEmpty())
-			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(framework.RunCmd, "docker", "start", nodeName)
-			if ok := e2enode.WaitForNodeToBeNotReady(ctx, f.ClientSet, nodeName, f.Timeouts.NodeNotReady); !ok {
-				framework.Failf("Node %s failed to enter NotReady state", nodeName)
-			}
-
-			ginkgo.By("apply out-of-service taint on node " + nodeName)
-			taint := v1.Taint{
-				Key:    v1.TaintNodeOutOfService,
-				Effect: v1.TaintEffectNoExecute,
-			}
-			e2enode.AddOrUpdateTaintOnNode(ctx, f.ClientSet, nodeName, taint)
-			e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, nodeName, &taint)
-			ginkgo.DeferCleanup(e2enode.RemoveTaintOffNode, f.ClientSet, nodeName, taint)
-
-			ginkgo.By("waiting for claim to get deallocated")
-			gomega.Eventually(ctx, framework.GetObject(b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Get, claim.Name, metav1.GetOptions{})).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
-		})
-	}
-
-	// The following tests only make sense when there is more than one node.
-	// They get skipped when there's only one node.
-	multiNodeTests := func(parameterMode parameterMode) {
-		nodes := NewNodes(f, 2, 8)
-
-		switch parameterMode {
-		case parameterModeStructured:
-			ginkgo.Context("with different ResourceSlices", func() {
-				firstDevice := "pre-defined-device-01"
-				secondDevice := "pre-defined-device-02"
-				devicesPerNode := []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					// First node:
-					{
-						firstDevice: {
-							"healthy": {BoolValue: ptr.To(true)},
-							"exists":  {BoolValue: ptr.To(true)},
-						},
+				gomega.Eventually(ctx, framework.ListObjects(f.ClientSet.ResourceV1beta1().ResourceSlices().List,
+					metav1.ListOptions{
+						FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driver.Name,
 					},
-					// Second node:
-					{
-						secondDevice: {
-							"healthy": {BoolValue: ptr.To(false)},
-							// Has no "exists" attribute!
-						},
-					},
-				}
-				driver := NewDriver(f, nodes, perNode(-1, nodes), devicesPerNode...)
-				b := newBuilder(f, driver)
-
-				ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
-					// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
-					// it should still not schedule the pod because there is something wrong with it.
-					// Scheduling it would make it harder to detect that there is a problem.
-					//
-					// This matches the "CEL-runtime-error-for-subset-of-nodes" unit test, except that
-					// here we try it in combination with the actual scheduler and can extend it with
-					// other checks, like event handling (future extension).
-
-					gomega.Eventually(ctx, framework.ListObjects(f.ClientSet.ResourceV1alpha3().ResourceSlices().List,
-						metav1.ListOptions{
-							FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driver.Name,
-						},
-					)).Should(gomega.HaveField("Items", gomega.ConsistOf(
-						gomega.HaveField("Spec.Devices", gomega.ConsistOf(
-							gomega.Equal(resourceapi.Device{
-								Name: firstDevice,
-								Basic: &resourceapi.BasicDevice{
-									Attributes: devicesPerNode[0][firstDevice],
-								},
-							}))),
-						gomega.HaveField("Spec.Devices", gomega.ConsistOf(
-							gomega.Equal(resourceapi.Device{
-								Name: secondDevice,
-								Basic: &resourceapi.BasicDevice{
-									Attributes: devicesPerNode[1][secondDevice],
-								},
-							}))),
-					)))
-
-					pod, template := b.podInline()
-					template.Spec.Spec.Devices.Requests[0].Selectors = append(template.Spec.Spec.Devices.Requests[0].Selectors,
-						resourceapi.DeviceSelector{
-							CEL: &resourceapi.CELDeviceSelector{
-								// Runtime error on one node, but not all.
-								Expression: fmt.Sprintf(`device.attributes["%s"].exists`, driver.Name),
+				)).Should(gomega.HaveField("Items", gomega.ConsistOf(
+					gomega.HaveField("Spec.Devices", gomega.ConsistOf(
+						gomega.Equal(resourceapi.Device{
+							Name: firstDevice,
+							Basic: &resourceapi.BasicDevice{
+								Attributes: devicesPerNode[0][firstDevice],
 							},
-						},
-					)
-					b.create(ctx, pod, template)
+						}))),
+					gomega.HaveField("Spec.Devices", gomega.ConsistOf(
+						gomega.Equal(resourceapi.Device{
+							Name: secondDevice,
+							Basic: &resourceapi.BasicDevice{
+								Attributes: devicesPerNode[1][secondDevice],
+							},
+						}))),
+				)))
 
-					framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "scheduling failure", f.Timeouts.PodStartShort, func(pod *v1.Pod) (bool, error) {
-						for _, condition := range pod.Status.Conditions {
-							if condition.Type == "PodScheduled" {
-								if condition.Status != "False" {
-									gomega.StopTrying("pod got scheduled unexpectedly").Now()
-								}
-								if strings.Contains(condition.Message, "CEL runtime error") {
-									// This is what we are waiting for.
-									return true, nil
-								}
+				pod, template := b.podInline()
+				template.Spec.Spec.Devices.Requests[0].Selectors = append(template.Spec.Spec.Devices.Requests[0].Selectors,
+					resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							// Runtime error on one node, but not all.
+							Expression: fmt.Sprintf(`device.attributes["%s"].exists`, driver.Name),
+						},
+					},
+				)
+				b.create(ctx, pod, template)
+
+				framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "scheduling failure", f.Timeouts.PodStartShort, func(pod *v1.Pod) (bool, error) {
+					for _, condition := range pod.Status.Conditions {
+						if condition.Type == "PodScheduled" {
+							if condition.Status != "False" {
+								gomega.StopTrying("pod got scheduled unexpectedly").Now()
+							}
+							if strings.Contains(condition.Message, "CEL runtime error") {
+								// This is what we are waiting for.
+								return true, nil
 							}
 						}
-						return false, nil
-					}), "pod must not get scheduled because of a CEL runtime error")
-				})
-			})
-		case parameterModeClassicDRA:
-			ginkgo.Context("with network-attached resources", func() {
-				multiNodeDRAControllerTests(nodes)
-			})
-
-			ginkgo.Context("reallocation", func() {
-				var allocateWrapper2 app.AllocateWrapperType
-				driver := NewDriver(f, nodes, perNode(1, nodes))
-				driver.parameterMode = parameterModeClassicDRA
-				driver2 := NewDriver(f, nodes, func() app.Resources {
-					return app.Resources{
-						NodeLocal:      true,
-						MaxAllocations: 1,
-						Nodes:          nodes.NodeNames,
-
-						AllocateWrapper: func(
-							ctx context.Context,
-							claimAllocations []*controller.ClaimAllocation,
-							selectedNode string,
-							handler func(
-								ctx context.Context,
-								claimAllocations []*controller.ClaimAllocation,
-								selectedNode string),
-						) {
-							allocateWrapper2(ctx, claimAllocations, selectedNode, handler)
-						},
 					}
-				})
-				driver2.NameSuffix = "-other"
-				driver2.parameterMode = parameterModeClassicDRA
-
-				b := newBuilder(f, driver)
-				b2 := newBuilder(f, driver2)
-
-				ginkgo.It("works", func(ctx context.Context) {
-					// A pod with multiple claims can run on a node, but
-					// only if allocation of all succeeds. This
-					// test simulates the scenario where one claim
-					// gets allocated from one driver, but the claims
-					// from second driver fail allocation because of a
-					// race with some other pod.
-					//
-					// To ensure the right timing, allocation of the
-					// claims from second driver are delayed while
-					// creating another pod that gets the remaining
-					// resource on the node from second driver.
-					ctx, cancel := context.WithCancel(ctx)
-					defer cancel()
-
-					// Order is relevant here: each pod must be matched with its own claim.
-					pod1claim1 := b.externalClaim()
-					pod1 := b.podExternal()
-					pod2claim1 := b2.externalClaim()
-					pod2 := b2.podExternal()
-
-					// Add another claim to pod1.
-					pod1claim2 := b2.externalClaim()
-					pod1.Spec.ResourceClaims = append(pod1.Spec.ResourceClaims,
-						v1.PodResourceClaim{
-							Name:              "claim-other",
-							ResourceClaimName: &pod1claim2.Name,
-						},
-					)
-
-					// Allocating the second claim in pod1 has to wait until pod2 has
-					// consumed the available resources on the node.
-					blockClaim, cancelBlockClaim := context.WithCancel(ctx)
-					defer cancelBlockClaim()
-					allocateWrapper2 = func(ctx context.Context,
-						claimAllocations []*controller.ClaimAllocation,
-						selectedNode string,
-						handler func(ctx context.Context,
-							claimAllocations []*controller.ClaimAllocation,
-							selectedNode string),
-					) {
-						if claimAllocations[0].Claim.Name == pod1claim2.Name {
-							<-blockClaim.Done()
-						}
-						handler(ctx, claimAllocations, selectedNode)
-					}
-
-					b.create(ctx, pod1claim1, pod1claim2, pod1)
-
-					ginkgo.By("waiting for one claim from driver1 to be allocated")
-					var nodeSelector *v1.NodeSelector
-					gomega.Eventually(ctx, func(ctx context.Context) (int, error) {
-						claims, err := f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-						if err != nil {
-							return 0, err
-						}
-						allocated := 0
-						for _, claim := range claims.Items {
-							if claim.Status.Allocation != nil {
-								allocated++
-								nodeSelector = claim.Status.Allocation.NodeSelector
-							}
-						}
-						return allocated, nil
-					}).WithTimeout(time.Minute).Should(gomega.Equal(1), "one claim allocated")
-
-					// Now create a second pod which we force to
-					// run on the same node that is currently being
-					// considered for the first one. We know what
-					// the node selector looks like and can
-					// directly access the key and value from it.
-					ginkgo.By(fmt.Sprintf("create second pod on the same node %s", nodeSelector))
-
-					req := nodeSelector.NodeSelectorTerms[0].MatchExpressions[0]
-					node := req.Values[0]
-					pod2.Spec.NodeSelector = map[string]string{req.Key: node}
-
-					b2.create(ctx, pod2claim1, pod2)
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2), "start pod 2")
-
-					// Allow allocation of second claim in pod1 to proceed. It should fail now
-					// and the other node must be used instead, after deallocating
-					// the first claim.
-					ginkgo.By("move first pod to other node")
-					cancelBlockClaim()
-
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod1), "start pod 1")
-					pod1, err := f.ClientSet.CoreV1().Pods(pod1.Namespace).Get(ctx, pod1.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err, "get first pod")
-					if pod1.Spec.NodeName == "" {
-						framework.Fail("first pod should be running on node, was not scheduled")
-					}
-					gomega.Expect(pod1.Spec.NodeName).ToNot(gomega.Equal(node), "first pod should run on different node than second one")
-					gomega.Expect(driver.Controller.GetNumDeallocations()).To(gomega.Equal(int64(1)), "number of deallocations")
-				})
+					return false, nil
+				}), "pod must not get scheduled because of a CEL runtime error")
 			})
-		}
+		})
 
 		ginkgo.Context("with node-local resources", func() {
 			driver := NewDriver(f, nodes, perNode(1, nodes))
-			driver.parameterMode = parameterMode
 			b := newBuilder(f, driver)
 
 			ginkgo.It("uses all resources", func(ctx context.Context) {
@@ -964,17 +718,13 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	}
 
-	tests := func(parameterMode parameterMode) {
-		ginkgo.Context("on single node", func() {
-			singleNodeTests(parameterMode)
-		})
-		ginkgo.Context("on multiple nodes", func() {
-			multiNodeTests(parameterMode)
-		})
-	}
+	ginkgo.Context("on single node", func() {
+		singleNodeTests()
+	})
 
-	framework.Context("with classic DRA", feature.DRAControlPlaneController, func() { tests(parameterModeClassicDRA) })
-	framework.Context("with structured parameters", func() { tests(parameterModeStructured) })
+	ginkgo.Context("on multiple nodes", func() {
+		multiNodeTests()
+	})
 
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
 	// executed with different parameters.
@@ -984,7 +734,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
 
-		ginkgo.It("support validating admission policy for admin access", func(ctx context.Context) {
+		f.It("support validating admission policy for admin access", feature.DRAAdminAccess, func(ctx context.Context) {
 			// Create VAP, after making it unique to the current test.
 			adminAccessPolicyYAML := strings.ReplaceAll(adminAccessPolicyYAML, "dra.example.com", b.f.UniqueName)
 			driver.createFromYAML(ctx, []byte(adminAccessPolicyYAML), "")
@@ -1010,19 +760,19 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
-				if err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				if err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
 			}).Should(matchVAPError)
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
-				if err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				if err := b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
-				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
+				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
 				return err
 			}).Should(matchVAPError)
 
@@ -1032,11 +782,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
 			}).Should(gomega.Succeed())
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
+				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
 				return err
 			}).Should(gomega.Succeed())
 		})
@@ -1066,7 +816,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					},
 				},
 			}
-			_, err := f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+			_, err := f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "create first claim")
 
 			resourceName := "count/resourceclaims.resource.k8s.io"
@@ -1093,63 +843,48 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			// Now creating another claim should fail.
 			claim2 := claim.DeepCopy()
 			claim2.Name = "claim-1"
-			_, err = f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
+			_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
 			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
-	})
 
-	// The following tests are all about behavior in combination with a
-	// control-plane DRA driver controller.
-	framework.Context("cluster with classic DRA", feature.DRAControlPlaneController, func() {
-		nodes := NewNodes(f, 1, 4)
+		f.It("DaemonSet with admin access", feature.DRAAdminAccess, func(ctx context.Context) {
+			pod, template := b.podInline()
+			template.Spec.Spec.Devices.Requests[0].AdminAccess = true
+			// Limit the daemon set to the one node where we have the driver.
+			nodeName := nodes.NodeNames[0]
+			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+			pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			daemonSet := &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "monitoring-ds",
+				},
+				Spec: appsv1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "monitoring"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "monitoring"},
+						},
+						Spec: pod.Spec,
+					},
+				},
+			}
 
-		// kube-controller-manager can trigger delayed allocation for pods where the
-		// node name was already selected when creating the pod. For immediate
-		// allocation, the creator has to ensure that the node matches the claims.
-		// This does not work for resource claim templates and only isn't
-		// a problem here because the resource is network-attached and available
-		// on all nodes.
-		preScheduledTests := func(b *builder, driver *Driver) {
-			ginkgo.It("supports scheduled pod referencing inline resource claim", func(ctx context.Context) {
-				pod, template := b.podInline()
-				pod.Spec.NodeName = nodes.NodeNames[0]
-				b.create(ctx, pod, template)
+			created := b.create(ctx, template, daemonSet)
+			if !created[0].(*resourceapi.ResourceClaimTemplate).Spec.Spec.Devices.Requests[0].AdminAccess {
+				framework.Fail("AdminAccess field was cleared. This test depends on the DRAAdminAccess feature.")
+			}
+			ds := created[1].(*appsv1.DaemonSet)
 
-				b.testPod(ctx, f.ClientSet, pod)
-			})
-
-			ginkgo.It("supports scheduled pod referencing external resource claim", func(ctx context.Context) {
-				claim := b.externalClaim()
-				pod := b.podExternal()
-				pod.Spec.NodeName = nodes.NodeNames[0]
-				b.create(ctx, claim, pod)
-
-				b.testPod(ctx, f.ClientSet, pod)
-			})
-		}
-
-		ginkgo.Context("with setting ReservedFor", func() {
-			driver := NewDriver(f, nodes, networkResources)
-			driver.parameterMode = parameterModeClassicDRA
-			b := newBuilder(f, driver)
-			preScheduledTests(b, driver)
-			claimTests(b, driver)
-		})
-
-		ginkgo.Context("without setting ReservedFor", func() {
-			driver := NewDriver(f, nodes, func() app.Resources {
-				resources := networkResources()
-				resources.DontSetReservedFor = true
-				return resources
-			})
-			driver.parameterMode = parameterModeClassicDRA
-			b := newBuilder(f, driver)
-			preScheduledTests(b, driver)
-			claimTests(b, driver)
+			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+				return e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{nodeName})(ctx)
+			}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("DaemonSet pod should be running on node %s but isn't", nodeName))
+			framework.ExpectNoError(e2edaemonset.CheckDaemonStatus(ctx, f, daemonSet.Name))
 		})
 	})
 
-	ginkgo.Context("cluster with structured parameters", func() {
+	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
 		driver := NewDriver(f, nodes, perNode(1, nodes))
 
@@ -1190,7 +925,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				},
 			}
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, fictionalNodeSlice.Name, metav1.DeleteOptions{})
+				err := f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, fictionalNodeSlice.Name, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}
@@ -1209,19 +944,19 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 			mustCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				ginkgo.GinkgoHelper()
-				slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+				slice, err := clientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
 				return slice
 			}
 			mustUpdate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				ginkgo.GinkgoHelper()
-				slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+				slice, err := clientSet.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
 				return slice
 			}
 			mustDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) {
 				ginkgo.GinkgoHelper()
-				err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+				err := clientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
 			}
 			mustCreateAndDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) {
@@ -1231,17 +966,17 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 			mustFailToCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice, matchError types.GomegaMatcher) {
 				ginkgo.GinkgoHelper()
-				_, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+				_, err := clientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 				gomega.Expect(err).To(matchError, fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
 			}
 			mustFailToUpdate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice, matchError types.GomegaMatcher) {
 				ginkgo.GinkgoHelper()
-				_, err := clientSet.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+				_, err := clientSet.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 				gomega.Expect(err).To(matchError, fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
 			}
 			mustFailToDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice, matchError types.GomegaMatcher) {
 				ginkgo.GinkgoHelper()
-				err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+				err := clientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
 				gomega.Expect(err).To(matchError, fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
 			}
 
@@ -1274,7 +1009,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				},
 			}
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, clusterSlice.Name, metav1.DeleteOptions{})
+				err := f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, clusterSlice.Name, metav1.DeleteOptions{})
 				if !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}
@@ -1301,7 +1036,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Now check for exactly the right set of objects for all nodes.
 			ginkgo.By("check if ResourceSlice object(s) exist on the API server")
-			resourceClient := f.ClientSet.ResourceV1alpha3().ResourceSlices()
+			resourceClient := f.ClientSet.ResourceV1beta1().ResourceSlices()
 			var expectedObjects []any
 			for _, nodeName := range nodes.NodeNames {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
@@ -1351,15 +1086,17 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	})
 
-	multipleDrivers := func(nodeV1alpha3 bool) {
+	multipleDrivers := func(nodeV1alpha4, nodeV1beta1 bool) {
 		nodes := NewNodes(f, 1, 4)
 		driver1 := NewDriver(f, nodes, perNode(2, nodes))
-		driver1.NodeV1alpha3 = nodeV1alpha3
+		driver1.NodeV1alpha4 = nodeV1alpha4
+		driver1.NodeV1beta1 = nodeV1beta1
 		b1 := newBuilder(f, driver1)
 
 		driver2 := NewDriver(f, nodes, perNode(2, nodes))
+		driver2.NodeV1alpha4 = nodeV1alpha4
+		driver2.NodeV1beta1 = nodeV1beta1
 		driver2.NameSuffix = "-other"
-		driver2.NodeV1alpha3 = nodeV1alpha3
 		b2 := newBuilder(f, driver2)
 
 		ginkgo.It("work", func(ctx context.Context) {
@@ -1381,14 +1118,16 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b1.testPod(ctx, f.ClientSet, pod)
 		})
 	}
-	multipleDriversContext := func(prefix string, nodeV1alpha3 bool) {
+	multipleDriversContext := func(prefix string, nodeV1alpha4, nodeV1beta1 bool) {
 		ginkgo.Context(prefix, func() {
-			multipleDrivers(nodeV1alpha3)
+			multipleDrivers(nodeV1alpha4, nodeV1beta1)
 		})
 	}
 
 	ginkgo.Context("multiple drivers", func() {
-		multipleDriversContext("using only drapbv1alpha3", true)
+		multipleDriversContext("using only drapbv1alpha4", true, false)
+		multipleDriversContext("using only drapbv1beta1", false, true)
+		multipleDriversContext("using both drav1alpha4 and drapbv1beta1", true, true)
 	})
 
 	ginkgo.It("runs pod after driver starts", func(ctx context.Context) {
@@ -1411,7 +1150,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
-		// framework.ExpectNoError(f.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		// framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
@@ -1441,16 +1180,11 @@ func (b *builder) class() *resourceapi.DeviceClass {
 			Name: b.className(),
 		},
 	}
-	switch b.driver.parameterMode {
-	case parameterModeClassicDRA:
-		class.Spec.SuitableNodes = b.nodeSelector()
-	case parameterModeStructured:
-		class.Spec.Selectors = []resourceapi.DeviceSelector{{
-			CEL: &resourceapi.CELDeviceSelector{
-				Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
-			},
-		}}
-	}
+	class.Spec.Selectors = []resourceapi.DeviceSelector{{
+		CEL: &resourceapi.CELDeviceSelector{
+			Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
+		},
+	}}
 	if b.classParameters != "" {
 		class.Spec.Config = []resourceapi.DeviceClassConfiguration{{
 			DeviceConfiguration: resourceapi.DeviceConfiguration{
@@ -1462,24 +1196,6 @@ func (b *builder) class() *resourceapi.DeviceClass {
 		}}
 	}
 	return class
-}
-
-// nodeSelector returns a node selector that matches all nodes on which the
-// kubelet plugin was deployed.
-func (b *builder) nodeSelector() *v1.NodeSelector {
-	return &v1.NodeSelector{
-		NodeSelectorTerms: []v1.NodeSelectorTerm{
-			{
-				MatchExpressions: []v1.NodeSelectorRequirement{
-					{
-						Key:      "kubernetes.io/hostname",
-						Operator: v1.NodeSelectorOpIn,
-						Values:   b.driver.Nodenames(),
-					},
-				},
-			},
-		},
-	}
 }
 
 // externalClaim returns external resource claim
@@ -1519,10 +1235,6 @@ func (b *builder) claimSpec() resourceapi.ResourceClaimSpec {
 				},
 			}},
 		},
-	}
-
-	if b.driver.parameterMode == parameterModeClassicDRA {
-		spec.Controller = b.driver.Name
 	}
 
 	return spec
@@ -1628,9 +1340,9 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		var createdObj klog.KMetadata
 		switch obj := obj.(type) {
 		case *resourceapi.DeviceClass:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha3().DeviceClasses().Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.f.ClientSet.ResourceV1beta1().DeviceClasses().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1alpha3().DeviceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				err := b.f.ClientSet.ResourceV1beta1().DeviceClasses().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete device class")
 			})
 		case *v1.Pod:
@@ -1638,14 +1350,21 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		case *v1.ConfigMap:
 			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaimTemplate:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceSlice:
-			createdObj, err = b.f.ClientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
+			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				err := b.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				err := b.f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
+			})
+		case *appsv1.DaemonSet:
+			createdObj, err = b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			// Cleanup not really needed, but speeds up namespace shutdown.
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Delete(ctx, obj.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete daemonset")
 			})
 		default:
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
@@ -1740,14 +1459,14 @@ func (b *builder) tearDown(ctx context.Context) {
 		return b.listTestPods(ctx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
 
-	claims, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	claims, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "get resource claims")
 	for _, claim := range claims.Items {
 		if claim.DeletionTimestamp != nil {
 			continue
 		}
 		ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
-		err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete claim")
 		}
@@ -1760,7 +1479,7 @@ func (b *builder) tearDown(ctx context.Context) {
 
 	ginkgo.By("waiting for claims to be deallocated and deleted")
 	gomega.Eventually(func() ([]resourceapi.ResourceClaim, error) {
-		claims, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		claims, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}

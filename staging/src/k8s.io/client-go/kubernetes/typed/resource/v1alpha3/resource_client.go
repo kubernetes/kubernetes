@@ -29,7 +29,6 @@ import (
 type ResourceV1alpha3Interface interface {
 	RESTClient() rest.Interface
 	DeviceClassesGetter
-	PodSchedulingContextsGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
@@ -42,10 +41,6 @@ type ResourceV1alpha3Client struct {
 
 func (c *ResourceV1alpha3Client) DeviceClasses() DeviceClassInterface {
 	return newDeviceClasses(c)
-}
-
-func (c *ResourceV1alpha3Client) PodSchedulingContexts(namespace string) PodSchedulingContextInterface {
-	return newPodSchedulingContexts(c, namespace)
 }
 
 func (c *ResourceV1alpha3Client) ResourceClaims(namespace string) ResourceClaimInterface {

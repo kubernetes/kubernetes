@@ -244,6 +244,9 @@ type QualifiedName string
 // FullyQualifiedName is a QualifiedName where the domain is set.
 type FullyQualifiedName string
 
+// DeviceMaxDomainLength is the maximum length of the domain prefix in a fully-qualified name.
+const DeviceMaxDomainLength = 63
+
 // DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
 const DeviceMaxIDLength = 32
 
@@ -330,19 +333,10 @@ type ResourceClaimSpec struct {
 	// +optional
 	Devices DeviceClaim `json:"devices" protobuf:"bytes,1,name=devices"`
 
-	// Controller is the name of the DRA driver that is meant
-	// to handle allocation of this claim. If empty, allocation is handled
-	// by the scheduler while scheduling a pod.
-	//
-	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
-	//
-	// This is an alpha field and requires enabling the DRAControlPlaneController
-	// feature gate.
-	//
-	// +optional
-	// +featureGate=DRAControlPlaneController
-	Controller string `json:"controller,omitempty" protobuf:"bytes,2,opt,name=controller"`
+	// Controller is tombstoned since Kubernetes 1.32 where
+	// it got removed. May be reused once decoding v1alpha3 is no longer
+	// supported.
+	// Controller string `json:"controller,omitempty" protobuf:"bytes,2,opt,name=controller"`
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.
@@ -457,8 +451,12 @@ type DeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
+	// This is an alpha field and requires enabling the DRAAdminAccess
+	// feature gate.
+	//
 	// +optional
 	// +default=false
+	// +featureGate=DRAAdminAccess
 	AdminAccess bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
 }
 
@@ -532,9 +530,33 @@ type CELDeviceSelector struct {
 	//
 	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
 	//
+	// The length of the expression must be smaller or equal to 10 Ki. The
+	// cost of evaluating it is also limited based on the estimated number
+	// of logical steps. Validation against those limits happens only when
+	// setting an expression for the first time or when changing
+	// it. Therefore it is possible to change these limits without
+	// affecting stored expressions. Those remain valid.
+	//
 	// +required
 	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
 }
+
+// CELSelectorExpressionMaxCost specifies the cost limit for a single CEL selector
+// evaluation.
+//
+// There is no overall budget for selecting a device, so the actual time
+// required for that is proportional to the number of CEL selectors and how
+// often they need to be evaluated, which can vary depending on several factors
+// (number of devices, cluster utilization, additional constraints).
+//
+// According to
+// https://github.com/kubernetes/kubernetes/blob/4aeaf1e99e82da8334c0d6dddd848a194cd44b4f/staging/src/k8s.io/apiserver/pkg/apis/cel/config.go#L20-L22,
+// this gives roughly 0.1 second for each expression evaluation.
+// However, this depends on how fast the machine is.
+const CELSelectorExpressionMaxCost = 1000000
+
+// CELSelectorExpressionMaxLength is the maximum length of a CEL selector expression string.
+const CELSelectorExpressionMaxLength = 10 * 1024
 
 // DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraint struct {
@@ -658,19 +680,10 @@ type ResourceClaimStatus struct {
 	// +patchMergeKey=uid
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,2,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
-	// Indicates that a claim is to be deallocated. While this is set,
-	// no new consumers may be added to ReservedFor.
-	//
-	// This is only used if the claim needs to be deallocated by a DRA driver.
-	// That driver then must deallocate this claim and reset the field
-	// together with clearing the Allocation field.
-	//
-	// This is an alpha field and requires enabling the DRAControlPlaneController
-	// feature gate.
-	//
-	// +optional
-	// +featureGate=DRAControlPlaneController
-	DeallocationRequested bool `json:"deallocationRequested,omitempty" protobuf:"bytes,3,opt,name=deallocationRequested"`
+	// DeallocationRequested is tombstoned since Kubernetes 1.32 where
+	// it got removed. May be reused once decoding v1alpha3 is no longer
+	// supported.
+	// DeallocationRequested bool `json:"deallocationRequested,omitempty" protobuf:"bytes,3,opt,name=deallocationRequested"`
 }
 
 // ReservedForMaxSize is the maximum number of entries in
@@ -710,21 +723,10 @@ type AllocationResult struct {
 	// +optional
 	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,3,opt,name=nodeSelector"`
 
-	// Controller is the name of the DRA driver which handled the
-	// allocation. That driver is also responsible for deallocating the
-	// claim. It is empty when the claim can be deallocated without
-	// involving a driver.
-	//
-	// A driver may allocate devices provided by other drivers, so this
-	// driver name here can be different from the driver names listed for
-	// the results.
-	//
-	// This is an alpha field and requires enabling the DRAControlPlaneController
-	// feature gate.
-	//
-	// +optional
-	// +featureGate=DRAControlPlaneController
-	Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+	// Controller is tombstoned since Kubernetes 1.32 where
+	// it got removed. May be reused once decoding v1alpha3 is no longer
+	// supported.
+	// Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
 }
 
 // DeviceAllocationResult is the result of allocating devices.
@@ -785,6 +787,22 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +required
 	Device string `json:"device" protobuf:"bytes,4,name=device"`
+
+	// AdminAccess is a copy of the AdminAccess value in the
+	// request which caused this device to be allocated.
+	//
+	// New allocations are required to have this set when the DRAAdminAccess
+	// feature gate is enabled. Old allocations made
+	// by Kubernetes 1.31 do not have it yet. Clients which want to
+	// support Kubernetes 1.31 need to look up the request and retrieve
+	// the value from there if this field is not set.
+	//
+	// This is an alpha field and requires enabling the DRAAdminAccess
+	// feature gate.
+	//
+	// +required
+	// +featureGate=DRAAdminAccess
+	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -826,107 +844,6 @@ type ResourceClaimList struct {
 
 	// Items is the list of resource claims.
 	Items []ResourceClaim `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-
-// PodSchedulingContext objects hold information that is needed to schedule
-// a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
-// mode.
-//
-// This is an alpha type and requires enabling the DRAControlPlaneController
-// feature gate.
-type PodSchedulingContext struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Spec describes where resources for the Pod are needed.
-	Spec PodSchedulingContextSpec `json:"spec" protobuf:"bytes,2,name=spec"`
-
-	// Status describes where resources for the Pod can be allocated.
-	//
-	// +optional
-	Status PodSchedulingContextStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
-}
-
-// PodSchedulingContextSpec describes where resources for the Pod are needed.
-type PodSchedulingContextSpec struct {
-	// SelectedNode is the node for which allocation of ResourceClaims that
-	// are referenced by the Pod and that use "WaitForFirstConsumer"
-	// allocation is to be attempted.
-	//
-	// +optional
-	SelectedNode string `json:"selectedNode,omitempty" protobuf:"bytes,1,opt,name=selectedNode"`
-
-	// PotentialNodes lists nodes where the Pod might be able to run.
-	//
-	// The size of this field is limited to 128. This is large enough for
-	// many clusters. Larger clusters may need more attempts to find a node
-	// that suits all pending resources. This may get increased in the
-	// future, but not reduced.
-	//
-	// +optional
-	// +listType=atomic
-	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
-}
-
-// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
-type PodSchedulingContextStatus struct {
-	// ResourceClaims describes resource availability for each
-	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
-	// uses "WaitForFirstConsumer" allocation mode.
-	//
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	ResourceClaims []ResourceClaimSchedulingStatus `json:"resourceClaims,omitempty" protobuf:"bytes,1,opt,name=resourceClaims"`
-
-	// If there ever is a need to support other kinds of resources
-	// than ResourceClaim, then new fields could get added here
-	// for those other resources.
-}
-
-// ResourceClaimSchedulingStatus contains information about one particular
-// ResourceClaim with "WaitForFirstConsumer" allocation mode.
-type ResourceClaimSchedulingStatus struct {
-	// Name matches the pod.spec.resourceClaims[*].Name field.
-	//
-	// +required
-	Name string `json:"name" protobuf:"bytes,1,name=name"`
-
-	// UnsuitableNodes lists nodes that the ResourceClaim cannot be
-	// allocated for.
-	//
-	// The size of this field is limited to 128, the same as for
-	// PodSchedulingSpec.PotentialNodes. This may get increased in the
-	// future, but not reduced.
-	//
-	// +optional
-	// +listType=atomic
-	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
-}
-
-// PodSchedulingNodeListMaxSize defines the maximum number of entries in the
-// node lists that are stored in PodSchedulingContext objects. This limit is part
-// of the API.
-const PodSchedulingNodeListMaxSize = 128
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-
-// PodSchedulingContextList is a collection of Pod scheduling objects.
-type PodSchedulingContextList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Items is the list of PodSchedulingContext objects.
-	Items []PodSchedulingContext `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient
@@ -977,21 +894,10 @@ type DeviceClassSpec struct {
 	// +listType=atomic
 	Config []DeviceClassConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
 
-	// Only nodes matching the selector will be considered by the scheduler
-	// when trying to find a Node that fits a Pod when that Pod uses
-	// a claim that has not been allocated yet *and* that claim
-	// gets allocated through a control plane controller. It is ignored
-	// when the claim does not use a control plane controller
-	// for allocation.
-	//
-	// Setting this field is optional. If unset, all Nodes are candidates.
-	//
-	// This is an alpha field and requires enabling the DRAControlPlaneController
-	// feature gate.
-	//
-	// +optional
-	// +featureGate=DRAControlPlaneController
-	SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
+	// SuitableNodes is tombstoned since Kubernetes 1.32 where
+	// it got removed. May be reused once decoding v1alpha3 is no longer
+	// supported.
+	// SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

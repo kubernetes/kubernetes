@@ -525,15 +525,6 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
-		case framework.PodSchedulingContext:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				handlerRegistration = resourceClaimCache.AddEventHandler(
@@ -543,7 +534,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceSlice:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceSlices().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1beta1().ResourceSlices().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceSlice, "ResourceSlice"),
 				); err != nil {
 					return err
@@ -552,7 +543,7 @@ func addAllEventHandlers(
 			}
 		case framework.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1beta1().DeviceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.DeviceClass, "DeviceClass"),
 				); err != nil {
 					return err

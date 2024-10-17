@@ -31,8 +31,7 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/api/resource"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -67,6 +66,10 @@ type CompilationResult struct {
 	OutputType  *cel.Type
 	Environment *cel.Env
 
+	// MaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MaxCost uint64
+
 	emptyMapVal ref.Val
 }
 
@@ -77,7 +80,7 @@ type Device struct {
 	// string attribute.
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resource.Quantity
+	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -107,6 +110,10 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
 
+	// We don't have a SizeEstimator. The potential size of the input (= a
+	// device) is already declared in the definition of the environment.
+	estimator := &library.CostEstimator{}
+
 	ast, issues := env.Compile(expression)
 	if issues != nil {
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
@@ -122,18 +129,35 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
+		// cel.CostLimit is also set to the VAP PerCallLimit as part of
+		// the base environment.
+		//
+		// This call here should override that. In practice it shouldn't
+		// matter because the limits are the same.
+		cel.CostLimit(resourceapi.CELSelectorExpressionMaxCost),
+		cel.CostTracking(estimator),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
-	return CompilationResult{
+
+	compilationResult := CompilationResult{
 		Program:     prog,
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 	}
+
+	costEst, err := env.EstimateCost(ast, estimator)
+	if err != nil {
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
+		return compilationResult
+	}
+
+	compilationResult.MaxCost = costEst.Max
+	return compilationResult
 }
 
 // getAttributeValue returns the native representation of the one value that
@@ -177,12 +201,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	}
 
 	capacity := make(map[string]any)
-	for name, quantity := range input.Capacity {
+	for name, cap := range input.Capacity {
 		domain, id := parseQualifiedName(name, input.Driver)
 		if capacity[domain] == nil {
 			capacity[domain] = make(map[string]apiservercel.Quantity)
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Quantity}
 	}
 
 	variables := map[string]any{
@@ -209,7 +233,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 }
 
 func mustBuildEnv() *environment.EnvSet {
-	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
+	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}

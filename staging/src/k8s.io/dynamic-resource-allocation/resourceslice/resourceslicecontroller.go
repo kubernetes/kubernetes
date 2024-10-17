@@ -27,13 +27,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -440,7 +440,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	// Remove stale slices.
 	for _, slice := range obsoleteSlices {
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice))
-		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := c.kubeClient.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("delete resource slice: %w", err)
 		}
 	}
@@ -449,7 +449,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	for _, slice := range slices {
 		if slice.UID == "" {
 			logger.V(5).Info("Creating new resource slice", "slice", klog.KObj(slice))
-			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
+			if _, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create resource slice: %w", err)
 			}
 			continue
@@ -457,7 +457,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 
 		// TODO: switch to SSA once unit testing supports it.
 		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
-		if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update resource slice: %w", err)
 		}
 	}

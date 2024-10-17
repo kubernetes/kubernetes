@@ -33,7 +33,6 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  controller: controllerValue
   devices:
     config:
     - opaque:
@@ -62,7 +61,6 @@ spec:
           expression: expressionValue
 status:
   allocation:
-    controller: controllerValue
     devices:
       config:
       - opaque:
@@ -78,7 +76,8 @@ status:
         - requestsValue
         source: sourceValue
       results:
-      - device: deviceValue
+      - adminAccess: true
+        device: deviceValue
         driver: driverValue
         pool: poolValue
         request: requestValue
@@ -94,7 +93,6 @@ status:
           operator: operatorValue
           values:
           - valuesValue
-  deallocationRequested: true
   reservedFor:
   - apiGroup: apiGroupValue
     name: nameValue
