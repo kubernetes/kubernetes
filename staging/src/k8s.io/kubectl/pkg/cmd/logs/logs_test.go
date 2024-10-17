@@ -696,6 +696,24 @@ func TestValidateLogOptions(t *testing.T) {
 			args:     []string{"my-pod", "my-container"},
 			expected: "only one of -c or an inline",
 		},
+		{
+			name: "specific stream combined with --tail",
+			opts: func(streams genericiooptions.IOStreams) *LogsOptions {
+				o := NewLogsOptions(streams)
+				o.Tail = 10
+				o.Stream = streamStdout
+
+				var err error
+				o.Options, err = o.ToLogOptions()
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				return o
+			},
+			args:     []string{"foo"},
+			expected: "specific log stream and --tail are mutually exclusive",
+		},
 	}
 	for _, test := range tests {
 		streams := genericiooptions.NewTestIOStreamsDiscard()
