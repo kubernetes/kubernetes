@@ -1084,7 +1084,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 
 	// non-windows checks
 	checks = addSwapCheck(checks)
-	checks = addExecChecks(checks, execer)
+	checks = addExecChecks(checks, execer, k8sVersion)
 	checks = append(checks,
 		SystemVerificationCheck{},
 		HostnameCheck{nodeName: nodeReg.Name},
