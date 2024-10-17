@@ -276,10 +276,10 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 		}
 		klog.SetLoggerWithOptions(log, opts...)
 	}
-	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
+	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity, nil).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog verbosity: %v", err)
 	}
-	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
+	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule, nil).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
 	}
 	setSlogDefaultLogger()
@@ -364,8 +364,8 @@ func addFlags(c *LoggingConfiguration, fs flagSet) {
 	logRegistry.freeze()
 
 	fs.DurationVar(&c.FlushFrequency.Duration.Duration, LogFlushFreqFlagName, c.FlushFrequency.Duration.Duration, "Maximum number of seconds between log flushes")
-	fs.VarP(VerbosityLevelPflag(&c.Verbosity), "v", "v", "number for the log level verbosity")
-	fs.Var(VModuleConfigurationPflag(&c.VModule), "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
+	fs.VarP(VerbosityLevelPflag(&c.Verbosity, lookupValue(&loggingFlags, "v")), "v", "v", "number for the log level verbosity")
+	fs.Var(VModuleConfigurationPflag(&c.VModule, lookupValue(&loggingFlags, "vmodule")), "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 
 	fs.BoolVar(&c.Options.Text.SplitStream, "log-text-split-stream", false, "[Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.")
 	fs.Var(&c.Options.Text.InfoBufferSize, "log-text-info-buffer-size", "[Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.")
@@ -376,6 +376,14 @@ func addFlags(c *LoggingConfiguration, fs flagSet) {
 		fs.BoolVar(&c.Options.JSON.SplitStream, "log-json-split-stream", false, "[Alpha] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.")
 		fs.Var(&c.Options.JSON.InfoBufferSize, "log-json-info-buffer-size", "[Alpha] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.")
 	}
+}
+
+func lookupValue(fs *pflag.FlagSet, flagName string) pflag.Value {
+	f := fs.Lookup(flagName)
+	if f == nil {
+		return nil
+	}
+	return f.Value
 }
 
 // SetRecommendedLoggingConfiguration sets the default logging configuration
