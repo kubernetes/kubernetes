@@ -228,7 +228,7 @@ func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, inter
 			}
 
 			klog.V(1).Infof("[discovery] Waiting for the cluster-info ConfigMap to receive a JWS signature"+
-				"for token ID %q", token.ID)
+				" for token ID %q", token.ID)
 
 			cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).
 				Get(context.Background(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
