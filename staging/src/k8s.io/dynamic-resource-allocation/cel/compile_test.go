@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -207,10 +208,29 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		"expensive": {
 			// The worst-case is based on the maximum number of
 			// attributes and the maximum attribute name length.
-			expression:  `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
-			driver:      "dra.example.com",
-			expectMatch: true,
-			expectCost:  18446744073709551615, // Exceeds limit!
+			// To actually reach that expected cost at runtime, we must
+			// have many attributes.
+			attributes: func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+				attributes := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+				prefix := "dra.example.com/"
+				attribute := resourceapi.DeviceAttribute{
+					StringValue: ptr.To("abc"),
+				}
+				// If the cost estimate was accurate, using exactly as many attributes
+				// as allowed at most should exceed the limit. In practice, the estimate
+				// is an upper bound and significantly more attributes are needed before
+				// the runtime cost becomes too large.
+				for i := 0; i < 1000*resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+					suffix := fmt.Sprintf("-%d", i)
+					name := prefix + strings.Repeat("x", resourceapi.DeviceMaxIDLength-len(suffix)) + suffix
+					attributes[resourceapi.QualifiedName(name)] = attribute
+				}
+				return attributes
+			}(),
+			expression:       `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
+			driver:           "dra.example.com",
+			expectMatchError: "actual cost limit exceeded",
+			expectCost:       18446744073709551615, // Exceeds limit!
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
