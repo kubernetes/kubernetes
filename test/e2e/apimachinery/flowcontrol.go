@@ -104,7 +104,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// priority.
 	ginkgo.It("should ensure that requests can't be drowned out (priority)", func(ctx context.Context) {
 		// See https://github.com/kubernetes/kubernetes/issues/96710
-		ginkgo.Skip("skipping test until flakiness is resolved")
+		// ginkgo.Skip("skipping test until flakiness is resolved")
 
 		flowSchemaNamePrefix := "e2e-testing-flowschema-" + f.UniqueName
 		priorityLevelNamePrefix := "e2e-testing-prioritylevel-" + f.UniqueName
@@ -189,7 +189,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// having a higher QPS.
 	ginkgo.It("should ensure that requests can't be drowned out (fairness)", func(ctx context.Context) {
 		// See https://github.com/kubernetes/kubernetes/issues/96710
-		ginkgo.Skip("skipping test until flakiness is resolved")
+		// ginkgo.Skip("skipping test until flakiness is resolved")
 
 		priorityLevelName := "e2e-testing-prioritylevel-" + f.UniqueName
 		flowSchemaName := "e2e-testing-flowschema-" + f.UniqueName
