@@ -55,6 +55,8 @@ type podContainerManagerImpl struct {
 	// cpuCFSQuotaPeriod is the cfs period value, cfs_period_us, setting per
 	// node for all containers in usec
 	cpuCFSQuotaPeriod uint64
+	// cpuManagerPolicy is the cpu manager policy
+	cpuManagerPolicy string
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -82,7 +84,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.cpuManagerPolicy),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
