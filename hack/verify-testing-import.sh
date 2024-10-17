@@ -28,6 +28,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
+kube::golang::setup_env
+
 RELEASE_BIN_PKGS=(
   "${KUBE_ROOT}/cmd/cloud-controller-manager"
   "${KUBE_ROOT}/cmd/kube-apiserver"
