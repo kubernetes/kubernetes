@@ -161,6 +161,9 @@ linters:
     - stylecheck
     - testifylint
     - unused
+  {{- if not .Base }}
+    - usestdlibvars
+  {{- end}}
   {{- if .Strict}}
   disable:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
