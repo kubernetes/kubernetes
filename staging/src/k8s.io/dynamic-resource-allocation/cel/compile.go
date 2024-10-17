@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -130,12 +131,25 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
-		// cel.CostLimit is also set to the VAP PerCallLimit as part of
-		// the base environment.
+		// The Kubernetes CEL base environment sets the VAP cost limit.
 		//
-		// This call here should override that. In practice it shouldn't
-		// matter because the limits are the same.
-		cel.CostLimit(resourceapi.CELSelectorExpressionMaxCost),
+		// In DRA, the cost check is done only at validation time.  At
+		// runtime, any expression that passed validation gets executed
+		// without interrupting it. The advantage is that it becomes
+		// easier to change the limit because stored expression do not
+		// suddenly fail after an up- or downgrade.  The limit could
+		// even become a configuration parameter of the apiserver
+		// because that is the only place where the limit gets checked
+		//
+		// We cannot unset the cost limit
+		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/cel/options.go#L512-L518). But
+		// we can set a high value that then never triggers
+		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/interpreter/runtimecost.go#L104-L106).
+		//
+		// Even better would be to enable cost tracking only during
+		// validation, but for that k8s.io/apiserver/pkg/cel/environment would
+		// have to be changed to not set the limit.
+		cel.CostLimit(math.MaxInt64),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
