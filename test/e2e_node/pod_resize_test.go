@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"regexp"
 	"strconv"
 	"strings"
@@ -339,7 +340,7 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				}
 				// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
 				// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
+				expectedCPUShares = int64(util.CPUSharesToCPUWeight(uint64(expectedCPUShares)))
 			}
 			if expectedMemLimitString != "0" {
 				err := verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString)
@@ -402,7 +403,7 @@ func waitForPodResizeActuation(ctx context.Context, f *framework.Framework, c cl
 	gomega.Eventually(ctx, waitForContainerRestart, timeouts.PodStartShort, timeouts.Poll).
 		WithArguments(f, podClient, pod, expectedContainers).
 		ShouldNot(gomega.HaveOccurred(), "failed waiting for expected container restart")
-		// Verify Pod Containers Cgroup Values
+	// Verify Pod Containers Cgroup Values
 	gomega.Eventually(ctx, verifyPodContainersCgroupValues, timeouts.PodStartShort, timeouts.Poll).
 		WithArguments(f, patchedPod, expectedContainers).
 		ShouldNot(gomega.HaveOccurred(), "failed to verify container cgroup values to match expected")
