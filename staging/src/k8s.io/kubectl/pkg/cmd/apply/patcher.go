@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -387,12 +388,13 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		return modified, nil, err
 	}
 	// TODO: use wait
-	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, p.Timeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := p.Helper.Get(namespace, name); !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
-	}); err != nil {
+	})
+	if err != nil {
 		return modified, nil, err
 	}
 	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)
