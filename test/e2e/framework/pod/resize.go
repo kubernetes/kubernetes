@@ -264,15 +264,18 @@ func VerifyPodAllocations(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) err
 	return nil
 }
 
-func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
+func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 	gomega.Expect(gotPod.Status.ContainerStatuses).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
 	for i, wantCtr := range wantCtrs {
 		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
 		ctr, _ := makeResizableContainer(wantCtr)
 		gomega.Expect(gotCtrStatus.Name).To(gomega.Equal(ctr.Name))
-		gomega.Expect(ctr.Resources).To(gomega.Equal(*gotCtrStatus.Resources))
+		if !cmp.Equal(ctr.Resources, *gotCtrStatus.Resources) {
+			return fmt.Errorf("failed to verify Pod status resources, resources of container %s not equal to expected", ctr.Name)
+		}
 	}
+	return nil
 }
 
 // isPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
@@ -431,6 +434,15 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 		return VerifyPodAllocations(resizedPod, expectedContainers)
 	}, timeouts.PodStartShort, timeouts.Poll).
 		ShouldNot(gomega.HaveOccurred(), "timed out waiting for pod resource allocation values to match expected")
+	// Wait for pod status resources to equal expected values after resize
+	gomega.Eventually(ctx, func() error {
+		resizedPod, pErr = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		if pErr != nil {
+			return pErr
+		}
+		return VerifyPodStatusResources(resizedPod, expectedContainers)
+	}, timeouts.PodStartShort, timeouts.Poll).
+		ShouldNot(gomega.HaveOccurred(), "timed out waiting for pod status resource values to match expected")
 	return resizedPod
 }
 
