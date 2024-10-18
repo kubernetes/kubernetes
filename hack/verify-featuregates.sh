@@ -28,4 +28,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
+set +e
 go run test/featuregates_linter/main.go feature-gates verify
+exit_code=$?
+set -e
+
+# Check the exit code
+if [ $exit_code -eq 1 ]; then
+  echo "Please run 'hack/update-featuregates.sh' to update the feature list."
+fi
+exit "$exit_code"
