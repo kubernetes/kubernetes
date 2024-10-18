@@ -185,6 +185,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 
 	pullCredentials, _ := keyring.Lookup(repoToPull)
 
+	// TODO: the below code should all live in the `if imageRef != "" scope`
 	var imagePullSecrets []imagemanager1alpha1.ImagePullSecret
 	for _, s := range pullCredentials {
 		if s.Source == nil {
