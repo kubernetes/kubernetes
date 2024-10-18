@@ -394,7 +394,12 @@ func waitForContainerRestart(ctx context.Context, podClient *PodClient, pod *v1.
 	restartedContainersCount := 0
 	for _, cName := range restartContainersExpected {
 		cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, cName)
-		if cs.RestartCount < 1 {
+		expectedRestarts := int32(1)
+		// if we're rolling back, we should have 2 container restarts
+		if isRollback {
+			expectedRestarts = int32(2)
+		}
+		if cs.RestartCount < expectedRestarts {
 			break
 		}
 		restartedContainersCount++
