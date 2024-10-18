@@ -17,8 +17,15 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"testing"
 	"time"
 )
@@ -44,5 +51,30 @@ func Test_atomicLastError(t *testing.T) {
 	err = aError.Load()
 	if err.Error() != "now error" {
 		t.Fatalf("Expected: \"now error\" got: %s", err.Error())
+	}
+}
+
+func TestClientWithGrpcHealthcheck(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+
+	etcdConfig := testserver.NewTestConfig(t)
+
+	client := testserver.RunEtcd(t, etcdConfig)
+	cfg := storagebackend.Config{
+		Type: storagebackend.StorageTypeETCD3,
+		Transport: storagebackend.TransportConfig{
+			ServerList:            client.Endpoints(),
+			EnableGrpcHealthcheck: true,
+		},
+		Codec: codec,
+	}
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
+	defer destroyFunc()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = storage.Create(context.TODO(), "/abc", &example.Pod{}, nil, 0)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
 }
