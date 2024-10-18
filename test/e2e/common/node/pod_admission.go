@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,6 +62,52 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 			// Check the pod is still not running
 			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
 			framework.ExpectNoError(err)
+		})
+	})
+})
+
+var _ = SIGDescribe("PodOSRejectionStatus", func() {
+	f := framework.NewDefaultFramework("pod-os-rejection-status")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	ginkgo.Context("Kubelet", func() {
+		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
+			linuxNode, err := findLinuxNode(ctx, f)
+			framework.ExpectNoError(err)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "wrong-pod-os",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					OS: &v1.PodOS{
+						Name: "windows", // explicitly set the pod OS to a wrong but valid value
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "wrong-pod-os",
+							Image: imageutils.GetPauseImageName(),
+						},
+					},
+					NodeName: linuxNode.Name, // Set the node to an node which doesn't support
+				},
+			}
+
+			pod = e2epod.NewPodClient(f).Create(ctx, pod)
+			// Check the pod is still not running
+			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "PodOSNotSupported", f.Timeouts.PodStartShort)
+			framework.ExpectNoError(err)
+
+			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			// Check the pod status is set correctly
+			expectedStatus := pod.Status.DeepCopy()
+                         // overwriting all fields that we expect are overriden by kubelet.
+                         // All other fields must stay the same as before kubelet touched them
+			expectedStatus.Phase = gotPod.Status.Phase
+			expectedStatus.Reason = gotPod.Status.Reason
+			expectedStatus.Message = gotPod.Status.Message
+			expectedStatus.StartTime = gotPod.Status.StartTime
+			gomega.Expect(gotPod).To(gomega.HaveField("Status", *expectedStatus))
 		})
 	})
 })
