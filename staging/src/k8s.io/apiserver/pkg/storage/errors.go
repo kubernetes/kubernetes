@@ -205,6 +205,12 @@ func NewInvalidError(errors field.ErrorList) InvalidError {
 type InternalError struct {
 	Reason string
 
+	// TODO: streamline error management for storage:
+	// a) remove InternalError, and user StorageError instead (use a new code ErrCodeInternal)
+	// b) when creating a StorageError do best effort to populate revision and key
+	// c) use errors.As()
+	ResourceVersion int64
+
 	// retain the inner error to maintain the error tree, so as to enable us
 	// to do proper error checking, but we also need to be backward compatible.
 	err error
@@ -223,7 +229,15 @@ func IsInternalError(err error) bool {
 }
 
 func NewInternalError(err error) InternalError {
-	return InternalError{Reason: err.Error(), err: err}
+	return NewInternalErrorWithRevision(0, err)
+}
+
+func NewInternalErrorWithRevision(revision int64, err error) InternalError {
+	return InternalError{
+		ResourceVersion: revision,
+		Reason:          err.Error(),
+		err:             err,
+	}
 }
 
 var tooLargeResourceVersionCauseMsg = "Too large resource version"

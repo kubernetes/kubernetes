@@ -18,7 +18,8 @@ package registry
 
 import (
 	"context"
-	"strings"
+	"errors"
+	"strconv"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,26 +88,23 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 		return nil, false, apierrors.NewInvalid(qualifiedKind, name, fieldErrList)
 	}
 
-	// try normal deletetion anyway, it is expected to fail
-	obj, deleted, err := d.store.Delete(ctx, name, deleteValidation, opts)
-	if err == nil {
-		return obj, deleted, err
+	var (
+		preconditions *storage.Preconditions
+		internalErr   storage.InternalError
+	)
+	// if we have the resource version of the object then we pin it to the
+	// preconditions, otherwise we drop preconditions entirely.
+	if errors.As(err, &internalErr) && internalErr.ResourceVersion != 0 {
+		preconditions = &storage.Preconditions{
+			ResourceVersion: ptr.To[string](strconv.FormatInt(internalErr.ResourceVersion, 10)),
+		}
 	}
-	// TODO: unfortunately we can't do storage.IsCorruptObject(err),
-	// conversion to API error drops the inner error chain
-	if !strings.Contains(err.Error(), "corrupt object") {
-		return obj, deleted, err
-	}
-
-	// TODO: at this instant, some actor may have managed to recreate this
-	// object by doing a delete+create, or the underlying error has resolved
-	// and the object is readable now
 
 	klog.FromContext(ctx).V(1).Info("Going to perform unsafe object deletion", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	out := d.store.NewFunc()
 	storageOpts := storage.DeleteOptions{IgnoreStoreReadError: true}
-	// dropping preconditions, and keeping the admission
-	if err := storageBackend.Delete(ctx, key, out, nil, storage.ValidateObjectFunc(deleteValidation), nil, storageOpts); err != nil {
+	// keep the admission
+	if err := storageBackend.Delete(ctx, key, out, preconditions, storage.ValidateObjectFunc(deleteValidation), nil, storageOpts); err != nil {
 		if storage.IsNotFound(err) {
 			// the DELETE succeeded, but we don't have the object since it's
 			// not retrievable from the storage, so we send a nil object

@@ -212,7 +212,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return storage.NewInternalError(err)
+		return storage.NewInternalErrorWithRevision(getResp.KV.ModRevision, err)
 	}
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
@@ -956,8 +956,10 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v
 		state.meta.ResourceVersion = uint64(state.rev)
 
 		if skipTransformDecode {
-			// be explicit that we don't have the object
-			state.obj = nil
+			state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
+			if err := s.versioner.UpdateObject(state.obj, uint64(state.rev)); err != nil {
+				return nil, err
+			}
 			state.stale = true // this seems a more sane value here
 			return state, nil
 		}
