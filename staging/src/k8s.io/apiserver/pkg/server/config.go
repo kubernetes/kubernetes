@@ -74,11 +74,14 @@ import (
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/tracing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -103,6 +106,8 @@ const (
 
 	// APIGroupPrefix is where non-legacy API group will be located.
 	APIGroupPrefix = "/apis"
+
+	componentName = "apiserver"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -189,6 +194,7 @@ type Config struct {
 	LivezChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
 	ReadyzChecks []healthz.HealthChecker
+	FlagSets     []*cliflag.NamedFlagSets
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -378,6 +384,7 @@ type AuthorizationInfo struct {
 
 func init() {
 	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // NewConfig returns a Config struct with the default values
@@ -1100,6 +1107,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
 			slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
+	}
+
+	if c.FeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, componentName, c.FlagSets)
 	}
 
 	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)

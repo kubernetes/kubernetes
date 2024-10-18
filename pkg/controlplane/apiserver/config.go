@@ -47,6 +47,7 @@ import (
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
+	cliflag "k8s.io/component-base/cli/flag"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
@@ -118,6 +119,7 @@ func BuildGenericConfig(
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	genericConfig.FlagSets = []*cliflag.NamedFlagSets{&s.FlagSets}
 	genericConfig.MergedResourceConfig = resourceConfig
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
