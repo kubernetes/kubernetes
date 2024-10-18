@@ -35,7 +35,9 @@ import (
 // The frequency with which global timestamp of the cache is to
 // is to be updated periodically. If pod workers get stuck at cache.GetNewerThan
 // call, after this period it will be unblocked.
-const globalCacheUpdatePeriod = 5 * time.Second
+// This is the same values as the relist period of Generic PLEG
+// in order to unblock pod workers as frequent as Generic PLEG.
+const globalCacheUpdatePeriod = 1 * time.Second
 
 var (
 	eventedPLEGUsage   = false
@@ -150,6 +152,13 @@ func (e *EventedPLEG) Stop() {
 // called periodically to update the global timestamp of the cache so that those
 // pods stuck at GetNewerThan in pod workers will get unstuck.
 func (e *EventedPLEG) updateGlobalCache() {
+	// Confirm that there is no communication problem with the runtime.
+	if _, err := e.runtimeService.Version(context.TODO(), ""); err != nil {
+		e.logger.Error(err, "Evented PLEG: failed to communicate with the runtime before updating the global cache")
+		return
+	}
+	// Without any communication problem, events should be delivered to pods whose statuses have been changed.
+	// The global cache can be updated for pods to which no events are delivered.
 	e.cache.UpdateTime(time.Now())
 }
 
