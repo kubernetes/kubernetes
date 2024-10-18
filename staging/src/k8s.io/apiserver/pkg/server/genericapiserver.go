@@ -750,7 +750,7 @@ func (s preparedGenericAPIServer) NonBlockingRunWithContext(ctx context.Context,
 
 	s.RunPostStartHooks(ctx)
 
-	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
+	if _, err := systemd.SdNotify(true, systemd.SdNotifyReady); err != nil {
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
