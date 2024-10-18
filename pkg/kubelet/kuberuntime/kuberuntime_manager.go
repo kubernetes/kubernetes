@@ -45,7 +45,6 @@ import (
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -80,6 +79,11 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 	// OpenTelemetry instrumentation scope name
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+
+	// runtimeMinimumCPULimit is the minimum cpu in milli value set for CPU quota in cgroup.
+	runtimeMinimumCPULimit = 10
+	// runtimeMinimumCPURequest is the minimum cpu in milli value set for CPU share in cgroup.
+	runtimeMinimumCPURequest = 2
 )
 
 var (
@@ -581,10 +585,24 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 			currentMemoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
 		}
 		if kubeContainerStatus.Resources.CPULimit != nil {
-			currentCPULimit = kubeContainerStatus.Resources.CPULimit.MilliValue()
+			runtimeReportedCPULimit := kubeContainerStatus.Resources.CPULimit.MilliValue()
+			// For any limit value set within runtimeMinimumCPULimit, minimum value set by runtime is runtimeMinimumCPULimit.
+			// If user tries to change values within runtimeMinimumCPULimit, set current limit as desired limit to avoid inifinite reconciliation as desiredCPULimit never be equall to runtimeReportedCPULimit.
+			if desiredCPULimit <= runtimeMinimumCPULimit && runtimeReportedCPULimit <= runtimeMinimumCPULimit {
+				currentCPULimit = desiredCPULimit
+			} else {
+				currentCPULimit = runtimeReportedCPULimit
+			}
 		}
 		if kubeContainerStatus.Resources.CPURequest != nil {
-			currentCPURequest = kubeContainerStatus.Resources.CPURequest.MilliValue()
+			runtimeReportedCPURequest := kubeContainerStatus.Resources.CPURequest.MilliValue()
+			// For any request value set within runtimeMinimumCPURequest, minimum value set by runtime is runtimeMinimumCPURequest.
+			// If user tries to change values within runtimeMinimumCPURequest, set current request as desired request to avoid inifinite reconciliation as desiredCPURequest never be equall to runtimeReportedCPURequest.
+			if desiredCPURequest <= runtimeMinimumCPURequest && runtimeReportedCPURequest <= runtimeMinimumCPURequest {
+				currentCPURequest = desiredCPURequest
+			} else {
+				currentCPURequest = runtimeReportedCPURequest
+			}
 		}
 	}
 
