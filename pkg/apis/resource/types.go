@@ -217,7 +217,7 @@ type BasicDevice struct {
 	Capacity map[QualifiedName]resource.Quantity
 }
 
-// Limit for the sum of the number of entries in both ResourceSlices.
+// Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
@@ -888,7 +888,7 @@ type DeviceClassSpec struct {
 	// SuitableNodes is tombstoned since Kubernetes 1.32 where
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
-	// SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
+	// SuitableNodes *core.NodeSelector
 }
 
 // DeviceClassConfiguration is used in DeviceClass.
