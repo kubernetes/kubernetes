@@ -45,7 +45,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace (
-	k8s.io/apimachinery => ../apimachinery
-	k8s.io/code-generator => ../code-generator
-)
+replace k8s.io/apimachinery => ../apimachinery

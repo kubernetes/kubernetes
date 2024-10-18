@@ -90,7 +90,6 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/cri-api => ../cri-api
-	k8s.io/dynamic-resource-allocation => ../dynamic-resource-allocation
 	k8s.io/kms => ../kms
 	k8s.io/kubelet => ../kubelet
 )
