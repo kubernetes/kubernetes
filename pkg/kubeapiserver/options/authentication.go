@@ -135,7 +135,8 @@ type ServiceAccountAuthenticationOptions struct {
 	ExtendExpiration bool
 	// OptionalTokenGetter is a function that returns a service account token getter.
 	// If not set, the default token getter will be used.
-	OptionalTokenGetter func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
+	OptionalTokenGetter      func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
+	ExternalPublicKeysGetter serviceaccount.PublicKeysGetter
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -271,7 +272,9 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
 		if len(o.ServiceAccounts.KeyFiles) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+			if o.ServiceAccounts.ExternalPublicKeysGetter == nil {
+				allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+			}
 		}
 
 		// Validate the JWKS URI when it is explicitly set.
@@ -606,6 +609,8 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 				return kubeauthenticator.Config{}, fmt.Errorf("failed to set up public service account keys: %w", err)
 			}
 			ret.ServiceAccountPublicKeysGetter = keysGetter
+		} else if o.ServiceAccounts.ExternalPublicKeysGetter != nil {
+			ret.ServiceAccountPublicKeysGetter = o.ServiceAccounts.ExternalPublicKeysGetter
 		}
 		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
