@@ -196,6 +196,14 @@ type Status struct {
 	SoftRequirements error
 }
 
+func int64Slice(in []int) []int64 {
+	out := make([]int64, len(in))
+	for i := range in {
+		out[i] = int64(in[i])
+	}
+	return out
+}
+
 // parsePercentage parses the percentage string to numeric value.
 func parsePercentage(v string) (int64, error) {
 	if !strings.HasSuffix(v, "%") {

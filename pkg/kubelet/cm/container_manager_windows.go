@@ -25,6 +25,9 @@ package cm
 import (
 	"context"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"sync"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -37,7 +40,6 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
@@ -62,12 +64,10 @@ type containerManagerImpl struct {
 	deviceManager devicemanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
-}
-
-type noopWindowsResourceAllocator struct{}
-
-func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	return admission.GetPodAdmitResult(nil)
+	cpuManager      cpumanager.Manager
+	memoryManager   memorymanager.Manager
+	nodeInfo        *v1.Node
+	sync.RWMutex
 }
 
 func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
@@ -77,6 +77,8 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	runtimeService internalapi.RuntimeService,
 	localStorageCapacityIsolation bool) error {
 	klog.V(2).InfoS("Starting Windows container manager")
+
+	cm.nodeInfo = node
 
 	if localStorageCapacityIsolation {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
@@ -89,6 +91,21 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
+
+	// Initialize CPU manager
+	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+	if err != nil {
+		return fmt.Errorf("start cpu manager error: %v", err)
+	}
+
+	// Initialize memory manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
+		containerMap, _ := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
+		err := cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		if err != nil {
+			return fmt.Errorf("start memory manager error: %v", err)
+		}
+	}
 
 	// Starts device manager.
 	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap, containerRunningSet); err != nil {
@@ -115,7 +132,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cadvisorInterface: cadvisorInterface,
 	}
 
-	cm.topologyManager = topologymanager.NewFakeManager()
+	klog.InfoS("Creating topology manager")
+	cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
+		nodeConfig.TopologyManagerPolicy,
+		nodeConfig.TopologyManagerScope,
+		nodeConfig.TopologyManagerPolicyOptions)
+
+	if err != nil {
+		return nil, err
+	}
 
 	klog.InfoS("Creating device plugin manager")
 	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
@@ -123,6 +148,40 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	cm.topologyManager.AddHintProvider(cm.deviceManager)
+
+	klog.InfoS("Creating cpu manager")
+	cm.cpuManager, err = cpumanager.NewManager(
+		nodeConfig.CPUManagerPolicy,
+		nodeConfig.CPUManagerPolicyOptions,
+		nodeConfig.CPUManagerReconcilePeriod,
+		machineInfo,
+		nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
+		cm.GetNodeAllocatableReservation(),
+		nodeConfig.KubeletRootDir,
+		cm.topologyManager,
+	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to initialize cpu manager")
+		return nil, err
+	}
+	cm.topologyManager.AddHintProvider(cm.cpuManager)
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
+		klog.InfoS("Creating memory manager")
+		cm.memoryManager, err = memorymanager.NewManager(
+			nodeConfig.ExperimentalMemoryManagerPolicy,
+			machineInfo,
+			cm.GetNodeAllocatableReservation(),
+			nodeConfig.ExperimentalMemoryManagerReservedMemory,
+			nodeConfig.KubeletRootDir,
+			cm.topologyManager,
+		)
+		if err != nil {
+			klog.ErrorS(err, "Failed to initialize memory manager")
+			return nil, err
+		}
+		cm.topologyManager.AddHintProvider(cm.memoryManager)
+	}
 
 	return cm, nil
 }
@@ -132,7 +191,9 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 }
 
 func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
-	return NodeConfig{}
+	cm.RLock()
+	defer cm.RUnlock()
+	return cm.nodeConfig
 }
 
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
@@ -223,7 +284,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, cm.topologyManager}
 }
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
@@ -243,19 +304,25 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	return &noopWindowsResourceAllocator{}
+	return cm.topologyManager
 }
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
-	return nil
+func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+	if cm.cpuManager != nil {
+		return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
+	}
+	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
-	return nil
+	if cm.cpuManager != nil {
+		return int64Slice(cm.cpuManager.GetAllocatableCPUs().UnsortedList())
+	}
+	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {

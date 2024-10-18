@@ -300,8 +300,10 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 }
 
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	klog.InfoS("jjs Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
+		klog.InfoS("shared pool", "pod", klog.KObj(pod), "containerName", container.Name)
 		// container belongs in the shared pool (nothing to do; use default cpuset)
 		return nil
 	}
@@ -396,7 +398,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 }
 
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
-	klog.InfoS("AllocateCPUs", "numCPUs", numCPUs, "socket", numaAffinity)
+	klog.InfoS("CPUSet", "numCPUs", numCPUs, "socket", numaAffinity)
 
 	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
 
@@ -434,6 +436,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+		klog.InfoS("Not guaranteed", "pod", pod.UID, "containerName", container.Name)
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]

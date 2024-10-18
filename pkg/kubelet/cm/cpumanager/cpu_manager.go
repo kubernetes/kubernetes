@@ -19,7 +19,9 @@ package cpumanager
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"math"
+	"runtime"
 	"sync"
 	"time"
 
@@ -265,6 +267,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
+	klog.InfoS("jjs allocate call")
 	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
@@ -533,6 +536,24 @@ func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string,
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
+
+	if runtime.GOOS == "windows" {
+		klog.Info("Updating windows CPU affinity")
+
+		affinities := winstats.CpusToGroupAffinity(cpus.List())
+		var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
+		for _, affinity := range affinities {
+			cpuGroupAffinities = append(cpuGroupAffinities, &runtimeapi.WindowsCpuGroupAffinity{
+				CpuGroup: uint32(affinity.Group),
+				CpuMask:  uint64(affinity.Mask),
+			})
+		}
+		return m.containerRuntime.UpdateContainerResources(ctx, containerID, &runtimeapi.ContainerResources{
+			Windows: &runtimeapi.WindowsContainerResources{
+				AffinityCpus: cpuGroupAffinities,
+			},
+		})
+	}
 	return m.containerRuntime.UpdateContainerResources(
 		ctx,
 		containerID,
