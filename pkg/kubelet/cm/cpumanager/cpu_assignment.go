@@ -95,8 +95,10 @@ func standardDeviation(xs []int) float64 {
 type numaOrSocketsFirstFuncs interface {
 	takeFullFirstLevel()
 	takeFullSecondLevel()
+	takeThirdLevel()
 	sortAvailableNUMANodes() []int
 	sortAvailableSockets() []int
+	sortAvailableUncoreCaches() []int
 	sortAvailableCores() []int
 }
 
@@ -116,6 +118,23 @@ func (n *numaFirst) takeFullFirstLevel() {
 // from the set of sockets as the second level.
 func (n *numaFirst) takeFullSecondLevel() {
 	n.acc.takeFullSockets()
+}
+
+// In Split UncoreCache Topology, we take from the sets of UncoreCache as the third level
+func (n *numaFirst) takeThirdLevel() {
+	n.acc.takeUncoreCache()
+}
+
+// If NUMA nodes are higher in the memory hierarchy than sockets, then just
+// sort the NUMA nodes directly, and return them.
+func (n *numaFirst) sortAvailableUncoreCaches() []int {
+	var result []int
+	for _, socket := range n.acc.sortAvailableNUMANodes() {
+		uncore := n.acc.details.UncoreInNUMANodes(socket).UnsortedList()
+		n.acc.sort(uncore, n.acc.details.CPUsInUncoreCaches)
+		result = append(result, uncore...)
+	}
+	return result
 }
 
 // If NUMA nodes are higher in the memory hierarchy than sockets, then just
@@ -163,6 +182,10 @@ func (s *socketsFirst) takeFullSecondLevel() {
 	s.acc.takeFullNUMANodes()
 }
 
+func (s *socketsFirst) takeThirdLevel() {
+	s.acc.takeUncoreCache()
+}
+
 // If sockets are higher in the memory hierarchy than NUMA nodes, then we need
 // to pull the set of NUMA nodes out of each sorted Socket, and accumulate the
 // partial order across them.
@@ -182,6 +205,18 @@ func (s *socketsFirst) sortAvailableSockets() []int {
 	sockets := s.acc.details.Sockets().UnsortedList()
 	s.acc.sort(sockets, s.acc.details.CPUsInSockets)
 	return sockets
+}
+
+// If sockets  higher in the memory hierarchy than NUMA nodes, then UncoreCache
+// sit directly below NUMA Nodes in the memory hierchy
+func (s *socketsFirst) sortAvailableUncoreCaches() []int {
+	var result []int
+	for _, uncore := range s.acc.sortAvailableNUMANodes() {
+		uncore := s.acc.details.UncoreInNUMANodes(uncore).UnsortedList()
+		s.acc.sort(uncore, s.acc.details.CPUsInUncoreCaches)
+		result = append(result, uncore...)
+	}
+	return result
 }
 
 // If sockets are higher in the memory hierarchy than NUMA nodes, then cores
@@ -318,6 +353,12 @@ func (a *cpuAccumulator) isSocketFree(socketID int) bool {
 	return a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
 }
 
+// Returns true if the supplied UnCoreCache is fully available in `a.details`.
+// "fully available" means that all the CPUs in it are free.
+func (a *cpuAccumulator) isUncoreCacheFree(uncoreID int) bool {
+	return a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
+}
+
 // Returns true if the supplied core is fully available in `a.details`.
 // "fully available" means that all the CPUs in it are free.
 func (a *cpuAccumulator) isCoreFree(coreID int) bool {
@@ -344,6 +385,22 @@ func (a *cpuAccumulator) freeSockets() []int {
 		}
 	}
 	return free
+}
+
+// Returns free UncoreCache IDs as a slice sorted by sortAvailableUnCoreCache().
+func (a *cpuAccumulator) freeUncoreCache() []int {
+	free := []int{}
+	for _, uncore := range a.numaOrSocketsFirst.sortAvailableUncoreCaches() {
+		if a.isUncoreCacheFree(uncore) {
+			free = append(free, uncore)
+		}
+	}
+	return free
+}
+
+// Returns all UncoreCache IDs as a slice sorted by sortAvailableUncoreCache().
+func (a *cpuAccumulator) allUncoreCache() []int {
+	return a.numaOrSocketsFirst.sortAvailableUncoreCaches()
 }
 
 // Returns free core IDs as a slice sorted by sortAvailableCores().
@@ -516,6 +573,45 @@ func (a *cpuAccumulator) takeFullSockets() {
 		}
 		klog.V(4).InfoS("takeFullSockets: claiming socket", "socket", socket)
 		a.take(cpusInSocket)
+	}
+}
+func (a *cpuAccumulator) takeFullUnCore() {
+	for _, uncore := range a.freeUncoreCache() {
+		cpusInUncore := a.topo.CPUDetails.CPUsInUncoreCaches(uncore)
+		if !a.needsAtLeast(cpusInUncore.Size()) {
+			continue
+		}
+		a.take(cpusInUncore)
+	}
+}
+
+// First try to take full UncoreCache, if available and need is at least the size of the UncoreCache group.
+// Second try to take the partial UncoreCache if available and the request size can fit w/in the UncoreCache.
+func (a *cpuAccumulator) takeUncoreCache() {
+	for _, uncore := range a.allUncoreCache() {
+		numCoresNeeded := a.numCPUsNeeded / a.topo.CPUsPerCore()
+
+		// take full UncoreCache if the CPUs needed is greater a UncoreCache size
+		if a.numCPUsNeeded >= a.topo.NumCPUs/a.topo.NumUncoreCache {
+			a.takeFullUnCore()
+		}
+
+		var freeCPUsInUncoreCache cpuset.CPUSet
+		// need to get needed cores in UncoreCache
+		freeCoresInUncoreCache := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncore)
+		klog.V(2).InfoS("free cores from a.details list: ", "freeCoresInUncorecache", freeCoresInUncoreCache)
+		for _, coreID := range freeCoresInUncoreCache.List() {
+			freeCPUsInUncoreCache = freeCPUsInUncoreCache.Union(a.topo.CPUDetails.CPUsInCores(coreID))
+		}
+		klog.V(2).InfoS("freeCPUsInUncorecache  : ", "freeCPUsInUncorecache", freeCPUsInUncoreCache)
+		if a.numCPUsNeeded == freeCPUsInUncoreCache.Size() {
+			klog.V(4).InfoS("takePartialUncore: claiming cores from Uncorecache ID", "uncore", uncore)
+			a.take(freeCPUsInUncoreCache)
+		}
+
+		if a.isSatisfied() {
+			return
+		}
 	}
 }
 
@@ -692,6 +788,59 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 	}
 
 	// 3. Acquire single threads, preferring to fill partially-allocated cores
+	//    on the same sockets as the whole cores we have already taken in this
+	//    allocation.
+	acc.takeRemainingCPUs()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+
+	return cpuset.New(), fmt.Errorf("failed to allocate cpus")
+}
+
+// takeByTopologyUnCoreCachePacked uses the "packed" sorting strategy similar to takeByTopologyNUMAPacked.
+// It includes an additional level of sorting by uncorecache
+func takeByTopologyUncoreCachePacked(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy) (cpuset.CPUSet, error) {
+	acc := newCPUAccumulator(topo, availableCPUs, numCPUs, cpuSortingStrategy)
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	if acc.isFailed() {
+		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+	}
+
+	// Algorithm: topology-aware best-fit
+	// 1. Acquire whole NUMA nodes and sockets, if available and the container
+	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
+	//    Nodes map to 1 or more sockets, pull from NUMA nodes first.
+	//    Otherwise pull from sockets first.
+	acc.numaOrSocketsFirst.takeFullFirstLevel()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+	acc.numaOrSocketsFirst.takeFullSecondLevel()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+
+	// 2. Acquire partial uncorecache, if there are enough CPUs available to satisfy the container requirement
+	//    Acquire the full uncorecache, if available and the container requires at least all the CPUs in the uncorecache grouping
+	acc.numaOrSocketsFirst.takeThirdLevel()
+	if acc.isSatisfied() {
+		return acc.result, nil
+	}
+
+	// 3. Acquire whole cores, if available and the container requires at least
+	//    a core's-worth of CPUs.
+	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
+	if cpuSortingStrategy != CPUSortingStrategySpread {
+		acc.takeFullCores()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+	}
+
+	// 4. Acquire single threads, preferring to fill partially-allocated cores
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	acc.takeRemainingCPUs()
