@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -67,6 +68,10 @@ type CompilationResult struct {
 	OutputType  *cel.Type
 	Environment *cel.Env
 
+	// MaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MaxCost uint64
+
 	emptyMapVal ref.Val
 }
 
@@ -107,6 +112,10 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
 
+	// We don't have a SizeEstimator. The potential size of the input (= a
+	// device) is already declared in the definition of the environment.
+	estimator := &library.CostEstimator{}
+
 	ast, issues := env.Compile(expression)
 	if issues != nil {
 		return resultError("compilation failed: "+issues.String(), apiservercel.ErrorTypeInvalid)
@@ -122,18 +131,47 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
+		// The Kubernetes CEL base environment sets the VAP cost limit.
+		//
+		// In DRA, the cost check is done only at validation time.  At
+		// runtime, any expression that passed validation gets executed
+		// without interrupting it. The advantage is that it becomes
+		// easier to change the limit because stored expression do not
+		// suddenly fail after an up- or downgrade.  The limit could
+		// even become a configuration parameter of the apiserver
+		// because that is the only place where the limit gets checked
+		//
+		// We cannot unset the cost limit
+		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/cel/options.go#L512-L518). But
+		// we can set a high value that then never triggers
+		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/interpreter/runtimecost.go#L104-L106).
+		//
+		// Even better would be to enable cost tracking only during
+		// validation, but for that k8s.io/apiserver/pkg/cel/environment would
+		// have to be changed to not set the limit.
+		cel.CostLimit(math.MaxInt64),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
-	return CompilationResult{
+
+	compilationResult := CompilationResult{
 		Program:     prog,
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 	}
+
+	costEst, err := env.EstimateCost(ast, estimator)
+	if err != nil {
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
+		return compilationResult
+	}
+
+	compilationResult.MaxCost = costEst.Max
+	return compilationResult
 }
 
 // getAttributeValue returns the native representation of the one value that
@@ -160,14 +198,14 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
+func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
 		value, err := getAttributeValue(attr)
 		if err != nil {
-			return false, fmt.Errorf("attribute %s: %w", name, err)
+			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
 		domain, id := parseQualifiedName(name, input.Driver)
 		if attributes[domain] == nil {
@@ -193,23 +231,23 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		},
 	}
 
-	result, _, err := c.Program.ContextEval(ctx, variables)
+	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
-		return false, err
+		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)
 	if err != nil {
-		return false, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
+		return false, details, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
 	}
 	resultBool, ok := resultAny.(bool)
 	if !ok {
-		return false, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
+		return false, details, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
 	}
-	return resultBool, nil
+	return resultBool, details, nil
 }
 
 func mustBuildEnv() *environment.EnvSet {
-	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
+	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}
