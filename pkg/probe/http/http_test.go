@@ -513,7 +513,8 @@ func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
 		case "/success":
 			if r.Host == successHostHeader {
 				w.WriteHeader(http.StatusOK)
-				w.Write(oversizePayload)
+				_, err := w.Write(oversizePayload)
+				require.NoError(t, err)
 			} else {
 				http.Error(w, "", http.StatusBadRequest)
 			}
@@ -534,8 +535,47 @@ func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
 		require.NoError(t, err)
 		result, body, err := prober.Probe(req, wait.ForeverTestTimeout)
 		assert.NoError(t, err)
-		assert.Equal(t, probe.Success, result)
-		assert.Equal(t, string(truncatedPayload), body)
+		assert.Equal(t, probe.Warning, result)
+		assert.NotContains(t, body, string(truncatedPayload))
+	})
+}
+
+// oversized body + timeout reached shall lead to a warning, not a failure
+func TestHTTPProbeChecker_PayloadTruncatedAndTimeout(t *testing.T) {
+	successHostHeader := "www.success.com"
+	oversizePayload := bytes.Repeat([]byte("a"), maxRespBodyLength+1)
+	truncatedPayload := bytes.Repeat([]byte("a"), maxRespBodyLength)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			if r.Host == successHostHeader {
+				w.WriteHeader(http.StatusOK)
+				_, err := w.Write(oversizePayload)
+				require.NoError(t, err)
+				time.Sleep(2 * time.Second)
+			} else {
+				http.Error(w, "", http.StatusBadRequest)
+			}
+		default:
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	headers := http.Header{}
+	headers.Add("Host", successHostHeader)
+	t.Run("truncated payload", func(t *testing.T) {
+		prober := New(false)
+		target, err := url.Parse(server.URL + "/success")
+		require.NoError(t, err)
+		req, err := NewProbeRequest(target, headers)
+		require.NoError(t, err)
+		result, body, err := prober.Probe(req, 1*time.Second)
+		assert.NoError(t, err)
+		assert.Equal(t, probe.Warning, result)
+		assert.NotContains(t, body, string(truncatedPayload))
 	})
 }
 
