@@ -254,7 +254,18 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				t.Errorf("expected CEL cost %d, got %d instead", expect, actual)
 			}
 
-			match, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+			match, details, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+			// details.ActualCost can be called for nil details, no need to check.
+			actualCost := ptr.Deref(details.ActualCost(), 0)
+			if scenario.expectCost > 0 {
+				t.Logf("actual cost %d, %d%% of worst-case estimate", actualCost, actualCost*100/scenario.expectCost)
+			} else {
+				t.Logf("actual cost %d, expected zero costs", actualCost)
+				if actualCost > 0 {
+					t.Errorf("expected zero costs for (presumably) constant expression %q, got instead %d", scenario.expression, actualCost)
+				}
+			}
+
 			if err != nil {
 				if scenario.expectMatchError == "" {
 					t.Fatalf("unexpected evaluation error: %v", err)
