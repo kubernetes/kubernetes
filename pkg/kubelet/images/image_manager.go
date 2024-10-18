@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -43,9 +44,11 @@ type ImagePodPullingTimeRecorder interface {
 
 // imageManager provides the functionalities for image pulling.
 type imageManager struct {
-	recorder     record.EventRecorder
-	imageService kubecontainer.ImageService
-	backOff      *flowcontrol.Backoff
+	recorder       record.EventRecorder
+	imageService   kubecontainer.ImageService
+	backOff        *flowcontrol.Backoff
+	prevPullErrMsg sync.Map
+
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
 	puller imagePuller
 
@@ -154,8 +157,20 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", imgRef)
 		m.logIt(objRef, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
+
+		// Wrap the error from the actual pull if available.
+		// This information is populated to the pods
+		// .status.containerStatuses[*].state.waiting.message.
+		prevPullErrMsg, ok := m.prevPullErrMsg.Load(backOffKey)
+		if ok {
+			msg = fmt.Sprintf("%s: %s", msg, prevPullErrMsg)
+		}
+
 		return "", msg, ErrImagePullBackOff
 	}
+	// Ensure that the map cannot grow indefinitely.
+	m.prevPullErrMsg.Delete(backOffKey)
+
 	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
 	m.logIt(objRef, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", imgRef), klog.Info)
 	startTime := time.Now()
@@ -167,6 +182,11 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
 
 		msg, err := evalCRIPullErr(imgRef, imagePullResult.err)
+
+		// Store the actual pull error for providing that information during
+		// the image pull back-off.
+		m.prevPullErrMsg.Store(backOffKey, fmt.Sprintf("%s: %s", err, msg))
+
 		return "", msg, err
 	}
 	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
