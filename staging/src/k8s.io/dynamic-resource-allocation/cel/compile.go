@@ -198,14 +198,14 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
+func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
 		value, err := getAttributeValue(attr)
 		if err != nil {
-			return false, fmt.Errorf("attribute %s: %w", name, err)
+			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
 		domain, id := parseQualifiedName(name, input.Driver)
 		if attributes[domain] == nil {
@@ -231,19 +231,19 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		},
 	}
 
-	result, _, err := c.Program.ContextEval(ctx, variables)
+	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
-		return false, err
+		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)
 	if err != nil {
-		return false, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
+		return false, details, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
 	}
 	resultBool, ok := resultAny.(bool)
 	if !ok {
-		return false, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
+		return false, details, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
 	}
-	return resultBool, nil
+	return resultBool, details, nil
 }
 
 func mustBuildEnv() *environment.EnvSet {
