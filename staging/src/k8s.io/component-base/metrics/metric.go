@@ -78,6 +78,10 @@ type lazyMetric struct {
 }
 
 func (r *lazyMetric) IsCreated() bool {
+	if r == nil {
+		return false
+	}
+
 	r.createLock.RLock()
 	defer r.createLock.RUnlock()
 	return r.isCreated
@@ -131,6 +135,10 @@ func (r *lazyMetric) preprocessMetric(version semver.Version) {
 }
 
 func (r *lazyMetric) IsHidden() bool {
+	if r == nil {
+		return false
+	}
+
 	return r.isHidden
 }
 

@@ -30,6 +30,7 @@ var (
 )
 
 func TestObserveHealthcheck(t *testing.T) {
+	Init()
 	defer legacyregistry.Reset()
 	defer ResetFeatureInfoMetric()
 
