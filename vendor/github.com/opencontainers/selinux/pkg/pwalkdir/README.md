@@ -28,7 +28,9 @@ Please note the following limitations of this code:
 
   * fs.SkipDir is not supported;
 
-  * no errors are ever passed to WalkDirFunc;
+  * ErrNotExist errors from filepath.WalkDir are silently ignored for any path
+    except the top directory (WalkDir argument); any other error is returned to
+    the caller of WalkDir;
 
   * once any error is returned from any walkDirFunc instance, no more calls
     to WalkDirFunc are made, and the error is returned to the caller of WalkDir;
@@ -51,4 +53,4 @@ filepath.WalkDir.
 Otherwise (if a WalkDirFunc is actually doing something) this is usually
 faster, except when the WalkDirN(..., 1) is used. Run `go test -bench .`
 to see how different operations can benefit from it, as well as how the
-level of paralellism affects the speed.
+level of parallelism affects the speed.
