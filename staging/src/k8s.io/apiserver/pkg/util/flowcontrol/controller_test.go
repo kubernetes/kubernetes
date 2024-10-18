@@ -407,7 +407,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 	}()
 
 	// ensure that the controller has run its first loop.
-	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 		return controller.hasPriorityLevelState(plName), nil
 	})
 	if err != nil {
