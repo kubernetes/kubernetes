@@ -35,6 +35,11 @@ func init() {
 	metav1.AddToGroupVersion(parameterScheme, versionV1)
 }
 
+// NewBasicNegotiatedSerializer returns a basic, negotiated serializer
+func NewBasicNegotiatedSerializer() runtime.NegotiatedSerializer {
+	return &basicNegotiatedSerializer{}
+}
+
 // basicNegotiatedSerializer is used to handle discovery and error handling serialization
 type basicNegotiatedSerializer struct{}
 
