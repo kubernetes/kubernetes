@@ -93,8 +93,9 @@ func TestEndpointUpdates(t *testing.T) {
 
 	// Set pod IPs
 	createdPod.Status = v1.PodStatus{
-		Phase:  v1.PodRunning,
-		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+		Phase:    v1.PodRunning,
+		QOSClass: createdPod.Status.QOSClass,
+		PodIPs:   []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 	}
 	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 	if err != nil {
@@ -222,6 +223,7 @@ func TestEndpointWithMultiplePodUpdates(t *testing.T) {
 		Phase:      v1.PodRunning,
 		Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
 		PodIPs:     []v1.PodIP{{IP: "1.1.1.1"}},
+		QOSClass:   pod.Status.QOSClass,
 	}
 	pod, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, pod, metav1.UpdateOptions{})
 	if err != nil {
@@ -360,8 +362,9 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 
 	// Set pod IPs
 	createdPod.Status = v1.PodStatus{
-		Phase:  v1.PodRunning,
-		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+		Phase:    v1.PodRunning,
+		QOSClass: createdPod.Status.QOSClass,
+		PodIPs:   []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 	}
 	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 	if err != nil {
@@ -466,7 +469,8 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 			},
 		},
 		Status: v1.PodStatus{
-			Phase: v1.PodRunning,
+			Phase:    v1.PodRunning,
+			QOSClass: v1.PodQOSBestEffort,
 			Conditions: []v1.PodCondition{
 				{
 					Type:   v1.PodReady,
@@ -659,7 +663,8 @@ func TestEndpointTruncate(t *testing.T) {
 			},
 		},
 		Status: v1.PodStatus{
-			Phase: v1.PodRunning,
+			Phase:    v1.PodRunning,
+			QOSClass: v1.PodQOSBestEffort,
 			Conditions: []v1.PodCondition{
 				{
 					Type:   v1.PodReady,

@@ -401,7 +401,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test node: %v", err)
 	}
-	_, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	pod, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create test ready pod: %v", err)
 	}

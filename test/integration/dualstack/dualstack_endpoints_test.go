@@ -176,8 +176,9 @@ func TestDualStackEndpoints(t *testing.T) {
 			// Set pod IPs
 			podIPbyFamily := map[v1.IPFamily]string{v1.IPv4Protocol: "1.1.1.1", v1.IPv6Protocol: "2001:db2::65"}
 			createdPod.Status = v1.PodStatus{
-				Phase:  v1.PodRunning,
-				PodIPs: []v1.PodIP{{IP: podIPbyFamily[v1.IPv4Protocol]}, {IP: podIPbyFamily[v1.IPv6Protocol]}},
+				Phase:    v1.PodRunning,
+				QOSClass: createdPod.Status.QOSClass,
+				PodIPs:   []v1.PodIP{{IP: podIPbyFamily[v1.IPv4Protocol]}, {IP: podIPbyFamily[v1.IPv6Protocol]}},
 			}
 			_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 			if err != nil {

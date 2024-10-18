@@ -306,6 +306,7 @@ func validateDaemonSetPodsAndMarkReady(
 				podCopy := pod.DeepCopy()
 				podCopy.Status = v1.PodStatus{
 					Phase:      v1.PodRunning,
+					QOSClass:   pod.Status.QOSClass,
 					Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
 				}
 				_, err := podClient.UpdateStatus(context.TODO(), podCopy, metav1.UpdateOptions{})
