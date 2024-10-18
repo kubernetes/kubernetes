@@ -1765,7 +1765,21 @@
             "resourceClaimName": "resourceClaimNameValue",
             "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "limitsKey": "0"
+          },
+          "requests": {
+            "requestsKey": "0"
+          },
+          "claims": [
+            {
+              "name": "nameValue",
+              "request": "requestValue"
+            }
+          ]
+        }
       }
     },
     "updateStrategy": {

@@ -341,6 +341,10 @@ func SetObjectDefaults_DaemonSet(in *extensionsv1beta1.DaemonSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_DaemonSetList(in *extensionsv1beta1.DaemonSetList) {
@@ -646,6 +650,10 @@ func SetObjectDefaults_Deployment(in *extensionsv1beta1.Deployment) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_DeploymentList(in *extensionsv1beta1.DeploymentList) {
@@ -981,6 +989,10 @@ func SetObjectDefaults_ReplicaSet(in *extensionsv1beta1.ReplicaSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_ReplicaSetList(in *extensionsv1beta1.ReplicaSetList) {

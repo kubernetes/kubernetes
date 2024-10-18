@@ -333,6 +333,10 @@ func SetObjectDefaults_CronJob(in *batchv1beta1.CronJob) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
+	if in.Spec.JobTemplate.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_CronJobList(in *batchv1beta1.CronJobList) {
