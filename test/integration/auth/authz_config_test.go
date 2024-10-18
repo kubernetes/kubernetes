@@ -54,8 +54,6 @@ import (
 )
 
 func TestAuthzConfig(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
-
 	dir := t.TempDir()
 	configFileName := filepath.Join(dir, "config.yaml")
 	if err := atomicWriteFile(configFileName, []byte(`
@@ -126,7 +124,6 @@ authorizers:
 func TestMultiWebhookAuthzConfig(t *testing.T) {
 	authzmetrics.ResetMetricsForTest()
 	defer authzmetrics.ResetMetricsForTest()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, true)
 
 	dir := t.TempDir()
@@ -415,7 +412,7 @@ users:
 
 	configFileName := filepath.Join(dir, "config.yaml")
 	if err := atomicWriteFile(configFileName, []byte(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1beta1
 kind: AuthorizationConfiguration
 authorizers:
 - type: Webhook
@@ -803,7 +800,7 @@ authorizers:
 
 	// write good config with different webhook
 	if err := atomicWriteFile(configFileName, []byte(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthorizationConfiguration
 authorizers:
 - type: Webhook
