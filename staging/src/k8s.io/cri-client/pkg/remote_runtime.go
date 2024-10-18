@@ -364,8 +364,8 @@ func (r *remoteRuntimeService) StartContainer(ctx context.Context, containerID s
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (r *remoteRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) (err error) {
-	r.log(10, "[RemoteRuntimeService] StopContainer", "containerID", containerID, "timeout", timeout)
+func (r *remoteRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64, stopSignal string) (err error) {
+	r.log(10, "[RemoteRuntimeService] StopContainer", "containerID", containerID, "timeout", timeout, "stopSignal", stopSignal)
 	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
 	// for SIGKILL container and request latency.
 	t := r.timeout + time.Duration(timeout)*time.Second
@@ -377,6 +377,7 @@ func (r *remoteRuntimeService) StopContainer(ctx context.Context, containerID st
 	if _, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
 		ContainerId: containerID,
 		Timeout:     timeout,
+		StopSignal:  stopSignal,
 	}); err != nil {
 		r.logErr(err, "StopContainer from runtime service failed", "containerID", containerID)
 		return err

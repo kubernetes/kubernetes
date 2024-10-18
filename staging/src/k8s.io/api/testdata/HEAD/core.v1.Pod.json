@@ -731,6 +731,7 @@
             "localhostProfile": "localhostProfileValue"
           }
         },
+        "stopSignal": "stopSignalValue",
         "stdin": true,
         "stdinOnce": true,
         "tty": true
@@ -1027,6 +1028,7 @@
             "localhostProfile": "localhostProfileValue"
           }
         },
+        "stopSignal": "stopSignalValue",
         "stdin": true,
         "stdinOnce": true,
         "tty": true
@@ -1323,6 +1325,7 @@
             "localhostProfile": "localhostProfileValue"
           }
         },
+        "stopSignal": "stopSignalValue",
         "stdin": true,
         "stdinOnce": true,
         "tty": true,
@@ -1826,7 +1829,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "containerStatuses": [
@@ -1918,7 +1922,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "qosClass": "qosClassValue",
@@ -2011,7 +2016,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "resize": "resizeValue",

@@ -2566,6 +2566,9 @@ type Container struct {
 	// +optional
 	SecurityContext *SecurityContext
 
+	// +optional
+	StopSignal string
+
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
 	// +optional
@@ -2785,6 +2788,8 @@ type ContainerStatus struct {
 	// +featureGate=ResourceHealthStatus
 	// +optional
 	AllocatedResourcesStatus []ResourceStatus
+
+	StopSignal string
 }
 
 type ResourceStatus struct {
@@ -4012,6 +4017,9 @@ type EphemeralContainerCommon struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
 	SecurityContext *SecurityContext
+
+	// +optional
+	StopSignal string
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.

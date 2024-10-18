@@ -160,7 +160,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "containerStatuses": [
@@ -252,7 +253,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "qosClass": "qosClassValue",
@@ -345,7 +347,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "resize": "resizeValue",
