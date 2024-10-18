@@ -19,6 +19,8 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -307,56 +309,145 @@ func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 		}
 		return nil
 	}
+
+	var podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes int64
 	for _, ci := range tcInfo {
-		if ci.Resources == nil {
-			continue
-		}
+
 		tc, _ := makeTestContainer(ci)
-		if tc.Resources.Limits != nil || tc.Resources.Requests != nil {
-			var expectedCPUShares int64
-			var expectedCPULimitString, expectedMemLimitString string
-			expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
-			cpuRequest := tc.Resources.Requests.Cpu()
-			cpuLimit := tc.Resources.Limits.Cpu()
-			if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
+		var expectedCPUShares int64
+		var expectedCPULimitString, expectedMemLimitString string
+		expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
+		cpuRequest := tc.Resources.Requests.Cpu()
+		cpuLimit := tc.Resources.Limits.Cpu()
+		if cpuRequest.IsZero() && !cpuLimit.IsZero() {
+			expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
+		} else {
+			expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
+		}
+		cpuQuota := int64(-1)
+		if !cpuLimit.IsZero() {
+			cpuQuota = kubecm.MilliCPUToQuota(cpuLimit.MilliValue(), kubecm.QuotaPeriod)
+		}
+		expectedCPULimitString = strconv.FormatInt(cpuQuota, 10)
+		expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
+		if podOnCgroupv2Node {
+			if expectedCPULimitString == "-1" {
+				expectedCPULimitString = "max"
+			}
+			expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
+			if expectedMemLimitString == "0" {
+				expectedMemLimitString = "max"
+			}
+			// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
+			// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
+			expectedCPUShares = 1 + ((expectedCPUShares-2)*9999)/262142
+		}
+		if expectedMemLimitString != "0" {
+			err := verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString)
+			if err != nil {
+				return err
+			}
+		}
+		err := verifyCgroupValue(ci.Name, cgroupCPULimit, expectedCPULimitString)
+		if err != nil {
+			return err
+		}
+		err = verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10))
+		if err != nil {
+			return err
+		}
+
+		// Accumulate container resources for verifying pod
+		if cpuRequest != nil {
+			podCPURequestMilliValue += cpuRequest.MilliValue()
+		}
+		if podCPULimitMilliValue >= 0 {
+			if cpuLimit == nil || cpuLimit.IsZero() {
+				podCPULimitMilliValue = -1
 			} else {
-				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
+				podCPULimitMilliValue += cpuLimit.MilliValue()
 			}
-			cpuQuota := kubecm.MilliCPUToQuota(cpuLimit.MilliValue(), kubecm.QuotaPeriod)
-			if cpuLimit.IsZero() {
-				cpuQuota = -1
-			}
-			expectedCPULimitString = strconv.FormatInt(cpuQuota, 10)
-			expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
-			if podOnCgroupv2Node {
-				if expectedCPULimitString == "-1" {
-					expectedCPULimitString = "max"
-				}
-				expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
-				if expectedMemLimitString == "0" {
-					expectedMemLimitString = "max"
-				}
-				// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
-				// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
-			}
-			if expectedMemLimitString != "0" {
-				err := verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString)
-				if err != nil {
-					return err
-				}
-			}
-			err := verifyCgroupValue(ci.Name, cgroupCPULimit, expectedCPULimitString)
-			if err != nil {
-				return err
-			}
-			err = verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10))
-			if err != nil {
-				return err
+		}
+		if podMemoryLimitInBytes >= 0 {
+			if expectedMemLimitInBytes == 0 {
+				podMemoryLimitInBytes = -1
+			} else {
+				podMemoryLimitInBytes += expectedMemLimitInBytes
 			}
 		}
 	}
+
+	if !podOnCgroupv2Node {
+		// cgroup v1 is in maintenance mode. Skip verifying pod cgroup
+		return nil
+	}
+
+	// Verify pod cgroup
+
+	verifyPodCgroupValue := func(cgPath, expectedCgValue string) error {
+		cgValueBytes, err := os.ReadFile(cgPath)
+		if err != nil {
+			return fmt.Errorf("failed to read pod cgroup value %q", cgPath)
+		}
+		cgValue := strings.TrimSpace(string(cgValueBytes))
+		if cgValue != expectedCgValue {
+			return fmt.Errorf("pod cgroup value '%s' not equal to expected '%s'", cgValue, expectedCgValue)
+		}
+		return nil
+	}
+
+	expectedPodCPUShares := int64(kubecm.MilliCPUToShares(podCPURequestMilliValue))
+	expectedPodCPUQuota := int64(-1)
+	if podCPULimitMilliValue > 0 {
+		expectedPodCPUQuota = kubecm.MilliCPUToQuota(podCPULimitMilliValue, kubecm.QuotaPeriod)
+	}
+	expectedPodCPULimitString := strconv.FormatInt(expectedPodCPUQuota, 10)
+	if podMemoryLimitInBytes < 0 {
+		podMemoryLimitInBytes = 0
+	}
+	expectedPodMemLimitString := strconv.FormatInt(podMemoryLimitInBytes, 10)
+	if expectedPodCPULimitString == "-1" {
+		expectedPodCPULimitString = "max"
+	}
+	expectedPodCPULimitString = fmt.Sprintf("%s %s", expectedPodCPULimitString, CPUPeriod)
+	if expectedPodMemLimitString == "0" {
+		expectedPodMemLimitString = "max"
+	}
+	// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
+	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
+	expectedPodCPUShares = 1 + ((expectedPodCPUShares-2)*9999)/262142
+
+	var cgroupName kubecm.CgroupName
+	switch pod.Status.QOSClass {
+	case v1.PodQOSGuaranteed:
+		cgroupName = kubecm.NewCgroupName(kubecm.RootCgroupName, defaultNodeAllocatableCgroup, "pod"+string(pod.UID))
+	case v1.PodQOSBurstable:
+		cgroupName = kubecm.NewCgroupName(kubecm.RootCgroupName, defaultNodeAllocatableCgroup, "burstable", "pod"+string(pod.UID))
+	case v1.PodQOSBestEffort:
+		cgroupName = kubecm.NewCgroupName(kubecm.RootCgroupName, defaultNodeAllocatableCgroup, "besteffort", "pod"+string(pod.UID))
+	}
+	cgroupFsName := ""
+	if kubeletCfg.CgroupDriver == "systemd" {
+		cgroupFsName = cgroupName.ToSystemd()
+	} else {
+		cgroupFsName = cgroupName.ToCgroupfs()
+	}
+
+	subsystems, err := kubecm.GetCgroupSubsystems()
+	if err != nil {
+		return err
+	}
+
+	if err := verifyPodCgroupValue(filepath.Join(subsystems.MountPoints["cpu"], cgroupFsName, "cpu.weight"), strconv.FormatInt(expectedPodCPUShares, 10)); err != nil {
+		return err
+	}
+	if err := verifyPodCgroupValue(filepath.Join(subsystems.MountPoints["cpu"], cgroupFsName, "cpu.max"), expectedPodCPULimitString); err != nil {
+		return err
+	}
+	if err := verifyPodCgroupValue(filepath.Join(subsystems.MountPoints["memory"], cgroupFsName, "memory.max"), expectedPodMemLimitString); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1128,6 +1219,34 @@ func doPodResizeTests() {
 					CPUPolicy:    &doRestart,
 					MemPolicy:    &doRestart,
 					RestartCount: 1,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, two containers - no change for c1 (no resource config), increase c2 resources",
+			containers: []TestContainerInfo{
+				{
+					Name: "c1",
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c2", "resources":{"requests":{"memory":"250Mi"}}}
+					]}}`,
+			expected: []TestContainerInfo{
+				{
+					Name: "c1",
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "250Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
 				},
 			},
 		},
