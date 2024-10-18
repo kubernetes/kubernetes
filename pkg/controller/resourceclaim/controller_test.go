@@ -85,17 +85,18 @@ func init() {
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name             string
-		key              string
-		claims           []*resourceapi.ResourceClaim
-		claimsInCache    []*resourceapi.ResourceClaim
-		pods             []*v1.Pod
-		podsLater        []*v1.Pod
-		templates        []*resourceapi.ResourceClaimTemplate
-		expectedClaims   []resourceapi.ResourceClaim
-		expectedStatuses map[string][]v1.PodResourceClaimStatus
-		expectedError    bool
-		expectedMetrics  expectedMetrics
+		name               string
+		key                string
+		adminAccessEnabled bool
+		claims             []*resourceapi.ResourceClaim
+		claimsInCache      []*resourceapi.ResourceClaim
+		pods               []*v1.Pod
+		podsLater          []*v1.Pod
+		templates          []*resourceapi.ResourceClaimTemplate
+		expectedClaims     []resourceapi.ResourceClaim
+		expectedStatuses   map[string][]v1.PodResourceClaimStatus
+		expectedError      bool
+		expectedMetrics    expectedMetrics
 	}{
 		{
 			name:           "create",
@@ -392,7 +393,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 
-			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(klog.FromContext(ctx), tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
