@@ -873,9 +873,7 @@ func TestFilter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			environment.DisableBaseEnvSetCachingForTests()
-			if tc.enableSelectors {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, tc.enableSelectors)
 
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit
