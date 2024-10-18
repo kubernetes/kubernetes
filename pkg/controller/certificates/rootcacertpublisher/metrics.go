@@ -26,40 +26,46 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+type syncedResource string
+
 // RootCACertPublisher - subsystem name used by root_ca_cert_publisher
-const RootCACertPublisher = "root_ca_cert_publisher"
+const (
+	RootCACertPublisher                       = "root_ca_cert_publisher"
+	namespaceResource          syncedResource = "namespace"
+	clusterTrustBundleResource syncedResource = "clustertrustbundle"
+)
 
 var (
 	syncCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      RootCACertPublisher,
 			Name:           "sync_total",
-			Help:           "Number of namespace syncs happened in root ca cert publisher.",
+			Help:           "Number of syncs happened in root ca cert publisher.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"code"},
+		[]string{"code", "resource"},
 	)
 	syncLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      RootCACertPublisher,
 			Name:           "sync_duration_seconds",
-			Help:           "Number of namespace syncs happened in root ca cert publisher.",
+			Help:           "Number of syncs happened in root ca cert publisher.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"code"},
+		[]string{"code", "resource"},
 	)
 )
 
-func recordMetrics(start time.Time, err error) {
+func recordMetrics(start time.Time, resource syncedResource, err error) {
 	code := "500"
 	if err == nil {
 		code = "200"
 	} else if se, ok := err.(*apierrors.StatusError); ok && se.Status().Code != 0 {
 		code = strconv.Itoa(int(se.Status().Code))
 	}
-	syncLatency.WithLabelValues(code).Observe(time.Since(start).Seconds())
-	syncCounter.WithLabelValues(code).Inc()
+	syncLatency.WithLabelValues(code, string(resource)).Observe(time.Since(start).Seconds())
+	syncCounter.WithLabelValues(code, string(resource)).Inc()
 }
 
 var once sync.Once
