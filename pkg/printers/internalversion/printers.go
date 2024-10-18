@@ -876,55 +876,66 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	}
 
 	initContainers := make(map[string]*api.Container)
-	for i := range pod.Spec.InitContainers {
-		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
-		if isRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+	for _, initContainer := range pod.Spec.InitContainers {
+		initContainers[initContainer.Name] = &initContainer
+		if isRestartableInitContainer(&initContainer) {
 			totalContainers++
 		}
 	}
 
+	containers := make(map[string]*api.Container)
+	for _, container := range pod.Spec.Containers {
+		containers[container.Name] = &container
+	}
+
 	initializing := false
-	for i := range pod.Status.InitContainerStatuses {
-		container := pod.Status.InitContainerStatuses[i]
-		restarts += int(container.RestartCount)
-		if container.LastTerminationState.Terminated != nil {
-			terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+	for i, cs := range pod.Status.InitContainerStatuses {
+		initContainer := initContainers[cs.Name]
+
+		if initContainer == nil {
+			// This is a container that was not in the pod spec, so we don't count it.
+			continue
+		}
+
+		restarts += int(cs.RestartCount)
+		if cs.LastTerminationState.Terminated != nil {
+			terminatedDate := cs.LastTerminationState.Terminated.FinishedAt
 			if lastRestartDate.Before(&terminatedDate) {
 				lastRestartDate = terminatedDate
 			}
 		}
-		if isRestartableInitContainer(initContainers[container.Name]) {
-			restartableInitContainerRestarts += int(container.RestartCount)
-			if container.LastTerminationState.Terminated != nil {
-				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+		if isRestartableInitContainer(initContainer) {
+			restartableInitContainerRestarts += int(cs.RestartCount)
+			if cs.LastTerminationState.Terminated != nil {
+				terminatedDate := cs.LastTerminationState.Terminated.FinishedAt
 				if lastRestartableInitContainerRestartDate.Before(&terminatedDate) {
 					lastRestartableInitContainerRestartDate = terminatedDate
 				}
 			}
 		}
 		switch {
-		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+		case cs.State.Terminated != nil && cs.State.Terminated.ExitCode == 0:
 			continue
-		case isRestartableInitContainer(initContainers[container.Name]) &&
-			container.Started != nil && *container.Started:
-			if container.Ready {
+		case isRestartableInitContainer(initContainer) &&
+			cs.Started != nil && *cs.Started:
+			if cs.Ready {
 				readyContainers++
 			}
 			continue
-		case container.State.Terminated != nil:
+		case cs.State.Terminated != nil:
 			// initialization is failed
-			if len(container.State.Terminated.Reason) == 0 {
-				if container.State.Terminated.Signal != 0 {
-					reason = fmt.Sprintf("Init:Signal:%d", container.State.Terminated.Signal)
+			if len(cs.State.Terminated.Reason) == 0 {
+				if cs.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("Init:Signal:%d", cs.State.Terminated.Signal)
 				} else {
-					reason = fmt.Sprintf("Init:ExitCode:%d", container.State.Terminated.ExitCode)
+					reason = fmt.Sprintf("Init:ExitCode:%d", cs.State.Terminated.ExitCode)
 				}
 			} else {
-				reason = "Init:" + container.State.Terminated.Reason
+				reason = "Init:" + cs.State.Terminated.Reason
 			}
 			initializing = true
-		case container.State.Waiting != nil && len(container.State.Waiting.Reason) > 0 && container.State.Waiting.Reason != "PodInitializing":
-			reason = "Init:" + container.State.Waiting.Reason
+		case cs.State.Waiting != nil && len(cs.State.Waiting.Reason) > 0 && cs.State.Waiting.Reason != "PodInitializing":
+			reason = "Init:" + cs.State.Waiting.Reason
 			initializing = true
 		default:
 			reason = fmt.Sprintf("Init:%d/%d", i, len(pod.Spec.InitContainers))
@@ -938,26 +949,32 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		lastRestartDate = lastRestartableInitContainerRestartDate
 		hasRunning := false
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
-			container := pod.Status.ContainerStatuses[i]
+			cs := pod.Status.ContainerStatuses[i]
 
-			restarts += int(container.RestartCount)
-			if container.LastTerminationState.Terminated != nil {
-				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
+			container := containers[cs.Name]
+			if container == nil {
+				// This is a container that was not in the pod spec, so we don't count it.
+				continue
+			}
+
+			restarts += int(cs.RestartCount)
+			if cs.LastTerminationState.Terminated != nil {
+				terminatedDate := cs.LastTerminationState.Terminated.FinishedAt
 				if lastRestartDate.Before(&terminatedDate) {
 					lastRestartDate = terminatedDate
 				}
 			}
-			if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
-				reason = container.State.Waiting.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
-				reason = container.State.Terminated.Reason
-			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
-				if container.State.Terminated.Signal != 0 {
-					reason = fmt.Sprintf("Signal:%d", container.State.Terminated.Signal)
+			if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+				reason = cs.State.Waiting.Reason
+			} else if cs.State.Terminated != nil && cs.State.Terminated.Reason != "" {
+				reason = cs.State.Terminated.Reason
+			} else if cs.State.Terminated != nil && cs.State.Terminated.Reason == "" {
+				if cs.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("Signal:%d", cs.State.Terminated.Signal)
 				} else {
-					reason = fmt.Sprintf("ExitCode:%d", container.State.Terminated.ExitCode)
+					reason = fmt.Sprintf("ExitCode:%d", cs.State.Terminated.ExitCode)
 				}
-			} else if container.Ready && container.State.Running != nil {
+			} else if cs.Ready && cs.State.Running != nil {
 				hasRunning = true
 				readyContainers++
 			}
