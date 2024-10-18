@@ -196,10 +196,16 @@ func TestE2eNode(t *testing.T) {
 		warns, errs := system.ValidateSpec(*spec, "remote")
 		if len(warns) != 0 {
 			klog.Warningf("system validation warns: %v", warns)
+<<<<<<< HEAD
 		}
 		if len(errs) != 0 {
 			klog.Exitf("system validation failed: %v", errs)
 		}
+=======
+		} 
+		if len(errs) != 0 {
+			klog.Exitf("system validation failed: %v", errs)
+		} 
 		return
 	}
 
