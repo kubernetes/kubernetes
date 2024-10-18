@@ -43,7 +43,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/pointer"
@@ -236,12 +235,6 @@ func TestAuthenticationValidate(t *testing.T) {
 				areFlagsConfigured: func() bool { return true },
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
-		},
-		{
-			name:             "fails to validate if ServiceAccountTokenNodeBindingValidation is disabled and ServiceAccountTokenNodeBinding is enabled",
-			enabledFeatures:  []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBinding},
-			disabledFeatures: []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBindingValidation},
-			expectErr:        "the \"ServiceAccountTokenNodeBinding\" feature gate can only be enabled if the \"ServiceAccountTokenNodeBindingValidation\" feature gate is also enabled",
 		},
 		{
 			name:                         "test when authentication config file and anonymous-auth flags are set AnonymousAuthConfigurableEndpoints disabled",
@@ -489,7 +482,6 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 }
 
 func TestWithTokenGetterFunction(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.ServiceAccountTokenNodeBindingValidation, false)
 	fakeClientset := fake.NewSimpleClientset()
 	versionedInformer := informers.NewSharedInformerFactory(fakeClientset, 0)
 	{

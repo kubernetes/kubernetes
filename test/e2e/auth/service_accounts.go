@@ -100,6 +100,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
+		// Read the running pod to get the current node name
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
 		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 		mountedToken, err := tk.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
 		framework.ExpectNoError(err)
@@ -132,6 +138,29 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		if !groups.Has("system:serviceaccounts:" + f.Namespace.Name) {
 			framework.Failf("expected system:serviceaccounts:%s group, had %v", f.Namespace.Name, groups.List())
+		}
+
+		credentialID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/credential-id"]
+		if !ok || len(credentialID) != 1 || !strings.HasPrefix(credentialID[0], "JTI=") {
+			framework.Failf("expected single authentication.kubernetes.io/credential-id extra info item starting with 'JTI=', got %v", credentialID)
+		}
+
+		podName, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/pod-name"]
+		if !ok || len(podName) != 1 || podName[0] != pod.Name {
+			framework.Failf("expected single authentication.kubernetes.io/pod-name extra info item matching %v, got %v", pod.Name, podName)
+		}
+		podUID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/pod-uid"]
+		if !ok || len(podUID) != 1 || podUID[0] != string(pod.UID) {
+			framework.Failf("expected single authentication.kubernetes.io/pod-uid extra info item matching %v, got %v", pod.UID, podUID)
+		}
+
+		nodeName, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/node-name"]
+		if !ok || len(nodeName) != 1 || nodeName[0] != node.Name {
+			framework.Failf("expected single authentication.kubernetes.io/node-name extra info item matching %v, got %v", node.Name, nodeName)
+		}
+		nodeUID, ok := tokenReview.Status.User.Extra["authentication.kubernetes.io/node-uid"]
+		if !ok || len(nodeUID) != 1 || nodeUID[0] != string(node.UID) {
+			framework.Failf("expected single authentication.kubernetes.io/node-uid extra info item matching %v, got %v", node.UID, nodeUID)
 		}
 	})
 
