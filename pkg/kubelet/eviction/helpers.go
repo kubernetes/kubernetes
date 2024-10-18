@@ -751,14 +751,9 @@ func swap(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := swapUsage(p1Stats.Swap)
-		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
-		p1Memory.Sub(p1Request)
-
 		p2Memory := swapUsage(p2Stats.Swap)
-		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
-		p2Memory.Sub(p2Request)
 
-		// prioritize evicting the pod which has the larger consumption of memory
+		// prioritize evicting the pod which has the larger consumption of swap
 		return p2Memory.Cmp(*p1Memory)
 	}
 }
@@ -852,7 +847,21 @@ func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
 }
 
 func rankSwapPressure(pods []*v1.Pod, stats statsFunc) {
-	orderedBy(swap(stats)).Sort(pods)
+	podsWithSwapUsageNonZero := []*v1.Pod{}
+	// We only want to include active pods that are swapping
+	// when swap pressure is hit
+	// swap eviction will never evict non swapping pods
+	for _, val := range pods {
+		swapStats, _ := stats(val)
+		if swapStats.Swap != nil && swapStats.Swap.SwapUsageBytes != nil {
+			swapUsage := *swapStats.Swap.SwapUsageBytes
+			if swapUsage > 0 {
+				podsWithSwapUsageNonZero = append(podsWithSwapUsageNonZero, val)
+			}
+		}
+	}
+
+	orderedBy(swap(stats)).Sort(podsWithSwapUsageNonZero)
 }
 
 // rankPIDPressure orders the input pods by priority in response to PID pressure.
