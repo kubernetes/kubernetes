@@ -18,7 +18,6 @@ package memorymanager
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -689,10 +688,27 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 
-			if !reflect.DeepEqual(*memoryState1, *memoryState2) {
+			if memoryState1.TotalMemSize != memoryState2.TotalMemSize || memoryState1.SystemReserved != memoryState2.SystemReserved || memoryState1.Allocatable != memoryState2.Allocatable {
 				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
+
+			totalFree1 := uint64(0)
+			totalReserved1 := uint64(0)
+			totalFree2 := uint64(0)
+			totalReserved2 := uint64(0)
+			for _, nodeId := range nodeState1.Cells {
+				totalFree1 += ms1[nodeId].MemoryMap[resourceName].Free
+				totalReserved1 += ms1[nodeId].MemoryMap[resourceName].Reserved
+				totalFree2 += ms2[nodeId].MemoryMap[resourceName].Free
+				totalReserved2 += ms2[nodeId].MemoryMap[resourceName].Reserved
+			}
+
+			if totalFree1 != totalFree2 || totalReserved1 != totalReserved2 {
+				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
+
 		}
 	}
 	return true
