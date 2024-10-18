@@ -193,8 +193,12 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, "remote"); len(err) != 0 {
-			klog.Exitf("system validation failed: %v", err)
+		warns, errs := system.ValidateSpec(*spec, "remote")
+		if len(warns) != 0 {
+			klog.Warningf("system validation warns: %v", warns)
+		}
+		if len(errs) != 0 {
+			klog.Exitf("system validation failed: %v", errs)
 		}
 		return
 	}
