@@ -101,6 +101,8 @@ var _ = SIGDescribe("PodOSRejectionStatus", func() {
 			framework.ExpectNoError(err)
 			// Check the pod status is set correctly
 			expectedStatus := pod.Status.DeepCopy()
+                         // overwriting all fields that we expect are overriden by kubelet.
+                         // All other fields must stay the same as before kubelet touched them
 			expectedStatus.Phase = gotPod.Status.Phase
 			expectedStatus.Reason = gotPod.Status.Reason
 			expectedStatus.Message = gotPod.Status.Message
