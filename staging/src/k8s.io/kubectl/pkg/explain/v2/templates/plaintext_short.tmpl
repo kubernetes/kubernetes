@@ -112,11 +112,7 @@ Takes dictionary as argument with keys:
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
             {{- if $subschema.enum -}}
-                {{- $spaceString := " " }}
-                {{- if $.Recursive -}}
-                    {{- $spaceString = "| " }}
-                {{- end -}}
-                {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1 "spaceString" $spaceString ) -}}{{"\n"}}
+                {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document) -}}{{"\n"}}
             {{- end -}}
             {{- "\n" -}}
         {{- end -}}
@@ -144,24 +140,18 @@ Takes dictionary as argument with keys:
 Prints list of fields of a given open api schema in following form:
 
 field1 <type> -required-
-    DESCRIPTION
 
 field2 <type> -required-
-    DESCRIPTION
 
 or if Recursive is enabled:
-* field1 <type> -required-
-| DESCRIPTION
-|
-| * subfield1 <type>
-| | enum: type1, type2, ....
-| | DESCRIPTION
-| |
-| | * subsubfield1 <type>
-| | | DESCRIPTION
-| | |
-| | * subsubfield2 <type>
-| | | DESCRIPTION
+field1 <type> -required-
+    subfield1 <type>
+        subsubfield1 <type>
+        subsubfield2 <type>
+    subfield2 <type>
+field2 <type> -required-
+    subfield1 <type>
+    subfield2 <type>
 
 Follows refs for field traversal. If there are cycles in the schema, they are
 detected and traversal ends.
@@ -177,17 +167,13 @@ Takes dictionary as argument with keys:
     {{- /* Resolve schema if it is a ref */}}
     {{- /* If this is a ref seen before, then ignore it */}}
     {{- $refString := or (index $.schema "$ref") "" }}
-    {{- $spaceString := " " }}
-    {{- if $.Recursive -}}
-        {{- $spaceString = "| " }}
-    {{- end -}}
     {{- if and $refString (index (or $.history (dict)) $refString) -}}
         {{- /* Do nothing for cycle */}}
     {{- else -}}
         {{- $nextContext := set $ "history" (set $.history $refString 1) -}}
         {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
         {{- range $k, $v := $resolved.properties -}}
-            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "spaceString" $spaceString "level" $.level "Document" $.Document) -}}
+            {{- template "fieldDetail" (dict "name" $k "schema" $resolved "level" $.level "Document" $.Document) -}}
             {{- if $.Recursive -}}
                 {{- /* Check if we already know about this element */ -}}
                 {{- template "fieldList" (set $nextContext "schema" $v "level" (add $.level 1)) -}}
@@ -212,37 +198,16 @@ Optionally prints in a one-line style
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema which contains the field
     name: name of field
-    spaceString: use for indention
     level: indentation amount
     Document: openapi document
 */ -}}
 {{- define "fieldDetail" -}}
     {{- $level := or $.level 0 -}}
-    {{- $indentAmount := $level -}}
-    {{- if eq $.spaceString " " -}}
-        {{- $indentAmount = mul $indentAmount 2 -}}
-    {{- end -}}
+    {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- if eq $.spaceString " " -}}
-        {{- $.name | indent $indentAmount $.spaceString -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
-    {{- else -}}
-        {{- printf "* %s" $.name | indent (sub $indentAmount 1) $.spaceString -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
-    {{- end -}}
+    {{- $.name | indent $indentAmount " " -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- "\n" -}}
-    {{- if eq $.spaceString " " -}}
-        {{- $indentAmount = add $indentAmount 2 -}}
-    {{- end -}}
-    {{- if $fieldSchema.enum -}}
-        {{- template "extractEnum" (dict "schema" $fieldSchema "Document" $.Document "isLongView" false "limit" 4 "indentAmount" $indentAmount "spaceString" $.spaceString) -}}
-        {{- "\n" -}}
-    {{- end -}}
-    {{- or $fieldSchema.description "<no description>" | wrap (sub 80 $indentAmount) | indent $indentAmount $.spaceString -}}{{- "\n" -}}
-    {{- if eq $.spaceString "| " -}}
-        {{- indent $indentAmount $.spaceString "" -}}
-    {{- end -}}
-    {{- "\n" -}}
-
 {{- end -}}
 
 {{- /*
@@ -324,44 +289,21 @@ Takes dictionary as argument with keys:
         BlockDevice
         CharDevice
         Directory
-    enum: "", BlockDevice, CharDevice, Directory
 
     Can change the style of enum in future by modifying this function
 
 Takes dictionary as argument with keys:
     schema: openapiv3 JSON schema
     Document: openapi document
-    isLongView: (boolean) Simple view: long list of all fields. Long view: all details of one field
-    limit: (int) truncate the amount of enums that can be printed in simple view, -1 means all items
-    indentAmount: intent of the beginning enum line in longform view
-    spaceString: use for indention
 */ -}}
 {{- define "extractEnum" -}}
     {{- with $.schema -}}
-        {{- $enumLen := len .enum -}}
-        {{- $limit := or $.limit -1 -}}
-        {{- if eq $.isLongView false -}}
-            {{- "" | indent $.indentAmount $.spaceString -}}
-            {{- "enum: " -}}
-        {{- else -}}
-            {{- "ENUM:" -}}
-        {{- end -}}
+        {{- "ENUM:" -}}
         {{- range $index, $element := .enum -}}
-            {{- /* Prints , ....  and return the range when it goes over the limit */ -}}
-            {{- if and (gt $limit -1) (ge $index $limit) -}}
-                {{- ", ...." -}}
-                {{- break -}}
-            {{- end -}}
             {{- /* Use to reflect "" when we see empty string */ -}}
             {{- $elementType := printf "%T" $element -}}
-            {{- /* Print out either `, ` or `\n    ` based of the view */ -}}
-            {{- /* Simple view */ -}}
-            {{- if and (gt $index 0) (eq $.isLongView false) -}}
-                {{- ", " -}}
             {{- /* Long view */ -}}
-            {{- else if eq $.isLongView true -}}
-                {{- "\n" -}}{{- "" | indent 4 " " -}}
-            {{- end -}}
+            {{- "\n" -}}{{- "" | indent 4 " " -}}
             {{- /* Convert empty string to `""` for more clarification */ -}}
             {{- if and (eq "string" $elementType) (eq $element "") -}}
                 {{- `""` -}}
