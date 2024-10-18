@@ -820,6 +820,14 @@ spec:
   - name: nameValue
     resourceClaimName: resourceClaimNameValue
     resourceClaimTemplateName: resourceClaimTemplateNameValue
+  resources:
+    claims:
+    - name: nameValue
+      request: requestValue
+    limits:
+      limitsKey: "0"
+    requests:
+      requestsKey: "0"
   restartPolicy: restartPolicyValue
   runtimeClassName: runtimeClassNameValue
   schedulerName: schedulerNameValue
