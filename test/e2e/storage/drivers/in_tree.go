@@ -48,6 +48,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
@@ -506,8 +507,12 @@ func (h *hostPathSymlinkDriver) CreateVolume(ctx context.Context, config *storag
 	f := config.Framework
 	cs := f.ClientSet
 
-	sourcePath := fmt.Sprintf("/tmp/%v", f.Namespace.Name)
-	targetPath := fmt.Sprintf("/tmp/%v-link", f.Namespace.Name)
+	// Random 5 characters are added to the filename to avoid conflicts between parallel tests.
+	// The error message is like below:
+	// - mkdir: can't create directory '/tmp/provisioning-1604': File exists
+	filename := fmt.Sprintf("%s-%s", f.Namespace.Name, utilrand.String(5))
+	sourcePath := fmt.Sprintf("/tmp/%v", filename)
+	targetPath := fmt.Sprintf("/tmp/%v-link", filename)
 	volumeName := "test-volume"
 
 	// pods should be scheduled on the node
