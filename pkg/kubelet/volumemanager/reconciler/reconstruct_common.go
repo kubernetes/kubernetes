@@ -72,9 +72,8 @@ type reconstructedVolume struct {
 	volumeName          v1.UniqueVolumeName
 	podName             volumetypes.UniquePodName
 	volumeSpec          *volumepkg.Spec
-	outerVolumeSpecName string
 	pod                 *v1.Pod
-	volumeGidValue      string
+	volumeGIDValue      string
 	devicePath          string
 	mounter             volumepkg.Mounter
 	deviceMounter       volumepkg.DeviceMounter
@@ -87,7 +86,6 @@ func (rv reconstructedVolume) MarshalLog() interface{} {
 		VolumeName          string `json:"volumeName"`
 		PodName             string `json:"podName"`
 		VolumeSpecName      string `json:"volumeSpecName"`
-		OuterVolumeSpecName string `json:"outerVolumeSpecName"`
 		PodUID              string `json:"podUID"`
 		VolumeGIDValue      string `json:"volumeGIDValue"`
 		DevicePath          string `json:"devicePath"`
@@ -96,9 +94,8 @@ func (rv reconstructedVolume) MarshalLog() interface{} {
 		VolumeName:          string(rv.volumeName),
 		PodName:             string(rv.podName),
 		VolumeSpecName:      rv.volumeSpec.Name(),
-		OuterVolumeSpecName: rv.outerVolumeSpecName,
 		PodUID:              string(rv.pod.UID),
-		VolumeGIDValue:      rv.volumeGidValue,
+		VolumeGIDValue:      rv.volumeGIDValue,
 		DevicePath:          rv.devicePath,
 		SeLinuxMountContext: rv.seLinuxMountContext,
 	}
@@ -376,17 +373,12 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 	}
 
 	reconstructedVolume := &reconstructedVolume{
-		volumeName: uniqueVolumeName,
-		podName:    volume.podName,
-		volumeSpec: volumeSpec,
-		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
-		// for volume cleanup.
-		// in case reconciler calls mountOrAttachVolumes, outerVolumeSpecName will
-		// be updated from dsw information in ASW.MarkVolumeAsMounted().
-		outerVolumeSpecName: volume.volumeSpecName,
-		pod:                 pod,
-		deviceMounter:       deviceMounter,
-		volumeGidValue:      "",
+		volumeName:     uniqueVolumeName,
+		podName:        volume.podName,
+		volumeSpec:     volumeSpec,
+		pod:            pod,
+		deviceMounter:  deviceMounter,
+		volumeGIDValue: "",
 		// devicePath is updated during updateStates() by checking node status's VolumesAttached data.
 		// TODO: get device path directly from the volume mount path.
 		devicePath:          "",
