@@ -2188,9 +2188,10 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer}
 
 	for desc, test := range map[string]struct {
-		podResizePolicyFn       func(*v1.Pod)
-		mutatePodFn             func(*v1.Pod)
-		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
+		podResizePolicyFn         func(*v1.Pod)
+		mutatePodFn               func(*v1.Pod)
+		mutateRuntimeContainersFn func([]*apitest.FakeContainer)
+		getExpectedPodActionsFn   func(*v1.Pod, *kubecontainer.PodStatus) *podActions
 	}{
 		"Update container CPU and memory resources": {
 			mutatePodFn: func(pod *v1.Pod) {
@@ -2478,6 +2479,34 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				return &pa
 			},
 		},
+		"Nothing when no CPU requests are configured in spec and runtime status has the minimum CPU requests": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceMemory: mem100M},
+				}
+				if idx, found := podutil.GetIndexOfContainerStatus(pod.Status.ContainerStatuses, pod.Spec.Containers[0].Name); found {
+					pod.Status.ContainerStatuses[idx].Resources = &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: mem100M},
+					}
+				}
+			},
+			mutateRuntimeContainersFn: func(containers []*apitest.FakeContainer) {
+				containers[0].ContainerStatus.Resources = &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuShares: 2,
+					},
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				pa := podActions{
+					SandboxID:          podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
+					ContainersToStart:  []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+				}
+				return &pa
+			},
+		},
 	} {
 		pod, kps := makeBasePodAndStatus()
 		for idx := range pod.Spec.Containers {
@@ -2493,7 +2522,10 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
 			}
 		}
-		makeAndSetFakePod(t, m, fakeRuntime, pod)
+		_, runtimeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+		if test.mutateRuntimeContainersFn != nil {
+			test.mutateRuntimeContainersFn(runtimeContainers)
+		}
 		ctx := context.Background()
 		status, _ := m.GetPodStatus(ctx, kps.ID, pod.Name, pod.Namespace)
 		for idx := range pod.Spec.Containers {
