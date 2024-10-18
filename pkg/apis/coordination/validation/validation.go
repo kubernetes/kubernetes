@@ -124,29 +124,19 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 		allErrs = append(allErrs, field.Invalid(fld, spec.BinaryVersion, "must be greater than or equal to `emulationVersion`"))
 	}
 
-	if len(spec.PreferredStrategies) > 0 {
-		for i, strategy := range spec.PreferredStrategies {
-			fld := fldPath.Child("preferredStrategies").Index(i)
-
-			strategySeen := make(map[coordination.CoordinatedLeaseStrategy]bool)
-			if _, ok := strategySeen[strategy]; ok {
-				allErrs = append(allErrs, field.Duplicate(fld, strategy))
-			} else {
-				strategySeen[strategy] = true
+	if spec.Strategy != "" {
+		fld := fldPath.Child("preferredStrategies")
+		if spec.Strategy == coordination.OldestEmulationVersion {
+			zeroVersion := semver.Version{}
+			if bv.EQ(zeroVersion) {
+				allErrs = append(allErrs, field.Required(fldPath.Child("binaryVersion"), "must be specified when `strategy` is 'OldestEmulationVersion'"))
 			}
-
-			if strategy == coordination.OldestEmulationVersion {
-				zeroVersion := semver.Version{}
-				if bv.EQ(zeroVersion) {
-					allErrs = append(allErrs, field.Required(fldPath.Child("binaryVersion"), "must be specified when `strategy` is 'OldestEmulationVersion'"))
-				}
-				if ev.EQ(zeroVersion) {
-					allErrs = append(allErrs, field.Required(fldPath.Child("emulationVersion"), "must be specified when `strategy` is 'OldestEmulationVersion'"))
-				}
+			if ev.EQ(zeroVersion) {
+				allErrs = append(allErrs, field.Required(fldPath.Child("emulationVersion"), "must be specified when `strategy` is 'OldestEmulationVersion'"))
 			}
-
-			allErrs = append(allErrs, ValidateCoordinatedLeaseStrategy(strategy, fld)...)
 		}
+
+		allErrs = append(allErrs, ValidateCoordinatedLeaseStrategy(spec.Strategy, fld)...)
 	}
 	// spec.PingTime is a MicroTime and doesn't need further validation
 	// spec.RenewTime is a MicroTime and doesn't need further validation
