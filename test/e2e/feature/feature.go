@@ -202,11 +202,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
 
-	// Owner: sig-node
-	// Marks tests that require parallel image pull
-	// As the image pulling delay is needed, this feature needs a CRI proxy to inject the delay and this cannot be a general E2E.
-	MaxParallelImagePull = framework.WithFeature(framework.ValidFeatures.Add("MaxParallelImagePull"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
 

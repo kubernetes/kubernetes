@@ -45,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
@@ -315,7 +316,7 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 }
 
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
-func getCRIClient() (*criproxy.RuntimeServiceProxy, *criproxy.ImageServiceProxy, error) {
+func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
 	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
