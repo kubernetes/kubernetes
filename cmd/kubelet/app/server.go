@@ -137,7 +137,12 @@ const (
 	componentKubelet = "kubelet"
 )
 
-// NewKubeletCommand creates a *cobra.Command object with default parameters
+// NewKubeletCommand creates a *cobra.Command object with default parameters.
+// This function accepts a context.Context parameter, which is used for
+// contextual logging and cancellation. Although it is generally a good
+// practice to return an error when using context, in this case, any errors
+// encountered will cause the program to exit immediately. Therefore, returning
+// an error is deemed unnecessary.
 func NewKubeletCommand(ctx context.Context) *cobra.Command {
 	logger := klog.FromContext(ctx)
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
@@ -745,7 +750,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
 	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
 	if err != nil {
-		logger.Info("Failed to get the kubelet's cgroup. Kubelet system container metrics may be missing.", "err", err)
+		logger.Info("Failed to get the kubelet's cgroup. Kubelet system container metrics may be missing", "err", err)
 	} else if kubeletCgroup != "" {
 		cgroupRoots = append(cgroupRoots, kubeletCgroup)
 	}
@@ -773,7 +778,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
-			logger.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
+			logger.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  Defaulting to /")
 			s.CgroupRoot = "/"
 		}
 
