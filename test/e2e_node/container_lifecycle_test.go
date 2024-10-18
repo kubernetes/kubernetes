@@ -3717,7 +3717,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "init container attempted to run with updated image",
 						time.Duration(30)*time.Second, func(pod *v1.Pod) (bool, error) {
 							containerStatus := pod.Status.InitContainerStatuses[1]
-							return containerStatus.Image == updatedImage, nil
+							return containerStatus.Image == updatedImage && containerStatus.RestartCount > 1, nil
 						})
 					framework.ExpectNoError(err)
 
