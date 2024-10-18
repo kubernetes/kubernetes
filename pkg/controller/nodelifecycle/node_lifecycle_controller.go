@@ -111,6 +111,7 @@ var (
 		v1.TaintNodeUnreachable:        v1.NodeReady,
 		v1.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		v1.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
+		v1.TaintNodeSwapPressure:       v1.NodeSwapPressure,
 		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
