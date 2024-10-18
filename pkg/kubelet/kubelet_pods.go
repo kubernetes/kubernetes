@@ -1741,30 +1741,36 @@ func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirement
 
 func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
-	specStatusDiffer := false
-	for _, c := range pod.Spec.Containers {
-		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			cResourceCopy := c.Resources.DeepCopy()
-			// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
-			// which are included in convertToAPIContainerStatuses
-			deleteCustomResourceFromResourceRequirements(cResourceCopy)
-			csResourceCopy := cs.Resources.DeepCopy()
-			if csResourceCopy != nil && !cmp.Equal(*cResourceCopy, *csResourceCopy) {
-				specStatusDiffer = true
-				break
+
+	if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
+		if resizeStatus != v1.PodResizeStatusInProgress {
+			return resizeStatus
+		}
+
+		specStatusDiffer := false
+		for _, c := range pod.Spec.Containers {
+			if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
+				cResourceCopy := c.Resources.DeepCopy()
+				// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
+				// which are included in convertToAPIContainerStatuses
+				deleteCustomResourceFromResourceRequirements(cResourceCopy)
+				csResourceCopy := cs.Resources.DeepCopy()
+				if csResourceCopy != nil && !cmp.Equal(*cResourceCopy, *csResourceCopy) {
+					specStatusDiffer = true
+					break
+				}
 			}
 		}
-	}
-	if !specStatusDiffer {
+		if specStatusDiffer {
+			return resizeStatus
+		}
+
 		// Clear last resize state from checkpoint
 		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
 		}
-	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
-			podResizeStatus = resizeStatus
-		}
 	}
+
 	return podResizeStatus
 }
 
