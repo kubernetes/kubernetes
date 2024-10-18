@@ -269,43 +269,6 @@ type podSyncer interface {
 	SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 }
 
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
-type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
-type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
-type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
-
-// podSyncerFuncs implements podSyncer and accepts functions for each method.
-type podSyncerFuncs struct {
-	syncPod                   syncPodFnType
-	syncTerminatingPod        syncTerminatingPodFnType
-	syncTerminatingRuntimePod syncTerminatingRuntimePodFnType
-	syncTerminatedPod         syncTerminatedPodFnType
-}
-
-func newPodSyncerFuncs(s podSyncer) podSyncerFuncs {
-	return podSyncerFuncs{
-		syncPod:                   s.SyncPod,
-		syncTerminatingPod:        s.SyncTerminatingPod,
-		syncTerminatingRuntimePod: s.SyncTerminatingRuntimePod,
-		syncTerminatedPod:         s.SyncTerminatedPod,
-	}
-}
-
-var _ podSyncer = podSyncerFuncs{}
-
-func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
-	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
-}
-func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
-	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
-}
-func (f podSyncerFuncs) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
-	return f.syncTerminatingRuntimePod(ctx, runningPod)
-}
-func (f podSyncerFuncs) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
-	return f.syncTerminatedPod(ctx, pod, podStatus)
-}
-
 const (
 	// jitter factor for resyncInterval
 	workerResyncIntervalJitterFactor = 0.5
