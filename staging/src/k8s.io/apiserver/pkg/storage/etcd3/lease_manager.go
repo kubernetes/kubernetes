@@ -27,7 +27,7 @@ import (
 
 const (
 	defaultLeaseReuseDurationSeconds = 60
-	defaultLeaseMaxObjectCount       = 1000
+	defaultLeaseMaxObjectCount       = 1
 )
 
 // LeaseManagerConfig is configuration for creating a lease manager.
