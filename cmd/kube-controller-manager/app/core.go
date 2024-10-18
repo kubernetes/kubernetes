@@ -68,6 +68,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
+	"k8s.io/kubernetes/pkg/controller/volume/vacprotection"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -743,6 +744,31 @@ func startPersistentVolumeProtectionController(ctx context.Context, controllerCo
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.ClientBuilder.ClientOrDie("pv-protection-controller"),
 	).Run(ctx, 1)
+	return nil, true, nil
+}
+
+func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.VolumeAttributesClassProtectionController,
+		initFunc: startVolumeAttributesClassProtectionController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.VolumeAttributesClass,
+		},
+	}
+}
+
+func startVolumeAttributesClassProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	vacProtectionController, err := vacprotection.NewVACProtectionController(
+		klog.FromContext(ctx),
+		controllerContext.ClientBuilder.ClientOrDie("volumeattributesclass-protection-controller"),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
+		controllerContext.InformerFactory.Storage().V1beta1().VolumeAttributesClasses(),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start the vac protection controller: %w", err)
+	}
+	go vacProtectionController.Run(ctx, 1)
 	return nil, true, nil
 }
 
