@@ -267,6 +267,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
 		controllerContext.Cloud,
 		controllerContext.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
+		controllerContext.ComponentConfig.KubeCloudShared.InstanceExistsGracePeriod.Duration,
 	)
 	if err != nil {
 		// the controller manager should continue to run if the "Instances" interface is not

@@ -63,6 +63,8 @@ type KubeCloudSharedConfiguration struct {
 	RouteReconciliationPeriod metav1.Duration
 	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
 	NodeMonitorPeriod metav1.Duration
+	// InstanceExistsGracePeriod is the period after Node creation that CloudNodeLifecycleController will assume the cloud instance exists.
+	InstanceExistsGracePeriod metav1.Duration
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string
 	// clusterCIDR is CIDR Range for Pods in cluster.
