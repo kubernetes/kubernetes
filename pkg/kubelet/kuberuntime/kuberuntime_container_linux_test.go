@@ -452,7 +452,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			pod:  pod1,
 			expected: &expectedResult{
 				l1,
-				128 * 1024 * 1024,
+				int64(math.Floor(
+					float64(128*1024*1024)*cm.Cgroup2MemoryMinFactor/float64(defaultPageSize))) * defaultPageSize,
 				int64(pod1MemoryHigh),
 			},
 		},
@@ -461,7 +462,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			pod:  pod2,
 			expected: &expectedResult{
 				l2,
-				128 * 1024 * 1024,
+				int64(math.Floor(
+					float64(128*1024*1024)*cm.Cgroup2MemoryMinFactor/float64(defaultPageSize))) * defaultPageSize,
 				int64(pod2MemoryHigh),
 			},
 		},
