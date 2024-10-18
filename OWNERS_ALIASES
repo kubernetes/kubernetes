@@ -138,7 +138,6 @@ aliases:
   # - rootfs
   sig-storage-reviewers:
     - carlory
-    - chrishenzie
     - gnufied
     - humblec
     - jsafrane
@@ -149,6 +148,7 @@ aliases:
     - saikat-royc
     - xing-yang
   # emeritus:
+  # - chrishenzie
   # - davidz627
   # - Jiawei0227
   # - rootfs
