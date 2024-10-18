@@ -25,6 +25,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -104,9 +106,11 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	p.podsGetter = f.Core().V1().Pods().Lister()
 	p.nodesGetter = f.Core().V1().Nodes().Lister()
-	p.csiDriverGetter = f.Storage().V1().CSIDrivers().Lister()
-	p.pvcGetter = f.Core().V1().PersistentVolumeClaims().Lister()
-	p.pvGetter = f.Core().V1().PersistentVolumes().Lister()
+	if p.serviceAccountNodeAudienceRestriction {
+		p.csiDriverGetter = f.Storage().V1().CSIDrivers().Lister()
+		p.pvcGetter = f.Core().V1().PersistentVolumeClaims().Lister()
+		p.pvGetter = f.Core().V1().PersistentVolumes().Lister()
+	}
 }
 
 // ValidateInitialization validates the Plugin was initialized properly
@@ -120,14 +124,16 @@ func (p *Plugin) ValidateInitialization() error {
 	if p.nodesGetter == nil {
 		return fmt.Errorf("%s requires a node getter", PluginName)
 	}
-	if p.csiDriverGetter == nil {
-		return fmt.Errorf("%s requires a CSI driver getter", PluginName)
-	}
-	if p.pvcGetter == nil {
-		return fmt.Errorf("%s requires a PVC getter", PluginName)
-	}
-	if p.pvGetter == nil {
-		return fmt.Errorf("%s requires a PV getter", PluginName)
+	if p.serviceAccountNodeAudienceRestriction {
+		if p.csiDriverGetter == nil {
+			return fmt.Errorf("%s requires a CSI driver getter", PluginName)
+		}
+		if p.pvcGetter == nil {
+			return fmt.Errorf("%s requires a PVC getter", PluginName)
+		}
+		if p.pvGetter == nil {
+			return fmt.Errorf("%s requires a PV getter", PluginName)
+		}
 	}
 	return nil
 }
@@ -615,19 +621,8 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	}
 
 	if p.serviceAccountNodeAudienceRestriction {
-		// ensure all items in tr.Spec.Audiences are present in a volume mount in the pod
-		requestedAudience := ""
-		switch len(tr.Spec.Audiences) {
-		case 0:
-			requestedAudience = ""
-		case 1:
-			requestedAudience = tr.Spec.Audiences[0]
-		default:
-			return admission.NewForbidden(a, fmt.Errorf("node may only request 0 or 1 audiences"))
-		}
-
-		if foundAudiencesInPodSpec := p.podReferencesAudience(pod, requestedAudience); !foundAudiencesInPodSpec {
-			return admission.NewForbidden(a, fmt.Errorf("audience %q not found in pod spec volume", requestedAudience))
+		if err := p.validateNodeServiceAccountAudience(tr, pod); err != nil {
+			return admission.NewForbidden(a, err)
 		}
 	}
 
@@ -640,12 +635,36 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	return nil
 }
 
-func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) bool {
+func (p *Plugin) validateNodeServiceAccountAudience(tr *authenticationapi.TokenRequest, pod *v1.Pod) error {
+	// ensure all items in tr.Spec.Audiences are present in a volume mount in the pod
+	requestedAudience := ""
+	switch len(tr.Spec.Audiences) {
+	case 0:
+		requestedAudience = ""
+	case 1:
+		requestedAudience = tr.Spec.Audiences[0]
+	default:
+		return fmt.Errorf("node may only request 0 or 1 audiences")
+	}
+
+	foundAudiencesInPodSpec, err := p.podReferencesAudience(pod, requestedAudience)
+	if err != nil {
+		return fmt.Errorf("error validating audience: %w", err)
+	}
+	if !foundAudiencesInPodSpec {
+		return fmt.Errorf("audience %q not found in pod spec volume", requestedAudience)
+	}
+	return nil
+}
+
+func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) (bool, error) {
+	var errs []error
+
 	for _, v := range pod.Spec.Volumes {
 		if v.Projected != nil {
 			for _, src := range v.Projected.Sources {
 				if src.ServiceAccountToken != nil && src.ServiceAccountToken.Audience == audience {
-					return true
+					return true, nil
 				}
 			}
 		}
@@ -659,31 +678,42 @@ func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) bool {
 		switch {
 		case v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil:
 			pvcName := ephemeral.VolumeClaimName(pod, &v)
-			driverName, err = getCSIFromPVC(p.pvcGetter, p.pvGetter, pod.Namespace, pvcName)
+			driverName, err = p.getCSIFromPVC(pod.Namespace, pvcName)
 		case v.PersistentVolumeClaim != nil:
-			driverName, err = getCSIFromPVC(p.pvcGetter, p.pvGetter, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			driverName, err = p.getCSIFromPVC(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 		case v.CSI != nil:
 			driverName = v.CSI.Driver
 		}
 
-		if err == nil && len(driverName) > 0 {
-			if hasAudience, hasAudienceErr := csiDriverHasAudience(p.csiDriverGetter, driverName, audience); hasAudienceErr == nil && hasAudience {
-				return true
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		if len(driverName) > 0 {
+			hasAudience, hasAudienceErr := p.csiDriverHasAudience(driverName, audience)
+			if hasAudienceErr != nil {
+				errs = append(errs, hasAudienceErr)
+				continue
+			}
+			if hasAudience {
+				return true, nil
 			}
 		}
 	}
-	return false
+
+	return false, utilerrors.NewAggregate(errs)
 }
 
 // getCSIFromPVC returns the CSI driver name from the PVC->PV->CSI->Driver chain
-func getCSIFromPVC(pvcGetter corev1lister.PersistentVolumeClaimLister, pvGetter corev1lister.PersistentVolumeLister, namespace, claimName string) (string, error) {
-	pvc, err := pvcGetter.PersistentVolumeClaims(namespace).Get(claimName)
+func (p *Plugin) getCSIFromPVC(namespace, claimName string) (string, error) {
+	pvc, err := p.pvcGetter.PersistentVolumeClaims(namespace).Get(claimName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting PVC %s: %w", claimName, err)
 	}
-	pv, err := pvGetter.Get(pvc.Spec.VolumeName)
+	pv, err := p.pvGetter.Get(pvc.Spec.VolumeName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting PV %s: %w", pvc.Spec.VolumeName, err)
 	}
 	if pv.Spec.CSI != nil {
 		return pv.Spec.CSI.Driver, nil
@@ -691,10 +721,10 @@ func getCSIFromPVC(pvcGetter corev1lister.PersistentVolumeClaimLister, pvGetter 
 	return "", nil
 }
 
-func csiDriverHasAudience(csiDriverGetter storagelisters.CSIDriverLister, driverName, audience string) (bool, error) {
-	driver, err := csiDriverGetter.Get(driverName)
+func (p *Plugin) csiDriverHasAudience(driverName, audience string) (bool, error) {
+	driver, err := p.csiDriverGetter.Get(driverName)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error getting CSIDriver %s: %w", driverName, err)
 	}
 
 	for _, tokenRequest := range driver.Spec.TokenRequests {

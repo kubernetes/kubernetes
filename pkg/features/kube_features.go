@@ -690,7 +690,6 @@ const (
 
 	// owner: @aramase
 	// kep: https://kep.k8s.io/4412
-	// beta: v1.32
 	//
 	// ServiceAccountNodeAudienceRestriction is used to restrict the audience for which the
 	// kubelet can request a service account token for.
