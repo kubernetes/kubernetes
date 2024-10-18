@@ -167,13 +167,13 @@ var (
 				},
 				{
 					label:  eventLabelName,
-					values: clusterEventsToLabels(schedframework.AllEvents),
+					values: schedframework.AllClusterEventLabels(),
 				},
 			},
 			"scheduler_event_handling_duration_seconds": {
 				{
 					label:  eventLabelName,
-					values: clusterEventsToLabels(schedframework.AllEvents),
+					values: schedframework.AllClusterEventLabels(),
 				},
 			},
 		},
@@ -203,14 +203,6 @@ var (
 		names.VolumeZone,
 	}
 )
-
-func clusterEventsToLabels(events []schedframework.ClusterEvent) []string {
-	labels := make([]string, 0, len(events))
-	for _, event := range events {
-		labels = append(labels, event.Label)
-	}
-	return labels
-}
 
 // testCase defines a set of test cases that intends to test the performance of
 // similar workloads of varying sizes with shared overall settings such as
@@ -1256,7 +1248,7 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 }
 
 func checkEmptyInFlightEvents() error {
-	labels := append(clusterEventsToLabels(schedframework.AllEvents), metrics.PodPoppedInFlightEvent)
+	labels := append(schedframework.AllClusterEventLabels(), metrics.PodPoppedInFlightEvent)
 	for _, label := range labels {
 		value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
 		if err != nil {
