@@ -83,8 +83,8 @@ var _ = SIGDescribe("SystemdWatchdog", feature.CriProxy, framework.WithSlow(), f
 })
 
 func getKubeletMainPID() string {
-	stdout, err := exec.Command("sudo", "systemctl", "show", "kubelet", "-p", "MainPID").CombinedOutput()
+	kubeletServiceName := findKubeletServiceName(true)
+	stdout, err := exec.Command("sudo", "systemctl", "show", kubeletServiceName, "-p", "MainPID").CombinedOutput()
 	framework.ExpectNoError(err)
-
 	return string(stdout)
 }

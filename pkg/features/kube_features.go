@@ -750,7 +750,7 @@ const (
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
 
-	// owner: @derekwaynecarr, @zhifei92
+	// owner: @zhifei92
 	// beta: v1.32
 	//
 	// Enables the systemd watchdog for the kubelet. When enabled, the kubelet will
