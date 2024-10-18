@@ -46,6 +46,10 @@ func getTestRunningStatus() v1.PodStatus {
 	return getTestRunningStatusWithStarted(true)
 }
 
+func getTestNotRunningStatus() v1.PodStatus {
+	return getTestRunningStatusWithStarted(false)
+}
+
 func getTestRunningStatusWithStarted(started bool) v1.PodStatus {
 	containerStatus := v1.ContainerStatus{
 		Name:        testContainerName,

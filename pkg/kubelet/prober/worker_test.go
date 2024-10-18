@@ -268,6 +268,91 @@ func TestSuccessThreshold(t *testing.T) {
 	}
 }
 
+func TestStartupProbeSuccessThreshold(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+
+	for i := 0; i < successThreshold+1; i++ {
+		if i < successThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until successThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d success", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
+			expectResult(t, w, results.Success, msg)
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when successThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because successThreshold is exceeded")
+			}
+			// Meeting or exceeding successThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
+		}
+	}
+}
+
+func TestStartupProbeFailureThreshold(t *testing.T) {
+	ctx := context.Background()
+	m := newTestManager()
+	successThreshold := 1
+	failureThreshold := 3
+	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	m.statusManager.SetPodStatus(w.pod, getTestNotRunningStatus())
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+
+	for i := 0; i < failureThreshold+1; i++ {
+		if i < failureThreshold {
+			// Probe should not be on hold and will continue to be excuted
+			// until failureThreshold is met
+			if w.onHold {
+				t.Errorf("Prober should not be on hold")
+			}
+			msg := fmt.Sprintf("%d failure", i+1)
+			expectContinue(t, w, w.doProbe(ctx), msg)
+			switch i {
+			case 0, 1:
+				// At this point, the expected result is Unknown
+				// because w.resultsManager.Set() will be called after FailureThreshold is reached
+				expectResult(t, w, results.Unknown, msg)
+				// resultRun should be incremented until failureThreshold is met
+				if w.resultRun != i+1 {
+					t.Errorf("Prober resultRun should be %d, but %d", i+1, w.resultRun)
+				}
+			case 2:
+				// The expected result is Failure
+				// because w.resultsManager.Set() will be called due to resultRun reaching failureThreshold,
+				// updating the cached result to Failure.
+				// After that, resultRun will be reset to 0.
+				expectResult(t, w, results.Failure, msg)
+				// Meeting failureThreshold should cause resultRun to reset to 0
+				if w.resultRun != 0 {
+					t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+				}
+			}
+		} else {
+			// Probe should be on hold and will not be executed anymore
+			// when failureThreshold is met
+			if !w.onHold {
+				t.Errorf("Prober should be on hold because failureThreshold is exceeded")
+			}
+			// Exceeding failureThreshold should cause resultRun to reset to 0
+			if w.resultRun != 0 {
+				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
+			}
+		}
+	}
+}
+
 func TestCleanUp(t *testing.T) {
 	m := newTestManager()
 
@@ -366,8 +451,10 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 		msg = "hold lifted"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Success, msg)
-		if w.onHold {
+		if probeType == liveness && w.onHold {
 			t.Errorf("Prober should not be on hold anymore")
+		} else if probeType == startup && !w.onHold {
+			t.Errorf("Prober should be on hold due to %s check success", probeType)
 		}
 	}
 }
