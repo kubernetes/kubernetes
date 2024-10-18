@@ -27618,6 +27618,13 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 							Ref:         ref("k8s.io/api/core/v1.AppArmorProfile"),
 						},
 					},
+					"seLinuxChangePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod. It has no effect on nodes that do not support SELinux or to volumes does not support SELinux. Valid values are \"MountOption\" and \"Recursive\". If not specified, \"MountOption\" is used. It affects only in-tree iSCSI and FibreChannel volumes, and CSI volumes that announce \"SELinuxMount: true\" in their CSIDriver instance. It affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers. Note that this field cannot be set when spec.os.name is windows.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
