@@ -69,10 +69,19 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
+//logcheck:context // NewWithContext should be used instead because record.NewBroadcaster is called and works better when a context is supplied (contextual logging, cancellation).
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
+	ctx := context.Background()
+	return NewWithContext(ctx, routes, kubeClient, nodeInformer, clusterName, clusterCIDRs)
+}
+
+func NewWithContext(ctx context.Context, routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
+
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
 		routes:           routes,
@@ -81,6 +90,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		clusterCIDRs:     clusterCIDRs,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		broadcaster:      eventBroadcaster,
+		recorder:         recorder,
 	}
 
 	return rc
@@ -88,9 +99,6 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 
 func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
-
-	rc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
-	rc.recorder = rc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	// Start event processing pipeline.
 	if rc.broadcaster != nil {

@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"k8s.io/apimachinery/pkg/util/version"
 	"testing"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -39,6 +39,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -437,13 +438,13 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
 	ns := framework.CreateNamespaceOrDie(client, "test-service-load-balancer-class", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
+	controller, cloud, informer := newServiceController(t, ctx, client)
 
-	controller, cloud, informer := newServiceController(t, client)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
@@ -483,13 +484,14 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
 	ns := framework.CreateNamespaceOrDie(client, "test-service-immutable-load-balancer-class", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	controller, cloud, informer := newServiceController(t, client)
+	controller, cloud, informer := newServiceController(t, ctx, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
@@ -534,13 +536,14 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
 	ns := framework.CreateNamespaceOrDie(client, "test-service-update-load-balancer-class", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	controller, cloud, informer := newServiceController(t, client)
+	controller, cloud, informer := newServiceController(t, ctx, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
@@ -584,13 +587,14 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
 	ns := framework.CreateNamespaceOrDie(client, "test-service-mixed-protocols", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	controller, cloud, informer := newServiceController(t, client)
+	controller, cloud, informer := newServiceController(t, ctx, client)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
@@ -626,13 +630,15 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 	}
 }
 
-func newServiceController(t *testing.T, client *clientset.Clientset) (*servicecontroller.Controller, *fakecloud.Cloud, informers.SharedInformerFactory) {
+func newServiceController(t *testing.T, ctx context.Context, client *clientset.Clientset) (*servicecontroller.Controller, *fakecloud.Cloud, informers.SharedInformerFactory) {
 	cloud := &fakecloud.Cloud{}
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
-	controller, err := servicecontroller.New(cloud,
+	controller, err := servicecontroller.NewWithContext(
+		ctx,
+		cloud,
 		client,
 		serviceInformer,
 		nodeInformer,
@@ -722,15 +728,16 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 				t.Fatalf("Error creating clientset: %v", err)
 			}
 
+			ctx := ktesting.Init(t)
+			defer ctx.Cancel("test has completed")
+
 			ns := framework.CreateNamespaceOrDie(client, "test-service-update-load-balancer-ip-mode", t)
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-			controller, cloud, informer := newServiceController(t, client)
+			controller, cloud, informer := newServiceController(t, ctx, client)
 			cloud.ExternalIP = net.ParseIPSloppy(tc.externalIP)
 			cloud.BalancerIPMode = tc.expectedIngress.IPMode
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			informer.Start(ctx.Done())
 			go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 

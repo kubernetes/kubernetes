@@ -113,12 +113,29 @@ type CloudNodeController struct {
 }
 
 // NewCloudNodeController creates a CloudNodeController object
+//
+//logcheck:context // NewCloudNodeControllerWithContext should be used instead because record.NewBroadcaster is called and works better when a context is supplied (contextual logging, cancellation).
 func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	workerCount int32) (*CloudNodeController, error) {
+	ctx := context.Background()
+	return NewCloudNodeControllerWithContext(ctx, nodeInformer, kubeClient, cloud, nodeStatusUpdateFrequency, workerCount)
+}
+
+// NewCloudNodeController creates a CloudNodeController object
+func NewCloudNodeControllerWithContext(
+	ctx context.Context,
+	nodeInformer coreinformers.NodeInformer,
+	kubeClient clientset.Interface,
+	cloud cloudprovider.Interface,
+	nodeStatusUpdateFrequency time.Duration,
+	workerCount int32) (*CloudNodeController, error) {
+
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 
 	_, instancesSupported := cloud.Instances()
 	_, instancesV2Supported := cloud.InstancesV2()
@@ -129,6 +146,8 @@ func NewCloudNodeController(
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
+		broadcaster:               eventBroadcaster,
+		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		workerCount:               workerCount,
@@ -165,8 +184,6 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMet
 // from the cloud provider. This call is blocking so should be called
 // via a goroutine
 func (cnc *CloudNodeController) RunWithContext(ctx context.Context, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
-	cnc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
-	cnc.recorder = cnc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 	stopCh := ctx.Done()
 
 	defer utilruntime.HandleCrash()

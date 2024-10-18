@@ -41,6 +41,10 @@ import (
 func alwaysReady() bool { return true }
 
 func TestIsResponsibleForRoute(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	myClusterName := "my-awesome-cluster"
 	myClusterRoute := "my-awesome-cluster-12345678-90ab-cdef-1234-567890abcdef"
 	testCases := []struct {
@@ -64,6 +68,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		{"10.244.0.0/14", myClusterRoute, "10.243.255.0/24", false},
 		{"a00:100::/10", myClusterRoute, "b00:100::/24", false},
 	}
+
 	for i, testCase := range testCases {
 		_, cidr, err := netutils.ParseCIDRSloppy(testCase.clusterCIDR)
 		if err != nil {
@@ -71,7 +76,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		rc := NewWithContext(ctx, nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -438,7 +443,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
-			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			rc := NewWithContext(ctx, routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 			rc.nodeListerSynced = alwaysReady
 			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
 			for _, action := range testCase.clientset.Actions() {
