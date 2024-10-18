@@ -20,7 +20,7 @@ limitations under the License.
 package preflight
 
 import (
-	system "k8s.io/system-validators/validators"
+	system "github.com/pacoxu/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 )
 
