@@ -1686,8 +1686,6 @@ type (
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
-
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
 	tempKubeConfigFile, err := os.CreateTemp("/tmp", "kubeconfig")
@@ -2481,7 +2479,6 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 	testCases := []struct {
 		name            string
 		matchConditions []api.WebhookMatchCondition
-		featureEnabled  bool
 		expectedErr     string
 	}{
 		{
@@ -2494,26 +2491,11 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user == 'admin'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "",
-		},
-		{
-			name: "should fail when match conditions are used without feature enabled",
-			matchConditions: []api.WebhookMatchCondition{
-				{
-					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
-				},
-				{
-					Expression: "request.user == 'admin'",
-				},
-			},
-			featureEnabled: false,
-			expectedErr:    `matchConditions: Invalid value: "": matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled`,
+			expectedErr: "",
 		},
 		{
 			name:            "no matchConditions should not require feature enablement",
 			matchConditions: []api.WebhookMatchCondition{},
-			featureEnabled:  false,
 			expectedErr:     "",
 		},
 		{
@@ -2523,8 +2505,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "  ",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Required value",
+			expectedErr: "matchConditions[0].expression: Required value",
 		},
 		{
 			name: "match conditions with duplicate expressions",
@@ -2536,8 +2517,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user == 'admin'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
+			expectedErr: `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
 		},
 		{
 			name: "match conditions with undeclared reference",
@@ -2546,8 +2526,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "test",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
+			expectedErr: "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
 		},
 		{
 			name: "match conditions with bad return type",
@@ -2556,14 +2535,12 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user = 'test'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
+			expectedErr: "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)
 			celMatcher, errList := ValidateAndCompileMatchConditions(authorizationcel.NewDefaultCompiler(), tt.matchConditions)
 			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
 				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")

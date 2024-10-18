@@ -271,6 +271,45 @@ authorizers:
 			},
 		},
 		{
+			name: "v1 - json",
+			data: []byte(`{
+"apiVersion":"apiserver.config.k8s.io/v1",
+"kind":"AuthorizationConfiguration",
+"authorizers":[{"type":"Webhook"}]}`),
+			expectConfig: &api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{{Type: "Webhook"}},
+			},
+		},
+		{
+			name: "v1 - defaults",
+			data: []byte(`{
+"apiVersion":"apiserver.config.k8s.io/v1",
+"kind":"AuthorizationConfiguration",
+"authorizers":[{"type":"Webhook","name":"default","webhook":{}}]}`),
+			expectConfig: &api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{{
+					Type: "Webhook",
+					Name: "default",
+					Webhook: &api.WebhookConfiguration{
+						AuthorizedTTL:   metav1.Duration{Duration: 5 * time.Minute},
+						UnauthorizedTTL: metav1.Duration{Duration: 30 * time.Second},
+					},
+				}},
+			},
+		},
+		{
+			name: "v1 - yaml",
+			data: []byte(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthorizationConfiguration
+authorizers:
+- type: Webhook
+`),
+			expectConfig: &api.AuthorizationConfiguration{
+				Authorizers: []api.AuthorizerConfiguration{{Type: "Webhook"}},
+			},
+		},
+		{
 			name:      "missing apiVersion",
 			data:      []byte(`{"kind":"AuthorizationConfiguration"}`),
 			expectErr: `'apiVersion' is missing`,
