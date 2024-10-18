@@ -103,6 +103,7 @@ linters:
     - stylecheck
     - testifylint
     - unused
+    - usestdlibvars
 
 linters-settings: # please keep this alphabetized
   custom:
