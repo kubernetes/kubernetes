@@ -301,5 +301,6 @@ var (
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
 		"FailCgroupV1",
+		"PodHousekeepingPeriod",
 	)
 )
