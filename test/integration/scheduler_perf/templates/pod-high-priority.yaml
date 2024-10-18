@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  generateName: pod-
+  generateName: pod-high-priority-
 spec:
   priority: 10
   containers:

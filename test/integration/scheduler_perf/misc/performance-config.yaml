@@ -358,6 +358,16 @@
       SchedulerQueueingHints: false
     labels: [performance]
     threshold: 200
+    featureGates:
+      SchedulerAsyncPreemption: false
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_AsyncPreemption
+    labels: [performance]
+    featureGates:
+      SchedulerAsyncPreemption: true
     params:
       initNodes: 5000
       initPods: 20000
