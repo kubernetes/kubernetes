@@ -35,6 +35,7 @@ metadata:
 spec:
   minReadySeconds: 5
   paused: true
+  podReplacementPolicy: podReplacementPolicyValue
   progressDeadlineSeconds: 9
   replicas: 1
   revisionHistoryLimit: 6
@@ -1235,5 +1236,6 @@ status:
   observedGeneration: 1
   readyReplicas: 7
   replicas: 2
+  terminatingReplicas: 9
   unavailableReplicas: 5
   updatedReplicas: 3

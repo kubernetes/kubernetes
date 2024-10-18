@@ -18,20 +18,26 @@ package deployment
 
 import (
 	"math"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -47,9 +53,12 @@ func TestScale(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		deployment    *apps.Deployment
-		oldDeployment *apps.Deployment
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+
+		deployment           *apps.Deployment
+		oldDeployment        *apps.Deployment
+		podReplacementPolicy *apps.DeploymentPodReplacementPolicy
 
 		newRS  *apps.ReplicaSet
 		oldRSs []*apps.ReplicaSet
@@ -263,10 +272,400 @@ func TestScale(t *testing.T) {
 			expectedNew: rs("foo-v2", 2, nil, newTimestamp),
 			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 		},
+		// Ignores terminating pods.
+		{
+			name:                                 "scaling event with terminating pods is not partial with empty policy:: 10 -> 14",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, nil, nil, nil),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{TerminatingReplicas: 2}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 14, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "14",
+				deploymentutil.MaxReplicasAnnotation:     "14",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Ignores terminating pods.
+		{
+			name:                                 "scaling event with terminating pods is not partial with TerminationStarted policy:: 10 -> 14",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationStarted),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{TerminatingReplicas: 2}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 14, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "14",
+				deploymentutil.MaxReplicasAnnotation:     "14",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Takes terminating pods into account and scales partially.
+		{
+			name:                                 "scaling event with terminating pods and TerminationComplete policy: 10 -> 12 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{TerminatingReplicas: 2}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 12, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "10",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Takes terminating pods into account and scales partially for Recreate Deployment.
+		{
+			name:                                 "scaling event (Recreate Deployment) with terminating pods and TerminationComplete policy: 10 -> 12 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment: func() *apps.Deployment {
+				d := newDeployment("foo", 14, nil, nil, nil, nil)
+				d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+				return d
+			}(),
+			oldDeployment: func() *apps.Deployment {
+				d := newDeployment("foo", 10, nil, nil, nil, nil)
+				d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+				return d
+			}(),
+			podReplacementPolicy: ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{TerminatingReplicas: 2}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 12, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "10",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Takes surge pods into account and scales partially.
+		// ReplicaSet with a greater number of .status.replicas than .spec.replicas is not synced and the extra pod will likely be terminated shortly.
+		// We account for this by downscaling the RS by one pod. If the pod does not terminate in the meantime, we will scale to 14 shortly.
+		{
+			name:                                 "scaling event with surge pods and TerminationComplete policy: 10 -> 13 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{Replicas: 11}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 13, apps.ReplicaSetStatus{Replicas: 11}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "10",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Takes surge pods into account and scales partially for Recreate deployment.
+		// ReplicaSet with a greater number of .status.replicas than .spec.replicas is not synced and the extra pod will likely be terminated shortly.
+		// We account for this by downscaling the RS by one pod. If the pod does not terminate in the meantime, we will scale to 14 shortly.
+		{
+			name:                                 "scaling event (Recreate Deployment) with surge pods and TerminationComplete policy: 10 -> 12 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment: func() *apps.Deployment {
+				d := newDeployment("foo", 14, nil, nil, nil, nil)
+				d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+				return d
+			}(),
+			oldDeployment: func() *apps.Deployment {
+				d := newDeployment("foo", 10, nil, nil, nil, nil)
+				d.Spec.Strategy = apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}
+				return d
+			}(),
+			podReplacementPolicy: ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{Replicas: 11}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 13, apps.ReplicaSetStatus{Replicas: 11}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "10",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Takes terminating pods into account and scales partially.
+		{
+			name:                                 "scaling event with maxSurge, terminating pods and TerminationComplete policy [part 1]: 10 -> 13 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, ptr.To(intstr.FromInt32(3)), nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, ptr.To(intstr.FromInt32(3)), nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v1", 10, apps.ReplicaSetStatus{TerminatingReplicas: 4}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 13, apps.ReplicaSetStatus{TerminatingReplicas: 4}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "13",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Completes partial scaling once terminating pods are gone.
+		{
+			name:                                 "scaling event with maxSurge, terminating pods and TerminationComplete policy [part 2]: 10 -> 14 (14)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 14, nil, ptr.To(intstr.FromInt32(3)), nil, nil),
+			oldDeployment:                        newDeployment("foo", 10, nil, ptr.To(intstr.FromInt32(3)), nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v1", 13, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "10",
+				deploymentutil.MaxReplicasAnnotation:                   "13",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "10",
+			}, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{},
+
+			expectedNew: newRSWithFullStatus("foo-v1", 14, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "14",
+				deploymentutil.MaxReplicasAnnotation:     "17",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{},
+		},
+		// Ignores terminating pods.
+		{
+			name:                                 "proportional scaling with terminating pods is not partial with empty policy: 5 -> 10",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 10, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 5, nil, nil, nil, nil),
+
+			newRS:  newRSWithFullStatus("foo-v2", 2, apps.ReplicaSetStatus{TerminatingReplicas: 1}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 3, apps.ReplicaSetStatus{TerminatingReplicas: 1, Replicas: 4}, nil, nil, oldTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v2", 4, apps.ReplicaSetStatus{TerminatingReplicas: 1}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "10",
+				deploymentutil.MaxReplicasAnnotation:     "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 6, apps.ReplicaSetStatus{TerminatingReplicas: 1, Replicas: 4}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "10",
+				deploymentutil.MaxReplicasAnnotation:     "10",
+			}, nil, oldTimestamp)},
+		},
+		// Ignores terminating pods.
+		{
+			name:                                 "proportional scaling with terminating pods is not partial with TerminationStarted policy: 5 -> 10",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 10, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 5, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationStarted),
+
+			newRS:  newRSWithFullStatus("foo-v2", 2, apps.ReplicaSetStatus{TerminatingReplicas: 1}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 3, apps.ReplicaSetStatus{TerminatingReplicas: 1, Replicas: 4}, nil, nil, oldTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v2", 4, apps.ReplicaSetStatus{TerminatingReplicas: 1}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "10",
+				deploymentutil.MaxReplicasAnnotation:     "10",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 6, apps.ReplicaSetStatus{TerminatingReplicas: 1, Replicas: 4}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "10",
+				deploymentutil.MaxReplicasAnnotation:     "10",
+			}, nil, oldTimestamp)},
+		},
+		// Takes terminating pods into account and scales partially in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with terminating pods and TerminationComplete policy: 5 -> 8 (10)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 10, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 5, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS:  newRSWithFullStatus("foo-v2", 2, apps.ReplicaSetStatus{TerminatingReplicas: 1}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 3, apps.ReplicaSetStatus{TerminatingReplicas: 1}, nil, nil, oldTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v2", 2, apps.ReplicaSetStatus{TerminatingReplicas: 1}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "5",
+				deploymentutil.MaxReplicasAnnotation:                   "5",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "2",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v1", 6, apps.ReplicaSetStatus{TerminatingReplicas: 1}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "10",
+				deploymentutil.MaxReplicasAnnotation:     "10",
+			}, nil, oldTimestamp)},
+		},
+		// Takes terminating pods into account and scales partially in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with terminating and surge pods and TerminationComplete policy [part 1]: 7 -> 10 (12)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 12, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 7, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v3", 2, apps.ReplicaSetStatus{TerminatingReplicas: 1}, nil, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 3, apps.ReplicaSetStatus{}, nil, nil, oldTimestamp),
+				newRSWithFullStatus("foo-v1", 2, apps.ReplicaSetStatus{Replicas: 3}, nil, nil, olderTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v3", 3, apps.ReplicaSetStatus{TerminatingReplicas: 1}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "12",
+				deploymentutil.MaxReplicasAnnotation:     "12",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 5, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "7",
+				deploymentutil.MaxReplicasAnnotation:                   "7",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "3",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 2, apps.ReplicaSetStatus{Replicas: 3}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "7",
+				deploymentutil.MaxReplicasAnnotation:                   "7",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "2",
+			}, nil, olderTimestamp)},
+		},
+		// Completes partial scaling once terminating pods are gone in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with terminating and surge pods and TerminationComplete policy [part 2]: 7 -> 12 (12)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 12, nil, nil, nil, nil),
+			oldDeployment:                        newDeployment("foo", 7, nil, nil, nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v3", 3, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "12",
+				deploymentutil.MaxReplicasAnnotation:     "12",
+			}, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 5, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "7",
+				deploymentutil.MaxReplicasAnnotation:                   "7",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "3",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 2, apps.ReplicaSetStatus{Replicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "7",
+				deploymentutil.MaxReplicasAnnotation:                   "7",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "2",
+			}, nil, olderTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v3", 3, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "12",
+				deploymentutil.MaxReplicasAnnotation:     "12",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 6, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "12",
+				deploymentutil.MaxReplicasAnnotation:     "12",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 3, apps.ReplicaSetStatus{Replicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "12",
+				deploymentutil.MaxReplicasAnnotation:     "12",
+			}, nil, olderTimestamp)},
+		},
+		// Takes terminating pods into account and scales partially in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with maxSurge, terminating and surge pods and TerminationComplete policy [part 1]: 100 -> 115 (130)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 120, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			oldDeployment:                        newDeployment("foo", 100, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v3", 50, apps.ReplicaSetStatus{TerminatingReplicas: 6}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "100",
+				deploymentutil.MaxReplicasAnnotation:     "110",
+			}, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 30, apps.ReplicaSetStatus{TerminatingReplicas: 4}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "100",
+				deploymentutil.MaxReplicasAnnotation:     "110",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 20, apps.ReplicaSetStatus{TerminatingReplicas: 5}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "100",
+				deploymentutil.MaxReplicasAnnotation:     "110",
+			}, nil, olderTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v3", 59, apps.ReplicaSetStatus{TerminatingReplicas: 6}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 35, apps.ReplicaSetStatus{TerminatingReplicas: 4}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 21, apps.ReplicaSetStatus{TerminatingReplicas: 5}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "20",
+			}, nil, olderTimestamp)},
+		},
+		// Takes terminating pods into account and scales partially in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with maxSurge, terminating and surge pods and TerminationComplete policy [part 2]: 100 -> 125 (130)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 120, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			oldDeployment:                        newDeployment("foo", 100, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v3", 59, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			}, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 35, apps.ReplicaSetStatus{TerminatingReplicas: 3}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 21, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "20",
+			}, nil, olderTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v3", 66, apps.ReplicaSetStatus{TerminatingReplicas: 2}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 35, apps.ReplicaSetStatus{TerminatingReplicas: 3}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 24, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, olderTimestamp)},
+		},
+		// Completes partial scaling once terminating pods are gone in proportional scaling.
+		{
+			name:                                 "proportional partial scaling with maxSurge, terminating and surge pods and TerminationComplete policy [part 3]: 100 -> 130 (130)",
+			enableDeploymentPodReplacementPolicy: true,
+			deployment:                           newDeployment("foo", 120, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			oldDeployment:                        newDeployment("foo", 100, nil, ptr.To(intstr.FromInt32(10)), nil, nil),
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+
+			newRS: newRSWithFullStatus("foo-v3", 66, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation:               "100",
+				deploymentutil.MaxReplicasAnnotation:                   "110",
+				deploymentutil.ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			}, nil, newTimestamp),
+			oldRSs: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 35, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 24, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, olderTimestamp)},
+
+			expectedNew: newRSWithFullStatus("foo-v3", 71, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, newTimestamp),
+			expectedOld: []*apps.ReplicaSet{newRSWithFullStatus("foo-v2", 35, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, oldTimestamp), newRSWithFullStatus("foo-v1", 24, apps.ReplicaSetStatus{}, map[string]string{
+				deploymentutil.DesiredReplicasAnnotation: "120",
+				deploymentutil.MaxReplicasAnnotation:     "130",
+			}, nil, olderTimestamp)},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, test.enableDeploymentPodReplacementPolicy)
+			test.deployment.Spec.PodReplacementPolicy = test.podReplacementPolicy
+			test.oldDeployment.Spec.PodReplacementPolicy = test.podReplacementPolicy
+
 			_ = olderTimestamp
 			t.Log(test.name)
 			fake := fake.Clientset{}
@@ -275,65 +674,83 @@ func TestScale(t *testing.T) {
 				eventRecorder: &record.FakeRecorder{},
 			}
 
-			if test.newRS != nil {
-				desiredReplicas := *(test.oldDeployment.Spec.Replicas)
+			if test.newRS != nil && test.newRS.Annotations == nil {
+				tmpDesiredReplicas := test.oldDeployment.Spec.Replicas
 				if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
-					desiredReplicas = desired
+					test.oldDeployment.Spec.Replicas = ptr.To(desired)
 				}
-				deploymentutil.SetReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				annotationUpdate, _ := deploymentutil.ComputeReplicaSetScaleAnnotations(test.newRS, test.oldDeployment, false)
+				deploymentutil.SetReplicaSetScaleAnnotations(test.newRS, annotationUpdate)
+				test.oldDeployment.Spec.Replicas = tmpDesiredReplicas
 			}
 			for i := range test.oldRSs {
 				rs := test.oldRSs[i]
-				if rs == nil {
+				if rs == nil || rs.Annotations != nil {
 					continue
 				}
-				desiredReplicas := *(test.oldDeployment.Spec.Replicas)
+				tmpDesiredReplicas := test.oldDeployment.Spec.Replicas
 				if desired, ok := test.desiredReplicasAnnotations[rs.Name]; ok {
-					desiredReplicas = desired
+					test.oldDeployment.Spec.Replicas = ptr.To(desired)
 				}
-				deploymentutil.SetReplicasAnnotations(rs, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				annotationUpdate, _ := deploymentutil.ComputeReplicaSetScaleAnnotations(rs, test.oldDeployment, false)
+				deploymentutil.SetReplicaSetScaleAnnotations(rs, annotationUpdate)
+				test.oldDeployment.Spec.Replicas = tmpDesiredReplicas
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
 
 			if err := dc.scale(ctx, test.deployment, test.newRS, test.oldRSs); err != nil {
-				t.Errorf("%s: unexpected error: %v", test.name, err)
+				t.Errorf("unexpected error: %v", err)
 				return
 			}
 
-			// Construct the nameToSize map that will hold all the sizes we got our of tests
-			// Skip updating the map if the replica set wasn't updated since there will be
-			// no update action for it.
-			nameToSize := make(map[string]int32)
+			// Construct the nameToUpdatedRS map that will hold all the replicaset.spec.replicas sizes we got from our tests.
+			// Skip updating the map if the replica set wasn't updated since there will be no update action for it.
+			nameToUpdatedRS := make(map[string]*apps.ReplicaSet)
 			if test.newRS != nil {
-				nameToSize[test.newRS.Name] = *(test.newRS.Spec.Replicas)
+				nameToUpdatedRS[test.newRS.Name] = test.newRS
 			}
 			for i := range test.oldRSs {
 				rs := test.oldRSs[i]
-				nameToSize[rs.Name] = *(rs.Spec.Replicas)
+				nameToUpdatedRS[rs.Name] = rs
 			}
-			// Get all the UPDATE actions and update nameToSize with all the updated sizes.
+			// Get all the UPDATE actions and update nameToUpdatedRS with all the updated replica sets.
 			for _, action := range fake.Actions() {
 				rs := action.(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
 				if !test.wasntUpdated[rs.Name] {
-					nameToSize[rs.Name] = *(rs.Spec.Replicas)
+					nameToUpdatedRS[rs.Name] = rs
 				}
 			}
 
-			if test.expectedNew != nil && test.newRS != nil && *(test.expectedNew.Spec.Replicas) != nameToSize[test.newRS.Name] {
-				t.Errorf("%s: expected new replicas: %d, got: %d", test.name, *(test.expectedNew.Spec.Replicas), nameToSize[test.newRS.Name])
-				return
+			if test.expectedNew != nil && test.newRS != nil {
+				updatedRS := nameToUpdatedRS[test.newRS.Name]
+				if *(test.expectedNew.Spec.Replicas) != *(updatedRS.Spec.Replicas) {
+					t.Errorf("expected new replicas: %d, got: %d", *(test.expectedNew.Spec.Replicas), *(updatedRS.Spec.Replicas))
+					return
+				}
+				if test.expectedNew.Annotations != nil {
+					if !reflect.DeepEqual(test.expectedNew.Annotations, updatedRS.Annotations) {
+						t.Fatalf("unexpected %q annotations: %s", test.expectedNew.Name, cmp.Diff(test.expectedNew.Annotations, updatedRS.Annotations))
+					}
+				}
 			}
 			if len(test.expectedOld) != len(test.oldRSs) {
-				t.Errorf("%s: expected %d old replica sets, got %d", test.name, len(test.expectedOld), len(test.oldRSs))
+				t.Errorf("expected %d old replica sets, got %d", len(test.expectedOld), len(test.oldRSs))
 				return
 			}
 			for n := range test.oldRSs {
 				rs := test.oldRSs[n]
 				expected := test.expectedOld[n]
-				if *(expected.Spec.Replicas) != nameToSize[rs.Name] {
-					t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, *(expected.Spec.Replicas), nameToSize[rs.Name])
+				updatedRS := nameToUpdatedRS[rs.Name]
+				if *(expected.Spec.Replicas) != *(updatedRS.Spec.Replicas) {
+					t.Errorf("expected old (%s) replicas: %d, got: %d", rs.Name, *(expected.Spec.Replicas), *(updatedRS.Spec.Replicas))
 				}
+				if expected.Annotations != nil {
+					if !reflect.DeepEqual(expected.Annotations, updatedRS.Annotations) {
+						t.Fatalf("unexpected %q annotations: %s", expected.Name, cmp.Diff(expected.Annotations, updatedRS.Annotations))
+					}
+				}
+
 			}
 		})
 	}
@@ -346,9 +763,10 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	alreadyDeleted.DeletionTimestamp = &now
 
 	tests := []struct {
-		oldRSs               []*apps.ReplicaSet
-		revisionHistoryLimit int32
-		expectedDeletions    int
+		oldRSs                               []*apps.ReplicaSet
+		revisionHistoryLimit                 int32
+		expectedDeletions                    int
+		enableDeploymentPodReplacementPolicy bool
 	}{
 		{
 			oldRSs: []*apps.ReplicaSet{
@@ -369,6 +787,19 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			},
 			revisionHistoryLimit: 0,
 			expectedDeletions:    1,
+		},
+		{
+			// Only delete the replica set with Spec.Replicas = Status.Replicas = Status.TerminatingReplicas = 0.
+			oldRSs: []*apps.ReplicaSet{
+				newRSWithStatus("foo-1", 0, 0, selector),
+				newRSWithFullStatus("foo-2", 0, apps.ReplicaSetStatus{TerminatingReplicas: 1}, selector, nil, noTimestamp),
+				newRSWithStatus("foo-3", 0, 1, selector),
+				newRSWithStatus("foo-4", 1, 0, selector),
+				newRSWithStatus("foo-5", 1, 1, selector),
+			},
+			revisionHistoryLimit:                 0,
+			expectedDeletions:                    1,
+			enableDeploymentPodReplacementPolicy: true,
 		},
 
 		{
@@ -408,6 +839,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, test.enableDeploymentPodReplacementPolicy)
 		t.Logf("scenario %d", i)
 
 		_, ctx := ktesting.NewTestContext(t)

@@ -27,6 +27,7 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -548,6 +549,11 @@ func ValidateDeploymentStrategy(strategy *apps.DeploymentStrategy, fldPath *fiel
 	return allErrs
 }
 
+var supportedDeploymentPodReplacementPolicies = sets.NewString(
+	string(apps.TerminationStarted),
+	string(apps.TerminationComplete),
+)
+
 // ValidateRollback validates given RollbackConfig.
 func ValidateRollback(rollback *apps.RollbackConfig, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -593,6 +599,9 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
 		}
 	}
+	if spec.PodReplacementPolicy != nil && !supportedDeploymentPodReplacementPolicies.Has(string(*spec.PodReplacementPolicy)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("podReplacementPolicy"), *spec.PodReplacementPolicy, supportedDeploymentPodReplacementPolicies.List()))
+	}
 	return allErrs
 }
 
@@ -604,6 +613,7 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UpdatedReplicas), fldPath.Child("updatedReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
 	if status.CollisionCount != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
@@ -700,6 +710,7 @@ func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.FullyLabeledReplicas), fldPath.Child("fullyLabeledReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
 	msg := "cannot be greater than status.replicas"
 	if status.FullyLabeledReplicas > status.Replicas {
