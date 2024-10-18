@@ -21,9 +21,9 @@ type Rlimit struct {
 
 // IDMap represents UID/GID Mappings for User Namespaces.
 type IDMap struct {
-	ContainerID int `json:"container_id"`
-	HostID      int `json:"host_id"`
-	Size        int `json:"size"`
+	ContainerID int64 `json:"container_id"`
+	HostID      int64 `json:"host_id"`
+	Size        int64 `json:"size"`
 }
 
 // Seccomp represents syscall restrictions
