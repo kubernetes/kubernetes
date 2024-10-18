@@ -47,15 +47,19 @@ const (
 )
 
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
-	return newTestPluginWithVolumeHost(t, client, kubeletVolumeHostType)
+	return newTestPluginWithVolumeHost(t, client, CsiResyncPeriod, kubeletVolumeHostType)
 }
 
 func newTestPluginWithAttachDetachVolumeHost(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
-	return newTestPluginWithVolumeHost(t, client, attachDetachVolumeHostType)
+	return newTestPluginWithVolumeHost(t, client, CsiResyncPeriod, attachDetachVolumeHostType)
+}
+
+func newTestPluginWithAttachDetachVolumeHostWithResyncPeriod(t *testing.T, client *fakeclient.Clientset, resyncPeriod time.Duration) (*csiPlugin, string) {
+	return newTestPluginWithVolumeHost(t, client, resyncPeriod, attachDetachVolumeHostType)
 }
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hostType int) (*csiPlugin, string) {
+func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, resyncPeriod time.Duration, hostType int) (*csiPlugin, string) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -73,7 +77,7 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	})
 
 	// Start informer for CSIDrivers.
-	factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
+	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
