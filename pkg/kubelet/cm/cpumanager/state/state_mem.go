@@ -68,7 +68,7 @@ func (s *stateMemory) GetCPUAssignments() ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
-func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -77,26 +77,20 @@ func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset
 	}
 
 	s.assignments[podUID][containerName] = cset
-	klog.InfoS("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
+	s.defaultCPUSet = defaultCPUSet
+	klog.InfoS("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset, "defaultCPUSet", defaultCPUSet)
 }
 
-func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
-	s.Lock()
-	defer s.Unlock()
-
-	s.defaultCPUSet = cset
-	klog.InfoS("Updated default CPUSet", "cpuSet", cset)
-}
-
-func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments) {
+func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
 	s.assignments = a.Clone()
-	klog.InfoS("Updated CPUSet assignments", "assignments", a)
+	s.defaultCPUSet = defaultCPUSet
+	klog.InfoS("Updated CPUSet assignments", "assignments", a, "defaultCPUSet", defaultCPUSet)
 }
 
-func (s *stateMemory) Delete(podUID string, containerName string) {
+func (s *stateMemory) Delete(podUID string, containerName string, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -104,7 +98,8 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
-	klog.V(2).InfoS("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
+	s.defaultCPUSet = defaultCPUSet
+	klog.V(2).InfoS("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName, "currentDefaultCPUSet", defaultCPUSet)
 }
 
 func (s *stateMemory) ClearState() {
