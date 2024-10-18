@@ -56,7 +56,7 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 	if err := kl.getRuntime().UpdatePodCIDR(ctx, cidr); err != nil {
 		// If updatePodCIDR would fail, theoretically pod CIDR could not change.
 		// But it is better to be on the safe side to still return true here.
-		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
+		return true, fmt.Errorf("failed to update pod CIDR: %w", err)
 	}
 	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
