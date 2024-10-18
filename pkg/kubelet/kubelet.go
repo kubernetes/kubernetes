@@ -2861,6 +2861,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 			return pod
 		}
 		updatedPod.Status.Resize = resizeStatus
+		metrics.KubeletResizeRequestsTotal.WithLabelValues(string(resizeStatus)).Inc()
 	}
 	kl.podManager.UpdatePod(updatedPod)
 	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
