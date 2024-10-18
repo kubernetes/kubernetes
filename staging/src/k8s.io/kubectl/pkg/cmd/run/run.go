@@ -528,7 +528,7 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolic
 	case corev1.RestartPolicyNever:
 		return corev1.RestartPolicyNever, nil
 	}
-	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s", restart)
+	return "", cmdutil.UsageErrorf(cmd, "invalid restart policy: %s. Acceptable values are: %s, %s, %s.", restart, corev1.RestartPolicyAlways, corev1.RestartPolicyOnFailure, corev1.RestartPolicyNever)
 }
 
 func verifyImagePullPolicy(cmd *cobra.Command) error {
