@@ -62,7 +62,6 @@ type labeledContainerInfo struct {
 
 type annotatedContainerInfo struct {
 	Hash                      uint64
-	RestartCount              int
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
 	TerminationMessagePath    string
@@ -193,9 +192,6 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashLabel, "annotations", annotations)
 	}
-	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
-		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerRestartCountLabel, "annotations", annotations)
-	}
 	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label value from annotations", "label", podDeletionGracePeriodLabel, "annotations", annotations)
 	}
@@ -228,21 +224,6 @@ func getStringValueFromLabel(labels map[string]string, label string) string {
 	klog.V(3).InfoS("Container doesn't have requested label, it may be an old or invalid container", "label", label)
 	// Return empty string "" for these containers, the caller will get value by other ways.
 	return ""
-}
-
-func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
-	if strValue, found := labels[label]; found {
-		intValue, err := strconv.Atoi(strValue)
-		if err != nil {
-			// This really should not happen. Just set value to 0 to handle this abnormal case
-			return 0, err
-		}
-		return intValue, nil
-	}
-	// Do not report error, because there should be many old containers without label now.
-	klog.V(3).InfoS("Container doesn't have requested label, it may be an old or invalid container", "label", label)
-	// Just set the value to 0
-	return 0, nil
 }
 
 func getUint64ValueFromLabel(labels map[string]string, label string) (uint64, error) {
