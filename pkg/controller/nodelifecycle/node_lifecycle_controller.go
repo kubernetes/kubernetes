@@ -92,6 +92,9 @@ var (
 		v1.NodeMemoryPressure: {
 			v1.ConditionTrue: v1.TaintNodeMemoryPressure,
 		},
+		v1.NodeSwapPressure: {
+			v1.ConditionTrue: v1.TaintNodeSwapPressure,
+		},
 		v1.NodeDiskPressure: {
 			v1.ConditionTrue: v1.TaintNodeDiskPressure,
 		},

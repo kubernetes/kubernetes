@@ -58,6 +58,8 @@ const (
 	resourceInodes v1.ResourceName = "inodes"
 	// resourcePids, number. internal to this module, used to account for local pid consumption.
 	resourcePids v1.ResourceName = "pids"
+	// resourceSwap, number. internal to this module, used to account for swap usage
+	resourceSwap v1.ResourceName = "swap"
 	// OffendingContainersKey is the key in eviction event annotations for the list of container names which exceeded their requests
 	OffendingContainersKey = "offending_containers"
 	// OffendingContainersUsageKey is the key in eviction event annotations for the list of usage of containers which exceeded their requests
@@ -80,6 +82,7 @@ func init() {
 	signalToNodeCondition = map[evictionapi.Signal]v1.NodeConditionType{}
 	signalToNodeCondition[evictionapi.SignalMemoryAvailable] = v1.NodeMemoryPressure
 	signalToNodeCondition[evictionapi.SignalAllocatableMemoryAvailable] = v1.NodeMemoryPressure
+	signalToNodeCondition[evictionapi.SignalSwapMemoryAvailable] = v1.NodeSwapPressure
 	signalToNodeCondition[evictionapi.SignalImageFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalContainerFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
@@ -92,6 +95,7 @@ func init() {
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
 	signalToResource[evictionapi.SignalMemoryAvailable] = v1.ResourceMemory
 	signalToResource[evictionapi.SignalAllocatableMemoryAvailable] = v1.ResourceMemory
+	signalToResource[evictionapi.SignalSwapMemoryAvailable] = resourceSwap
 	signalToResource[evictionapi.SignalImageFsAvailable] = v1.ResourceEphemeralStorage
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceInodes
 	signalToResource[evictionapi.SignalContainerFsAvailable] = v1.ResourceEphemeralStorage
@@ -523,6 +527,15 @@ func processUsage(processStats *statsapi.ProcessStats) uint64 {
 	return usage
 }
 
+// swapUsage concerts swap usage into a resource quantity
+func swapUsage(swapStats *statsapi.SwapStats) *resource.Quantity {
+	if swapStats == nil || swapStats.SwapUsageBytes == nil {
+		return &resource.Quantity{Format: resource.BinarySI}
+	}
+	usage := int64(*swapStats.SwapUsageBytes)
+	return resource.NewQuantity(usage, resource.BinarySI)
+}
+
 // localVolumeNames returns the set of volumes for the pod that are local
 // TODO: summary API should report what volumes consume local storage rather than hard-code here.
 func localVolumeNames(pod *v1.Pod) []string {
@@ -726,6 +739,30 @@ func memory(stats statsFunc) cmpFunc {
 	}
 }
 
+// swap compares pods by largest consumer of swap relative to their requests
+func swap(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, p1Found := stats(p1)
+		p2Stats, p2Found := stats(p2)
+		if !p1Found || !p2Found {
+			// prioritize evicting the pod for which no stats were found
+			return cmpBool(!p1Found, !p2Found)
+		}
+
+		// adjust p1, p2 usage relative to the request (if any)
+		p1Memory := swapUsage(p1Stats.Swap)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
+		p1Memory.Sub(p1Request)
+
+		p2Memory := swapUsage(p2Stats.Swap)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
+		p2Memory.Sub(p2Request)
+
+		// prioritize evicting the pod which has the larger consumption of memory
+		return p2Memory.Cmp(*p1Memory)
+	}
+}
+
 // process compares pods by largest consumer of process number relative to request.
 func process(stats statsFunc) cmpFunc {
 	return func(p1, p2 *v1.Pod) int {
@@ -812,6 +849,10 @@ func cmpBool(a, b bool) int {
 // finally by memory usage above requests.
 func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
 	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
+}
+
+func rankSwapPressure(pods []*v1.Pod, stats statsFunc) {
+	orderedBy(swap(stats)).Sort(pods)
 }
 
 // rankPIDPressure orders the input pods by priority in response to PID pressure.
@@ -919,6 +960,16 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.DecimalSI),
 				time:      rlimit.Time,
 			}
+		}
+	}
+
+	if summary.Node.Swap != nil {
+		nodeSwapUsage := *summary.Node.Swap.SwapUsageBytes
+		nodeSwapCapacity := *summary.Node.Swap.SwapAvailableBytes + nodeSwapUsage
+		result[evictionapi.SignalSwapMemoryAvailable] = signalObservation{
+			available: resource.NewQuantity(int64(nodeSwapUsage), resource.BinarySI),
+			time:      summary.Node.Swap.Time,
+			capacity:  resource.NewQuantity(int64(nodeSwapCapacity), resource.BinarySI),
 		}
 	}
 	return result, statsFunc
@@ -1148,6 +1199,7 @@ func buildSignalToRankFunc(withImageFs bool, imageContainerSplitFs bool) map[evi
 	signalToRankFunc := map[evictionapi.Signal]rankFunc{
 		evictionapi.SignalMemoryAvailable:            rankMemoryPressure,
 		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressure,
+		evictionapi.SignalSwapMemoryAvailable:        rankSwapPressure,
 		evictionapi.SignalPIDAvailable:               rankPIDPressure,
 	}
 	// usage of an imagefs is optional
