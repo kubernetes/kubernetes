@@ -2471,6 +2471,77 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
+func TestDuplicatePVCNames(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "ReferOnePVCMultiTimes",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume1",
+						VolumeSource: api.VolumeSource{
+							PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+					{
+						Name: "volume2",
+						VolumeSource: api.VolumeSource{
+							PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "ReferOnePVCOnlyOnce",
+			oldPodSpec: &api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "volume1",
+						VolumeSource: api.VolumeSource{
+							PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc1",
+							},
+						},
+					},
+					{
+						Name: "volume2",
+						VolumeSource: api.VolumeSource{
+							PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+								ClaimName: "pvc2",
+							},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Pod meta doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowDuplicatePVCNames {
+				t.Errorf("Got AllowDuplicatePVCNames=%t, want %t", gotOptions.AllowDuplicatePVCNames, tc.wantOption)
+			}
+		})
+	}
+}
+
 func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 	testCases := []struct {
 		name       string
