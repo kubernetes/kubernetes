@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -58,6 +60,33 @@ var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 // It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
 
+// staticPortRange implements port allocation model described here
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3668-reserved-service-nodeport-range
+type staticPortRange struct {
+	sync.Mutex
+	baseport      int
+	length        int
+	reservedPorts sets.Set[int]
+}
+
+func calculateRange(size int) int {
+	minPort := 16
+	step := 32
+	maxPort := 128
+	return min(max(minPort, size/step), maxPort)
+}
+
+var staticPortAllocator *staticPortRange
+
+// Initialize only once per test
+func init() {
+	staticPortAllocator = &staticPortRange{
+		baseport:      NodePortRange.Base,
+		length:        calculateRange(NodePortRange.Size),
+		reservedPorts: sets.New[int](),
+	}
+}
+
 // TestJig is a test jig to help service testing.
 type TestJig struct {
 	Client    clientset.Interface
@@ -80,6 +109,68 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	j.Labels = map[string]string{"testid": j.ID}
 
 	return j
+}
+
+// allocatePort reserves the port provided as input.
+// If an invalid port was provided or if the port is already reserved, it returns false
+func (s *staticPortRange) allocatePort(port int) bool {
+	s.Lock()
+	defer s.Unlock()
+	port -= s.baseport
+	if port < 0 || port > s.length || s.reservedPorts.Has(port) {
+		return false
+	}
+	s.reservedPorts.Insert(port)
+	return true
+}
+
+// nextFreePort returns a free port from the range and returns its number and true
+// the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
+// if none is available then it returns -1 and false
+func (s *staticPortRange) nextFreePort() (int, bool) {
+	s.Lock()
+	defer s.Unlock()
+	// start in a random offset
+	start := rand.Intn(s.length)
+	for i := 0; i < s.length; i++ {
+		port := (start + i) % s.length
+		if !s.reservedPorts.Has(port) {
+			return s.baseport + port, true
+		}
+	}
+	return -1, false
+}
+
+// release the port passed as an argument and returns true. If
+// an invalid port or unreserved port was provided, it returns false
+func (s *staticPortRange) release(port int) bool {
+	s.Lock()
+	defer s.Unlock()
+	port -= s.baseport
+	// port is out of range, it can not be released
+	if port < 0 || port > s.length || !s.reservedPorts.Has(port) {
+		return false
+	}
+	s.reservedPorts.Delete(port)
+	return true
+}
+
+// ReserveStaticNodePort reserves the port provided as input.
+// If an invalid port was provided or if the port is already reserved, it returns false
+func ReserveStaticNodePort(port int) bool {
+	return staticPortAllocator.allocatePort(port)
+}
+
+// GetUnusedStaticNodePort returns a free port in static range and a boolean True value
+// If no port in static range is available it returns -1 and a boolean value False
+func GetUnusedStaticNodePort() (int, bool) {
+	return staticPortAllocator.nextFreePort()
+}
+
+// ReleaseStaticNodePort releases a previously reserved static port and returns true
+// If the port was not previously reserved it returns false
+func ReleaseStaticNodePort(port int) bool {
+	return staticPortAllocator.release(port)
 }
 
 // newServiceTemplate returns the default v1.Service template for this j, but
