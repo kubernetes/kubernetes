@@ -747,71 +747,120 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 	}
 
-	// TODO(random-liu): Refactor the unit test to be table driven test.
-	// Should report kubelet not ready if the runtime check is out of date
-	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
-
-	// Should report kubelet ready if the runtime check is updated
-	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
-
-	// Should report kubelet not ready if the runtime check is out of date
-	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
-
-	// Should report kubelet not ready if the runtime check failed
 	fakeRuntime := testKubelet.fakeRuntime
-	// Inject error into fake runtime status check, node should be NotReady
-	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
-	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
-
-	fakeRuntime.StatusErr = nil
-
-	// Should report node not ready if runtime status is nil.
-	fakeRuntime.RuntimeStatus = nil
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
-
-	// Should report node not ready if runtime status is empty.
-	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
-
-	// Should report node not ready if RuntimeReady is false.
-	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
-		Conditions: []kubecontainer.RuntimeCondition{
-			{Type: kubecontainer.RuntimeReady, Status: false},
-			{Type: kubecontainer.NetworkReady, Status: true},
+	cases := []struct {
+		Desc      string
+		Reason    string
+		Status    v1.ConditionStatus
+		PrepareFn func()
+		CleanupFn func()
+	}{
+		{
+			Desc:   "Should report kubelet not ready if the runtime check is out of date",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
+			},
+		},
+		{
+			Desc:   "Should report kubelet ready if the runtime check is updated",
+			Reason: "KubeletReady",
+			Status: v1.ConditionTrue,
+			PrepareFn: func() {
+				clock.SetTime(time.Now())
+			},
+		},
+		{
+			Desc:   "Should report kubelet not ready if the runtime check is out of date",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
+			},
+		},
+		{
+			Desc:   "Should report kubelet not ready if the runtime check failed",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				// Inject error into fake runtime status check, node should be NotReady
+				fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
+				clock.SetTime(time.Now())
+			},
+			CleanupFn: func() {
+				fakeRuntime.StatusErr = nil
+			},
+		},
+		{
+			Desc:   "Should report node not ready if runtime status is nil",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				fakeRuntime.RuntimeStatus = nil
+			},
+		},
+		{
+			Desc:   "Should report node not ready if runtime status is empty",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
+			},
+		},
+		{
+			Desc:   "Should report node not ready if RuntimeReady is false",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+					Conditions: []kubecontainer.RuntimeCondition{
+						{Type: kubecontainer.RuntimeReady, Status: false},
+						{Type: kubecontainer.NetworkReady, Status: true},
+					},
+				}
+			},
+		},
+		{
+			Desc:   "Should report node ready if RuntimeReady is true",
+			Reason: "KubeletReady",
+			Status: v1.ConditionTrue,
+			PrepareFn: func() {
+				fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+					Conditions: []kubecontainer.RuntimeCondition{
+						{Type: kubecontainer.RuntimeReady, Status: true},
+						{Type: kubecontainer.NetworkReady, Status: true},
+					},
+				}
+			},
+		},
+		{
+			Desc:   "Should report node not ready if NetworkReady is false",
+			Reason: "KubeletNotReady",
+			Status: v1.ConditionFalse,
+			PrepareFn: func() {
+				fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+					Conditions: []kubecontainer.RuntimeCondition{
+						{Type: kubecontainer.RuntimeReady, Status: true},
+						{Type: kubecontainer.NetworkReady, Status: false},
+					},
+				}
+			},
 		},
 	}
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
-	// Should report node ready if RuntimeReady is true.
-	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
-		Conditions: []kubecontainer.RuntimeCondition{
-			{Type: kubecontainer.RuntimeReady, Status: true},
-			{Type: kubecontainer.NetworkReady, Status: true},
-		},
-	}
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
+	for _, tc := range cases {
+		if tc.PrepareFn != nil {
+			tc.PrepareFn()
+		}
 
-	// Should report node not ready if NetworkReady is false.
-	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
-		Conditions: []kubecontainer.RuntimeCondition{
-			{Type: kubecontainer.RuntimeReady, Status: true},
-			{Type: kubecontainer.NetworkReady, Status: false},
-		},
+		kubelet.updateRuntimeUp()
+		checkNodeStatus(tc.Status, tc.Reason)
+
+		if tc.CleanupFn != nil {
+			tc.CleanupFn()
+		}
 	}
-	kubelet.updateRuntimeUp()
-	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
