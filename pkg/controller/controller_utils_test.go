@@ -491,6 +491,7 @@ func TestSortingActivePods(t *testing.T) {
 	now := metav1.Now()
 	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
 
+	restartAlways := v1.ContainerRestartPolicyAlways
 	tests := []struct {
 		name      string
 		pods      []v1.Pod
@@ -547,6 +548,22 @@ func TestSortingActivePods(t *testing.T) {
 					},
 				},
 				{
+					ObjectMeta: metav1.ObjectMeta{Name: "lowerSidecarContainerRestartCount", CreationTimestamp: now},
+					Spec: v1.PodSpec{
+						NodeName: "foo",
+						InitContainers: []v1.Container{{
+							Name:          "sidecar",
+							RestartPolicy: &restartAlways,
+						}},
+					},
+					Status: v1.PodStatus{
+						Phase:                 v1.PodRunning,
+						Conditions:            []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}},
+						ContainerStatuses:     []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}},
+						InitContainerStatuses: []v1.ContainerStatus{{Name: "sidecar", RestartCount: 2}},
+					},
+				},
+				{
 					ObjectMeta: metav1.ObjectMeta{Name: "lowerContainerRestartCount", CreationTimestamp: now},
 					Spec:       v1.PodSpec{NodeName: "foo"},
 					Status: v1.PodStatus{
@@ -573,6 +590,7 @@ func TestSortingActivePods(t *testing.T) {
 				"runningNoLastTransitionTime",
 				"runningWithLastTransitionTime",
 				"runningLongerTime",
+				"lowerSidecarContainerRestartCount",
 				"lowerContainerRestartCount",
 				"oldest",
 			},
@@ -611,12 +629,15 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	then5Hours := metav1.Time{Time: now.Add(-5 * time.Hour)}
 	then8Hours := metav1.Time{Time: now.Add(-8 * time.Hour)}
 	zeroTime := metav1.Time{}
-	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time, annotations map[string]string) *v1.Pod {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, sideRestarts int32, readySince metav1.Time, created metav1.Time, annotations map[string]string) *v1.Pod {
 		var conditions []v1.PodCondition
 		var containerStatuses []v1.ContainerStatus
+		var initContainerStatuses []v1.ContainerStatus
 		if ready {
 			conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: readySince}}
 			containerStatuses = []v1.ContainerStatus{{RestartCount: restarts}}
+			initContainerStatuses = []v1.ContainerStatus{{Name: "sidecar", RestartCount: sideRestarts}}
 		}
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -624,31 +645,36 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 				Name:              podName,
 				Annotations:       annotations,
 			},
-			Spec: v1.PodSpec{NodeName: nodeName},
+			Spec: v1.PodSpec{
+				NodeName:       nodeName,
+				InitContainers: []v1.Container{{Name: "sidecar", RestartPolicy: &restartAlways}},
+			},
 			Status: v1.PodStatus{
-				Conditions:        conditions,
-				ContainerStatuses: containerStatuses,
-				Phase:             phase,
+				Conditions:            conditions,
+				ContainerStatuses:     containerStatuses,
+				InitContainerStatuses: initContainerStatuses,
+				Phase:                 phase,
 			},
 		}
 	}
 	var (
-		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
-		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
-		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime, nil)
-		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime, nil)
-		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime, nil)
-		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now, nil)
-		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then1Month, then1Month, nil)
-		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now, nil)
-		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then1Month, nil)
-		lowPodDeletionCost                  = pod("low-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "10"})
-		highPodDeletionCost                 = pod("high-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "100"})
-		unscheduled5Hours                   = pod("unscheduled-5-hours", "", v1.PodPending, false, 0, then5Hours, then5Hours, nil)
-		unscheduled8Hours                   = pod("unscheduled-10-hours", "", v1.PodPending, false, 0, then8Hours, then8Hours, nil)
-		ready2Hours                         = pod("ready-2-hours", "", v1.PodRunning, true, 0, then2Hours, then1Month, nil)
-		ready5Hours                         = pod("ready-5-hours", "", v1.PodRunning, true, 0, then5Hours, then1Month, nil)
-		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, then8Hours, then1Month, nil)
+		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, 0, zeroTime, zeroTime, nil)
+		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, 0, zeroTime, zeroTime, nil)
+		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, 0, zeroTime, zeroTime, nil)
+		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, 0, zeroTime, zeroTime, nil)
+		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, 0, zeroTime, zeroTime, nil)
+		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, 0, now, now, nil)
+		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, 0, then1Month, then1Month, nil)
+		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, 0, now, now, nil)
+		runningReadyNowHighSideRestarts     = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, 9001, now, now, nil)
+		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, 0, now, then1Month, nil)
+		lowPodDeletionCost                  = pod("low-deletion-cost", "node", v1.PodRunning, true, 0, 0, now, then1Month, map[string]string{core.PodDeletionCost: "10"})
+		highPodDeletionCost                 = pod("high-deletion-cost", "node", v1.PodRunning, true, 0, 0, now, then1Month, map[string]string{core.PodDeletionCost: "100"})
+		unscheduled5Hours                   = pod("unscheduled-5-hours", "", v1.PodPending, false, 0, 0, then5Hours, then5Hours, nil)
+		unscheduled8Hours                   = pod("unscheduled-10-hours", "", v1.PodPending, false, 0, 0, then8Hours, then8Hours, nil)
+		ready2Hours                         = pod("ready-2-hours", "", v1.PodRunning, true, 0, 0, then2Hours, then1Month, nil)
+		ready5Hours                         = pod("ready-5-hours", "", v1.PodRunning, true, 0, 0, then5Hours, then1Month, nil)
+		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, 0, then8Hours, then1Month, nil)
 	)
 	equalityTests := []struct {
 		p1                          *v1.Pod
@@ -703,6 +729,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyThen, 1}},
 		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyThen, 1}},
 		{lesser: podWithRank{runningReadyNowHighRestarts, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNowHighSideRestarts, 1}, greater: podWithRank{runningReadyNowHighRestarts, 1}},
 		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNowHighRestarts, 1}},
 		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyNowCreatedThen, 1}},
 		{lesser: podWithRank{runningReadyNowCreatedThen, 2}, greater: podWithRank{runningReadyNow, 1}},
