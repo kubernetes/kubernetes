@@ -347,6 +347,23 @@ func getTestFsInfo(seed int) cadvisorapiv2.FsInfo {
 	}
 }
 
+func getTestFsInfoWithDifferentMount(seed int, device string) cadvisorapiv2.FsInfo {
+	var (
+		inodes     = uint64(seed + offsetFsInodes)
+		inodesFree = uint64(seed + offsetFsInodesFree)
+	)
+	return cadvisorapiv2.FsInfo{
+		Timestamp:  time.Now(),
+		Device:     device,
+		Mountpoint: "test-mount-point",
+		Capacity:   uint64(seed + offsetFsCapacity),
+		Available:  uint64(seed + offsetFsAvailable),
+		Usage:      uint64(seed + offsetFsUsage),
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
+	}
+}
+
 func getPodVolumeStats(seed int, volumeName string) statsapi.VolumeStats {
 	availableBytes := uint64(seed + offsetFsAvailable)
 	capacityBytes := uint64(seed + offsetFsCapacity)
