@@ -207,7 +207,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "webhook_fail_open_count",
-			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or mutating).",
+			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or admit).",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "type"})
@@ -217,7 +217,7 @@ func newAdmissionMetrics() *AdmissionMetrics {
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "webhook_request_total",
-			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or mutating) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
+			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"name", "type", "operation", "code", "rejected"})
