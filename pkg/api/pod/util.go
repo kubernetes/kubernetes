@@ -945,12 +945,12 @@ func dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec *api.PodSp
 	}
 
 	if affinity := podSpec.Affinity.PodAffinity; affinity != nil {
-		dropMatchLabelKeysFieldInPodAffnityTerm(affinity.RequiredDuringSchedulingIgnoredDuringExecution)
-		dropMatchLabelKeysFieldInWeightedPodAffnityTerm(affinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		dropMatchLabelKeysFieldInPodAffinityTerm(affinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		dropMatchLabelKeysFieldInWeightedPodAffinityTerm(affinity.PreferredDuringSchedulingIgnoredDuringExecution)
 	}
 	if antiaffinity := podSpec.Affinity.PodAntiAffinity; antiaffinity != nil {
-		dropMatchLabelKeysFieldInPodAffnityTerm(antiaffinity.RequiredDuringSchedulingIgnoredDuringExecution)
-		dropMatchLabelKeysFieldInWeightedPodAffnityTerm(antiaffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		dropMatchLabelKeysFieldInPodAffinityTerm(antiaffinity.RequiredDuringSchedulingIgnoredDuringExecution)
+		dropMatchLabelKeysFieldInWeightedPodAffinityTerm(antiaffinity.PreferredDuringSchedulingIgnoredDuringExecution)
 	}
 }
 
@@ -964,16 +964,16 @@ func dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec *api.Po
 	}
 }
 
-// dropMatchLabelKeysFieldInWeightedPodAffnityTerm removes MatchLabelKeys and MismatchLabelKeys fields from WeightedPodAffinityTerm
-func dropMatchLabelKeysFieldInWeightedPodAffnityTerm(terms []api.WeightedPodAffinityTerm) {
+// dropMatchLabelKeysFieldInWeightedPodAffinityTerm removes MatchLabelKeys and MismatchLabelKeys fields from WeightedPodAffinityTerm
+func dropMatchLabelKeysFieldInWeightedPodAffinityTerm(terms []api.WeightedPodAffinityTerm) {
 	for i := range terms {
 		terms[i].PodAffinityTerm.MatchLabelKeys = nil
 		terms[i].PodAffinityTerm.MismatchLabelKeys = nil
 	}
 }
 
-// dropMatchLabelKeysFieldInPodAffnityTerm removes MatchLabelKeys and MismatchLabelKeys fields from PodAffinityTerm
-func dropMatchLabelKeysFieldInPodAffnityTerm(terms []api.PodAffinityTerm) {
+// dropMatchLabelKeysFieldInPodAffinityTerm removes MatchLabelKeys and MismatchLabelKeys fields from PodAffinityTerm
+func dropMatchLabelKeysFieldInPodAffinityTerm(terms []api.PodAffinityTerm) {
 	for i := range terms {
 		terms[i].MatchLabelKeys = nil
 		terms[i].MismatchLabelKeys = nil
