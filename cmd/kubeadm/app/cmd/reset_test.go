@@ -80,7 +80,7 @@ func TestNewResetData(t *testing.T) {
 				options.CertificatesDir:       "/tmp",
 				options.NodeCRISocket:         constants.CRISocketCRIO,
 				options.IgnorePreflightErrors: "all",
-				options.ForceReset:            "true",
+				options.Force:                 "true",
 				options.DryRun:                "true",
 				options.CleanupTmpDir:         "true",
 			},
@@ -184,8 +184,8 @@ func TestNewResetData(t *testing.T) {
 		{
 			name: "--force flag is not allowed to mix with config",
 			flags: map[string]string{
-				options.CfgPath:    configFilePath,
-				options.ForceReset: "false",
+				options.CfgPath: configFilePath,
+				options.Force:   "false",
 			},
 			expectError: "can not mix '--config' with arguments",
 		},

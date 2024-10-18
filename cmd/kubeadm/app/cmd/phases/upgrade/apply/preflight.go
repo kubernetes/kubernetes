@@ -47,11 +47,11 @@ func NewPreflightPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.CfgPath,
 			options.KubeconfigPath,
+			options.Force,
 			options.DryRun,
 			options.IgnorePreflightErrors,
 			"allow-experimental-upgrades",
 			"allow-release-candidate-upgrades",
-			"force",
 			"yes",
 		},
 	}

@@ -124,7 +124,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	addApplyPlanFlags(cmd.Flags(), flags.applyPlanFlags)
 	// Specify the valid flags specific for apply
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
-	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
+	cmd.Flags().BoolVarP(&flags.force, options.Force, "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, options.EtcdUpgrade, flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
@@ -188,7 +188,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, err
 	}
 
-	force, ok := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), "force", upgradeCfg.Apply.ForceUpgrade, &applyFlags.force).(*bool)
+	force, ok := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, upgradeCfg.Apply.ForceUpgrade, &applyFlags.force).(*bool)
 	if !ok {
 		return nil, cmdutil.TypeMismatchErr("forceUpgrade", "bool")
 	}
