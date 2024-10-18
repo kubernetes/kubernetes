@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/common/model"
@@ -259,6 +261,90 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 			t.Errorf("No sample found for %#v", expectedMetric)
 		}
 	}
+}
+
+func TestAPIServerMetricsLabelsWithAllowList(t *testing.T) {
+
+	allowMetricLabels := []struct {
+		metricName  string
+		labelName   model.LabelName
+		allowValues model.LabelValues
+		isHistogram bool
+	}{
+		{
+			// CounterVec metric
+			metricName:  "apiserver_request_total",
+			labelName:   "code",
+			allowValues: model.LabelValues{"201", "500"},
+		},
+		{
+			// GaugeVec metric
+			metricName:  "apiserver_current_inflight_requests",
+			labelName:   "request_kind",
+			allowValues: model.LabelValues{"mutating"},
+		},
+		{
+			// Histogram metric
+			metricName:  "apiserver_request_duration_seconds",
+			labelName:   "verb",
+			allowValues: model.LabelValues{"POST", "LIST"},
+			isHistogram: true,
+		},
+	}
+
+	// Assemble the allow-metric-labels flag.
+	var allowMetricLabelFlagStrs []string
+	for _, allowMetricLabel := range allowMetricLabels {
+		var allowValuesStr []string
+		for _, allowValue := range allowMetricLabel.allowValues {
+			allowValuesStr = append(allowValuesStr, string(allowValue))
+		}
+		allowMetricLabelFlagStrs = append(allowMetricLabelFlagStrs, fmt.Sprintf("\"%s,%s=%s\"", allowMetricLabel.metricName, allowMetricLabel.labelName, strings.Join(allowValuesStr, ",")))
+	}
+	allowMetricLabelsFlag := "--allow-metric-labels=" + strings.Join(allowMetricLabelFlagStrs, ",")
+
+	testServerFlags := framework.DefaultTestServerFlags()
+	testServerFlags = append(testServerFlags, allowMetricLabelsFlag)
+
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	metrics, err := scrapeMetrics(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, allowMetric := range allowMetricLabels {
+		metricName := allowMetric.metricName
+		if allowMetric.isHistogram {
+			metricName = metricName + "_sum"
+		}
+		if samples, found := metrics[metricName]; !found {
+			t.Errorf("metric %q not found", metricName)
+		} else {
+			for _, sample := range samples {
+				if value, ok := sample.Metric[allowMetric.labelName]; ok {
+					if !slices.Contains(allowMetric.allowValues, value) && value != "unexpected" {
+						t.Errorf("value %q is not allowed for label %q", value, allowMetric.labelName)
+					}
+				}
+			}
+		}
+	}
+
+	// Check cardinality_enforcement_unexpected_categorizations_total, which should have positive value.
+	if samples, found := metrics["cardinality_enforcement_unexpected_categorizations_total"]; !found {
+		t.Errorf("metric cardinality_enforcement_unexpected_categorizations_total not found")
+	} else {
+		if len(samples) != 1 {
+			t.Fatalf("Unexpected number of samples in cardinality_enforcement_unexpected_categorizations_total")
+		}
+		if samples[0].Value <= 0 {
+			t.Errorf("Unexpected non-positive cardinality_enforcement_unexpected_categorizations_total, got: %s", samples[0].Value)
+		}
+	}
+
 }
 
 func TestAPIServerMetricsPods(t *testing.T) {
