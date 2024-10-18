@@ -251,7 +251,7 @@ type podSyncer interface {
 	// pod has reached a terminal state and the presence of the error indicates succeeded or failed.
 	// If an error is returned, the sync was not successful and should be rerun in the future. This
 	// is a long running method and should exit early with context.Canceled if the context is canceled.
-	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
+	SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, bool, error)
 	// SyncTerminatingPod attempts to ensure the pod's containers are no longer running and to collect
 	// any final status. This method is repeatedly invoked with diminishing grace periods until it exits
 	// without error. Once this method exits with no error other components are allowed to tear down
@@ -269,7 +269,7 @@ type podSyncer interface {
 	SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 }
 
-type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, bool, error)
 type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
@@ -293,7 +293,7 @@ func newPodSyncerFuncs(s podSyncer) podSyncerFuncs {
 
 var _ podSyncer = podSyncerFuncs{}
 
-func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, bool, error) {
 	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
 }
 func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
@@ -1231,7 +1231,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 		podUID, podRef := podUIDAndRefForUpdate(update.Options)
 
 		klog.V(4).InfoS("Processing pod event", "pod", podRef, "podUID", podUID, "updateType", update.WorkType)
-		var isTerminal bool
+		var isTerminal, resync bool
 		err := func() error {
 			// The worker is responsible for ensuring the sync method sees the appropriate
 			// status updates on resyncs (the result of the last sync), transitions to
@@ -1283,7 +1283,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 				}
 
 			default:
-				isTerminal, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
+				isTerminal, resync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
 			}
 
 			lastSyncTime = p.clock.Now()
@@ -1331,7 +1331,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 		}
 
 		// queue a retry if necessary, then put the next event in the channel if any
-		p.completeWork(podUID, phaseTransition, err)
+		p.completeWork(podUID, phaseTransition || resync, err)
 		if start := update.Options.StartTime; !start.IsZero() {
 			metrics.PodWorkerDuration.WithLabelValues(update.Options.UpdateType.String()).Observe(metrics.SinceInSeconds(start))
 		}
@@ -1484,10 +1484,10 @@ func (p *podWorkers) completeTerminated(podUID types.UID) {
 
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
 // work.
-func (p *podWorkers) completeWork(podUID types.UID, phaseTransition bool, syncErr error) {
+func (p *podWorkers) completeWork(podUID types.UID, immediateResync bool, syncErr error) {
 	// Requeue the last update if the last sync returned error.
 	switch {
-	case phaseTransition:
+	case immediateResync:
 		p.workQueue.Enqueue(podUID, 0)
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.

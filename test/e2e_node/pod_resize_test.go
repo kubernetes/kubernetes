@@ -277,7 +277,7 @@ func verifyPodAllocations(pod *v1.Pod, tcInfo []TestContainerInfo) error {
 	return nil
 }
 
-func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
+func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) error {
 	ginkgo.GinkgoHelper()
 	csMap := make(map[string]*v1.ContainerStatus)
 	for i, c := range pod.Status.ContainerStatuses {
@@ -287,8 +287,11 @@ func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		gomega.Expect(csMap).Should(gomega.HaveKey(ci.Name))
 		cs := csMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
-		gomega.Expect(tc.Resources).To(gomega.Equal(*cs.Resources))
+		if !cmp.Equal(tc.Resources, *cs.Resources) {
+			return fmt.Errorf("failed to verify Pod status resources, resources of container %s not equal to expected", cs.Name)
+		}
 	}
+	return nil
 }
 
 func verifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []TestContainerInfo) error {
@@ -415,6 +418,15 @@ func waitForPodResizeActuation(ctx context.Context, f *framework.Framework, c cl
 		return verifyPodAllocations(resizedPod, expectedContainers)
 	}, timeouts.PodStartShort, timeouts.Poll).
 		ShouldNot(gomega.HaveOccurred(), "timed out waiting for pod resource allocation values to match expected")
+	// Wait for pod status resources to equal expected values after resize
+	gomega.Eventually(ctx, func() error {
+		resizedPod, pErr = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		if pErr != nil {
+			return pErr
+		}
+		return verifyPodStatusResources(resizedPod, expectedContainers)
+	}, timeouts.PodStartShort, timeouts.Poll).
+		ShouldNot(gomega.HaveOccurred(), "timed out waiting for pod status resource values to match expected")
 	return resizedPod
 }
 
@@ -1131,6 +1143,37 @@ func doPodResizeTests() {
 				},
 			},
 		},
+		{
+			name: "Burstable QoS pod, two containers - increase c1 memory requests only, decrease c2 memory requests only, (set RestartContainer but, not restarted)",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "200Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"150Mi"}}},
+						{"name":"c2", "resources":{"requests":{"memory":"150Mi"}}}
+					]}}`,
+			expected: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "150Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "150Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
@@ -1166,7 +1209,8 @@ func doPodResizeTests() {
 			framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
 
 			ginkgo.By("verifying initial pod status resources")
-			verifyPodStatusResources(newPod, tc.containers)
+			err = verifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(err, "failed to verify initial pod status resources")
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
@@ -1266,7 +1310,8 @@ func doPodResizeErrorTests() {
 			verifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
-			verifyPodStatusResources(newPod, tc.containers)
+			err := verifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(err, "failed to verify initial pod status resources")
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
