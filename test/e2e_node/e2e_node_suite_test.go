@@ -240,7 +240,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	if framework.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		updateImageAllowList(ctx)
-		err := PrePullAllImages()
+		err := PrePullAllImages(ctx)
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	}
 
