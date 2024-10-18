@@ -99,8 +99,8 @@ func isIndexFailed(logger klog.Logger, job *batch.Job, pod *v1.Pod) bool {
 	isPodFailedCounted := false
 	if isPodFailed(pod, job) {
 		if job.Spec.PodFailurePolicy != nil {
-			_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
-			if action != nil && *action == batch.PodFailurePolicyActionFailIndex {
+			_, countFailed, rule := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
+			if rule != nil && rule.Action == batch.PodFailurePolicyActionFailIndex {
 				return true
 			}
 			isPodFailedCounted = countFailed

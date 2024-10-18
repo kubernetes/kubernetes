@@ -47,6 +47,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 		wantJobFailureMessage         *string
 		wantCountFailed               bool
 		wantAction                    *batch.PodFailurePolicyAction
+		wantRuleName                  *string
 	}{
 		"unknown action for rule matching by exit codes - skip rule with unknown action": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -833,19 +834,77 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			wantCountFailed:       true,
 			wantAction:            &count,
 		},
+		"expected matching rule returned": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						// simulating pod failure policy rule name defaulting to rule index when unset
+						Name:   ptr.To("0"),
+						Action: batch.PodFailurePolicyActionFailJob,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type:   v1.PodConditionType(batch.JobReasonMaxFailedIndexesExceeded),
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+					{
+						Name:   ptr.To("HostMaintenanceRule"),
+						Action: batch.PodFailurePolicyActionIgnore,
+						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type:   v1.DisruptionTarget,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.DisruptionTarget,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: nil,
+			wantCountFailed:       false,
+			wantAction:            &ignore,
+			wantRuleName:          ptr.To("HostMaintenanceRule"),
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
-			jobFailMessage, countFailed, action := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
+			jobFailMessage, countFailed, rule := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
 			if diff := cmp.Diff(tc.wantJobFailureMessage, jobFailMessage); diff != "" {
 				t.Errorf("Unexpected job failure message: %s", diff)
 			}
 			if tc.wantCountFailed != countFailed {
 				t.Errorf("Unexpected count failed. want: %v. got: %v", tc.wantCountFailed, countFailed)
 			}
-			if diff := cmp.Diff(tc.wantAction, action); diff != "" {
+
+			// Compare action.
+			var ruleAction *batch.PodFailurePolicyAction
+			if rule != nil {
+				ruleAction = &rule.Action
+			}
+			if diff := cmp.Diff(tc.wantAction, ruleAction); diff != "" {
 				t.Errorf("Unexpected failure policy action: %s", diff)
+			}
+
+			// Compare rule name if specified.
+			var ruleName *string
+			if rule != nil {
+				ruleName = rule.Name
+			}
+			if diff := cmp.Diff(tc.wantRuleName, ruleName); diff != "" {
+				t.Errorf("Unexpected failure policy name: %s", diff)
 			}
 		})
 	}

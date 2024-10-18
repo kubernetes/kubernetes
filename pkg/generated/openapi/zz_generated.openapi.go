@@ -17597,6 +17597,13 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 							},
 						},
 					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the pod failure policy rule. Defaults to the index of the rule if unset. The name must be unique within the given Job, and the Job failure condition reason that would be generated from a given rule name (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"action"},
 			},

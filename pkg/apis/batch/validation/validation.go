@@ -25,6 +25,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -71,6 +72,13 @@ const (
 	maxJobSuccessPolicySucceededIndexesLimit = 64 * 1024
 	// maximum number of rules in successPolicy.
 	maxSuccessPolicyRule = 20
+
+	// Maximium allowed length of pod failure policy rule names.
+	// The rule name is used in condition reasons in the format
+	// "PodFailurePolicy_{rule.Name}", where the prefix before
+	// the rule name is 17 characters, leaing 983 characters
+	// for the rule name.
+	maxPodFailurePolicyRuleNameLength = 983
 )
 
 var (
@@ -92,6 +100,9 @@ var (
 	supportedPodReplacementPolicy = sets.New(
 		batch.Failed,
 		batch.TerminatingOrFailed)
+
+	// Source: https://github.com/kubernetes/kubernetes/blob/8ccc878de07dd302b6115095884daa787a00c58c/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go#L1595-L1598
+	conditionReasonRegex = regexp.MustCompile(`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`)
 )
 
 // validateGeneratedSelector validates that the generated selector on a controller object match the controller object
@@ -298,15 +309,17 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
 		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.PodFailurePolicy.Rules), maxPodFailurePolicyRules))
 	}
-	containerNames := sets.NewString()
+	containerNames := sets.Set[string]{}
 	for _, containerSpec := range spec.Template.Spec.Containers {
 		containerNames.Insert(containerSpec.Name)
 	}
 	for _, containerSpec := range spec.Template.Spec.InitContainers {
 		containerNames.Insert(containerSpec.Name)
 	}
+
+	ruleNames := sets.Set[string]{}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), ruleNames, containerNames)...)
 	}
 	return allErrs
 }
@@ -327,7 +340,7 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, ruleNames, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -351,6 +364,24 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 	if rule.OnExitCodes == nil && len(rule.OnPodConditions) == 0 {
 		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying one of OnExitCodes and OnPodConditions is required"))
 	}
+	if rule.Name != nil {
+		// Validate rule name is unique within the Job.
+		ruleName := *rule.Name
+		if ruleNames.Has(ruleName) {
+			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, "pod failure policy rule names must be unique within a Job"))
+		}
+		ruleNames.Insert(ruleName)
+
+		// Validate the "JobFailed" condition reason that will result from this pod failure policy
+		// being triggered must be a valid condition reason.
+		reason := fmt.Sprintf("%s_%s", batchv1.JobReasonPodFailurePolicy, ruleName)
+		if len(reason) > maxPodFailurePolicyRuleNameLength {
+			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, fmt.Sprintf("pod failure policy rule name length must be <= %d characters", maxPodFailurePolicyRuleNameLength)))
+		}
+		if !conditionReasonRegex.MatchString(reason) {
+			allErrs = append(allErrs, field.Invalid(rulePath, ruleName, fmt.Sprintf("pod failure policy rule name must match regular expression: %s", conditionReasonRegex.String())))
+		}
+	}
 	return allErrs
 }
 
@@ -372,7 +403,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {

@@ -3986,6 +3986,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: name
+      type:
+        scalar: string
     - name: onExitCodes
       type:
         namedType: io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement
