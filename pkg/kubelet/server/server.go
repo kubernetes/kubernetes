@@ -54,6 +54,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -101,6 +102,8 @@ const (
 	checkpointPath      = "/checkpoint/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
+	podsPath            = "/pods"
+	runningPodsPath     = "/runningpods/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -240,10 +243,14 @@ func ListenAndServePodResources(endpoint string, providers podresources.PodResou
 	}
 }
 
+type NodeRequestAttributesGetter interface {
+	GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes
+}
+
 // AuthInterface contains all methods required by the auth filters
 type AuthInterface interface {
 	authenticator.Request
-	authorizer.RequestAttributesGetter
+	NodeRequestAttributesGetter
 	authorizer.Authorizer
 }
 
@@ -317,19 +324,35 @@ func (s *Server) InstallAuthFilter() {
 
 		// Get authorization attributes
 		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
+		var allowed bool
+		var msg string
+		var subresources []string
+		for _, attr := range attrs {
+			subresources = append(subresources, attr.GetSubresource())
+			decision, _, err := s.auth.Authorize(req.Request.Context(), attr)
+			if err != nil {
+				klog.ErrorS(err, "Authorization error", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
+				msg = fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attr.GetUser().GetName(), attr.GetVerb(), attr.GetResource(), attr.GetSubresource())
+				resp.WriteErrorString(http.StatusInternalServerError, msg)
+				return
 
-		// Authorize
-		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
-		if err != nil {
-			klog.ErrorS(err, "Authorization error", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
-			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			resp.WriteErrorString(http.StatusInternalServerError, msg)
-			return
+			}
+
+			if decision == authorizer.DecisionAllow {
+				allowed = true
+				break
+			}
 		}
-		if decision != authorizer.DecisionAllow {
-			klog.V(2).InfoS("Forbidden", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
-			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			resp.WriteErrorString(http.StatusForbidden, msg)
+
+		if !allowed {
+			if len(attrs) == 0 {
+				klog.ErrorS(fmt.Errorf("could not determine attributes for request"), "Authorization error")
+				resp.WriteErrorString(http.StatusForbidden, "Authorization error: could not determine attributes for request")
+				return
+			}
+			// The attributes only differ by subresource so we just use the first one.
+			klog.V(2).InfoS("Forbidden", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
+			resp.WriteErrorString(http.StatusForbidden, fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource(s)=%v)\n", attrs[0].GetUser().GetName(), attrs[0].GetVerb(), attrs[0].GetResource(), subresources))
 			return
 		}
 
@@ -381,7 +404,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.
-		Path("/pods").
+		Path(podsPath).
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getPods).
@@ -541,7 +564,7 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
 	ws.
-		Path("/runningpods/").
+		Path(runningPodsPath).
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getRunningPods).
@@ -565,7 +588,7 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 	s.addMetricsBucketMatcher("logs")
 	paths := []string{
 		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/",
-		"/runningpods/", pprofBasePath, logsPath}
+		runningPodsPath, pprofBasePath, logsPath}
 	for _, p := range paths {
 		s.restfulCont.Handle(p, h)
 	}

@@ -35,6 +35,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const DefaultHealthzPath = "/healthz"
+
 // HealthChecker is a named healthz checker.
 type HealthChecker interface {
 	Name() string
@@ -154,7 +156,7 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthChecker {
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
 func InstallHandler(mux mux, checks ...HealthChecker) {
-	InstallPathHandler(mux, "/healthz", checks...)
+	InstallPathHandler(mux, DefaultHealthzPath, checks...)
 }
 
 // InstallReadyzHandler registers handlers for health checking on the path

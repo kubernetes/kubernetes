@@ -412,6 +412,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeletFineGrainedAuthz: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletInUserNamespace: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 	},
