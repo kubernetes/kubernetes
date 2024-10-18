@@ -87,8 +87,9 @@ type GetHTTPInterface interface {
 }
 
 // DoHTTPProbe checks if a GET request to the url succeeds.
-// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
-// If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
+// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success, body, nil.
+// If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure, error msg, nil.
+// If any error that looks irrelevant to the HTTP server side happens, it returns Failure, nil, error.
 // This is exported because some other packages may want to do direct HTTP probes.
 func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, string, error) {
 	url := req.URL
@@ -96,7 +97,8 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
-		return probe.Failure, err.Error(), nil
+		klog.V(4).Infof("Probe failed for %s with communication error: %v", url.String(), err)
+		return probe.Failure, fmt.Sprintf("Probe failed with communication error: %v", err), nil
 	}
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
@@ -104,7 +106,9 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		if err == utilio.ErrLimitReached {
 			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
 		} else {
-			return probe.Failure, "", err
+			// Something seems wrong with the HTTP server (timeouts or disconnection). Return Failure (not error).
+			klog.V(4).Infof("Probe failed for %s at reading response body with response headers: %v, error: %v", url.String(), headers, err)
+			return probe.Failure, fmt.Sprintf("Probe failed at reading response body: %v", err), nil
 		}
 	}
 	body := string(b)
