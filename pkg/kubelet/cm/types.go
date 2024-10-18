@@ -90,7 +90,7 @@ type CgroupManager interface {
 	// Get the resource config values applied to the cgroup for specified resource type
 	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error)
 	// Set resource config for the specified resource type on the cgroup
-	SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error
+	SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error
 	// Version of the cgroup implementation on the host
 	Version() int
 }
@@ -136,5 +136,5 @@ type PodContainerManager interface {
 	GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error)
 
 	// Set resource config values for the specified resource type on the pod cgroup
-	SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error
+	SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error
 }

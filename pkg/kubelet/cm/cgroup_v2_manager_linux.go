@@ -98,22 +98,6 @@ func (c *cgroupV2impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName
 	return nil, fmt.Errorf("unsupported resource %v for cgroup %v", resource, name)
 }
 
-// Set resource config for the specified resource type on the cgroup
-func (c *cgroupV2impl) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
-	cgroupPaths := c.buildCgroupPaths(name)
-	cgroupResourcePath, found := cgroupPaths[string(resource)]
-	if !found {
-		return fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
-	}
-	switch resource {
-	case v1.ResourceCPU:
-		return c.setCgroupCPUConfig(cgroupResourcePath, resourceConfig)
-	case v1.ResourceMemory:
-		return c.setCgroupMemoryConfig(cgroupResourcePath, resourceConfig)
-	}
-	return nil
-}
-
 func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, error) {
 	var cpuLimitStr, cpuPeriodStr string
 	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
@@ -142,35 +126,6 @@ func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 	}
 	cpuShares := cpuWeightToCPUShares(cpuWeight)
 	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuLimit, CPUPeriod: &cpuPeriod}, nil
-}
-
-func (c *cgroupV2impl) setCgroupCPUConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	if resourceConfig.CPUQuota != nil {
-		if resourceConfig.CPUPeriod == nil {
-			return fmt.Errorf("CpuPeriod must be specified in order to set CpuLimit")
-		}
-		cpuLimitStr := Cgroup2MaxCpuLimit
-		if *resourceConfig.CPUQuota > -1 {
-			cpuLimitStr = strconv.FormatInt(*resourceConfig.CPUQuota, 10)
-		}
-		cpuPeriodStr := strconv.FormatUint(*resourceConfig.CPUPeriod, 10)
-		cpuMaxStr := fmt.Sprintf("%s %s", cpuLimitStr, cpuPeriodStr)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.max"), []byte(cpuMaxStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuMaxStr, cgroupPath, err)
-		}
-	}
-	if resourceConfig.CPUShares != nil {
-		cpuWeight := cpuSharesToCPUWeight(*resourceConfig.CPUShares)
-		cpuWeightStr := strconv.FormatUint(cpuWeight, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.weight"), []byte(cpuWeightStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuWeightStr, cgroupPath, err)
-		}
-	}
-	return nil
-}
-
-func (c *cgroupV2impl) setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	return writeCgroupMemoryLimit(filepath.Join(cgroupPath, cgroupv2MemLimitFile), resourceConfig)
 }
 
 func (c *cgroupV2impl) getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
