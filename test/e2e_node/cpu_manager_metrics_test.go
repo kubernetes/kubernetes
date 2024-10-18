@@ -91,11 +91,12 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 		ginkgo.AfterEach(func(ctx context.Context) {
 			if testPod != nil {
 				deletePodSyncByName(ctx, f, testPod.Name)
+				waitForContainerRemoval(ctx, testPod.Spec.Containers[0].Name, testPod.Name, testPod.Namespace)
 			}
 			updateKubeletConfig(ctx, f, oldCfg, true)
 		})
 
-		ginkgo.It("should report zero pinning counters after a fresh restart", func(ctx context.Context) {
+		ginkgo.It("[pinning] should report zero pinning counters after a fresh restart", func(ctx context.Context) {
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with no pods running")
@@ -115,7 +116,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
-		ginkgo.It("should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
+		ginkgo.It("[pinning] should report pinning failures when the cpumanager allocation is known to fail", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod which will be rejected for SMTAlignmentError")
 			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-err", 1))
 
@@ -138,7 +139,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
 
-		ginkgo.It("should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
+		ginkgo.It("[pinning] should not report any pinning failures when the cpumanager allocation is expected to succeed", func(ctx context.Context) {
 			ginkgo.By("Creating the test pod")
 			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-align-ok", smtLevel))
 
@@ -160,11 +161,32 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
+
+		ginkgo.It("[alignment] should return updated alignment counters when pod successfully run", func(ctx context.Context) {
+			ginkgo.By("Creating the test pod")
+			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("count-align-smt-ok", smtLevel))
+
+			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
+			// being [Serial], we can also assume noone else but us is running pods.
+			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with pod should be admitted")
+
+			idFn := makeCustomPairID("scope", "boundary")
+			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(1),
+				}),
+			})
+
+			ginkgo.By("Giving the Kubelet time to update the alignment metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations about alignment metrics a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
+		})
 	})
 })
 
 func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
-	ginkgo.By("getting Kubelet metrics from the metrics API")
+	ginkgo.By("Getting Kubelet metrics from the metrics API")
 	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
 }
 
@@ -189,7 +211,7 @@ func makeGuaranteedCPUExclusiveSleeperPod(name string, cpus int) *v1.Pod {
 							v1.ResourceMemory: resource.MustParse("64Mi"),
 						},
 					},
-					Command: []string{"sh", "-c", "sleep", "1d"},
+					Command: []string{"sh", "-c", "sleep 1d"},
 				},
 			},
 		},

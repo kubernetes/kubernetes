@@ -157,6 +157,13 @@ func containerID(element interface{}) string {
 	return fmt.Sprintf("%s::%s::%s", el.Metric["namespace"], el.Metric["pod"], el.Metric["container"])
 }
 
+func makeCustomPairID(pri, sec string) func(interface{}) string {
+	return func(element interface{}) string {
+		el := element.(*model.Sample)
+		return fmt.Sprintf("%s::%s", el.Metric[model.LabelName(pri)], el.Metric[model.LabelName(sec)])
+	}
+}
+
 func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
 		// We already check Metric when matching the Id
