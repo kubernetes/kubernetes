@@ -144,7 +144,7 @@ type Manager interface {
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
 	// GetContainerResourceAllocation returns checkpointed AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
+	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
 
 	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
 	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
@@ -236,7 +236,7 @@ func (m *manager) Start() {
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
 // If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
@@ -255,10 +255,7 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	for _, container := range pod.Spec.Containers {
-		var alloc v1.ResourceList
-		if container.Resources.Requests != nil {
-			alloc = container.Resources.Requests.DeepCopy()
-		}
+		alloc := *container.Resources.DeepCopy()
 		if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
 			return err
 		}

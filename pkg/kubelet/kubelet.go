@@ -2612,15 +2612,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 // updateContainerResourceAllocation updates AllocatedResources values
 // (for cpu & memory) from checkpoint store
 func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod) {
-	for _, c := range pod.Spec.Containers {
+	for i, c := range pod.Spec.Containers {
 		allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
-		if c.Resources.Requests != nil && found {
-			if _, ok := allocatedResources[v1.ResourceCPU]; ok {
-				c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
-			}
-			if _, ok := allocatedResources[v1.ResourceMemory]; ok {
-				c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
-			}
+		if found {
+			pod.Spec.Containers[i].Resources = allocatedResources
 		}
 	}
 }

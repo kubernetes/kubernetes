@@ -2082,9 +2082,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		container := kubecontainer.GetContainerSpec(pod, cName)
 		// AllocatedResources values come from checkpoint. It is the source-of-truth.
-		found := false
-		status.AllocatedResources, found = kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
-		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
+		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
+		if found {
+			status.AllocatedResources = alloc.Requests
+		} else if !(container.Resources.Requests == nil && container.Resources.Limits == nil) {
 			// Log error and fallback to AllocatedResources in oldStatus if it exists
 			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)
 			if oldStatusFound {
