@@ -975,6 +975,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	if summary.Node.Swap != nil {
 		nodeSwapUsage := *summary.Node.Swap.SwapUsageBytes
 		nodeSwapCapacity := *summary.Node.Swap.SwapAvailableBytes + nodeSwapUsage
+		klog.InfoS("NodeSwap Stats", "SwapUsageNode", nodeSwapUsage, "SwapCapacity", nodeSwapCapacity)
 		result[evictionapi.SignalSwapMemoryAvailable] = signalObservation{
 			available: resource.NewQuantity(int64(nodeSwapUsage), resource.BinarySI),
 			time:      summary.Node.Swap.Time,
