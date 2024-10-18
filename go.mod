@@ -51,7 +51,7 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/opencontainers/runc v1.1.15
 	github.com/opencontainers/selinux v1.11.0
-	github.com/pacoxu/system-validators v1.9.3
+	github.com/pacoxu/system-validators v1.9.8
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.19.1

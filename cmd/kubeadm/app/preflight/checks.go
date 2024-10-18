@@ -35,6 +35,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	system "github.com/pacoxu/system-validators/validators"
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,7 +43,6 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	system "github.com/pacoxu/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 

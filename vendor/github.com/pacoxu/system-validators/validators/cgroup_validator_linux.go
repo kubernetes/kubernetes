@@ -42,8 +42,9 @@ func (c *CgroupsValidator) Name() string {
 }
 
 const (
-	cgroupsConfigPrefix = "CGROUPS_"
-	mountsFilePath      = "/proc/mounts"
+	cgroupsConfigPrefix      = "CGROUPS_"
+	mountsFilePath           = "/proc/mounts"
+	defaultUnifiedMountPoint = "/sys/fs/cgroup"
 )
 
 // getUnifiedMountpoint checks if the default mount point is available.
@@ -64,6 +65,15 @@ func getUnifiedMountpoint(path string) (string, bool, error) {
 		// Example fields: `cgroup2 /sys/fs/cgroup cgroup2 rw,seclabel,nosuid,nodev,noexec,relatime 0 0`.
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
+			// If default unified mount point is available, return it directly.
+			if fields[1] == defaultUnifiedMountPoint {
+				if fields[2] == "tmpfs" {
+					// if `/sys/fs/cgroup/memory` is a dir, this means it uses cgroups v1
+					info, err := os.Stat(filepath.Join(defaultUnifiedMountPoint, "memory"))
+					return defaultUnifiedMountPoint, os.IsNotExist(err) || !info.IsDir(), nil
+				}
+				return defaultUnifiedMountPoint, fields[2] == "cgroup2", nil
+			}
 			switch fields[2] {
 			case "cgroup2":
 				// Return the first cgroups v2 mount point directly.
@@ -87,7 +97,6 @@ func getUnifiedMountpoint(path string) (string, bool, error) {
 // Validate is part of the system.Validator interface.
 func (c *CgroupsValidator) Validate(spec SysSpec) (warns, errs []error) {
 	unifiedMountpoint, isCgroupsV2, err := getUnifiedMountpoint(mountsFilePath)
-	fmt.Printf("unifiedMountpoint: %q; isCgroupsV2: %q", unifiedMountpoint, isCgroupsV2)
 	if err != nil {
 		return nil, []error{fmt.Errorf("cannot get a cgroup mount point: %w", err)}
 	}

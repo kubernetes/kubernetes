@@ -24,9 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	system "github.com/pacoxu/system-validators/validators"
->>>>>>> 53a80869d39 (testing)
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 
