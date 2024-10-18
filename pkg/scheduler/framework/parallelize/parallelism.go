@@ -19,6 +19,7 @@ package parallelize
 import (
 	"context"
 	"math"
+	"time"
 
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -53,13 +54,31 @@ func chunkSizeFor(n, parallelism int) int {
 
 // Until is a wrapper around workqueue.ParallelizeUntil to use in scheduling algorithms.
 // A given operation will be a label that is recorded in the goroutine metric.
-func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string) {
+func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece func(piece int) error, operation string) error {
 	goroutinesMetric := metrics.Goroutines.WithLabelValues(operation)
+	goroutinesDurationMetric := metrics.GoroutinesDuration.WithLabelValues(operation)
+	goroutinesExecutionSuccessMetric := metrics.GoroutinesExecutionTotal.WithLabelValues(operation, "success")
+	goroutinesExecutionErrorMetric := metrics.GoroutinesExecutionTotal.WithLabelValues(operation, "error")
+	errCh := newErrorChannel()
+	ctx, cancel := context.WithCancel(ctx)
+
 	withMetrics := func(piece int) {
+		startTime := time.Now()
 		goroutinesMetric.Inc()
-		doWorkPiece(piece)
+		if err := doWorkPiece(piece); err != nil {
+			errCh.sendErrorWithCancel(err, cancel)
+			goroutinesExecutionErrorMetric.Inc()
+		} else {
+			goroutinesExecutionSuccessMetric.Inc()
+		}
 		goroutinesMetric.Dec()
+		timeTaken := time.Since(startTime).Seconds()
+		goroutinesDurationMetric.Observe(timeTaken)
 	}
 
 	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, withMetrics, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)))
+	if err := errCh.receiveError(); err != nil {
+		return err
+	}
+	return nil
 }
