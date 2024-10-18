@@ -41,7 +41,6 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
 
@@ -83,6 +82,7 @@ import (
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -752,9 +752,40 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs", reflect.TypeOf(response)))
 		return
 	}
-	fw := flushwriter.Wrap(response.ResponseWriter)
+
+	var (
+		stdout io.Writer
+		stderr io.Writer
+		fw     = flushwriter.Wrap(response.ResponseWriter)
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SplitStdoutAndStderr) {
+		wantedStream := logOptions.Stream
+		// No stream type specified, default to All
+		if wantedStream == nil {
+			allStream := v1.LogStreamTypeAll
+			wantedStream = &allStream
+		}
+		switch *wantedStream {
+		case v1.LogStreamTypeStdout:
+			stdout, stderr = fw, nil
+		case v1.LogStreamTypeStderr:
+			stdout, stderr = nil, fw
+		case v1.LogStreamTypeAll:
+			stdout, stderr = fw, fw
+		default:
+			_ = response.WriteError(http.StatusBadRequest, fmt.Errorf("invalid stream type %q", *logOptions.Stream))
+			return
+		}
+	} else {
+		if logOptions.Stream != nil && *logOptions.Stream != v1.LogStreamTypeAll {
+			_ = response.WriteError(http.StatusBadRequest, fmt.Errorf("unable to return the given log stream: %q. Please enable SplitStdoutAndStderr feature gate in kubelet", *logOptions.Stream))
+			return
+		}
+		stdout, stderr = fw, fw
+	}
+
 	response.Header().Set("Transfer-Encoding", "chunked")
-	if err := s.host.GetKubeletContainerLogs(ctx, kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
+	if err := s.host.GetKubeletContainerLogs(ctx, kubecontainer.GetPodFullName(pod), containerName, logOptions, stdout, stderr); err != nil {
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
