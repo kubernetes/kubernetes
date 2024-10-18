@@ -1168,11 +1168,10 @@ func TestDryRunPreemption(t *testing.T) {
 					Handler:    pl.fh,
 					PodLister:  pl.podLister,
 					PdbLister:  pl.pdbLister,
-					State:      state,
 					Interface:  pl,
 				}
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _, _ := pe.DryRunPreemption(ctx, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1409,11 +1408,10 @@ func TestSelectBestCandidate(t *testing.T) {
 				Handler:    pl.fh,
 				PodLister:  pl.podLister,
 				PdbLister:  pl.pdbLister,
-				State:      state,
 				Interface:  pl,
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pe.DryRunPreemption(ctx, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pe.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pe.SelectCandidate(ctx, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
@@ -1792,7 +1790,6 @@ func TestPreempt(t *testing.T) {
 				Handler:    pl.fh,
 				PodLister:  pl.podLister,
 				PdbLister:  pl.pdbLister,
-				State:      state,
 				Interface:  &pl,
 			}
 
@@ -1804,7 +1801,7 @@ func TestPreempt(t *testing.T) {
 				nodeToStatusMap.Set(n.Name, framework.NewStatus(framework.Unschedulable))
 			}
 
-			res, status := pe.Preempt(ctx, test.pod, nodeToStatusMap)
+			res, status := pe.Preempt(ctx, state, test.pod, nodeToStatusMap)
 			if !status.IsSuccess() && !status.IsRejected() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
@@ -1859,7 +1856,7 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			res, status = pe.Preempt(ctx, test.pod, framework.NewDefaultNodeToStatus())
+			res, status = pe.Preempt(ctx, state, test.pod, framework.NewDefaultNodeToStatus())
 			if !status.IsSuccess() && !status.IsRejected() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
