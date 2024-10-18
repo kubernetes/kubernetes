@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 var _ Validator = &KernelValidator{}
@@ -63,7 +65,7 @@ func (k *KernelValidator) Validate(spec SysSpec) ([]error, []error) {
 	helper := KernelValidatorHelperImpl{}
 	release, err := helper.GetKernelReleaseVersion()
 	if err != nil {
-		return nil, []error{fmt.Errorf("failed to get kernel release: %w", err)}
+		return nil, []error{errors.Wrap(err, "failed to get kernel release")}
 	}
 	k.kernelRelease = release
 	var errs []error
@@ -90,14 +92,14 @@ func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
 		}
 	}
 	k.Reporter.Report("KERNEL_VERSION", k.kernelRelease, bad)
-	return fmt.Errorf("kernel release %s is unsupported. %s", k.kernelRelease, kSpec.VersionsNote)
+	return errors.Errorf("unsupported kernel release: %s", k.kernelRelease)
 }
 
 // validateKernelConfig validates the kernel configurations.
 func (k *KernelValidator) validateKernelConfig(kSpec KernelSpec) error {
 	allConfig, err := k.getKernelConfig()
 	if err != nil {
-		return fmt.Errorf("failed to parse kernel config: %w", err)
+		return errors.Wrap(err, "failed to parse kernel config")
 	}
 	return k.validateCachedKernelConfig(allConfig, kSpec)
 }
@@ -166,7 +168,7 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 		validateOpt(config, forbidden)
 	}
 	if len(badConfigs) > 0 {
-		return fmt.Errorf("unexpected kernel config: %s", strings.Join(badConfigs, " "))
+		return errors.Errorf("unexpected kernel config: %s", strings.Join(badConfigs, " "))
 	}
 	return nil
 }
@@ -221,14 +223,14 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 		// config module and check again.
 		output, err := exec.Command(modprobeCmd, configsModule).CombinedOutput()
 		if err != nil {
-			return nil, fmt.Errorf("unable to load kernel module: %q, output: %q, err: %w",
-				configsModule, output, err)
+			return nil, errors.Wrapf(err, "unable to load kernel module: %q, output: %q, err",
+				configsModule, output)
 		}
 		// Unload the kernel config module to make sure the validation have no side effect.
 		defer exec.Command(modprobeCmd, "-r", configsModule).Run()
 		loadModule = true
 	}
-	return nil, fmt.Errorf("no config path in %v is available", possibePaths)
+	return nil, errors.Errorf("no config path in %v is available", possibePaths)
 }
 
 // getKernelConfig gets kernel config from kernel config file and convert kernel config to internal type.

@@ -1173,7 +1173,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 ## explicit; go 1.23.0
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit; go 1.23.0
-# k8s.io/system-validators v1.9.0
+# k8s.io/system-validators v1.8.0
 ## explicit; go 1.16
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20240711033017-18e509b52bc8

@@ -17,10 +17,11 @@ limitations under the License.
 package system
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // ValidationResultType is type of the validation result. Different validation results
