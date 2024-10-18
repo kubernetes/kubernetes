@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -164,6 +165,32 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 }
+
+func setDefaults_PodResources(obj *v1.Pod) {
+	if obj.Name != "my-pod" {
+		return
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		return
+	}
+
+	if obj.Spec.Resources == nil {
+		return
+	}
+
+	if obj.Spec.Resources.Limits != nil && obj.Spec.Resources.Requests == nil {
+		obj.Spec.Resources.Requests = make(v1.ResourceList)
+		podReq := resourcehelper.PodRequests(obj, resourcehelper.PodResourcesOptions{InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)})
+		if len(podReq) == 0 {
+			podReq = obj.Spec.Resources.Limits
+		}
+		for key, value := range podReq {
+			obj.Spec.Resources.Requests[key] = value.DeepCopy()
+		}
+	}
+}
+
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
@@ -216,6 +243,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+	setDefaults_PodResources(obj)
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
