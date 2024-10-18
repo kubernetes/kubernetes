@@ -572,3 +572,87 @@ func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 
 	return allErrors
 }
+
+type ValidatePodCertificateRequestOptions struct {
+	AllowSettingStatusFields bool
+}
+
+// ValidatePodCertificateRequest runs all validation checks on a pod certificate request.
+func ValidatePodCertificateRequest(req *certificates.PodCertificateRequest, opts ValidatePodCertificateRequestOptions) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&req.ObjectMeta, true, validatePodCertificateRequestName, field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), req.Spec.SignerName)
+	allErrors = append(allErrors, signerNameErrors...)
+
+	// PodName, PodUID, ServiceAccountName, ServiceAccountUID, NodeName, and
+	// NodeUID have already been checked to be real values by the
+	// noderestriction admission plugin.
+
+	// TODO(KEP-4317): Validate Spec.MaxExpirationSeconds > 3600.
+
+	// TODO(KEP-4317): Validate Spec.PKIXPublicKey
+
+	// TODO(KEP-4317): Validate Spec.ProofOfPossession
+
+	// TODO(KEP-4317): Validate Status.CertificateChain, including lifetime checks.
+
+	// TODO(KEP-4317): Validate Status.IssuedAt, NotBefore, NotAfter against the
+	// issued certificate.
+
+	// TODO(KEP-4317): Validate Status.BeginRefreshAt.  Must be between
+	// NotBefore and NotAfter, and leave at least 10 minutes for refresh.
+
+	// TODO(KEP-4317): Tests
+
+	return allErrors
+}
+
+// ValidatePodCertificateRequestUpdate runs all update validation checks on an
+// update.
+func ValidatePodCertificateRequestUpdate(newReq, oldReq *certificates.PodCertificateRequest, opts ValidatePodCertificateRequestOptions) field.ErrorList {
+	// TODO(KEP-4317): If the caller isn't changing the status.certificateChain
+	// field, don't validate it, to defend against changes in Go X.509 parsing.
+
+	// TODO(KEP-4317): If the caller isn't changing Spec.PKIXPublicKey, don't
+	// validate it.  This guards against changes in Go library behavior.
+
+	// TODO(KEP-4317): If the caller isn't changing Spec.ProofOfPossession,
+	// don't validate it.  This guards against changes in Go library behavior.
+
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, ValidatePodCertificateRequest(newReq, opts)...)
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
+
+	// All spec fields are immutable.
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.SignerName, oldReq.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PodName, oldReq.Spec.PodName, field.NewPath("spec", "podName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PodUID, oldReq.Spec.PodUID, field.NewPath("spec", "podUID"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.ServiceAccountName, oldReq.Spec.ServiceAccountName, field.NewPath("spec", "serviceAccountName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.NodeName, oldReq.Spec.NodeName, field.NewPath("spec", "nodeName"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.PKIXPublicKey, oldReq.Spec.PKIXPublicKey, field.NewPath("spec", "pkixPublicKey"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec.ProofOfPossession, oldReq.Spec.ProofOfPossession, field.NewPath("spec", "proofOfPossession"))...)
+
+	if !opts.AllowSettingStatusFields {
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.CertificateChain, oldReq.Status.CertificateChain, field.NewPath("status", "certificateChain"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.IssuedAt, oldReq.Status.IssuedAt, field.NewPath("status", "issuedAt"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.NotBefore, oldReq.Status.NotBefore, field.NewPath("status", "notBefore"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.BeginRefreshAt, oldReq.Status.BeginRefreshAt, field.NewPath("status", "beginRefreshAt"))...)
+		allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status.NotAfter, oldReq.Status.NotAfter, field.NewPath("status", "notAfter"))...)
+	}
+
+	return allErrors
+}
+
+// We don't care what you call your pod certificate requests.
+func validatePodCertificateRequestName(name string, prefix bool) []string {
+	return nil
+}
+
+func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodCertificateRequest) field.ErrorList {
+	return ValidatePodCertificateRequestUpdate(newReq, oldReq, ValidatePodCertificateRequestOptions{
+		AllowSettingStatusFields: true,
+	})
+}

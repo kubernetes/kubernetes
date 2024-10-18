@@ -598,6 +598,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1alpha1.ClusterTrustBundleApplyConfiguration{}
 	case certificatesv1alpha1.SchemeGroupVersion.WithKind("ClusterTrustBundleSpec"):
 		return &applyconfigurationscertificatesv1alpha1.ClusterTrustBundleSpecApplyConfiguration{}
+	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequest"):
+		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestApplyConfiguration{}
+	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequestSpec"):
+		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestSpecApplyConfiguration{}
+	case certificatesv1alpha1.SchemeGroupVersion.WithKind("PodCertificateRequestStatus"):
+		return &applyconfigurationscertificatesv1alpha1.PodCertificateRequestStatusApplyConfiguration{}
 
 		// Group=certificates.k8s.io, Version=v1beta1
 	case certificatesv1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequest"):
@@ -868,6 +874,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodAffinityTermApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodAntiAffinity"):
 		return &applyconfigurationscorev1.PodAntiAffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodCertificateProjection"):
+		return &applyconfigurationscorev1.PodCertificateProjectionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodCondition"):
 		return &applyconfigurationscorev1.PodConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodDNSConfig"):
