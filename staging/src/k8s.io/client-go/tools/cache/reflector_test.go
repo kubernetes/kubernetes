@@ -235,9 +235,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	// Ensure the watcher methods are called exactly once in this exact order.
-	// TODO(karlkfi): Fix watchHandler to call Stop()
-	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
+	// Ensure ResultChan is called once and Stop is never called
 	assert.Equal(t, []string{"ResultChan"}, calls)
 }
 
@@ -271,9 +269,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	// Ensure the watcher methods are called exactly once in this exact order.
-	// TODO(karlkfi): Fix watchHandler to call Stop()
-	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
+	// Ensure ResultChan is called once and Stop is never called
 	assert.Equal(t, []string{"ResultChan"}, calls)
 }
 
@@ -299,9 +295,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	// Ensure the watcher methods are called exactly once in this exact order.
-	// TODO(karlkfi): Fix watchHandler to call Stop()
-	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
+	// Ensure ResultChan is called once and Stop is never called
 	assert.Equal(t, []string{"ResultChan"}, calls)
 }
 
@@ -332,9 +326,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	// Ensure the watcher methods are called exactly once in this exact order.
-	// TODO(karlkfi): Fix watchHandler to call Stop()
-	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
+	// Ensure ResultChan is called once and Stop is never called
 	assert.Equal(t, []string{"ResultChan"}, calls)
 }
 
