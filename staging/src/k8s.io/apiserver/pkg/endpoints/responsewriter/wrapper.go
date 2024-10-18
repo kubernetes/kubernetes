@@ -154,6 +154,11 @@ func (wr outerWithCloseNotifyAndFlush) Flush() {
 	wr.InnerCloseNotifierFlusher.Flush()
 }
 
+// GetUserProvidedDecorator returns the user provided ResponseWriter decorator
+func (wr outerWithCloseNotifyAndFlush) GetUserProvidedDecorator() UserProvidedDecorator {
+	return wr.UserProvidedDecorator
+}
+
 //lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 var _ http.CloseNotifier = outerWithCloseNotifyFlushAndHijack{}
 var _ http.Flusher = outerWithCloseNotifyFlushAndHijack{}

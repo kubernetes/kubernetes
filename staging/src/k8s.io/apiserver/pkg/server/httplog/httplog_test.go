@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
 func TestDefaultStacktracePred(t *testing.T) {
@@ -148,7 +149,7 @@ func TestLoggedStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
+	var tw http.ResponseWriter = new(responsewritertesting.FakeResponseWriter)
 	logger := newLogged(req, tw)
 	logger.Write(nil)
 
@@ -156,7 +157,7 @@ func TestLoggedStatus(t *testing.T) {
 		t.Errorf("expected status after write to be %v, got %v", http.StatusOK, logger.status)
 	}
 
-	tw = new(responsewriter.FakeResponseWriter)
+	tw = new(responsewritertesting.FakeResponseWriter)
 	logger = newLogged(req, tw)
 	logger.WriteHeader(http.StatusForbidden)
 	logger.Write(nil)
@@ -166,69 +167,35 @@ func TestLoggedStatus(t *testing.T) {
 	}
 }
 
-func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
-	tests := []struct {
-		name       string
-		r          func() http.ResponseWriter
-		hijackable bool
-	}{
-		{
-			name: "http2",
-			r: func() http.ResponseWriter {
-				return &responsewriter.FakeResponseWriterFlusherCloseNotifier{}
-			},
-			hijackable: false,
-		},
-		{
-			name: "http/1.x",
-			r: func() http.ResponseWriter {
-				return &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}
-			},
-			hijackable: true,
-		},
+func TestHTTPLogResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(h http.Handler) http.Handler {
+		return withLogging(h, DefaultStacktracePred, func() bool { return true })
+	})
+}
+
+func TestHTTPLogResponseWriterDecoratorConstruction(t *testing.T) {
+	inner := &responsewritertesting.FakeResponseWriter{}
+	middle := &respLogger{w: inner} // middle is the decorator
+	outer := responsewriter.WrapForHTTP1Or2(middle)
+
+	// FakeResponseWriter does not implement http.Flusher, FlusherError,
+	// http.CloseNotifier, or http.Hijacker; so WrapForHTTP1Or2 is not
+	// expected to return an outer object.
+	if outer != middle {
+		t.Errorf("did not expect a new outer object, but got %v", outer)
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", "http://example.com", nil)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-
-			var handler http.Handler
-			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch v := w.(type) {
-				case *respLogger:
-					t.Errorf("Did not expect %v", reflect.TypeOf(v))
-					return
-				default:
-				}
-
-				//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-				if _, ok := w.(http.CloseNotifier); !ok {
-					t.Errorf("Expected the ResponseWriter object to implement http.CloseNotifier")
-				}
-				if _, ok := w.(http.Flusher); !ok {
-					t.Errorf("Expected the ResponseWriter object to implement http.Flusher")
-				}
-				if _, ok := w.(http.Hijacker); test.hijackable != ok {
-					t.Errorf("http.Hijacker does not match, want: %t, got: %t", test.hijackable, ok)
-				}
-			})
-
-			handler = withLogging(handler, DefaultStacktracePred, func() bool { return true })
-			handler.ServeHTTP(test.r(), req)
-		})
+	decorator, ok := outer.(responsewriter.UserProvidedDecorator)
+	if !ok {
+		t.Fatal("expected the middle to implement UserProvidedDecorator")
+	}
+	if want, got := inner, decorator.Unwrap(); want != got {
+		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
 
-func TestResponseWriterDecorator(t *testing.T) {
-	decorator := &respLogger{
-		w: &responsewriter.FakeResponseWriter{},
-	}
-	var w http.ResponseWriter = decorator
-
-	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
-		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
-	}
+func TestHTTPLogResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithHTTPServer(t, func(h http.Handler) http.Handler {
+		return withLogging(h, DefaultStacktracePred, func() bool { return true })
+	})
 }
