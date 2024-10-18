@@ -32,6 +32,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,6 +49,9 @@ import (
 
 // podStatusManagerStateFile is the file name where status manager stores its state
 const podStatusManagerStateFile = "pod_status_manager_state"
+
+// defaultMinListPodCount is the minimum number of Pods, and all of these Pods need to update status, default to 50.
+const defaultMinListPodCount = 50
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
 // not sent to the API server.
@@ -85,6 +89,8 @@ type manager struct {
 	state state.State
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
+
+	nodeName string
 }
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -159,7 +165,8 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider,
+	podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string, nodeName string) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
@@ -169,6 +176,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
 		stateFileDirectory:      stateFileDirectory,
+		nodeName:                nodeName,
 	}
 }
 
@@ -827,32 +835,58 @@ func (m *manager) syncBatch(all bool) int {
 		}
 	}()
 
+	podInfos := make(map[string]v1.Pod)
+	updatedStatusesCount := len(updatedStatuses)
+	if m.nodeName != "" && updatedStatusesCount >= defaultMinListPodCount {
+		podOpts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", m.nodeName).String()}
+		pods, err := m.kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
+		if err != nil {
+			klog.InfoS("Failed to list pods for node", "node", m.nodeName, "err", err)
+		} else if pods != nil && len(pods.Items) > 0 {
+			for index := range pods.Items {
+				podInfo := pods.Items[index]
+				key := fmt.Sprintf("%s_%s", podInfo.Name, podInfo.Namespace)
+				podInfos[key] = podInfo
+			}
+		}
+	}
+
+	// TODO: use ParallelizeUntil to do same syncPod
 	for _, update := range updatedStatuses {
 		klog.V(5).InfoS("Sync pod status", "podUID", update.podUID, "statusUID", update.statusUID, "version", update.status.version)
-		m.syncPod(update.podUID, update.status)
+		key := fmt.Sprintf("%s_%s", update.status.podName, update.status.podNamespace)
+		podInfo, ok := podInfos[key]
+		if ok {
+			m.syncPod(update.podUID, update.status, &podInfo)
+		} else {
+			m.syncPod(update.podUID, update.status, nil)
+		}
 	}
 
 	return len(updatedStatuses)
 }
 
 // syncPod syncs the given status with the API server. The caller must not hold the status lock.
-func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
-	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		klog.V(3).InfoS("Pod does not exist on the server",
-			"podUID", uid,
-			"pod", klog.KRef(status.podNamespace, status.podName))
-		// If the Pod is deleted the status will be cleared in
-		// RemoveOrphanedStatuses, so we just ignore the update here.
-		return
-	}
-	if err != nil {
-		klog.InfoS("Failed to get status for pod",
-			"podUID", uid,
-			"pod", klog.KRef(status.podNamespace, status.podName),
-			"err", err)
-		return
+func (m *manager) syncPod(uid types.UID, status versionedPodStatus, pod *v1.Pod) {
+	if pod == nil {
+		// TODO: make me easier to express from client code
+		var err error
+		pod, err = m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			klog.V(3).InfoS("Pod does not exist on the server",
+				"podUID", uid,
+				"pod", klog.KRef(status.podNamespace, status.podName))
+			// If the Pod is deleted the status will be cleared in
+			// RemoveOrphanedStatuses, so we just ignore the update here.
+			return
+		}
+		if err != nil {
+			klog.InfoS("Failed to get status for pod",
+				"podUID", uid,
+				"pod", klog.KRef(status.podNamespace, status.podName),
+				"err", err)
+			return
+		}
 	}
 
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
