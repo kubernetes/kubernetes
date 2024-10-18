@@ -96,19 +96,23 @@ func NewUpdateFeatureListCommand() *cobra.Command {
 
 func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 	if err := verifyOrUpdateFeatureList(k8RootPath, unversionedFeatureListFile, false, false); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to verify feature list: \n%s", err)
+		os.Exit(1)
 	}
 	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, false, true); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to verify versioned feature list: \n%s", err)
+		os.Exit(1)
 	}
 }
 
 func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 	if err := verifyOrUpdateFeatureList(k8RootPath, unversionedFeatureListFile, true, false); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to update feature list: \n%s", err)
+		os.Exit(1)
 	}
 	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, true, true); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to update versioned feature list: \n%s", err)
+		os.Exit(1)
 	}
 }
 
