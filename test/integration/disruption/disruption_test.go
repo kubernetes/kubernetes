@@ -416,7 +416,7 @@ func createPod(ctx context.Context, t *testing.T, name, namespace string, labels
 			},
 		},
 	}
-	_, err := clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	pod, err := clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -439,7 +439,8 @@ func createNs(ctx context.Context, t *testing.T, name string, clientSet clientse
 
 func addPodConditionReady(pod *v1.Pod) {
 	pod.Status = v1.PodStatus{
-		Phase: v1.PodRunning,
+		Phase:    v1.PodRunning,
+		QOSClass: pod.Status.QOSClass,
 		Conditions: []v1.PodCondition{
 			{
 				Type:   v1.PodReady,
