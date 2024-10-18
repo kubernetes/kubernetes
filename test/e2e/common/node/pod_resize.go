@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1012,6 +1013,565 @@ func doPodResizeErrorTests(f *framework.Framework) {
 	}
 }
 
+func doConsecutivePodResizeTests(f *framework.Framework) {
+	var podClient *e2epod.PodClient
+	ginkgo.BeforeEach(func() {
+		podClient = e2epod.NewPodClient(f)
+	})
+
+	type testCase struct {
+		isSynchronous    bool
+		name             string
+		containers       []e2epod.ResizableContainerInfo
+		containerPatches [][]v1.Container
+		intervals        []time.Duration
+		expected         [][]e2epod.ResizableContainerInfo
+	}
+
+	noRestart := v1.NotRequired
+	doRestart := v1.RestartContainer
+
+	tests := []testCase{
+		{
+			isSynchronous: false,
+			name:          "Resize with restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: true,
+			name:          "Resize with restarting twice synchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{0},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "300Mi", MemLim: "300Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				}},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize without restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize with restarting, then resize without restarting asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 1,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize without restarting, then resize with restarting asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &doRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("150m"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "150m", CPULim: "150m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &doRestart,
+					RestartCount: 1,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only limits with restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: resource.MustParse("350Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("300m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only requests with restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy: &doRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("250Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "300Mi", MemLim: "400Mi"},
+					CPUPolicy:    &doRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 2,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only limits without restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("250m"),
+								v1.ResourceMemory: resource.MustParse("350Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("300m"),
+								v1.ResourceMemory: resource.MustParse("400Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+		{
+			isSynchronous: false,
+			name:          "Resize only requests without restarting twice asynchronously",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "300m", MemReq: "200Mi", MemLim: "400Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			containerPatches: [][]v1.Container{
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("150m"),
+								v1.ResourceMemory: resource.MustParse("250Mi"),
+							},
+						},
+					},
+				},
+				{
+					{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						},
+					},
+				},
+			},
+			intervals: []time.Duration{1 * time.Second},
+			expected: [][]e2epod.ResizableContainerInfo{
+				{},
+				{{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "300Mi", MemLim: "400Mi"},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
+				}},
+			},
+		},
+	}
+
+	timeouts := framework.NewTimeoutContext()
+
+	for idx := range tests {
+		tc := tests[idx]
+		ginkgo.It(tc.name, func(ctx context.Context) {
+			var testPod, patchedPod *v1.Pod
+			var pErr error
+
+			tStamp := strconv.Itoa(time.Now().Nanosecond())
+			e2epod.InitDefaultResizePolicy(tc.containers)
+			for _, e := range tc.expected {
+				if len(e) > 0 {
+					e2epod.InitDefaultResizePolicy(e)
+				}
+			}
+			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+			ginkgo.By("creating pod")
+			newPod := podClient.CreateSync(ctx, testPod)
+
+			ginkgo.By("verifying initial pod resources, allocations are as expected")
+			e2epod.VerifyPodResources(newPod, tc.containers)
+			ginkgo.By("verifying initial pod resize policy is as expected")
+			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
+
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, newPod.Namespace, newPod.Name, "Ready", timeouts.PodStartShort, testutils.PodRunningReady)
+			framework.ExpectNoError(err, "pod %s/%s did not go running", newPod.Namespace, newPod.Name)
+			framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
+
+			ginkgo.By("verifying initial pod status resources")
+			e2epod.VerifyPodStatusResources(newPod, tc.containers)
+
+			for i, p := range tc.containerPatches {
+				ginkgo.By("patching pod for resize")
+				patch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: p}})
+				framework.ExpectNoError(err, "failed to marshal patch")
+				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+					types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+
+				last := i == len(tc.containerPatches)-1
+				if !tc.isSynchronous && !last {
+					time.Sleep(tc.intervals[i])
+					continue
+				}
+
+				ginkgo.By("verifying pod patched for resize")
+				e2epod.VerifyPodResources(patchedPod, tc.expected[i])
+				if i == 0 {
+					err = e2epod.VerifyPodAllocations(patchedPod, tc.containers)
+				} else if tc.isSynchronous {
+					err = e2epod.VerifyPodAllocations(patchedPod, tc.expected[i-1])
+				}
+				framework.ExpectNoError(err, "failed to verify Pod allocations for patchedPod")
+
+				ginkgo.By("waiting for resize to be actuated")
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, patchedPod, tc.expected[i], nil, false)
+
+				ginkgo.By("verifying pod resources after resize")
+				e2epod.VerifyPodResources(resizedPod, tc.expected[i])
+
+				ginkgo.By("verifying pod allocations after resize")
+				err = e2epod.VerifyPodAllocations(resizedPod, tc.expected[i])
+				framework.ExpectNoError(err, "failed to verify Pod allocations for resizedPod")
+
+				if !last {
+					time.Sleep(tc.intervals[i])
+				}
+			}
+
+			ginkgo.By("deleting pod")
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
+		})
+	}
+}
+
 // NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
 //       because in e2e_node tests
 //          a) scheduler and controller manager is not running by the Node e2e
@@ -1033,4 +1593,5 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feat
 
 	doPodResizeTests(f)
 	doPodResizeErrorTests(f)
+	doConsecutivePodResizeTests(f)
 })
