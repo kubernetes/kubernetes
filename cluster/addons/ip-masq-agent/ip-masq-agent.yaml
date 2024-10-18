@@ -29,7 +29,7 @@ spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: registry.k8s.io/networking/ip-masq-agent-amd64:v2.6.1
+        image: registry.k8s.io/networking/ip-masq-agent:v2.9.3
         args:
           - --masq-chain=IP-MASQ
           - --nomasq-all-reserved-ranges
