@@ -18,6 +18,7 @@ package dynamiccertificates
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -225,8 +226,8 @@ NextTest:
 		c := DynamicServingCertificateController{sniCerts: sniCerts}
 		content, err := c.newTLSContent()
 		assert.NoError(t, err)
-
-		certMap, err := c.BuildNamedCertificates(content.sniCerts)
+		ctx := context.TODO()
+		certMap, err := c.BuildNamedCertificates(ctx, content.sniCerts)
 		if err == nil && len(test.errorString) != 0 {
 			t.Errorf("%d - expected no error, got: %v", i, err)
 		} else if err != nil && err.Error() != test.errorString {

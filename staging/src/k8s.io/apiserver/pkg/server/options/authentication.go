@@ -152,7 +152,7 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 		return nil, nil
 	}
 
-	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("request-header", s.ClientCAFile)
+	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile(context.Background(), "request-header", s.ClientCAFile)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamicc
 		return nil, nil
 	}
 
-	return dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", s.ClientCA)
+	return dynamiccertificates.NewDynamicCAContentFromFile(context.Background(), "client-ca-bundle", s.ClientCA)
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {

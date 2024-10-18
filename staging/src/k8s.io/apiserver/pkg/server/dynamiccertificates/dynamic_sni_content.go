@@ -16,6 +16,10 @@ limitations under the License.
 
 package dynamiccertificates
 
+import (
+	"context"
+)
+
 // DynamicFileSNIContent provides a SNICertKeyContentProvider that can dynamically react to new file content
 type DynamicFileSNIContent struct {
 	*DynamicCertKeyPairContent
@@ -36,7 +40,8 @@ func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames .
 		DynamicCertKeyPairContent: servingContent,
 		sniNames:                  sniNames,
 	}
-	if err := ret.loadCertKeyPair(); err != nil {
+	ctx := context.TODO()
+	if err := ret.loadCertKeyPair(ctx); err != nil {
 		return nil, err
 	}
 
