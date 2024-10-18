@@ -81,7 +81,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      v1.TaintNodeMemoryPressure,
+		Key:      v1.TaintNodeSwapPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})

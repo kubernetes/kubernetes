@@ -987,7 +987,7 @@ func TestSwapPressure(t *testing.T) {
 	summaryStatsMaker := makeSwapStats
 	podsToMake := []podToMake{
 		{name: "burstable-above-swap-pressure", priority: defaultPriority, requests: newResourceList("100m", "1000Mi", ""), limits: newResourceList("200m", "2Gi", ""), swapUsage: "800Mi", swapAvailable: "200Mi"},
-		{name: "burstable-below-swap-pressure", priority: defaultPriority, requests: newResourceList("100m", "1000Mi", ""), limits: newResourceList("200m", "2Gi", ""), swapUsage: "100Mi", swapAvailable: "900Mi"},
+		{name: "burstable-below-swap-pressure", priority: defaultPriority, requests: newResourceList("100m", "1000Mi", ""), limits: newResourceList("200m", "2Gi", ""), swapUsage: "200Mi", swapAvailable: "800Mi"},
 		{name: "guaranteed-no-swap", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), swapUsage: "0Mi", swapAvailable: "0Mi"},
 		{name: "best-effort-no-swap", priority: highPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), swapUsage: "0Mi", swapAvailable: "0Mi"},
 	}
@@ -1030,7 +1030,7 @@ func TestSwapPressure(t *testing.T) {
 			},
 		},
 	}
-	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2100Mi", "900Mi", podStats)}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2.9Gi", ".1Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
 		killPodFunc:                  podKiller.killPodNow,
@@ -1055,7 +1055,7 @@ func TestSwapPressure(t *testing.T) {
 		t.Fatalf("Manager expects no error but got %v", err)
 	}
 
-	// we should not have memory pressure
+	// we should not have swap pressure
 	if manager.IsUnderSwapPressure() {
 		t.Errorf("Manager should not report swap pressure")
 	}
@@ -1070,7 +1070,7 @@ func TestSwapPressure(t *testing.T) {
 
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
-	summaryProvider.result = summaryStatsMaker("2Gi", "1Gi", podStats)
+	summaryProvider.result = summaryStatsMaker("0.8Gi", "2.2Gi", podStats)
 	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
@@ -1089,7 +1089,7 @@ func TestSwapPressure(t *testing.T) {
 
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
-	summaryProvider.result = summaryStatsMaker("2Gi", "1Gi", podStats)
+	summaryProvider.result = summaryStatsMaker("0.8Gi", "2.2Gi", podStats)
 	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
@@ -1132,7 +1132,7 @@ func TestSwapPressure(t *testing.T) {
 
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
-	summaryProvider.result = summaryStatsMaker("0.5Gi", "2.5Gi", podStats)
+	summaryProvider.result = summaryStatsMaker("0.2Gi", "2.8Gi", podStats)
 	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
@@ -1154,7 +1154,7 @@ func TestSwapPressure(t *testing.T) {
 	}
 
 	// the best-effort pod should not admit, burstable should
-	expected = []bool{false, true}
+	expected = []bool{false, false}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
@@ -1181,8 +1181,7 @@ func TestSwapPressure(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
 	}
 
-	// the best-effort pod should not admit, burstable should
-	expected = []bool{false, true}
+	expected = []bool{false, false}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
 		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
@@ -1199,7 +1198,7 @@ func TestSwapPressure(t *testing.T) {
 		t.Fatalf("Manager expects no error but got %v", err)
 	}
 
-	// we should not have memory pressure (because transition period met)
+	// we should not have swap pressure (because transition period met)
 	if manager.IsUnderSwapPressure() {
 		t.Errorf("Manager should not report swap pressure")
 	}

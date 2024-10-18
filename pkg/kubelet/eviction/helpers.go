@@ -853,6 +853,7 @@ func rankSwapPressure(pods []*v1.Pod, stats statsFunc) {
 	// swap eviction will never evict non swapping pods
 	for _, val := range pods {
 		swapStats, _ := stats(val)
+		klog.InfoS("Swap Pod Usage", "SwapUsagePod", *swapStats.Swap.SwapUsageBytes, "SwapAvailable", *swapStats.Swap.SwapAvailableBytes)
 		if swapStats.Swap != nil && swapStats.Swap.SwapUsageBytes != nil {
 			swapUsage := *swapStats.Swap.SwapUsageBytes
 			if swapUsage > 0 {
@@ -975,9 +976,8 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	if summary.Node.Swap != nil {
 		nodeSwapUsage := *summary.Node.Swap.SwapUsageBytes
 		nodeSwapCapacity := *summary.Node.Swap.SwapAvailableBytes + nodeSwapUsage
-		klog.InfoS("NodeSwap Stats", "SwapUsageNode", nodeSwapUsage, "SwapCapacity", nodeSwapCapacity)
 		result[evictionapi.SignalSwapMemoryAvailable] = signalObservation{
-			available: resource.NewQuantity(int64(nodeSwapUsage), resource.BinarySI),
+			available: resource.NewQuantity(int64(*summary.Node.Swap.SwapAvailableBytes), resource.BinarySI),
 			time:      summary.Node.Swap.Time,
 			capacity:  resource.NewQuantity(int64(nodeSwapCapacity), resource.BinarySI),
 		}
@@ -1035,6 +1035,10 @@ func debugLogObservations(logPrefix string, observations signalObservations) {
 			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
 		}
 	}
+}
+
+func debugSummaryStats(summary *statsapi.Summary) {
+	klog.V(2).InfoS("Summary Stats", "SwapAvailabe", summary.Node.Swap.SwapAvailableBytes, "SwapUsage", summary.Node.Swap.SwapUsageBytes)
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
