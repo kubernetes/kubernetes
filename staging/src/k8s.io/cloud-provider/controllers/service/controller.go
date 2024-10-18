@@ -99,6 +99,8 @@ type Controller struct {
 
 // New returns a new service controller to keep cloud provider service resources
 // (like load balancers) in sync with the registry.
+//
+//logcheck:context // NewWithContext should be used instead because record.NewBroadcaster is called and works better when a context is supplied (contextual logging, cancellation).
 func New(
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
@@ -107,12 +109,32 @@ func New(
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
+	ctx := context.Background()
+	return NewWithContext(ctx, cloud, kubeClient, serviceInformer, nodeInformer, clusterName, featureGate)
+}
+
+// New returns a new service controller to keep cloud provider service resources
+// (like load balancers) in sync with the registry.
+func NewWithContext(
+	ctx context.Context,
+	cloud cloudprovider.Interface,
+	kubeClient clientset.Interface,
+	serviceInformer coreinformers.ServiceInformer,
+	nodeInformer coreinformers.NodeInformer,
+	clusterName string,
+	featureGate featuregate.FeatureGate,
+) (*Controller, error) {
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
+
 	registerMetrics()
 	s := &Controller{
 		cloud:            cloud,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
+		eventBroadcaster: broadcaster,
+		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		serviceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -218,9 +240,6 @@ func (c *Controller) enqueueNode(obj interface{}) {
 // It's an error to call Run() more than once for a given ServiceController
 // object.
 func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
-	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
-	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
-
 	defer runtime.HandleCrash()
 	defer c.serviceQueue.ShutDown()
 	defer c.nodeQueue.ShutDown()

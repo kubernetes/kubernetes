@@ -92,7 +92,8 @@ func newServiceLBControllerDescriptor() *ControllerDescriptor {
 }
 
 func startServiceLBController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	serviceController, err := servicecontroller.New(
+	serviceController, err := servicecontroller.NewWithContext(
+		ctx,
 		controllerContext.Cloud,
 		controllerContext.ClientBuilder.ClientOrDie("service-controller"),
 		controllerContext.InformerFactory.Core().V1().Services(),
@@ -261,7 +262,8 @@ func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 
 func startCloudNodeLifecycleController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
-	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
+	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleControllerWithContext(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
@@ -309,7 +311,9 @@ func startNodeRouteController(ctx context.Context, controllerContext ControllerC
 		return nil, false, err
 	}
 
-	routeController := routecontroller.New(routes,
+	routeController := routecontroller.NewWithContext(
+		ctx,
+		routes,
 		controllerContext.ClientBuilder.ClientOrDie("route-controller"),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
