@@ -67,6 +67,7 @@ func NewAPIServerCommand() *cobra.Command {
 	_, featureGate := featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
 		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	s := options.NewServerRunOptions()
+	ctx := genericapiserver.SetupSignalContext()
 
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
@@ -97,7 +98,7 @@ cluster's shared state through which all other components interact.`,
 			cliflag.PrintFlags(fs)
 
 			// set default options
-			completedOptions, err := s.Complete()
+			completedOptions, err := s.Complete(ctx)
 			if err != nil {
 				return err
 			}
@@ -108,7 +109,7 @@ cluster's shared state through which all other components interact.`,
 			}
 			// add feature enablement metrics
 			featureGate.AddMetrics()
-			return Run(cmd.Context(), completedOptions)
+			return Run(ctx, completedOptions)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -119,7 +120,7 @@ cluster's shared state through which all other components interact.`,
 			return nil
 		},
 	}
-	cmd.SetContext(genericapiserver.SetupSignalContext())
+	cmd.SetContext(ctx)
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()

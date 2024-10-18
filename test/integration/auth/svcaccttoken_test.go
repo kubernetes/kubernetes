@@ -691,7 +691,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("err calling Claims: %v", err)
 		}
-		tok, err := tokenGenerator.GenerateToken(sc, pc)
+		tok, err := tokenGenerator.GenerateToken(context.TODO(), sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
 		}

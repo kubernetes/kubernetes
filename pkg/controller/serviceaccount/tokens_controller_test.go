@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ type testGenerator struct {
 	Err   error
 }
 
-func (t *testGenerator) GenerateToken(sc *jwt.Claims, pc interface{}) (string, error) {
+func (t *testGenerator) GenerateToken(ctx context.Context, sc *jwt.Claims, pc interface{}) (string, error) {
 	return t.Token, t.Err
 }
 

@@ -127,15 +127,19 @@ type OIDCAuthenticationOptions struct {
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles         []string
-	Lookup           bool
-	Issuers          []string
-	JWKSURI          string
-	MaxExpiration    time.Duration
-	ExtendExpiration bool
+	KeyFiles              []string
+	Lookup                bool
+	Issuers               []string
+	JWKSURI               string
+	MaxExpiration         time.Duration
+	ExtendExpiration      bool
+	IsTokenSignerExternal bool
 	// OptionalTokenGetter is a function that returns a service account token getter.
 	// If not set, the default token getter will be used.
 	OptionalTokenGetter func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
+	// ExternalPublicKeysGetter gets set if `--service-account-signing-endpoint` is passed.
+	// ExternalPublicKeysGetter is mutually exclusive with KeyFiles.
+	ExternalPublicKeysGetter serviceaccount.PublicKeysGetter
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -270,8 +274,8 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		if len(o.ServiceAccounts.Issuers) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
-		if len(o.ServiceAccounts.KeyFiles) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+		if len(o.ServiceAccounts.KeyFiles) == 0 && o.ServiceAccounts.ExternalPublicKeysGetter == nil {
+			allErrors = append(allErrors, errors.New("either `--service-account-key-file` or `--service-account-signing-endpoint` must be set"))
 		}
 
 		// Validate the JWKS URI when it is explicitly set.
@@ -592,7 +596,11 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		if len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
 			ret.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
 		}
-		if len(o.ServiceAccounts.KeyFiles) > 0 {
+
+		switch {
+		case len(o.ServiceAccounts.KeyFiles) > 0 && o.ServiceAccounts.ExternalPublicKeysGetter != nil:
+			return kubeauthenticator.Config{}, fmt.Errorf("cannot set mutually exclusive flags `--service-account-key-file` and `--service-account-signing-endpoint` at the same time")
+		case len(o.ServiceAccounts.KeyFiles) > 0:
 			allPublicKeys := []interface{}{}
 			for _, keyfile := range o.ServiceAccounts.KeyFiles {
 				publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -606,7 +614,10 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 				return kubeauthenticator.Config{}, fmt.Errorf("failed to set up public service account keys: %w", err)
 			}
 			ret.ServiceAccountPublicKeysGetter = keysGetter
+		case o.ServiceAccounts.ExternalPublicKeysGetter != nil:
+			ret.ServiceAccountPublicKeysGetter = o.ServiceAccounts.ExternalPublicKeysGetter
 		}
+
 		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
 	}

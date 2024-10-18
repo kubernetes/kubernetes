@@ -317,3 +317,7 @@
   - k8s.io/cri-client
   - k8s.io/klog/v2
   - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/externaljwt"
+  allowedImports:
+  - k8s.io/externaljwt

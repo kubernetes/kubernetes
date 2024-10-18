@@ -390,7 +390,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
-	completedOptions, err := s.Complete()
+	completedOptions, err := s.Complete(tCtx)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
