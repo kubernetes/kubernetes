@@ -576,6 +576,74 @@ func getPod(cname string, resources podResources) *v1.Pod {
 	}
 }
 
+func TestEqualResourceList(t *testing.T) {
+	testCases := []struct {
+		description    string
+		list1          v1.ResourceList
+		list2          v1.ResourceList
+		expectedResult bool
+	}{
+		{
+			description: "Equal ResourceList",
+			list1: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1000m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			list2: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			expectedResult: true,
+		},
+		{
+			description: "Different CPU",
+			list1: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			list2: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			expectedResult: false,
+		},
+		{
+			description: "Different Memory",
+			list1: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			list2: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			expectedResult: false,
+		},
+		{
+			description: "Different length ResourceList",
+			list1: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			list2: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+			expectedResult: false,
+		},
+		{
+			description:    "Empty ResourceList",
+			list1:          v1.ResourceList{},
+			list2:          v1.ResourceList{},
+			expectedResult: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			assert.Equal(t, tc.expectedResult, EqualResourceList(tc.list1, tc.list2))
+		})
+	}
+}
+
 func TestPodResourceRequests(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
