@@ -958,11 +958,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
-	klet.healthChecker, err = watchdog.NewHealthChecker(klet)
-	if err != nil {
-		return nil, fmt.Errorf("create health checker: %w", err)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
+		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
+		// the kubelet will not be started.
+		klet.healthChecker, err = watchdog.NewHealthChecker(klet)
+		if err != nil {
+			return nil, fmt.Errorf("create health checker: %w", err)
+		}
 	}
-
 	return klet, nil
 }
 
@@ -1707,7 +1710,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		kl.eventedPleg.Start()
 	}
 
-	kl.healthChecker.Start()
+	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
+		kl.healthChecker.Start()
+	}
 
 	kl.syncLoop(ctx, updates, kl)
 }
