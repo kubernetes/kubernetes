@@ -219,3 +219,29 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 		})
 	}
 }
+
+func TestNoCloudProviderControllerStarted(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	controllerCtx := ControllerContext{
+		Cloud:    nil,
+		LoopMode: IncludeCloudLoops,
+	}
+	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+	for _, controller := range NewControllerDescriptors() {
+		if !controller.IsCloudProviderController() {
+			continue
+		}
+
+		controllerName := controller.Name()
+		checker, err := StartController(ctx, controllerCtx, controller, nil)
+		if err != nil {
+			t.Errorf("Error starting controller %q: %v", controllerName, err)
+		}
+		if checker != nil {
+			t.Errorf("Controller %q should not be started", controllerName)
+		}
+	}
+}

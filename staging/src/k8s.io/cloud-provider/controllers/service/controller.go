@@ -110,6 +110,7 @@ func New(
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
 	registerMetrics()
+
 	s := &Controller{
 		cloud:            cloud,
 		kubeClient:       kubeClient,
@@ -126,6 +127,10 @@ func New(
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node"},
 		),
 		lastSyncedNodes: make(map[string][]*v1.Node),
+	}
+
+	if err := s.init(); err != nil {
+		return nil, err
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -181,10 +186,6 @@ func New(
 		},
 		nodeSyncPeriod,
 	)
-
-	if err := s.init(); err != nil {
-		return nil, err
-	}
 
 	return s, nil
 }
