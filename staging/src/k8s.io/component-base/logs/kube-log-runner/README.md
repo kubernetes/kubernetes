@@ -49,6 +49,12 @@ kube-log-runner -log-file=/tmp/log echo "hello world"
 # Copy into log file and print to stdout (same as 2>&1 | tee -a /tmp/log).
 kube-log-runner -log-file=/tmp/log -also-stdout echo "hello world"
 
+# Copy into log file and print to stdout (same as 2>&1 | tee -a /tmp/log), will rotate the log file when its size exceedes 10 MB
+kube-log-runner -log-file=/tmp/log -log-file-size=10 -also-stdout echo "hello world"
+
+# Copy into log file and print to stdout (same as 2>&1 | tee -a /tmp/log), will rotate the log file when its size exceedes 10 MB, and will clean up old rotated log files when their age are older than 7 days
+kube-log-runner -log-file=/tmp/log -log-file-size=10 -log-file-age=7 -also-stdout echo "hello world"
+
 # Redirect only stdout into log file (same as 1>>/tmp/log).
 kube-log-runner -log-file=/tmp/log -redirect-stderr=false echo "hello world"
 ```
