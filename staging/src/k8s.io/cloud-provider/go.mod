@@ -114,7 +114,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
-	k8s.io/cloud-provider => ../cloud-provider
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/controller-manager => ../controller-manager
