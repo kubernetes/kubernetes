@@ -140,6 +140,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.RunOnce {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
+	}
 
 	for _, nodeTaint := range kc.RegisterWithTaints {
 		if err := utiltaints.CheckTaintValidation(nodeTaint); err != nil {
