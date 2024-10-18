@@ -498,6 +498,8 @@ github.com/onsi/gomega/types
 github.com/opencontainers/go-digest
 # github.com/opencontainers/runc v1.1.13
 ## explicit; go 1.18
+# github.com/opencontainers/runc v1.1.14
+## explicit; go 1.18
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/capabilities
