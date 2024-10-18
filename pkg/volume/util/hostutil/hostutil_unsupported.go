@@ -78,11 +78,6 @@ func (hu *HostUtil) PathExists(pathname string) (bool, error) {
 	return true, errUnsupported
 }
 
-// EvalHostSymlinks always returns an error on unsupported platforms
-func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
-	return "", errUnsupported
-}
-
 // GetOwner always returns an error on unsupported platforms
 func (hu *HostUtil) GetOwner(pathname string) (int64, int64, error) {
 	return -1, -1, errUnsupported
