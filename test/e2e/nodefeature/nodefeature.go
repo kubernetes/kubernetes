@@ -46,6 +46,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Eviction = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("Eviction"))
 
+	// Sig-node: E2E tests around separate container runtime filesystem
+	SeparateDisk = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SeparateDiskTest"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	FSGroup = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("FSGroup"))
 
