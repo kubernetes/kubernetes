@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -135,10 +135,11 @@ var (
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
-				Driver:  driver,
-				Pool:    nodeName,
-				Device:  "instance-1",
-				Request: "req-1",
+				Driver:      driver,
+				Pool:        nodeName,
+				Device:      "instance-1",
+				Request:     "req-1",
+				AdminAccess: ptr.To(false),
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -176,6 +177,19 @@ func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.Resourc
 	return st.FromResourceClaim(claim).
 		ReservedForPod(pod.Name, types.UID(pod.UID)).
 		Obj()
+}
+
+func adminAccess(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	for i := range claim.Spec.Devices.Requests {
+		claim.Spec.Devices.Requests[i].AdminAccess = true
+	}
+	if claim.Status.Allocation != nil {
+		for i := range claim.Status.Allocation.Devices.Results {
+			claim.Status.Allocation.Devices.Results[i].AdminAccess = ptr.To(true)
+		}
+	}
+	return claim
 }
 
 func breakCELInClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
@@ -556,6 +570,66 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 
+		"structured-request-admin-access": {
+			// Because the pending claim asks for admin access, allocation succeeds despite resources
+			// being exhausted.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: adminAccess(allocatedClaim),
+				},
+				prebind: result{
+					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = adminAccess(inUseClaim).Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
+				},
+			},
+		},
+
+		"structured-ignore-allocated-admin-access": {
+			// The allocated claim uses admin access, so a second claim may use
+			// the same device.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, adminAccess(otherAllocatedClaim)},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+				},
+			},
+		},
+
 		"claim-parameters-CEL-runtime-error": {
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{breakCELInClaim(pendingClaim)},
@@ -900,7 +974,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
-	claims, err := tc.client.ResourceV1alpha3().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
+	claims, err := tc.client.ResourceV1beta1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
@@ -946,7 +1020,7 @@ func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, up
 			t.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
 			switch obj := obj.(type) {
 			case *resourceapi.ResourceClaim:
-				obj, err := tc.client.ResourceV1alpha3().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+				obj, err := tc.client.ResourceV1beta1().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
@@ -999,7 +1073,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	tc.client.PrependReactor("*", "*", reactor)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil)
+	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
@@ -1019,11 +1093,11 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	// The tests use the API to create the objects because then reactors
 	// get triggered.
 	for _, claim := range claims {
-		_, err := tc.client.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1beta1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource claim")
 	}
 	for _, class := range classes {
-		_, err := tc.client.ResourceV1alpha3().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1beta1().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource class")
 	}
 
@@ -1211,7 +1285,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					// Some test claims already have it. Clear for create.
 					createClaim := claim.DeepCopy()
 					createClaim.UID = ""
-					storedClaim, err := testCtx.client.ResourceV1alpha3().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
+					storedClaim, err := testCtx.client.ResourceV1beta1().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
 					if err != nil {
 						t.Fatalf("create claim: expected no error, got: %v", err)
 					}
@@ -1226,7 +1300,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					updateClaim.UID = cachedClaim.(*resourceapi.ResourceClaim).UID
 					updateClaim.ResourceVersion = cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion
 
-					storedClaim, err := testCtx.client.ResourceV1alpha3().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
+					storedClaim, err := testCtx.client.ResourceV1beta1().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
 					if err != nil {
 						t.Fatalf("update claim: expected no error, got: %v", err)
 					}

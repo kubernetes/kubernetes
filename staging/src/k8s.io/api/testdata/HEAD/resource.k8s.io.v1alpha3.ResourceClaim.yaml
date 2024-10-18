@@ -76,7 +76,8 @@ status:
         - requestsValue
         source: sourceValue
       results:
-      - device: deviceValue
+      - adminAccess: true
+        device: deviceValue
         driver: driverValue
         pool: poolValue
         request: requestValue

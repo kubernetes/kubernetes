@@ -26,15 +26,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -85,7 +87,7 @@ type stateData struct {
 	informationsForClaim []informationForClaim
 
 	// nodeAllocations caches the result of Filter for the nodes.
-	nodeAllocations map[string][]*resourceapi.AllocationResult
+	nodeAllocations map[string][]resourceapi.AllocationResult
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -103,12 +105,15 @@ type informationForClaim struct {
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
 	enabled                   bool
+	enableAdminAccess         bool
 	enableSchedulingQueueHint bool
 
-	fh          framework.Handle
-	clientset   kubernetes.Interface
-	classLister resourcelisters.DeviceClassLister
-	sliceLister resourcelisters.ResourceSliceLister
+	fh               framework.Handle
+	clientset        kubernetes.Interface
+	classLister      resourcelisters.DeviceClassLister
+	sliceLister      resourcelisters.ResourceSliceLister
+	celCache         *structured.CELCache
+	allocatedDevices *allocatedDevices
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -173,16 +178,29 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	pl := &dynamicResources{
 		enabled:                   true,
+		enableAdminAccess:         fts.EnableDRAAdminAccess,
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 
 		fh:               fh,
 		clientset:        fh.ClientSet(),
-		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
-		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
+		classLister:      fh.SharedInformerFactory().Resource().V1beta1().DeviceClasses().Lister(),
+		sliceLister:      fh.SharedInformerFactory().Resource().V1beta1().ResourceSlices().Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
+
+		// This is a LRU cache for compiled CEL expressions. The most
+		// recent 10 of them get reused across different scheduling
+		// cycles.
+		celCache: structured.NewCELCache(10),
+
+		allocatedDevices: newAllocatedDevices(logger),
 	}
+
+	// Reacting to events is more efficient than iterating over the list
+	// repeatedly in PreFilter.
+	pl.claimAssumeCache.AddEventHandler(pl.allocatedDevices.handlers())
 
 	return pl, nil
 }
@@ -526,38 +544,50 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// persistently.
 		//
 		// Claims are treated as "allocated" if they are in the assume cache
-		// or currently their allocation is in-flight.
-		allocator, err := structured.NewAllocator(ctx, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
+		// or currently their allocation is in-flight. This does not change
+		// during filtering, so we can determine that once.
+		allocatedDevices := pl.listAllAllocatedDevices(logger)
+		slices, err := pl.sliceLister.List(labels.Everything())
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, allocatedDevices, pl.classLister, slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string][]*resourceapi.AllocationResult)
+		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
 	s.claims = claims
 	return nil, nil
 }
 
-type claimListerForAssumeCache struct {
-	assumeCache         *assumecache.AssumeCache
-	inFlightAllocations *sync.Map
-}
+func (pl *dynamicResources) listAllAllocatedDevices(logger klog.Logger) sets.Set[structured.DeviceID] {
+	// Start with a fresh set that matches the current known state of the
+	// world according to the informers.
+	allocated := pl.allocatedDevices.Get()
 
-func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	// Probably not worth adding an index for?
-	objs := cl.assumeCache.List(nil)
-	allocated := make([]*resourceapi.ResourceClaim, 0, len(objs))
-	for _, obj := range objs {
-		claim := obj.(*resourceapi.ResourceClaim)
-		if obj, ok := cl.inFlightAllocations.Load(claim.UID); ok {
-			claim = obj.(*resourceapi.ResourceClaim)
+	// Whatever is in flight also has to be checked.
+	pl.inFlightAllocations.Range(func(key, value any) bool {
+		claim := value.(*resourceapi.ResourceClaim)
+		for _, result := range claim.Status.Allocation.Devices.Results {
+			// Kubernetes 1.31 did not set this, 1.32 always does.
+			// Supporting 1.31 is not worth the additional code that
+			// would have to be written (= looking up in request) because
+			// it is extremely unlikely that there really is a result
+			// that still exists in a cluster from 1.31 where this matters.
+			if ptr.Deref(result.AdminAccess, false) {
+				// Is not considered as allocated.
+				continue
+			}
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
+			allocated.Insert(deviceID)
 		}
-		if claim.Status.Allocation != nil {
-			allocated = append(allocated, claim)
-		}
-	}
-	return allocated, nil
+		return true
+	})
+	return allocated
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -613,7 +643,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	}
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
-	var allocations []*resourceapi.AllocationResult
+	var allocations []resourceapi.AllocationResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -696,7 +726,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim.Status.ReservedFor = nil
 			claim.Status.Allocation = nil
 			logger.V(5).Info("Deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if _, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			if _, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return nil, statusError(logger, err)
 			}
 			return nil, framework.NewStatus(framework.Unschedulable, "deallocation of ResourceClaim completed")
@@ -761,7 +791,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			if index < 0 {
 				return statusError(logger, fmt.Errorf("internal error, claim %s with allocation not found", claim.Name))
 			}
-			allocation := allocations[i]
+			allocation := &allocations[i]
 			state.informationsForClaim[index].allocation = allocation
 
 			// Strictly speaking, we don't need to store the full modified object.
@@ -813,7 +843,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 				pod.UID,
 			)
 			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim), "pod", klog.KObj(pod))
-			claim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+			claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
 			if err != nil {
 				// We will get here again when pod scheduling is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
@@ -888,7 +918,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	refreshClaim := false
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
-			updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("get updated claim %s after conflict: %w", klog.KObj(claim), err)
 			}
@@ -913,7 +943,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			// If we were interrupted in the past, it might already be set and we simply continue.
 			if !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
-				updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
 				}
@@ -926,7 +956,7 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
-		updatedClaim, err := pl.clientset.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
 				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)
