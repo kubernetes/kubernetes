@@ -66,7 +66,7 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 			//
 			// Would be nice to log this with the source code location
 			// of our caller, but testing.Logf does not support that.
-			tb.Logf("\nWARNING: %s\n", timeoutCause)
+			tb.Logf("\nINFO: canceling context: %s\n", timeoutCause)
 			cancel(canceledError(timeoutCause))
 		}
 	}()
