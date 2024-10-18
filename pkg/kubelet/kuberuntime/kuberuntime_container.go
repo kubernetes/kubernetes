@@ -1127,6 +1127,18 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 					changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
 				}
 
+				// Restart running sidecar containers which have had their definition changed.
+				if _, _, changed := containerChanged(container, status); changed {
+					changes.ContainersToKill[status.ID] = containerToKillInfo{
+						name:      container.Name,
+						container: container,
+						message:   fmt.Sprintf("Init container %s definition changed", container.Name),
+						reason:    "",
+					}
+					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+					break
+				}
+
 				// A restartable init container does not have to take into account its
 				// liveness probe when it determines to start the next init container.
 				if container.LivenessProbe != nil {
