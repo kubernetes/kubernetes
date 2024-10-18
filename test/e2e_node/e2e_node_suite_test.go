@@ -23,6 +23,7 @@ package e2enode
 
 import (
 	"bytes"
+	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
@@ -51,7 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
-	system "k8s.io/system-validators/validators"
+	system "github.com/pacoxu/system-validators/validators"
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
@@ -193,6 +194,18 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
+		f, err := os.Open("/proc/mounts")
+		if err != nil {
+			klog.Exitf("open proc mounts failed: %v", err)
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			klog.Warningf("/proc/mounts: %v\n", line)
+		}
+
 		warns, errs := system.ValidateSpec(*spec, "remote")
 		if len(warns) != 0 {
 			klog.Warningf("system validation warns: %v", warns)

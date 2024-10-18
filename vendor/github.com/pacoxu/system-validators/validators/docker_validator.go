@@ -19,11 +19,10 @@ package system
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var _ Validator = &DockerValidator{}
@@ -72,7 +71,7 @@ func (d *DockerValidator) Validate(spec SysSpec) ([]error, []error) {
 	cmd.Stderr = &errb
 	err := cmd.Run()
 	if err != nil {
-		return nil, []error{errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nstderr: %s\nerror: %v`, outb.String(), errb.String(), err)}
+		return nil, []error{fmt.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nstderr: %s\nerror: %v`, outb.String(), errb.String(), err)}
 	}
 	if err := d.unmarshalDockerInfo(outb.Bytes(), &info); err != nil {
 		return nil, []error{err}
@@ -82,14 +81,14 @@ func (d *DockerValidator) Validate(spec SysSpec) ([]error, []error) {
 	warnings, errs := d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
 
 	if len(errb.String()) > 0 {
-		warnings = append(warnings, errors.Errorf(`the command "docker info --format '{{json.}}'" succeeded with potential warnings\noutput: %s`, errb.String()))
+		warnings = append(warnings, fmt.Errorf(`the command "docker info --format '{{json.}}'" succeeded with potential warnings\noutput: %s`, errb.String()))
 	}
 	return warnings, errs
 }
 
 func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error {
 	if err := json.Unmarshal(b, &info); err != nil {
-		return errors.Wrapf(err, "could not unmarshal the JSON output of 'docker info':\n%s\n", b)
+		return fmt.Errorf("could not unmarshal the JSON output of 'docker info':\n%s\n err: %w", b, err)
 	}
 	return nil
 }
@@ -97,7 +96,7 @@ func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error 
 func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) ([]error, []error) {
 	// Validate docker version.
 	if info.ServerErrors != nil {
-		return nil, []error{errors.Errorf("error verifying Docker info: %q", strings.Join(info.ServerErrors, `", "`))}
+		return nil, []error{fmt.Errorf("error verifying Docker info: %q", strings.Join(info.ServerErrors, `", "`))}
 	}
 
 	matched := false
@@ -115,7 +114,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) 
 		r := regexp.MustCompile(ver)
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)
-			w := errors.Errorf(
+			w := fmt.Errorf(
 				"this Docker version is not on the list of validated versions: %s. Latest validated version: %s",
 				info.ServerVersion,
 				latestValidatedDockerVersion,
@@ -123,7 +122,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) 
 			return []error{w}, nil
 		}
 		d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, bad)
-		return nil, []error{errors.Errorf("unsupported docker version: %s", info.ServerVersion)}
+		return nil, []error{fmt.Errorf("unsupported docker version: %s", info.ServerVersion)}
 	}
 	// Validate graph driver.
 	item := dockerConfigPrefix + "GRAPH_DRIVER"
@@ -134,5 +133,5 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) 
 		}
 	}
 	d.Reporter.Report(item, info.Driver, bad)
-	return nil, []error{errors.Errorf("unsupported graph driver: %s", info.Driver)}
+	return nil, []error{fmt.Errorf("unsupported graph driver: %s", info.Driver)}
 }
