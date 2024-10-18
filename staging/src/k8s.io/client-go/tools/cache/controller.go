@@ -389,6 +389,8 @@ type InformerOptions struct {
 	// for them.
 	// Optional - if unset no additional transforming is happening.
 	Transform TransformFunc
+
+	StoreTransform TransformFunc
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -544,6 +546,7 @@ func processDeltas(
 	clientState Store,
 	deltas Deltas,
 	isInInitialList bool,
+	transformer TransformFunc,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
@@ -551,13 +554,20 @@ func processDeltas(
 
 		switch d.Type {
 		case Sync, Replaced, Added, Updated:
+			storeObj := obj
+			var err error
+			if transformer != nil {
+				if storeObj, err = transformer(obj); err != nil {
+					return err
+				}
+			}
 			if old, exists, err := clientState.Get(obj); err == nil && exists {
-				if err := clientState.Update(obj); err != nil {
+				if err := clientState.Update(storeObj); err != nil {
 					return err
 				}
 				handler.OnUpdate(old, obj)
 			} else {
-				if err := clientState.Add(obj); err != nil {
+				if err := clientState.Add(storeObj); err != nil {
 					return err
 				}
 				handler.OnAdd(obj, isInInitialList)
@@ -598,7 +608,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
-				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+				return processDeltas(options.Handler, clientState, deltas, isInInitialList, options.StoreTransform)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
