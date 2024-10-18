@@ -113,7 +113,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			// allow up to 3x grace period (which allows process termination)
 			// for the kubelet to remove from api.  need to follow-up on if this
-			// latency between termination and reportal can be isolated further.
+			// latency between termination and reporting can be isolated further.
 			start := time.Now()
 			err = wait.Poll(time.Second*5, time.Second*30*3, func() (bool, error) {
 				podList, err := e2ekubelet.GetKubeletPods(ctx, f.ClientSet, pod.Spec.NodeName)
@@ -385,7 +385,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Failf("pod spec TerminationGracePeriodSeconds is not 1: %d", *pod.Spec.TerminationGracePeriodSeconds)
 			}
 
-			// retry if the TerminationGracePeriodSeconds is overrided
+			// retry if the TerminationGracePeriodSeconds is overridden
 			// see more in https://github.com/kubernetes/kubernetes/pull/115606
 			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})

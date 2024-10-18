@@ -108,7 +108,7 @@ type patchSpec struct {
 }
 
 func isInPlaceResizeSupportedByRuntime(c clientset.Interface, nodeName string) bool {
-	//TODO(vinaykul,InPlacePodVerticalScaling): Can we optimize this?
+	// TODO(vinaykul,InPlacePodVerticalScaling): Can we optimize this?
 	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return false
@@ -359,13 +359,13 @@ func verifyPodStatusResources(pod *v1.Pod, tcInfo []TestContainerInfo) {
 		cs := csMap[ci.Name]
 		tc, _ := makeTestContainer(ci)
 		gomega.Expect(tc.Resources).To(gomega.Equal(*cs.Resources))
-		//gomega.Expect(cs.RestartCount).To(gomega.Equal(ci.RestartCount))
+		// gomega.Expect(cs.RestartCount).To(gomega.Equal(ci.RestartCount))
 	}
 }
 
 func isPodOnCgroupv2Node(pod *v1.Pod) bool {
 	// Determine if pod is running on cgroupv2 or cgroupv1 node
-	//TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
+	// TODO(vinaykul,InPlacePodVerticalScaling): Is there a better way to determine this?
 	cgroupv2File := "/sys/fs/cgroup/cgroup.controllers"
 	_, err := e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--", "ls", cgroupv2File)
 	if err == nil {
@@ -543,7 +543,7 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 	// Wait for pod resource allocations to equal expected values after resize
 	resizedPod, aErr := waitPodAllocationsEqualsExpected()
 	framework.ExpectNoError(aErr, "failed to verify pod resource allocation values equals expected values")
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this check once base-OS updates to containerd>=1.6.9
+	// TODO(vinaykul,InPlacePodVerticalScaling): Remove this check once base-OS updates to containerd>=1.6.9
 	//                containerd needs to add CRI support before Beta (See Node KEP #2273)
 	if !isInPlaceResizeSupportedByRuntime(c, pod.Spec.NodeName) {
 		// Wait for PodSpec container resources to equal PodStatus container resources indicating resize is complete

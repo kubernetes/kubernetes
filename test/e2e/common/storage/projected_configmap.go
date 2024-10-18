@@ -120,7 +120,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 	/*
 	   Release: v1.9
 	   Testname: Projected Volume, ConfigMap, update
-	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the confgiMap to value-2.
+	   Description: A Pod is created with projected volume source 'ConfigMap' to store a configMap and performs a create and update to new value. Pod MUST be able to create the configMap with value-1. Pod MUST be able to update the value in the configMap to value-2.
 	*/
 	framework.ConformanceIt("updates should be reflected in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
@@ -458,9 +458,9 @@ var _ = SIGDescribe("Projected configMap", func() {
 
 	})
 
-	//The pod is in pending during volume creation until the configMap objects are available
-	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timeout exception unless it is marked optional.
-	//Slow (~5 mins)
+	// The pod is in pending during volume creation until the configMap objects are available
+	// or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timeout exception unless it is marked optional.
+	// Slow (~5 mins)
 	f.It("Should fail non-optional pod creation due to configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-configmap-volumes"
 		pod := createNonOptionalConfigMapPod(ctx, f, volumeMountPath)
@@ -468,9 +468,9 @@ var _ = SIGDescribe("Projected configMap", func() {
 		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 
-	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
+	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
-	//Slow (~5 mins)
+	// Slow (~5 mins)
 	f.It("Should fail non-optional pod creation due to the key in the configMap object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/configmap-volumes"
 		pod := createNonOptionalConfigMapPodWithConfig(ctx, f, volumeMountPath)
@@ -507,7 +507,7 @@ func doProjectedConfigMapE2EWithoutMappings(ctx context.Context, f *framework.Fr
 	}
 
 	if defaultMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
+		// pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.DefaultMode = defaultMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
 	}
 
@@ -554,7 +554,7 @@ func doProjectedConfigMapE2EWithMappings(ctx context.Context, f *framework.Frame
 	}
 
 	if itemMode != nil {
-		//pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
+		// pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = itemMode
 	}
 

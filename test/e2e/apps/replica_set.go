@@ -505,7 +505,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	})
 	framework.ExpectNoError(err, "ReplicaSet fail to scale to %q replicasets")
 
-	// Patch the PeplicaSet
+	// Patch the ReplicaSet
 	ginkgo.By("patching the ReplicaSet")
 	rsPatch, err := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{

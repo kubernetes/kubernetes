@@ -183,7 +183,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	/*
 		Release: v1.13
 		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
-		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
+		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapVolumes mounted. Pod MUST NOT fail waiting for Volumes.
 	*/
 	framework.ConformanceIt("should not cause race condition when used for configmaps", f.WithSerial(), func(ctx context.Context) {
 		configMapNames := createConfigmapsForRace(ctx, f)

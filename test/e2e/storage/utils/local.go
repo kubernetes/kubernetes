@@ -37,7 +37,7 @@ import (
 type LocalVolumeType string
 
 const (
-	// LocalVolumeDirectory reprensents a simple directory as local volume
+	// LocalVolumeDirectory represents a simple directory as local volume
 	LocalVolumeDirectory LocalVolumeType = "dir"
 	// LocalVolumeDirectoryLink is like LocalVolumeDirectory but it's a symbolic link to directory
 	LocalVolumeDirectoryLink LocalVolumeType = "dir-link"
@@ -93,7 +93,7 @@ func NewLocalResourceManager(prefix string, hostExec HostExec, hostBase string) 
 	}
 }
 
-// getTestDir returns a test dir under `hostBase` directory with randome name.
+// getTestDir returns a test dir under `hostBase` directory with random name.
 func (l *ltrMgr) getTestDir() string {
 	testDirName := fmt.Sprintf("%s-%s", l.prefix, string(uuid.NewUUID()))
 	return filepath.Join(l.hostBase, testDirName)
@@ -120,7 +120,7 @@ func (l *ltrMgr) cleanupLocalVolumeTmpfs(ctx context.Context, ltr *LocalTestReso
 	framework.ExpectNoError(err)
 }
 
-// createAndSetupLoopDevice creates an empty file and associates a loop devie with it.
+// createAndSetupLoopDevice creates an empty file and associates a loop device with it.
 func (l *ltrMgr) createAndSetupLoopDevice(ctx context.Context, dir string, node *v1.Node, size int) {
 	ginkgo.By(fmt.Sprintf("Creating block device on node %q using path %q", node.Name, dir))
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", dir)

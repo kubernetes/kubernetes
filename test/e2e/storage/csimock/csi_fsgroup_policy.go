@@ -109,12 +109,12 @@ var _ = utils.SIGDescribe("CSI Mock volume fsgroup policies", func() {
 				newFSGroupPolicy: storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy,
 			},
 			{
-				name:             "should not update fsGroup if update from detault to None",
+				name:             "should not update fsGroup if update from default to None",
 				oldFSGroupPolicy: storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy,
 				newFSGroupPolicy: storagev1.NoneFSGroupPolicy,
 			},
 			{
-				name:             "should update fsGroup if update from detault to File",
+				name:             "should update fsGroup if update from default to File",
 				oldFSGroupPolicy: storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy,
 				newFSGroupPolicy: storagev1.FileFSGroupPolicy,
 			},
@@ -193,5 +193,5 @@ func waitUtilFSGroupInPod(ctx context.Context, m *mockDriverSetup, modified bool
 		return err == nil
 	})
 
-	framework.ExpectNoError(err, "failed: verifing fsgroup in pod: %s", err)
+	framework.ExpectNoError(err, "failed: verifying fsgroup in pod: %s", err)
 }

@@ -517,7 +517,7 @@ func (f *Framework) createSecretFromDockerConfig(ctx context.Context, namespace 
 	return secret, err
 }
 
-// RecordFlakeIfError records flakeness info if error happens.
+// RecordFlakeIfError records flakiness info if error happens.
 // NOTE: This function is not used at any places yet, but we are in progress for https://github.com/kubernetes/kubernetes/issues/66239 which requires this. Please don't remove this.
 func (f *Framework) RecordFlakeIfError(err error, optionalDescription ...interface{}) {
 	f.flakeReport.RecordFlakeIfError(err, optionalDescription...)
@@ -667,7 +667,7 @@ func filterLabels(ctx context.Context, selectors map[string]string, cli clientse
 	var err error
 	var selector labels.Selector
 	var pl *v1.PodList
-	// List pods based on selectors.  This might be a tiny optimization rather then filtering
+	// List pods based on selectors.  This might be a tiny optimization rather than filtering
 	// everything manually.
 	if len(selectors) > 0 {
 		selector = labels.SelectorFromSet(labels.Set(selectors))
