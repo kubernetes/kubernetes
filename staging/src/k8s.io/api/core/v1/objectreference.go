@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// IsAnAPIObject allows clients to preemptively get a reference to an API object and pass it to places that
+// SetGroupVersionKind allows clients to preemptively get a reference to an API object and pass it to places that
 // intend only to get a reference to that object. This simplifies the event recording interface.
 func (obj *ObjectReference) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	obj.APIVersion, obj.Kind = gvk.ToAPIVersionAndKind()
