@@ -185,6 +185,9 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 			// The static policy cannot initialize without this information.
 			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
 		}
+		// TODO: We should remove this check as reserved CPU are no longer part of
+		// shared pool now, so setting sits size to be 0 won't leave non-gu pods
+		// without CPUs to run.
 		if reservedCPUs.IsZero() {
 			// The static policy requires this to be nonzero. Zero CPU reservation
 			// would allow the shared pool to be completely exhausted. At that point
