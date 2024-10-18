@@ -23,6 +23,8 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -206,7 +208,7 @@ func TestCpuSharesToCPUWeight(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		if actual := cpuSharesToCPUWeight(testCase.cpuShares); actual != testCase.expectedCpuWeight {
+		if actual := util.CPUSharesToCPUWeight(testCase.cpuShares); actual != testCase.expectedCpuWeight {
 			t.Errorf("cpuShares: %v, expectedCpuWeight: %v, actualCpuWeight: %v",
 				testCase.cpuShares, testCase.expectedCpuWeight, actual)
 		}
@@ -245,7 +247,7 @@ func TestCpuWeightToCPUShares(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		if actual := cpuWeightToCPUShares(testCase.cpuWeight); actual != testCase.expectedCpuShares {
+		if actual := util.CPUWeightToCPUShares(testCase.cpuWeight); actual != testCase.expectedCpuShares {
 			t.Errorf("cpuWeight: %v, expectedCpuShares: %v, actualCpuShares: %v",
 				testCase.cpuWeight, testCase.expectedCpuShares, actual)
 		}
