@@ -121,6 +121,12 @@ func (dp *DevicePlugin) Allocate(ctx context.Context, request *kubeletdeviceplug
 	dp.calls = append(dp.calls, "Allocate")
 	dp.callsSync.Unlock()
 
+	if dp.errorInjector != nil {
+		if err := dp.errorInjector("Allocate"); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, r := range request.ContainerRequests {
 		response := &kubeletdevicepluginv1beta1.ContainerAllocateResponse{}
 		for _, id := range r.DevicesIDs {
