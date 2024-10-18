@@ -63,12 +63,33 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// targets for OOM kills.
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
 			memoryRequest = cs.AllocatedResources.Memory().Value()
 		}
 	}
 	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
+
+	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
+	// calculate the oom score adjustment based on: min-memory( currentSideCarContainer , min-memory(regular containers) ) .
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isSidecarContainer(pod, container) {
+		// check min memory quantity in regular containers
+		minMemoryRequest := minRegularContainerMemory(*pod)
+		// check min memory quantity with the current sidecarContainer
+		// inPlacePodVerticalScaling is not possible for the moment in InitContainers
+		if minMemoryRequest > container.Resources.Requests.Memory().Value() {
+			minMemoryRequest = container.Resources.Requests.Memory().Value()
+		}
+		oomScoreAdjust = 1000 - (1000*minMemoryRequest)/memoryCapacity
+
+		// when OOM score adj currentSideCarContainer <= oom score adj min-memory(regular containers)
+		// ==> add 1 to the sidecar container oom score adj (first to kill).
+		if minMemoryRequest <= container.Resources.Requests.Memory().Value() {
+			oomScoreAdjust += 1
+		}
+	}
+
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
@@ -79,4 +100,19 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+// isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
+// Since v1.Container does not directly specify whether a container is a sidecar,
+// this function uses available indicators (container.RestartPolicy == v1.ContainerRestartPolicyAlways)
+// to make that determination.
+func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
+	if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		for _, initContainer := range pod.Spec.InitContainers {
+			if initContainer.Name == container.Name {
+				return true
+			}
+		}
+	}
+	return false
 }
