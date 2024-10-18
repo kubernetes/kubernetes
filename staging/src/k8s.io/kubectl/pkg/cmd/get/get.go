@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
-	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/ptr"
 )
@@ -319,7 +319,7 @@ func (o *GetOptions) Validate() error {
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
 		return fmt.Errorf("--output-watch-events option can only be used with --watch or --watch-only")
 	}
-	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+	if len(o.Subresource) > 0 && !slices.Contains(supportedSubresources, o.Subresource) {
 		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 	return nil
