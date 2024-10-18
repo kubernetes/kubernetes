@@ -210,21 +210,34 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthChecker
+	var checks, readyzChecks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
 		checks = append(checks, electionChecker)
+		readyzChecks = append(readyzChecks, electionChecker)
 	}
+	readyzChecks = append(readyzChecks, healthz.NewShutdownHealthz(ctx.Done()))
+
+	handlerSyncReadyCh := make(chan struct{})
+	handlerSyncCheck := healthz.NamedCheck("kcm-handler-sync", func(_ *http.Request) error {
+		select {
+		case <-handlerSyncReadyCh:
+			return nil
+		default:
+		}
+		return fmt.Errorf("waiting for handlers to sync")
+	})
+	readyzChecks = append(readyzChecks, handlerSyncCheck)
+
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
 
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks, readyzChecks)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
-
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -251,6 +264,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		controllerContext.InformerFactory.Start(stopCh)
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
+		close(handlerSyncReadyCh)
 
 		<-ctx.Done()
 	}
