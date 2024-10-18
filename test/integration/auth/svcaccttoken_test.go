@@ -248,8 +248,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 
 	t.Run("bound to service account and pod", func(t *testing.T) {
-		// Disable embedding pod's node info
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, false)
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
 				Audiences: []string{"api"},

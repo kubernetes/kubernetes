@@ -89,7 +89,7 @@ func TestClaims(t *testing.T) {
 		sc *jwt.Claims
 		pc *privateClaims
 
-		featureJTI, featurePodNodeInfo, featureNodeBinding bool
+		featureNodeBinding bool
 	}{
 		{
 			// pod and secret
@@ -115,6 +115,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -138,6 +139,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -160,6 +162,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+100, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -182,6 +185,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800+60*60*24, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -203,30 +207,6 @@ func TestClaims(t *testing.T) {
 			err: "token bound to Node object requested, but \"ServiceAccountTokenNodeBinding\" feature gate is disabled",
 		},
 		{
-			// node & pod with feature gate disabled
-			sa:   sa,
-			node: node,
-			pod:  pod,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-
-			sc: &jwt.Claims{
-				Subject:   "system:serviceaccount:myns:mysvcacct",
-				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
-				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
-				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
-			},
-			pc: &privateClaims{
-				Kubernetes: kubernetes{
-					Namespace: "myns",
-					Pod:       &ref{Name: "mypod", UID: "mypod-uid"},
-					Svcacct:   ref{Name: "mysvcacct", UID: "mysvcacct-uid"},
-				},
-			},
-		},
-		{
 			// node alone
 			sa:   sa,
 			node: node,
@@ -242,6 +222,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -256,8 +237,6 @@ func TestClaims(t *testing.T) {
 			sa:   sa,
 			pod:  pod,
 			node: node,
-			// enable embedding pod node info feature
-			featurePodNodeInfo: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -268,6 +247,7 @@ func TestClaims(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				NotBefore: jwt.NewNumericDate(time.Unix(1514764800, 0)),
 				Expiry:    jwt.NewNumericDate(time.Unix(1514764800, 0)),
+				ID:        "fixed",
 			},
 			pc: &privateClaims{
 				Kubernetes: kubernetes{
@@ -294,8 +274,6 @@ func TestClaims(t *testing.T) {
 		{
 			// ensure JTI is set
 			sa: sa,
-			// enable setting JTI feature
-			featureJTI: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -342,9 +320,7 @@ func TestClaims(t *testing.T) {
 			}
 
 			// set feature flags for the duration of the test case
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, c.featureJTI)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, c.featureNodeBinding)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, c.featurePodNodeInfo)
 
 			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud)
 			if err != nil && err.Error() != c.err {
@@ -376,8 +352,6 @@ type claimTestCase struct {
 	expiry    jwt.NumericDate
 	notBefore jwt.NumericDate
 	expectErr string
-
-	featureNodeBindingValidation bool
 }
 
 func TestValidatePrivateClaims(t *testing.T) {
@@ -458,11 +432,10 @@ func TestValidatePrivateClaims(t *testing.T) {
 			expectErr: "service account token has been invalidated",
 		},
 		{
-			name:                         "missing node",
-			getter:                       fakeGetter{serviceAccount, nil, nil, nil},
-			private:                      &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
-			expectErr:                    "service account token has been invalidated",
-			featureNodeBindingValidation: true,
+			name:      "missing node",
+			getter:    fakeGetter{serviceAccount, nil, nil, nil},
+			private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
+			expectErr: "service account token has been invalidated",
 		},
 		{
 			name:      "different uid serviceaccount",
@@ -522,11 +495,10 @@ func TestValidatePrivateClaims(t *testing.T) {
 				expectErr: deletedErr,
 			},
 			claimTestCase{
-				name:                         deletionTestCase.name + " node",
-				getter:                       fakeGetter{serviceAccount, nil, nil, deletedNode},
-				private:                      &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
-				expectErr:                    deletedErr,
-				featureNodeBindingValidation: true,
+				name:      deletionTestCase.name + " node",
+				getter:    fakeGetter{serviceAccount, nil, nil, deletedNode},
+				private:   &privateClaims{Kubernetes: kubernetes{Svcacct: ref{Name: "saname", UID: "sauid"}, Node: &ref{Name: "nodename", UID: "nodeuid"}, Namespace: "ns"}},
+				expectErr: deletedErr,
 			},
 		)
 	}
@@ -538,8 +510,6 @@ func TestValidatePrivateClaims(t *testing.T) {
 			if tc.expiry != 0 {
 				expiry = tc.expiry
 			}
-
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, tc.featureNodeBindingValidation)
 
 			_, err := v.Validate(context.Background(), "", &jwt.Claims{Expiry: &expiry, NotBefore: &tc.notBefore}, tc.private)
 			if len(tc.expectErr) > 0 {
