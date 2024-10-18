@@ -140,12 +140,20 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.32"
 - name: AuthorizeWithSelectors
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.32"
 - name: CloudControllerManagerWebhook
   versionedSpecs:
   - default: false
