@@ -125,8 +125,8 @@ const (
 	// SkipCertificateKeyPrint flag instructs kubeadm to skip printing certificate key used to encrypt certs by 'kubeadm init'.
 	SkipCertificateKeyPrint = "skip-certificate-key-print"
 
-	// ForceReset flag instructs kubeadm to reset the node without prompting for confirmation
-	ForceReset = "force"
+	// Force flag instructs kubeadm to do something (such as reset, upgrade, etc.) without prompting for confirmation.
+	Force = "force"
 
 	// CertificateRenewal flag instructs kubeadm to execute certificate renewal during upgrades
 	CertificateRenewal = "certificate-renewal"
