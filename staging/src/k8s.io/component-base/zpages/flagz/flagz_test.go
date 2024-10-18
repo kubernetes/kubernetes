@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -31,20 +32,19 @@ import (
 const wantTmpl = `
 ----------------------------
 title: %s flagz
-content_type: reference
-auto_generated: true
 description: flags enabled in %s
+warning: This endpoint is not meant to be machine parseable and is for debugging purposes only.
 ----------------------------
-
 `
 
 func TestFlags(t *testing.T) {
 	componentName := "test-server"
+	wantHeader := fmt.Sprintf(wantTmpl, componentName, componentName)
 	tests := []struct {
 		name       string
 		flagset    *cliflag.NamedFlagSets
-		wantResp   string
 		wantStatus int
+		wantResp   string
 	}{
 		{
 			name: "common flags",
@@ -62,8 +62,12 @@ func TestFlags(t *testing.T) {
 					}),
 				},
 			},
-			wantResp:   fmt.Sprintf("%s%s", fmt.Sprintf(wantTmpl, componentName, componentName), "test-flag-bar=test-value-bar\ntest-flag-foo=test-value-foo\n"),
 			wantStatus: http.StatusOK,
+			wantResp: strings.Join([]string{
+				wantHeader,
+				"test-flag-bar=test-value-bar",
+				"test-flag-foo=test-value-foo",
+			}, "\n") + "\n",
 		},
 		{
 			name: "secret flags",
@@ -77,8 +81,11 @@ func TestFlags(t *testing.T) {
 					}),
 				},
 			},
-			wantResp:   fmt.Sprintf("%s%s", fmt.Sprintf(wantTmpl, componentName, componentName), "test-flag-foo=CLASSIFIED\n"),
 			wantStatus: http.StatusOK,
+			wantResp: strings.Join([]string{
+				wantHeader,
+				"test-flag-foo=CLASSIFIED",
+			}, "\n") + "\n",
 		},
 	}
 

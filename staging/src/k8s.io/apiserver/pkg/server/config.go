@@ -97,8 +97,7 @@ import (
 // To be used for testing purpose only, to simulate scenarios where multiple apiservers
 // exist. In such cases we want to ensure unique apiserver IDs which are a hash of hostnameFunc.
 var (
-	hostnameFunc  = os.Hostname
-	componentName = "apiserver"
+	hostnameFunc = os.Hostname
 )
 
 const (
@@ -107,6 +106,8 @@ const (
 
 	// APIGroupPrefix is where non-legacy API group will be located.
 	APIGroupPrefix = "/apis"
+
+	componentName = "apiserver"
 )
 
 // Config is a structure used to configure a GenericAPIServer.

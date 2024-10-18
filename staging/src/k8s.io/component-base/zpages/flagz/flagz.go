@@ -27,7 +27,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/klog/v2"
 
 	cliflag "k8s.io/component-base/cli/flag"
@@ -37,9 +36,8 @@ const (
 	flagzTemplate = `
 ----------------------------
 title: {{.ComponentName}} flagz
-content_type: reference
-auto_generated: true
 description: flags enabled in {{.ComponentName}}
+warning: This endpoint is not meant to be machine parseable and is for debugging purposes only.
 ----------------------------
 
 `
@@ -49,8 +47,9 @@ var (
 	funcMap = template.FuncMap{
 		"ToLower": strings.ToLower,
 	}
-	tmpl          *template.Template
-	flagzRegistry = &Registry{}
+	tmpl           *template.Template
+	flagzRegistry  = &Registry{}
+	cachedResponse []byte
 )
 
 type Registry struct {
@@ -68,31 +67,17 @@ type templateData struct {
 	ComponentName string
 }
 
-func init() {
-	var err error
-	t := template.New("t").Funcs(funcMap)
-	tmpl, err = t.Parse(flagzTemplate)
-	if err != nil {
-		klog.Errorf("error while parsing gotemplate: %v", err)
-	}
-}
-
 func (f Flagz) Install(m mux, componentName string, flagSets []*cliflag.NamedFlagSets) {
 	flagzRegistry.installHandler(m, componentName, flagSets)
 }
 
 func (reg *Registry) installHandler(m mux, componentName string, flagSets []*cliflag.NamedFlagSets) {
-	m.Handle("/flagz",
-		metrics.InstrumentHandlerFunc("GET",
-			/* group = */ "",
-			/* version = */ "",
-			/* resource = */ "",
-			/* subresource = */ "/flagz",
-			/* scope = */ "",
-			/* component = */ "",
-			/* deprecated */ false,
-			/* removedRelease */ "",
-			reg.handleFlags(componentName, tmpl, flagSets)))
+	err := initializeTemplates()
+	if err != nil {
+		klog.Errorf("error while parsing gotemplate: %v", err)
+		return
+	}
+	m.Handle("/flagz", reg.handleFlags(componentName, tmpl, flagSets))
 }
 
 func (reg *Registry) handleFlags(componentName string, tmpl *template.Template, flagSets []*cliflag.NamedFlagSets) http.HandlerFunc {
@@ -106,30 +91,27 @@ func (reg *Registry) handleFlags(componentName string, tmpl *template.Template, 
 			}
 
 			fmt.Fprint(&reg.response, header)
-			flags := sortedFlags(flagSets)
-
-			for _, flag := range flags {
-				if set, ok := flag.Annotations["classified"]; !ok || len(set) == 0 {
-					fmt.Fprint(&reg.response, flag.Name, "=", flag.Value, "\n")
-				} else {
-					fmt.Fprint(&reg.response, flag.Name, "=", "CLASSIFIED", "\n")
-				}
-			}
+			reg.printFlags(sortedFlags(flagSets))
+			cachedResponse = reg.response.Bytes()
 		})
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		var cachedResponse bytes.Buffer
-		_, err := cachedResponse.Write(reg.response.Bytes())
-		if err != nil {
-			klog.Errorf("error writing to cachedResponse: %v", err)
-			http.Error(w, "error writing to cachedResponse", http.StatusInternalServerError)
-			return
-		}
-		_, err = cachedResponse.WriteTo(w)
+		_, err := w.Write(cachedResponse)
 		if err != nil {
 			klog.Errorf("error writing response: %v", err)
 			http.Error(w, "error writing response", http.StatusInternalServerError)
 		}
 	}
+}
+
+func initializeTemplates() error {
+	var err error
+	t := template.New("t").Funcs(funcMap)
+	tmpl, err = t.Parse(flagzTemplate)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func populateHeader(componentName string, tmpl *template.Template) (string, error) {
@@ -155,7 +137,7 @@ func sortedFlags(flagSets []*cliflag.NamedFlagSets) []*pflag.Flag {
 	for _, flagset := range flagSets {
 		for _, fs := range flagset.FlagSets {
 			fs.VisitAll(func(flag *pflag.Flag) {
-				if flag.Value != nil && flag.Value.String() != "" && flag.Value.String() != "[]" {
+				if flag.Value != nil {
 					flags = append(flags, flag)
 				}
 			})
@@ -167,4 +149,14 @@ func sortedFlags(flagSets []*cliflag.NamedFlagSets) []*pflag.Flag {
 	})
 
 	return flags
+}
+
+func (reg *Registry) printFlags(flags []*pflag.Flag) {
+	for _, flag := range flags {
+		if set, ok := flag.Annotations["classified"]; !ok || len(set) == 0 {
+			fmt.Fprint(&reg.response, flag.Name, "=", flag.Value, "\n")
+		} else {
+			fmt.Fprint(&reg.response, flag.Name, "=", "CLASSIFIED", "\n")
+		}
+	}
 }
