@@ -42,7 +42,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	system "k8s.io/system-validators/validators"
+	system "github.com/pacoxu/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 

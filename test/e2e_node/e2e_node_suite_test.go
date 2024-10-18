@@ -22,6 +22,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -34,6 +35,7 @@ import (
 	"testing"
 	"time"
 
+	system "github.com/pacoxu/system-validators/validators"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -51,7 +53,6 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
-	system "k8s.io/system-validators/validators"
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
@@ -193,9 +194,53 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, "remote"); len(err) != 0 {
-			klog.Exitf("system validation failed: %v", err)
+		{
+			f, err := os.Open("/proc/mounts")
+			if err != nil {
+				klog.Warningf("open proc mounts failed: %v", err)
+			}
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+	
+			for scanner.Scan() {
+				line := scanner.Text()
+				klog.Warningf("/proc/mounts: %v\n", line)
+			}	
 		}
+		{
+			f, err := os.Open("/proc/cgroups")
+			if err != nil {
+				klog.Warningf("open proc mounts failed: %v", err)
+			}
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+	
+			for scanner.Scan() {
+				line := scanner.Text()
+				klog.Warningf("/proc/mounts: %v\n", line)
+			}	
+		}
+		{
+			f, err := os.Open("/sys/fs/cgroup/unified/cgroup.controllers")
+			if err != nil {
+				klog.Warningf("open proc mounts failed: %v", err)
+			}
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+	
+			for scanner.Scan() {
+				line := scanner.Text()
+				klog.Warningf("/proc/mounts: %v\n", line)
+			}	
+		}
+
+		warns, errs := system.ValidateSpec(*spec, "remote")
+		if len(warns) != 0 {
+			klog.Warningf("system validation warns: %v", warns)
+		} 
+		if len(errs) != 0 {
+			klog.Exitf("system validation failed: %v", errs)
+		} 
 		return
 	}
 
