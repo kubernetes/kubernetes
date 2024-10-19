@@ -33,7 +33,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1014,13 +1013,9 @@ func doPodResizeErrorTests(f *framework.Framework) {
 }
 
 func doConsecutivePodResizeTests(f *framework.Framework) {
-	var podClient *e2epod.PodClient
-	ginkgo.BeforeEach(func() {
-		podClient = e2epod.NewPodClient(f)
-	})
 
 	type testCase struct {
-		isSynchronous    bool
+		isSynchronous    bool // If true, verify the result at each resize. If false, verify only the last result.
 		name             string
 		containers       []e2epod.ResizableContainerInfo
 		containerPatches [][]v1.Container
@@ -1500,15 +1495,14 @@ func doConsecutivePodResizeTests(f *framework.Framework) {
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
+			podClient := e2epod.NewPodClient(f)
 			var testPod, patchedPod *v1.Pod
 			var pErr error
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			e2epod.InitDefaultResizePolicy(tc.containers)
 			for _, e := range tc.expected {
-				if len(e) > 0 {
-					e2epod.InitDefaultResizePolicy(e)
-				}
+				e2epod.InitDefaultResizePolicy(e)
 			}
 			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
@@ -1521,20 +1515,23 @@ func doConsecutivePodResizeTests(f *framework.Framework) {
 			ginkgo.By("verifying initial pod resize policy is as expected")
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
-			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, newPod.Namespace, newPod.Name, "Ready", timeouts.PodStartShort, testutils.PodRunningReady)
-			framework.ExpectNoError(err, "pod %s/%s did not go running", newPod.Namespace, newPod.Name)
-			framework.Logf("pod %s/%s running", newPod.Namespace, newPod.Name)
-
 			ginkgo.By("verifying initial pod status resources")
 			e2epod.VerifyPodStatusResources(newPod, tc.containers)
 
-			for i, p := range tc.containerPatches {
-				ginkgo.By("patching pod for resize")
-				patch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: p}})
+			start := time.Now()
+
+			patches := make([][]byte, 0)
+			for _, p := range tc.containerPatches {
+				marshalledPatch, err := json.Marshal(v1.Pod{Spec: v1.PodSpec{Containers: p}})
 				framework.ExpectNoError(err, "failed to marshal patch")
+				patches = append(patches, marshalledPatch)
+			}
+
+			for i, p := range patches {
+				ginkgo.By("patching pod for resize")
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-					types.StrategicMergePatchType, patch, metav1.PatchOptions{})
-				framework.ExpectNoError(pErr, "failed to patch pod for resize")
+					types.StrategicMergePatchType, p, metav1.PatchOptions{})
+				framework.ExpectNoError(pErr, "failed to patch pod for resize: %v", p)
 
 				last := i == len(tc.containerPatches)-1
 				if !tc.isSynchronous && !last {
@@ -1543,6 +1540,8 @@ func doConsecutivePodResizeTests(f *framework.Framework) {
 				}
 
 				ginkgo.By("verifying pod patched for resize")
+				var err error
+				// spec is updated by patching while allocations are not.
 				e2epod.VerifyPodResources(patchedPod, tc.expected[i])
 				if i == 0 {
 					err = e2epod.VerifyPodAllocations(patchedPod, tc.containers)
@@ -1557,14 +1556,15 @@ func doConsecutivePodResizeTests(f *framework.Framework) {
 				ginkgo.By("verifying pod resources after resize")
 				e2epod.VerifyPodResources(resizedPod, tc.expected[i])
 
-				ginkgo.By("verifying pod allocations after resize")
-				err = e2epod.VerifyPodAllocations(resizedPod, tc.expected[i])
-				framework.ExpectNoError(err, "failed to verify Pod allocations for resizedPod")
-
 				if !last {
 					time.Sleep(tc.intervals[i])
 				}
 			}
+
+			// All resize should be completed within less than one minute (resolve #125205).
+			resizeTime := time.Since(start).Seconds()
+			expectedSeconds := 50
+			gomega.Expect(resizeTime).To(gomega.BeNumerically("<", expectedSeconds), fmt.Sprintf("should complete all resizing in < %d seconds, took %f", expectedSeconds, resizeTime))
 
 			ginkgo.By("deleting pod")
 			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)

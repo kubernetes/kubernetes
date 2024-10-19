@@ -175,7 +175,7 @@ func InitDefaultResizePolicy(containers []ResizableContainerInfo) {
 }
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) (v1.Container, v1.ContainerStatus) {
-	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	cmd := "trap exit TERM; grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
 	res, alloc, resizePol := getTestResourceInfo(tcInfo)
 
 	tc := v1.Container{
