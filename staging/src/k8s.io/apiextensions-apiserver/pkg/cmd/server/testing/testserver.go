@@ -38,10 +38,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	utilversion "k8s.io/component-base/registry"
 	"k8s.io/klog/v2"
 )
 

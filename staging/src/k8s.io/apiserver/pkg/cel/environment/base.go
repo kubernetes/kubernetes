@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/component-base/registry"
 )
 
 // DefaultCompatibilityVersion returns a default compatibility version for use with EnvSet

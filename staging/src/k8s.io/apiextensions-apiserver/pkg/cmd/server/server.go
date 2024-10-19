@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/component-base/registry"
 )
 
 func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command {
