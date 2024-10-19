@@ -75,6 +75,7 @@ const (
 // operator in the Kubelet's public API. Instead, we internally map signal types to operators.
 var OpForSignal = map[Signal]ThresholdOperator{
 	SignalMemoryAvailable:            OpLessThan,
+	SignalSwapMemoryAvailable:        OpLessThan,
 	SignalNodeFsAvailable:            OpLessThan,
 	SignalNodeFsInodesFree:           OpLessThan,
 	SignalImageFsAvailable:           OpLessThan,

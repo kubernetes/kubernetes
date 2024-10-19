@@ -292,7 +292,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		klog.ErrorS(err, "Eviction manager: failed to get summary stats")
 		return nil, nil
 	}
-	debugSummaryStats(summary)
 
 	if m.clock.Since(m.thresholdsLastUpdated) > notifierRefreshInterval {
 		m.thresholdsLastUpdated = m.clock.Now()

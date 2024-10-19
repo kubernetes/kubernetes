@@ -853,7 +853,6 @@ func rankSwapPressure(pods []*v1.Pod, stats statsFunc) {
 	// swap eviction will never evict non swapping pods
 	for _, val := range pods {
 		swapStats, _ := stats(val)
-		klog.InfoS("Swap Pod Usage", "SwapUsagePod", *swapStats.Swap.SwapUsageBytes, "SwapAvailable", *swapStats.Swap.SwapAvailableBytes)
 		if swapStats.Swap != nil && swapStats.Swap.SwapUsageBytes != nil {
 			swapUsage := *swapStats.Swap.SwapUsageBytes
 			if swapUsage > 0 {
@@ -1035,10 +1034,6 @@ func debugLogObservations(logPrefix string, observations signalObservations) {
 			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", signalToResource[k], "available", v.available, "capacity", v.capacity)
 		}
 	}
-}
-
-func debugSummaryStats(summary *statsapi.Summary) {
-	klog.V(2).InfoS("Summary Stats", "SwapAvailabe", summary.Node.Swap.SwapAvailableBytes, "SwapUsage", summary.Node.Swap.SwapUsageBytes)
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
