@@ -23,9 +23,9 @@ import (
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
+	utilversion "k8s.io/component-base/registry"
 	"k8s.io/kubernetes/pkg/features"
 
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"

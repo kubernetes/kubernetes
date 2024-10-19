@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/component-base/registry"
 
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
