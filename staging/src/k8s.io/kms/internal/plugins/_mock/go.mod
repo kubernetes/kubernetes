@@ -1,6 +1,6 @@
 module k8s.io/kms/plugins/mock
 
-go 1.23.0
+go 1.23.2
 
 godebug default=go1.23
 
@@ -23,3 +23,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/google/cadvisor => github.com/dims/cadvisor v0.24.0-alpha1.0.20241019144013-33d0bce4c700

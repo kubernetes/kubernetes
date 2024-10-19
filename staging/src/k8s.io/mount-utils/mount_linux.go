@@ -35,7 +35,7 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
+	libcontaineruserns "github.com/dims/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )

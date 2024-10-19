@@ -26,11 +26,11 @@ import (
 	"sync"
 	"time"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
-	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
+	libcontainercgroups "github.com/dims/libcontainer/cgroups"
+	"github.com/dims/libcontainer/cgroups/fscommon"
+	"github.com/dims/libcontainer/cgroups/manager"
+	cgroupsystemd "github.com/dims/libcontainer/cgroups/systemd"
+	libcontainerconfigs "github.com/dims/libcontainer/configs"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 

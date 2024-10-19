@@ -19,13 +19,13 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/dims/libcontainer/cgroups"
 
 	"github.com/google/cadvisor/container"
 
-	fs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	fs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
-	configs "github.com/opencontainers/runc/libcontainer/configs"
+	fs "github.com/dims/libcontainer/cgroups/fs"
+	fs2 "github.com/dims/libcontainer/cgroups/fs2"
+	configs "github.com/dims/libcontainer/configs"
 	"k8s.io/klog/v2"
 )
 

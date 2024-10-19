@@ -20,7 +20,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/inotify"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/dims/libcontainer/cgroups"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {

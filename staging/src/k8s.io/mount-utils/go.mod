@@ -2,13 +2,13 @@
 
 module k8s.io/mount-utils
 
-go 1.23.0
+go 1.23.2
 
 godebug default=go1.23
 
 require (
+	github.com/dims/libcontainer v0.0.0-20241019113956-16c90bf68746
 	github.com/moby/sys/mountinfo v0.7.2
-	github.com/opencontainers/runc v1.1.15
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/sys v0.26.0

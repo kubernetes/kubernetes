@@ -22,7 +22,7 @@ package e2enode
 import (
 	"fmt"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/dims/libcontainer/cgroups"
 )
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
