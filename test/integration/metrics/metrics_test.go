@@ -33,6 +33,42 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+// IMPORTANT: metrics are stored globally so all the tests must run sequentially
+func TestMetricsWrapper(t *testing.T) {
+	tests := []struct {
+		testName string
+		testFunc func(t *testing.T)
+	}{
+		{
+			testName: "test apiserver process metrics",
+			testFunc: testAPIServerProcessMetrics,
+		},
+		{
+			testName: "test apiserver storage metrics",
+			testFunc: testAPIServerStorageMetrics,
+		},
+		{
+			testName: "test apiserver metrics",
+			testFunc: testAPIServerMetrics,
+		},
+		{
+			testName: "test apiserver metrics labels",
+			testFunc: testAPIServerMetricsLabels,
+		},
+		{
+			testName: "test apiserver metrics pods",
+			testFunc: testAPIServerMetricsPods,
+		},
+		{
+			testName: "test apiserver metrics namespaces",
+			testFunc: testAPIServerMetricsNamespaces,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, test.testFunc)
+	}
+}
+
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
 	client, err := clientset.NewForConfig(s.ClientConfig)
 	if err != nil {
@@ -56,7 +92,7 @@ func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMet
 	}
 }
 
-func TestAPIServerProcessMetrics(t *testing.T) {
+func testAPIServerProcessMetrics(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
@@ -76,7 +112,7 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 	})
 }
 
-func TestAPIServerStorageMetrics(t *testing.T) {
+func testAPIServerStorageMetrics(t *testing.T) {
 	config := framework.SharedEtcd()
 	config.Transport.ServerList = []string{config.Transport.ServerList[0], config.Transport.ServerList[0]}
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), config)
@@ -100,7 +136,7 @@ func TestAPIServerStorageMetrics(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetrics(t *testing.T) {
+func testAPIServerMetrics(t *testing.T) {
 	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
@@ -131,7 +167,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	})
 }
 
-func TestAPIServerMetricsLabels(t *testing.T) {
+func testAPIServerMetricsLabels(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have service account controller running.
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer s.TearDownFn()
@@ -261,7 +297,7 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetricsPods(t *testing.T) {
+func testAPIServerMetricsPods(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -378,7 +414,7 @@ func TestAPIServerMetricsPods(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetricsNamespaces(t *testing.T) {
+func testAPIServerMetricsNamespaces(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
