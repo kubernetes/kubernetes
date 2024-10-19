@@ -1219,7 +1219,7 @@ func (s *StorageClassWrapper) AllowedTopologies(topologies []v1.TopologySelector
 	return s
 }
 
-// Label sets a {k,v} pair to the inner pod label.
+// Label sets a {k,v} pair to the inner StorageClass label.
 func (s *StorageClassWrapper) Label(k, v string) *StorageClassWrapper {
 	if s.ObjectMeta.Labels == nil {
 		s.ObjectMeta.Labels = make(map[string]string)

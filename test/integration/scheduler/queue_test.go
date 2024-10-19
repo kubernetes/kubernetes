@@ -1299,28 +1299,33 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
-			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			name: "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
+			initialNodes: []*v1.Node{
+				st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-east-1b").Obj(),
+			},
 			initialPVs: []*v1.PersistentVolume{
-				st.MakePersistentVolume().Name("pv1").
+				st.MakePersistentVolume().
+					Name("pv1").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
+					NodeAffinityIn(v1.LabelTopologyZone, []string{"us-east-1a"}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
 				st.MakePersistentVolumeClaim().
 					Name("pvc1").
-					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
-					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
-					StorageClassName(ptr.To("wait-sc")).
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 					Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
-				node := st.MakeNode().Name("fake-node2").Label("node", "fake-node").Obj()
+				node := st.MakeNode().Name("fake-node2").Label(v1.LabelTopologyZone, "us-east-1a").Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
 					return nil, fmt.Errorf("failed to create node: %w", err)
 				}
@@ -1330,28 +1335,36 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			enableSchedulingQueueHint: []bool{true},
 		},
 		{
-			name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
-			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			name: "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is updated",
+			initialNodes: []*v1.Node{
+				st.MakeNode().
+					Name("fake-node").
+					Label("node", "fake-node").
+					Label("aaa", "bbb").
+					Obj(),
+			},
 			initialPVs: []*v1.PersistentVolume{
 				st.MakePersistentVolume().Name("pv1").
-					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
 					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					NodeAffinityIn("aaa", []string{"ccc"}).
 					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: ptr.To(v1.HostPathDirectoryOrCreate)}).
 					Obj(),
 			},
 			initialPVCs: []*v1.PersistentVolumeClaim{
 				st.MakePersistentVolumeClaim().
 					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
 					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
-					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}}).
-					StorageClassName(ptr.To("wait-sc")).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 					Obj(),
 			},
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
 			},
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
-				node := st.MakeNode().Name("fake-node").Label("node", "fake-node2").Obj()
+				node := st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("aaa", "ccc").Obj()
 				if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
 					return nil, fmt.Errorf("failed to create node: %w", err)
 				}
