@@ -18,12 +18,9 @@ package node
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"reflect"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,7 +30,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -79,9 +75,6 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
 
-			outOfCPUs := resource.MustParse("10")
-			outOfCPUs.Add(node.Status.Allocatable[v1.ResourceCPU])
-
 			// Create a pod that requests more CPU than the node has
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -95,43 +88,56 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 							Image: imageutils.GetPauseImageName(),
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceCPU: outOfCPUs, // requests more CPU than the node has
+									v1.ResourceCPU: resource.MustParse("1000000000000"), // requests more CPU than any node has
 								},
 							},
 						},
 					},
-					NodeName: node.Name, // Set the node to an node which has less CPU
 				},
 			}
 
 			pod = e2epod.NewPodClient(f).Create(ctx, pod)
 
-			// Check the pod status after the pod is rejected
-			var condition = func(oldPod *v1.Pod, newPod *v1.Pod) (bool, error) {
-				switch newPod.Status.Phase {
-				case v1.PodSucceeded:
-					return true, errors.New("pod succeeded unexpectedly")
-				case v1.PodFailed:
-					if strings.HasPrefix(newPod.Status.Reason, "OutOf") {
-						expectedStatus := oldPod.Status
-						// overwriting all fields that we expect are overridden by kubelet.
-						// All other fields must stay the same as before kubelet touched them
-						expectedStatus.Phase = newPod.Status.Phase
-						expectedStatus.Reason = newPod.Status.Reason
-						expectedStatus.Message = newPod.Status.Message
-						expectedStatus.StartTime = newPod.Status.StartTime
-						if !reflect.DeepEqual(expectedStatus, newPod.Status) {
-							return true, fmt.Errorf("unexpected status change: \nExpected:\n%s\n But got:\n%v", format.Object(expectedStatus, 1), format.Object(newPod.Status, 1))
-						}
-						return true, nil
-					} else {
-						return true, fmt.Errorf("pod failed with reason %s", newPod.Status.Reason)
-					}
-				}
-				return false, nil
-			}
-			err = e2epod.WaitForPodChange(ctx, f.ClientSet, pod.Namespace, pod.Name, f.Timeouts.PodStartShort, condition)
+			// Wait for the scheduler to update the pod status
+			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err)
+
+			// Fetch the pod to get the latest status which should be last one observed by the scheduler
+			// before it rejected the pod
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			// force assign the Pod to a node in order to get rejection status later
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       pod.UID,
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			// kubelet has rejected the pod
+			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "OutOfcpu", f.Timeouts.PodStartShort)
+			framework.ExpectNoError(err)
+
+			// fetch the reject Pod and compare the status
+			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			expectedStatus := pod.Status.DeepCopy()
+			// overwriting all fields that we expect are overridden by kubelet.
+			// All other fields must stay the same as before kubelet touched them
+			expectedStatus.Phase = gotPod.Status.Phase
+			expectedStatus.Reason = gotPod.Status.Reason
+			expectedStatus.Message = gotPod.Status.Message
+			expectedStatus.StartTime = gotPod.Status.StartTime
+			gomega.Expect(gotPod).To(gomega.HaveField("Status", *expectedStatus))
 		})
 	})
 })
