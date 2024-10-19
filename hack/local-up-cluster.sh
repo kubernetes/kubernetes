@@ -51,7 +51,7 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
-# if true, limited swap is being used instead of unlimited swap (default)
+# if true, limited swap is being used instead of no swap (default)
 LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
