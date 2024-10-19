@@ -451,12 +451,12 @@ func TestSwapPressure_VerifyPodStatus(t *testing.T) {
 	wantPodStatus := v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  "Evicted",
-		Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 2000Mi. ",
+		Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 50Mi. ",
 		Conditions: []v1.PodCondition{{
 			Type:    "DisruptionTarget",
 			Status:  "True",
 			Reason:  "TerminationByKubelet",
-			Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 2000Mi. ",
+			Message: "The node was low on resource: swap. Threshold quantity: 2Gi, available: 50Mi. ",
 		}},
 	}
 
