@@ -130,14 +130,22 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			expectedStatus := pod.Status.DeepCopy()
-			// overwriting all fields that we expect are overridden by kubelet.
-			// All other fields must stay the same as before kubelet touched them
-			expectedStatus.Phase = gotPod.Status.Phase
-			expectedStatus.Reason = gotPod.Status.Reason
-			expectedStatus.Message = gotPod.Status.Message
-			expectedStatus.StartTime = gotPod.Status.StartTime
-			gomega.Expect(gotPod).To(gomega.HaveField("Status", *expectedStatus))
+			gotStatus := gotPod.Status
+			gomega.Expect(gotStatus.Phase).To(gomega.Equal(v1.PodFailed), "Pod should be in Failed phase")
+			gomega.Expect(gotStatus.Reason).To(gomega.HavePrefix("OutOf"), "Pod should be rejected due to OutOf*")
+			gomega.Expect(gotStatus.Message).ToNot(gomega.BeEmpty(), "Pod should have a rejection message")
+			gomega.Expect(gotStatus.StartTime).ToNot(gomega.BeNil(), "Pod should have a StartTime")
+			gomega.Expect(gotStatus.QOSClass).To(gomega.Equal(pod.Status.QOSClass), "QOSClass should be preserved")
+
+			// other fields should be dropped
+			expectedStatus := v1.PodStatus{
+				Phase:     gotPod.Status.Phase,
+				Reason:    gotPod.Status.Reason,
+				Message:   gotPod.Status.Message,
+				StartTime: gotPod.Status.StartTime,
+				QOSClass:  gotPod.Status.QOSClass,
+			}
+			gomega.Expect(gotPod).To(gomega.HaveField("Status", expectedStatus))
 		})
 	})
 })
