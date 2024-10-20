@@ -132,7 +132,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 			return nil, false, errors.New("--cidr-allocator-type is set to 'CloudAllocator' but cloud provider is not configured")
 		}
 		// As part of the removal of all the cloud providers from kubernetes, this support will be removed as well
-		klog.Warningf("DEPRECATED: 'CloudAllocator' bas been deprecated and will be removed in a future release.")
+		logger.Info("DEPRECATED: 'CloudAllocator' bas been deprecated and will be removed in a future release.")
 	}
 
 	clusterCIDRs, err := validateCIDRs(controllerContext.ComponentConfig.KubeCloudShared.ClusterCIDR)
