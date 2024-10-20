@@ -18,7 +18,6 @@ package node
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -26,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -42,78 +39,6 @@ import (
 const (
 	fakeExtendedResource = "dummy.com/dummy"
 )
-
-func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, new *v1.Node) error {
-	oldData, err := json.Marshal(old)
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(new)
-	if err != nil {
-		return err
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
-	if err != nil {
-		return fmt.Errorf("failed to create merge patch for node %q: %w", old.Name, err)
-	}
-	_, err = client.CoreV1().Nodes().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
-}
-
-func addExtendedResource(clientSet clientset.Interface, nodeName, extendedResourceName string, extendedResourceQuantity resource.Quantity) {
-	extendedResource := v1.ResourceName(extendedResourceName)
-
-	ginkgo.By("Adding a custom resource")
-	OriginalNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-
-	node := OriginalNode.DeepCopy()
-	node.Status.Capacity[extendedResource] = extendedResourceQuantity
-	node.Status.Allocatable[extendedResource] = extendedResourceQuantity
-	err = patchNode(context.Background(), clientSet, OriginalNode.DeepCopy(), node)
-	framework.ExpectNoError(err)
-
-	gomega.Eventually(func() error {
-		node, err = clientSet.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-
-		fakeResourceCapacity, exists := node.Status.Capacity[extendedResource]
-		if !exists {
-			return fmt.Errorf("node %s has no %s resource capacity", node.Name, extendedResourceName)
-		}
-		if expectedResource := resource.MustParse("123"); fakeResourceCapacity.Cmp(expectedResource) != 0 {
-			return fmt.Errorf("node %s has resource capacity %s, expected: %s", node.Name, fakeResourceCapacity.String(), expectedResource.String())
-		}
-
-		return nil
-	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
-}
-
-func removeExtendedResource(clientSet clientset.Interface, nodeName, extendedResourceName string) {
-	extendedResource := v1.ResourceName(extendedResourceName)
-
-	ginkgo.By("Removing a custom resource")
-	originalNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-
-	node := originalNode.DeepCopy()
-	delete(node.Status.Capacity, extendedResource)
-	delete(node.Status.Allocatable, extendedResource)
-	err = patchNode(context.Background(), clientSet, originalNode.DeepCopy(), node)
-	framework.ExpectNoError(err)
-
-	gomega.Eventually(func() error {
-		node, err = clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-
-		if _, exists := node.Status.Capacity[extendedResource]; exists {
-			return fmt.Errorf("node %s has resource capacity %s which is expected to be removed", node.Name, extendedResourceName)
-		}
-
-		return nil
-	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
-}
 
 func doPodResizeTests(f *framework.Framework) {
 	type testCase struct {
@@ -870,11 +795,11 @@ func doPodResizeTests(f *framework.Framework) {
 				framework.ExpectNoError(err)
 
 				for _, node := range nodes.Items {
-					addExtendedResource(f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
+					e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
 				}
 				defer func() {
 					for _, node := range nodes.Items {
-						removeExtendedResource(f.ClientSet, node.Name, fakeExtendedResource)
+						e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
 					}
 				}()
 			}
