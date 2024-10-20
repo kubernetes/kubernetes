@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -99,7 +98,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "cloud-controller-manager")
+	result.TmpDir, err = os.MkdirTemp("", "cloud-controller-manager")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
