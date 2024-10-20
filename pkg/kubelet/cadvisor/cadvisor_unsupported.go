@@ -30,6 +30,7 @@ type cadvisorUnsupported struct {
 }
 
 var _ Interface = new(cadvisorUnsupported)
+var MaxHouseKeepingInterval int = 0
 
 // New creates a new cAdvisor Interface for unsupported systems.
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
