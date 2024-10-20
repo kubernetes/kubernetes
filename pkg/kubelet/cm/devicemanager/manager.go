@@ -237,6 +237,12 @@ func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	newEndpoint := endpointInfo{e, options}
+	if ep, exists := m.endpoints[resourceName]; exists {
+		klog.V(2).InfoS("Endpoint is tookover", "resourceName", resourceName, "prevEndpoint", ep, "newEndpoint", newEndpoint)
+		ep.e.setStopTime(time.Now())
+	}
+	m.endpoints[resourceName] = newEndpoint
 	m.endpoints[resourceName] = endpointInfo{e, options}
 
 	klog.V(2).InfoS("Device plugin connected", "resourceName", resourceName)
