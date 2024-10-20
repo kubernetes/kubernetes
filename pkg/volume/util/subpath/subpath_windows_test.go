@@ -21,7 +21,6 @@ package subpath
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +37,7 @@ func makeLink(link, target string) error {
 }
 
 func TestDoSafeMakeDir(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestDoSafeMakeDir")
+	base, err := os.MkdirTemp("", "TestDoSafeMakeDir")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -134,7 +133,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 }
 
 func TestLockAndCheckSubPath(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestLockAndCheckSubPath")
+	base, err := os.MkdirTemp("", "TestLockAndCheckSubPath")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -238,7 +237,7 @@ func TestLockAndCheckSubPath(t *testing.T) {
 }
 
 func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestLockAndCheckSubPathWithoutSymlink")
+	base, err := os.MkdirTemp("", "TestLockAndCheckSubPathWithoutSymlink")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -342,7 +341,7 @@ func TestLockAndCheckSubPathWithoutSymlink(t *testing.T) {
 }
 
 func TestFindExistingPrefix(t *testing.T) {
-	base, err := ioutil.TempDir("", "TestFindExistingPrefix")
+	base, err := os.MkdirTemp("", "TestFindExistingPrefix")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
