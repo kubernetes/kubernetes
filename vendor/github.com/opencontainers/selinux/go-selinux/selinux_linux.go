@@ -132,7 +132,7 @@ func verifySELinuxfsMount(mnt string) bool {
 		if err == nil {
 			break
 		}
-		if err == unix.EAGAIN || err == unix.EINTR { //nolint:errorlint // unix errors are bare
+		if err == unix.EAGAIN || err == unix.EINTR {
 			continue
 		}
 		return false
@@ -263,7 +263,7 @@ func isProcHandle(fh *os.File) error {
 		if err == nil {
 			break
 		}
-		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
+		if err != unix.EINTR {
 			return &os.PathError{Op: "fstatfs", Path: fh.Name(), Err: err}
 		}
 	}
@@ -328,8 +328,8 @@ func lSetFileLabel(fpath string, label string) error {
 		if err == nil {
 			break
 		}
-		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
-			return &os.PathError{Op: "lsetxattr", Path: fpath, Err: err}
+		if err != unix.EINTR {
+			return &os.PathError{Op: fmt.Sprintf("lsetxattr(label=%s)", label), Path: fpath, Err: err}
 		}
 	}
 
@@ -347,8 +347,8 @@ func setFileLabel(fpath string, label string) error {
 		if err == nil {
 			break
 		}
-		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
-			return &os.PathError{Op: "setxattr", Path: fpath, Err: err}
+		if err != unix.EINTR {
+			return &os.PathError{Op: fmt.Sprintf("setxattr(label=%s)", label), Path: fpath, Err: err}
 		}
 	}
 
@@ -639,6 +639,7 @@ func (m mlsRange) String() string {
 	return low + "-" + high
 }
 
+// TODO: remove min and max once Go < 1.21 is not supported.
 func max(a, b uint) uint {
 	if a > b {
 		return a
@@ -1134,7 +1135,7 @@ func rchcon(fpath, label string) error { //revive:disable:cognitive-complexity
 	}
 	return pwalkdir.Walk(fpath, func(p string, _ fs.DirEntry, _ error) error {
 		if fastMode {
-			if cLabel, err := lFileLabel(fpath); err == nil && cLabel == label {
+			if cLabel, err := lFileLabel(p); err == nil && cLabel == label {
 				return nil
 			}
 		}

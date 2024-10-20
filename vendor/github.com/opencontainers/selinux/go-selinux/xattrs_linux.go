@@ -31,7 +31,7 @@ func lgetxattr(path, attr string) ([]byte, error) {
 func doLgetxattr(path, attr string, dest []byte) (int, error) {
 	for {
 		sz, err := unix.Lgetxattr(path, attr, dest)
-		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
+		if err != unix.EINTR {
 			return sz, err
 		}
 	}
@@ -64,7 +64,7 @@ func getxattr(path, attr string) ([]byte, error) {
 func dogetxattr(path, attr string, dest []byte) (int, error) {
 	for {
 		sz, err := unix.Getxattr(path, attr, dest)
-		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
+		if err != unix.EINTR {
 			return sz, err
 		}
 	}
