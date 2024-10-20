@@ -335,6 +335,10 @@ func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
+	if in.Spec.JobTemplate.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_CronJobList(in *batchv1.CronJobList) {
@@ -640,6 +644,10 @@ func SetObjectDefaults_Job(in *batchv1.Job) {
 		}
 	}
 	apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_JobList(in *batchv1.JobList) {

@@ -838,6 +838,11 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
 		}
 
+		if pod.Spec.Resources != nil {
+			w.Write(LEVEL_0, "%sResources:\n", "")
+			describeResource(pod.Spec.Resources, w, LEVEL_1)
+		}
+
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
@@ -899,6 +904,24 @@ func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
 	w.Write(LEVEL_0, "%sIPs:\n", space)
 	for _, ipInfo := range pod.Status.PodIPs {
 		w.Write(LEVEL_1, "IP:\t%s\n", ipInfo.IP)
+	}
+}
+
+func describeResource(resources *corev1.ResourceRequirements, w PrefixWriter, level int) {
+	if len(resources.Limits) > 0 {
+		w.Write(level, "Limits:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Limits) {
+		quantity := resources.Limits[name]
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+	}
+
+	if len(resources.Requests) > 0 {
+		w.Write(level, "Requests:\n")
+	}
+	for _, name := range SortedResourceNames(resources.Requests) {
+		quantity := resources.Requests[name]
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
 	}
 }
 
@@ -1800,7 +1823,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		if ok {
 			describeContainerState(status, w)
 		}
-		describeContainerResource(container, w)
+		describeResource(&container.Resources, w, LEVEL_2)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
 			describeContainerEnvFrom(container, resolverFn, w)
@@ -1883,25 +1906,6 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 				w.Write(LEVEL_3, "%s\n", s)
 			}
 		}
-	}
-}
-
-func describeContainerResource(container corev1.Container, w PrefixWriter) {
-	resources := container.Resources
-	if len(resources.Limits) > 0 {
-		w.Write(LEVEL_2, "Limits:\n")
-	}
-	for _, name := range SortedResourceNames(resources.Limits) {
-		quantity := resources.Limits[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
-	}
-
-	if len(resources.Requests) > 0 {
-		w.Write(LEVEL_2, "Requests:\n")
-	}
-	for _, name := range SortedResourceNames(resources.Requests) {
-		quantity := resources.Requests[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
 	}
 }
 
