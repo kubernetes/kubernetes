@@ -10983,6 +10983,23 @@ func TestValidatePod(t *testing.T) {
 				}),
 			),
 		},
+		"invalid node selector requirement in node affinity, value of NodeSelectorRequirement should be a valid label value": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]: Invalid value: \"-1\": a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "foo",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						}},
+				}),
+			),
+		},
 		"invalid node selector requirement in node affinity, key is invalid": {
 			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key",
 			spec: *podtest.MakePod("123",
@@ -11064,6 +11081,25 @@ func TestValidatePod(t *testing.T) {
 									Key:      "foo",
 									Operator: core.NodeSelectorOpIn,
 									Values:   []string{"bar"},
+								}},
+							},
+						}},
+					},
+				}),
+			),
+		},
+		"invalid preferredSchedulingTerm in node affinity, value of NodeSelectorRequirement should be a valid label value": {
+			expectedError: "spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference.matchExpressions[0].values[0]: Invalid value: \"-1\": a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{{
+							Weight: 1,
+							Preference: core.NodeSelectorTerm{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "foo",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
 								}},
 							},
 						}},
