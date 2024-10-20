@@ -21,20 +21,18 @@ package emptydir
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -963,27 +961,7 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 		nodeAllocatableMemory resource.Quantity
 		emptyDirSizeLimit     resource.Quantity
 		expectedResult        resource.Quantity
-		featureGateEnabled    bool
 	}{
-		"SizeMemoryBackedVolumesDisabled": {
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceName("memory"): resource.MustParse("10Gi"),
-								},
-							},
-						},
-					},
-				},
-			},
-			nodeAllocatableMemory: resource.MustParse("16Gi"),
-			emptyDirSizeLimit:     resource.MustParse("1Gi"),
-			expectedResult:        resource.MustParse("0"),
-			featureGateEnabled:    false,
-		},
 		"EmptyDirLocalLimit": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -1001,7 +979,6 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 			nodeAllocatableMemory: resource.MustParse("16Gi"),
 			emptyDirSizeLimit:     resource.MustParse("1Gi"),
 			expectedResult:        resource.MustParse("1Gi"),
-			featureGateEnabled:    true,
 		},
 		"PodLocalLimit": {
 			pod: &v1.Pod{
@@ -1020,7 +997,6 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 			nodeAllocatableMemory: resource.MustParse("16Gi"),
 			emptyDirSizeLimit:     resource.MustParse("0"),
 			expectedResult:        resource.MustParse("10Gi"),
-			featureGateEnabled:    true,
 		},
 		"NodeAllocatableLimit": {
 			pod: &v1.Pod{
@@ -1039,13 +1015,11 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 			nodeAllocatableMemory: resource.MustParse("16Gi"),
 			emptyDirSizeLimit:     resource.MustParse("0"),
 			expectedResult:        resource.MustParse("16Gi"),
-			featureGateEnabled:    true,
 		},
 	}
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)
 			spec := &volume.Spec{
 				Volume: &v1.Volume{
 					VolumeSource: v1.VolumeSource{
