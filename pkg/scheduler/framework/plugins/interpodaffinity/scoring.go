@@ -190,7 +190,7 @@ func (pl *InterPodAffinity) PreScore(
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := allNodes[i]
 
 		// Unless the pod being scheduled has preferred affinity terms, we only
@@ -208,8 +208,11 @@ func (pl *InterPodAffinity) PreScore(
 		if len(topoScore) > 0 {
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
+		return nil
 	}
-	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
+	if err := pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name()); err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
 
 	if index == -1 {
 		return framework.NewStatus(framework.Skip)
