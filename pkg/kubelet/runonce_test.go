@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	utiltesting "k8s.io/client-go/util/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
@@ -82,7 +82,7 @@ func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{
 		rootDirectory:    filepath.Clean(basePath),
 		podLogsDirectory: filepath.Join(basePath, "pod-logs"),
-		recorder:         &record.FakeRecorder{},
+		recorder:         &events.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, basePath),
