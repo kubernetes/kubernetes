@@ -1566,6 +1566,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsrbacv1beta1.SubjectApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
+	case v1alpha3.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
+		return &resourcev1alpha3.AllocatedDeviceStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("BasicDevice"):
@@ -1600,6 +1602,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceRequestAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("NetworkDeviceData"):
+		return &resourcev1alpha3.NetworkDeviceDataApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaim"):
