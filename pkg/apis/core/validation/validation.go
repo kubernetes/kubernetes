@@ -4413,7 +4413,12 @@ func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *f
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
 	}
-
+	for valueIndex, value := range rq.Values {
+		for _, msg := range validation.IsValidLabelValue(value) {
+			tmp := field.Invalid(fldPath.Child("values").Index(valueIndex), value, msg)
+			allErrs = append(allErrs, tmp)
+		}
+	}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
 
 	return allErrs
