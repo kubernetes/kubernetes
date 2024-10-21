@@ -934,6 +934,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.32"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
