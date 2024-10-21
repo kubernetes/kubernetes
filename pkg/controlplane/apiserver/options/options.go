@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 
+	"k8s.io/externaljwt/pkg/plugin"
 	_ "k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -85,6 +87,8 @@ type Options struct {
 	ShowHiddenMetricsForVersion string
 
 	SystemNamespaces []string
+
+	ServiceAccountSigningEndpoint string
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -191,6 +195,9 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
+		"Path to socket where a external JWT signer is listening")
 }
 
 func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
@@ -262,6 +269,23 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 			if err != nil {
 				return CompletedOptions{}, fmt.Errorf("failed to build token generator: %w", err)
 			}
+		} else if completed.ServiceAccountSigningEndpoint != "" {
+			plugin, cache, err := plugin.New(completed.Authentication.ServiceAccounts.Issuers[0], completed.ServiceAccountSigningEndpoint)
+			if err != nil {
+				return CompletedOptions{}, fmt.Errorf("while setting up external-jwt-signer: %w", err)
+			}
+			metadata, err := plugin.GetServiceMetadata(context.Background())
+			if err != nil {
+				return CompletedOptions{}, fmt.Errorf("while setting up external-jwt-signer: %w", err)
+			}
+			if metadata.MaxTokenExpirationSeconds < 600 {
+				return CompletedOptions{}, fmt.Errorf("Max token life supported by external-jwt-signer (%ds) is less than accaptable (min 600s)", metadata.MaxTokenExpirationSeconds)
+			}
+			if metadata.MaxTokenExpirationSeconds < int(completed.Authentication.ServiceAccounts.MaxExpiration.Seconds()) {
+				return CompletedOptions{}, fmt.Errorf("Max token life supported by external-jwt-signer (%ds) is less than configured value for service-account-max-token-expiration (%ds)", metadata.MaxTokenExpirationSeconds, int(completed.Authentication.ServiceAccounts.MaxExpiration.Seconds()))
+			}
+			completed.ServiceAccountIssuer = plugin
+			completed.Authentication.ServiceAccounts.ExternalPublicKeysGetter = cache
 		}
 	}
 
