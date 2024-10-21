@@ -25,10 +25,10 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -97,6 +97,9 @@ type Manager interface {
 	// GetAllCPUs returns all the CPUs known by cpumanager, as reported by the
 	// hardware discovery. Maps to the CPU capacity.
 	GetAllCPUs() cpuset.CPUSet
+
+	// Check whether any container within a pod uses exclusive cpus
+	PodContainsPinnedCpus(pod *v1.Pod) bool
 }
 
 type manager struct {
@@ -419,6 +422,19 @@ func (m *manager) removeStaleState() {
 	})
 }
 
+func (m *manager) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		exclusiveCPUs := m.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			klog.V(4).InfoS("Pod contains container with pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+	}
+
+	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	return false
+}
+
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
 	ctx := context.Background()
 	success = []reconciledContainer{}
@@ -501,6 +517,16 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 		}
 	}
 	return success, failure
+}
+
+func StaticCPUPolicyConditionsSatisfied(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *apiresource.Quantity) bool {
+	// returns true if
+	// 1. cpu manager policy is static
+	// 2. pod has quos PodQOSGuaranteed
+	// 3. container has integer cpu request
+	return cpuManagerPolicyName == string(PolicyStatic) &&
+		podQos == v1.PodQOSGuaranteed &&
+		cpuRequest.Value()*1000 == cpuRequest.MilliValue()
 }
 
 func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {

@@ -145,6 +145,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)
 	memoryLimits := int64(0)
+
 	if request, found := reqs[v1.ResourceCPU]; found {
 		cpuRequests = request.MilliValue()
 	}
@@ -159,13 +160,13 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	cpuShares := MilliCPUToShares(cpuRequests)
 	cpuQuota := MilliCPUToQuota(cpuLimits, int64(cpuPeriod))
 
-	// quota is not capped when cfs quota is disabled
+	qosClass := v1qos.GetPodQOS(pod)
+
+	// quota is not capped when cfs quota is disabled,
+	// or if static cpu policy conditions are satisfied
 	if !enforceCPULimits {
 		cpuQuota = int64(-1)
 	}
-
-	// determine the qos class
-	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
 	result := &ResourceConfig{}

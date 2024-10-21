@@ -28,9 +28,6 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-
 	"github.com/google/go-cmp/cmp"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +39,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cpumanager "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -365,7 +365,189 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
-		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, v1.PodQOSBurstable)
+		assert.Equal(t, test.expected, linuxContainerResources)
+	}
+}
+
+func TestCalculateLinuxResourcesWithStaticCpuPolicy(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	m.cpuCFSQuota = true
+
+	assert.NoError(t, err)
+
+	generateResourceQuantity := func(str string) *resource.Quantity {
+		quantity := resource.MustParse(str)
+		return &quantity
+	}
+
+	cpuPolicyNone := string(cpumanager.PolicyNone)
+	cpuPolicyStatic := string(cpumanager.PolicyStatic)
+
+	tests := []struct {
+		name          string
+		cpuReq        *resource.Quantity
+		cpuLim        *resource.Quantity
+		memReq        *resource.Quantity
+		memLim        *resource.Quantity
+		expected      *runtimeapi.LinuxContainerResources
+		cgroupVersion CgroupVersion
+		podQos        v1.PodQOSClass
+		cmPolicy      string
+	}{
+		{
+			name:   "GuarenteedIntegerCpuStaticPolicy",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("1"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           -1,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion: cgroupV1,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyStatic,
+		},
+		{
+			name:   "GuarenteedNonIntegerCpuStaticPolicy",
+			cpuReq: generateResourceQuantity("250m"),
+			cpuLim: generateResourceQuantity("250m"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           25000,
+				CpuShares:          256,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion: cgroupV1,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyStatic,
+		},
+		{
+			name:   "GuarenteedIntegerCpuNonePolicy",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("1"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           100000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion: cgroupV1,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyNone,
+		},
+		{
+			name:   "GuarenteedNonIntegerCpuNonePolicy",
+			cpuReq: generateResourceQuantity("250m"),
+			cpuLim: generateResourceQuantity("250m"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           25000,
+				CpuShares:          256,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion: cgroupV1,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyNone,
+		},
+		{
+			name:   "GuarenteedOneDecimalCpuStaticPolicy",
+			cpuReq: generateResourceQuantity("1.0"),
+			cpuLim: generateResourceQuantity("1.0"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           -1,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion: cgroupV1,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyStatic,
+		},
+		{
+			name:   "GuarenteedIntegerCpuStaticPolicy",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("1"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           -1,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyStatic,
+		},
+		{
+			name:   "GuarenteedNonIntegerCpuStaticPolicy",
+			cpuReq: generateResourceQuantity("250m"),
+			cpuLim: generateResourceQuantity("250m"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           25000,
+				CpuShares:          256,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyStatic,
+		},
+		{
+			name:   "GuarenteedIntegerCpuNonePolicy",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("1"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           100000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyNone,
+		},
+		{
+			name:   "GuarenteedNonIntegerCpuNonePolicy",
+			cpuReq: generateResourceQuantity("250m"),
+			cpuLim: generateResourceQuantity("250m"),
+			memReq: generateResourceQuantity("128Mi"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           25000,
+				CpuShares:          256,
+				MemoryLimitInBytes: 134217728,
+				Unified:            map[string]string{"memory.oom.group": "1"},
+			},
+			cgroupVersion: cgroupV2,
+			podQos:        v1.PodQOSGuaranteed,
+			cmPolicy:      cpuPolicyNone,
+		},
+	}
+	for _, test := range tests {
+		setCgroupVersionDuringTest(test.cgroupVersion)
+		setCPUPolicyDuringTest(test.cmPolicy)
+		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim, test.podQos)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
 }
@@ -1437,6 +1619,12 @@ const (
 	cgroupV1 CgroupVersion = "v1"
 	cgroupV2 CgroupVersion = "v2"
 )
+
+func setCPUPolicyDuringTest(cpuPolicy string) {
+	isStaticCPUPolicyConditionSatisfied = func(cpuManagerPolicyName string, podQos v1.PodQOSClass, cpuRequest *resource.Quantity) bool {
+		return cpumanager.StaticCPUPolicyConditionsSatisfied(cpuPolicy, podQos, cpuRequest)
+	}
+}
 
 func setCgroupVersionDuringTest(version CgroupVersion) {
 	isCgroup2UnifiedMode = func() bool {
