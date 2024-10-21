@@ -916,7 +916,19 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, batch.JobReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 		}
 	}
+
+	if isIndexedJob(&job) {
+		jobCtx.prevSucceededIndexes, jobCtx.succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
+		jobCtx.succeeded = int32(jobCtx.succeededIndexes.total())
+	}
+	wantActive := wantActivePods(&job, jobCtx)
+	metCompletionCriteria := false
 	if jobCtx.finishedCondition == nil {
+		metCompletionCriteria = succeededPodsNumExceededCompletions(jobCtx, job) &&
+			((job.Spec.Completions != nil && satisfiedExpectations && job.DeletionTimestamp == nil && wantActive == 0) || active == 0)
+	}
+
+	if !metCompletionCriteria && jobCtx.finishedCondition == nil {
 		if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
 			// check if the number of pod restart exceeds backoff (for restart OnFailure only)
 			// OR if the number of failed jobs increased since the last syncJob
@@ -930,9 +942,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	if isIndexedJob(&job) {
-		jobCtx.prevSucceededIndexes, jobCtx.succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
-		jobCtx.succeeded = int32(jobCtx.succeededIndexes.total())
+	if isIndexedJob(&job) && !metCompletionCriteria {
 		if hasBackoffLimitPerIndex(&job) {
 			jobCtx.failedIndexes = calculateFailedIndexes(logger, &job, pods)
 			if jobCtx.finishedCondition == nil {
@@ -968,26 +978,10 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	} else {
 		manageJobCalled := false
 		if satisfiedExpectations && job.DeletionTimestamp == nil {
-			active, action, manageJobErr = jm.manageJob(ctx, &job, jobCtx)
+			active, action, manageJobErr = jm.manageJob(ctx, &job, jobCtx, wantActive)
 			manageJobCalled = true
 		}
-		complete := false
-		if job.Spec.Completions == nil {
-			// This type of job is complete when any pod exits with success.
-			// Each pod is capable of
-			// determining whether or not the entire Job is done.  Subsequent pods are
-			// not expected to fail, but if they do, the failure is ignored.  Once any
-			// pod succeeds, the controller waits for remaining pods to finish, and
-			// then the job is complete.
-			complete = jobCtx.succeeded > 0 && active == 0
-		} else {
-			// Job specifies a number of completions.  This type of job signals
-			// success by having that number of successes.  Since we do not
-			// start more pods than there are remaining completions, there should
-			// not be any remaining active pods once this count is reached.
-			complete = jobCtx.succeeded >= *job.Spec.Completions && active == 0
-		}
-		if complete {
+		if succeededPodsNumExceededCompletions(jobCtx, job) && active == 0 {
 			jobCtx.finishedCondition = jm.newSuccessCondition()
 		} else if manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
@@ -1036,6 +1030,23 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	}
 
 	return manageJobErr
+}
+
+func succeededPodsNumExceededCompletions(jobCtx *syncJobCtx, job batch.Job) bool {
+	if job.Spec.Completions == nil {
+		// This type of job is complete when any pod exits with success.
+		// Each pod is capable of
+		// determining whether or not the entire Job is done.  Subsequent pods are
+		// not expected to fail, but if they do, the failure is ignored.  Once any
+		// pod succeeds, the controller waits for remaining pods to finish, and
+		// then the job is complete.
+		return jobCtx.succeeded > 0
+	}
+	// Job specifies a number of completions.  This type of job signals
+	// success by having that number of successes.  Since we do not
+	// start more pods than there are remaining completions, there should
+	// not be any remaining active pods once this count is reached.
+	return jobCtx.succeeded >= *job.Spec.Completions
 }
 
 func (jm *Controller) newFailureCondition(reason, message string) *batch.JobCondition {
@@ -1598,10 +1609,9 @@ func jobSuspended(job *batch.Job) bool {
 // pods according to what is specified in the job.Spec.
 // Respects back-off; does not create new pods if the back-off time has not passed
 // Does NOT modify <activePods>.
-func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syncJobCtx) (int32, string, error) {
+func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syncJobCtx, wantActive int32) (int32, string, error) {
 	logger := klog.FromContext(ctx)
 	active := int32(len(jobCtx.activePods))
-	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
@@ -1619,28 +1629,6 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		}
 		jobCtx.ready -= removedReady
 		return active, metrics.JobSyncActionPodsDeleted, err
-	}
-
-	wantActive := int32(0)
-	if job.Spec.Completions == nil {
-		// Job does not specify a number of completions.  Therefore, number active
-		// should be equal to parallelism, unless the job has seen at least
-		// once success, in which leave whatever is running, running.
-		if jobCtx.succeeded > 0 {
-			wantActive = active
-		} else {
-			wantActive = parallelism
-		}
-	} else {
-		// Job specifies a specific number of completions.  Therefore, number
-		// active should not ever exceed number of remaining completions.
-		wantActive = *job.Spec.Completions - jobCtx.succeeded
-		if wantActive > parallelism {
-			wantActive = parallelism
-		}
-		if wantActive < 0 {
-			wantActive = 0
-		}
 	}
 
 	rmAtLeast := active - wantActive
@@ -1792,6 +1780,35 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 	}
 
 	return active, metrics.JobSyncActionTracking, nil
+}
+
+// wantActivePods returns a desired number of active pods.
+func wantActivePods(job *batch.Job, jobCtx *syncJobCtx) int32 {
+	active := int32(len(jobCtx.activePods))
+	parallelism := *job.Spec.Parallelism
+	wantActive := int32(0)
+
+	if job.Spec.Completions == nil {
+		// Job does not specify a number of completions. Therefore, number active
+		// should be equal to parallelism, unless the job has seen at least
+		// once success, in which leave whatever is running, running.
+		if jobCtx.succeeded > 0 {
+			wantActive = active
+		} else {
+			wantActive = parallelism
+		}
+	} else {
+		// Job specifies a specific number of completions. Therefore, number
+		// active should not ever exceed number of remaining completions.
+		wantActive = *job.Spec.Completions - jobCtx.succeeded
+		if wantActive > parallelism {
+			wantActive = parallelism
+		}
+		if wantActive < 0 {
+			wantActive = 0
+		}
+	}
+	return wantActive
 }
 
 // getPodCreationInfoForIndependentIndexes returns a sub-list of all indexes

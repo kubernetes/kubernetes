@@ -2681,6 +2681,56 @@ func TestSyncJobPastDeadline(t *testing.T) {
 				},
 			},
 		},
+		"nonIndexed job succeeded and exceeded activeDeadlineSeconds": {
+			parallelism:           1,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         1,
+			expectedSucceeded:     1,
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobComplete,
+					Reason:  batch.JobReasonCompletionsReached,
+					Status:  v1.ConditionTrue,
+					Message: "Reached expected number of succeeded pods",
+				},
+			},
+		},
+		"indexed job succeeded and exceeded activeDeadlineSeconds": {
+			parallelism:           2,
+			completions:           2,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         2,
+			expectedSucceeded:     2,
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobComplete,
+					Reason:  batch.JobReasonCompletionsReached,
+					Status:  v1.ConditionTrue,
+					Message: "Reached expected number of succeeded pods",
+				},
+			},
+		},
+		"elasticIndexed job is scaled down and exceeded activeDeadlineSeconds; the number of succeeded pods already reached the completions": {
+			parallelism:           1,
+			completions:           1,
+			activeDeadlineSeconds: 10,
+			startTime:             15,
+			succeededPods:         1,
+			activePods:            2,
+			expectedFailed:        2,
+			expectedSucceeded:     1,
+			expectedDeletions:     2,
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobComplete,
+					Reason:  batch.JobReasonCompletionsReached,
+					Status:  v1.ConditionTrue,
+					Message: "Reached expected number of succeeded pods",
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -5269,7 +5319,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				Succeeded:               2,
 				Terminating:             ptr.To[int32](0),
 				CompletedIndexes:        "0,1",
-				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
