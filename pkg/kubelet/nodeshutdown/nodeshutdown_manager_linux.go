@@ -148,7 +148,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 }
 
 // Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {

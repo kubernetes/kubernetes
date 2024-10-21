@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -622,7 +623,8 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
-	err := policy.Allocate(st, testCase.pod, container)
+	_, ctx := ktesting.NewTestContext(t)
+	err := policy.Allocate(ctx, st, testCase.pod, container)
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -693,9 +695,10 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		}
 		pod := testCase.pod
 
+		_, ctx := ktesting.NewTestContext(t)
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			policy.Allocate(st, pod, &container)
+			policy.Allocate(ctx, st, pod, &container)
 		}
 		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
@@ -746,9 +749,11 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 		}
 		pod := testCase.pod
 
+		_, ctx := ktesting.NewTestContext(t)
+
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(st, pod, &container)
+			err := policy.Allocate(ctx, st, pod, &container)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
@@ -1068,8 +1073,10 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
 
+		_, ctx := ktesting.NewTestContext(t)
+
 		container := &testCase.pod.Spec.Containers[0]
-		err := policy.Allocate(st, testCase.pod, container)
+		err := policy.Allocate(ctx, st, testCase.pod, container)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
