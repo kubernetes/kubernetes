@@ -546,6 +546,53 @@ func (_c *MockManager_GetPodsAndMirrorPods_Call) RunAndReturn(run func() ([]*v1.
 	return _c
 }
 
+// GetStaticPodToMirrorPodMap provides a mock function with given fields:
+func (_m *MockManager) GetStaticPodToMirrorPodMap() map[*v1.Pod]*v1.Pod {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStaticPodToMirrorPodMap")
+	}
+
+	var r0 map[*v1.Pod]*v1.Pod
+	if rf, ok := ret.Get(0).(func() map[*v1.Pod]*v1.Pod); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[*v1.Pod]*v1.Pod)
+		}
+	}
+
+	return r0
+}
+
+// MockManager_GetStaticPodToMirrorPodMap_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetStaticPodToMirrorPodMap'
+type MockManager_GetStaticPodToMirrorPodMap_Call struct {
+	*mock.Call
+}
+
+// GetStaticPodToMirrorPodMap is a helper method to define mock.On call
+func (_e *MockManager_Expecter) GetStaticPodToMirrorPodMap() *MockManager_GetStaticPodToMirrorPodMap_Call {
+	return &MockManager_GetStaticPodToMirrorPodMap_Call{Call: _e.mock.On("GetStaticPodToMirrorPodMap")}
+}
+
+func (_c *MockManager_GetStaticPodToMirrorPodMap_Call) Run(run func()) *MockManager_GetStaticPodToMirrorPodMap_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockManager_GetStaticPodToMirrorPodMap_Call) Return(_a0 map[*v1.Pod]*v1.Pod) *MockManager_GetStaticPodToMirrorPodMap_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockManager_GetStaticPodToMirrorPodMap_Call) RunAndReturn(run func() map[*v1.Pod]*v1.Pod) *MockManager_GetStaticPodToMirrorPodMap_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUIDTranslations provides a mock function with given fields:
 func (_m *MockManager) GetUIDTranslations() (map[kubelettypes.ResolvedPodUID]kubelettypes.MirrorPodUID, map[kubelettypes.MirrorPodUID]kubelettypes.ResolvedPodUID) {
 	ret := _m.Called()

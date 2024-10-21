@@ -3274,3 +3274,72 @@ func TestSyncPodSpans(t *testing.T) {
 		assert.Equalf(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), "runtime service span %s %s should be child of root span", span.Name, span.Parent.SpanID())
 	}
 }
+
+func TestInitialStaticPodsRegistration(t *testing.T) {
+	normalPod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{})
+	staticPod := podWithUIDNameNsSpec("123456789", "kube-system", "new", v1.PodSpec{})
+	staticPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
+	mirrorPod := podWithUIDNameNsSpec("111111", "kube-system", "new", v1.PodSpec{})
+	mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "api"
+	mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = "mirror"
+	tests := []struct {
+		desc              string
+		pods              []*v1.Pod
+		alreadyRegistered bool
+		nodeNotRegistered bool
+		wantErr           bool
+	}{
+		{
+			desc: "a normal pod",
+			pods: []*v1.Pod{normalPod},
+		},
+		{
+			desc:    "a static pod",
+			pods:    []*v1.Pod{staticPod},
+			wantErr: true,
+		},
+		{
+			desc: "a static pod and a corresponding mirror pod",
+			pods: []*v1.Pod{staticPod, mirrorPod},
+		},
+		{
+			desc:    "a normal pod and a static pod",
+			pods:    []*v1.Pod{normalPod, staticPod},
+			wantErr: true,
+		},
+		{
+			desc: "a normal pod, a static pod and a corresponding mirror pod",
+			pods: []*v1.Pod{normalPod, staticPod, mirrorPod},
+		},
+		{
+			desc:              "static pods already registered and new static pod added",
+			alreadyRegistered: true,
+			pods:              []*v1.Pod{staticPod},
+		},
+		{
+			desc:              "node is not yet registered",
+			nodeNotRegistered: true,
+			pods:              []*v1.Pod{staticPod},
+			wantErr:           true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.podManager.SetPods(tc.pods)
+			kubelet.initialStaticPodsRegistered.Store(tc.alreadyRegistered)
+			if tc.nodeNotRegistered {
+				kubelet.nodeLister = testNodeLister{}
+			}
+			err := kubelet.initialStaticPodsRegistration()
+			if tc.wantErr && err == nil {
+				t.Fatal("initialStaticPodsRegistration() did not return any error, want error")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatal("initialStaticPodsRegistration() returned error, want nil")
+			}
+		})
+	}
+}
