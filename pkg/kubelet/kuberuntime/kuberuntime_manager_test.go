@@ -180,7 +180,7 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
 	containerID := apitest.BuildContainerName(containerConfig.Metadata, podSandboxID)
 	imageRef := containerConfig.Image.Image
-	return &apitest.FakeContainer{
+	fakeContainer := &apitest.FakeContainer{
 		ContainerStatus: runtimeapi.ContainerStatus{
 			Id:          containerID,
 			Metadata:    containerConfig.Metadata,
@@ -194,6 +194,12 @@ func makeFakeContainer(t *testing.T, m *kubeGenericRuntimeManager, template cont
 		},
 		SandboxID: podSandboxID,
 	}
+	if containerConfig.Linux != nil {
+		fakeContainer.ContainerStatus.Resources = &runtimeapi.ContainerResources{
+			Linux: containerConfig.Linux.GetResources(),
+		}
+	}
+	return fakeContainer
 }
 
 // makeFakeContainers creates a group of fake containers based on the container templates.
@@ -2178,6 +2184,9 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
+	cpu1m := resource.MustParse("1m")
+	cpu2m := resource.MustParse("2m")
+	cpu10m := resource.MustParse("10m")
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
@@ -2188,9 +2197,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer}
 
 	for desc, test := range map[string]struct {
-		podResizePolicyFn       func(*v1.Pod)
-		mutatePodFn             func(*v1.Pod)
-		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
+		podResizePolicyFn         func(*v1.Pod)
+		mutatePodFn               func(*v1.Pod)
+		updateContainerResourceFn func(*v1.Pod)
+		getExpectedPodActionsFn   func(*v1.Pod, *kubecontainer.PodStatus) *podActions
+		enableCFSQuota            bool
 	}{
 		"Update container CPU and memory resources": {
 			mutatePodFn: func(pod *v1.Pod) {
@@ -2478,7 +2489,126 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				return &pa
 			},
 		},
+		"Update container CPU resources with values less than 2": {
+			enableCFSQuota: true,
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu1m},
+				}
+				pod.Status.ContainerStatuses[1].Resources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m},
+				}
+				pod.Status.ContainerStatuses[1].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1m}
+			},
+			updateContainerResourceFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m},
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
+				pa := podActions{
+					SandboxID:         podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
+					ContainersToStart: []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+						v1.ResourceCPU: {
+							{
+								apiContainerIdx: 1,
+								kubeContainerID: kcs.ID,
+								desiredContainerResources: containerResources{
+									cpuRequest: cpu1m.MilliValue(),
+									cpuLimit:   cpu1m.MilliValue(),
+								},
+								currentContainerResources: &containerResources{
+									cpuRequest: cpu200m.MilliValue(),
+									cpuLimit:   cpu200m.MilliValue(),
+								},
+							},
+						},
+					},
+				}
+				return &pa
+			},
+		},
+		"Update container CPU resources when current values are minimal": {
+			enableCFSQuota: true,
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu200m},
+				}
+				pod.Status.ContainerStatuses[1].Resources = &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu2m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu10m},
+				}
+				pod.Status.ContainerStatuses[1].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu200m}
+			},
+			updateContainerResourceFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu2m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu10m},
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
+				pa := podActions{
+					SandboxID:         podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:  getKillMap(pod, podStatus, []int{}),
+					ContainersToStart: []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+						v1.ResourceCPU: {
+							{
+								apiContainerIdx: 1,
+								kubeContainerID: kcs.ID,
+								desiredContainerResources: containerResources{
+									cpuRequest: cpu200m.MilliValue(),
+									cpuLimit:   cpu200m.MilliValue(),
+								},
+								currentContainerResources: &containerResources{
+									cpuRequest: cpu2m.MilliValue(),
+									cpuLimit:   cpu10m.MilliValue(),
+								},
+							},
+						},
+					},
+				}
+				return &pa
+			},
+		},
+		"Shoud not update container CPU when updating within minimal values": {
+			enableCFSQuota: true,
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu1m},
+				}
+				pod.Status.ContainerStatuses[1].Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: cpu10m},
+				}
+				pod.Status.ContainerStatuses[1].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1m}
+			},
+			updateContainerResourceFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu10m},
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				pa := podActions{
+					SandboxID:          podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
+					ContainersToStart:  []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+				}
+				return &pa
+			},
+		},
 	} {
+		m.cpuCFSQuota = test.enableCFSQuota
 		pod, kps := makeBasePodAndStatus()
 		for idx := range pod.Spec.Containers {
 			// default resize policy when pod resize feature is enabled
@@ -2486,6 +2616,9 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		}
 		if test.podResizePolicyFn != nil {
 			test.podResizePolicyFn(pod)
+		}
+		if test.updateContainerResourceFn != nil {
+			test.updateContainerResourceFn(pod)
 		}
 		for idx := range pod.Spec.Containers {
 			// compute hash
