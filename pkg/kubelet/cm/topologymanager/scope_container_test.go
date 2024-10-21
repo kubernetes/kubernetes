@@ -39,6 +39,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -52,6 +53,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -74,6 +76,7 @@ func TestContainerCalculateAffinity(t *testing.T) {
 							{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -86,11 +89,13 @@ func TestContainerCalculateAffinity(t *testing.T) {
 							{NUMANodeAffinity: NewTestBitMask(3, 4), Preferred: false},
 						},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
 						"resource-3": nil,
 					},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -155,6 +160,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -168,6 +174,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": nil,
 					},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -183,11 +190,13 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{
 						"resource2": {TopologyHint{}},
 					},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -206,8 +215,9 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
+					nil,
 				},
-				&mockHintProvider{nil},
+				&mockHintProvider{nil, nil},
 			},
 			expected: []map[string][]TopologyHint{
 				{
@@ -223,9 +233,11 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {TopologyHint{}},
 					},
+					nil,
 				},
 				&mockHintProvider{
 					map[string][]TopologyHint{},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
@@ -243,6 +255,7 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 						"resource1": {TopologyHint{}},
 						"resource2": {TopologyHint{}},
 					},
+					nil,
 				},
 			},
 			expected: []map[string][]TopologyHint{
