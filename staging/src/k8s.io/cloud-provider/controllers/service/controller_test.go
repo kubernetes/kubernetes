@@ -1498,12 +1498,8 @@ func TestNeedsUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			controller, _, _ := newController(ctx)
 			oldSvc, newSvc := tc.updateFn()
-			obtainedResult := controller.needsUpdate(oldSvc, newSvc)
+			obtainedResult := needsUpdate(oldSvc, newSvc)
 			if obtainedResult != tc.expectedNeedsUpdate {
 				t.Errorf("%v needsUpdate() should have returned %v but returned %v", tc.testName, tc.expectedNeedsUpdate, obtainedResult)
 			}
