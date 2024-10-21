@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/dims/libcontainer/cgroups"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"
 

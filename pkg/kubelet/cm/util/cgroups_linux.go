@@ -19,8 +19,8 @@ package util
 import (
 	"path/filepath"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
+	libcontainercgroups "github.com/dims/libcontainer/cgroups"
+	libcontainerutils "github.com/dims/libcontainer/utils"
 )
 
 const (

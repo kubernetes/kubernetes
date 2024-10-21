@@ -16,7 +16,7 @@ limitations under the License.
 
 package inuserns
 
-import libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
+import libcontaineruserns "github.com/dims/libcontainer/userns"
 
 // RunningInUserNS detects whether the current process is running in a user namespace.
 func RunningInUserNS() bool {

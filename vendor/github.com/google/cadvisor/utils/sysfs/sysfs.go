@@ -254,10 +254,8 @@ func (fs *realSysFs) IsBlockDeviceHidden(name string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to read %s: %w", devHiddenPath, err)
 	}
-	if string(hidden) == "1" {
-		return true, nil
-	}
-	return false, nil
+
+	return strings.TrimSpace(string(hidden)) == "1", nil
 }
 
 func (fs *realSysFs) GetBlockDeviceScheduler(name string) (string, error) {

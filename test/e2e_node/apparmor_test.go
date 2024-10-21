@@ -44,7 +44,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/opencontainers/runc/libcontainer/apparmor"
+	"github.com/dims/libcontainer/apparmor"
 )
 
 var _ = SIGDescribe("AppArmor", framework.WithNodeConformance(), func() {

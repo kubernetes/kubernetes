@@ -2,7 +2,7 @@
 
 module k8s.io/code-generator/examples
 
-go 1.23.0
+go 1.23.2
 
 godebug default=go1.23
 
@@ -58,3 +58,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/google/cadvisor => github.com/dims/cadvisor v0.24.0-alpha1.0.20241019144013-33d0bce4c700

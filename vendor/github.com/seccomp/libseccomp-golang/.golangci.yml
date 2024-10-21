@@ -1,4 +1,0 @@
-# For documentation, see https://golangci-lint.run/usage/configuration/
-linters:
-  enable:
-    - gofumpt

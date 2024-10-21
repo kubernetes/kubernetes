@@ -2,7 +2,7 @@
 
 module k8s.io/cluster-bootstrap
 
-go 1.23.0
+go 1.23.2
 
 godebug default=go1.23
 
