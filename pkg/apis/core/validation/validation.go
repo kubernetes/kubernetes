@@ -5170,6 +5170,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(fldPath, newPod.Status.QOSClass, "Pod QoS is immutable"))
 	}
 
+	isPodResizeRequestValid := isPodResizeRequestValid(*oldPod)
+	if !isPodResizeRequestValid {
+		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without IPPVS enabled may not be updated"))
+	}
+
 	// handle updateable fields by munging those fields prior to deep equal comparison.
 	mungedPodSpec := *newPod.Spec.DeepCopy()
 	// munge spec.containers[*].image
@@ -5178,7 +5183,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		// When the feature-gate is turned off, any new requests attempting to update CPU or memory
 		// resource values will result in validation failure.
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeRequestValid {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
 			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
@@ -5288,6 +5293,19 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
+}
+
+func isPodResizeRequestValid(pod core.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.State.Running != nil {
+			return c.Resources != nil
+		}
+	}
+	// No running containers
+	return true
 }
 
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted
