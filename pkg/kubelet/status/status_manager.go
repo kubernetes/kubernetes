@@ -1083,23 +1083,6 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// ResourceClaimStatuses is not owned and not modified by kubelet.
 	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses
 
-	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
-	// The Kubelet should never transition a pod to terminal status that could have running
-	// containers and thus actively be leveraging exclusive resources. Note that resources
-	// like volumes are reconciled by a subsystem in the Kubelet and will converge if a new
-	// pod reuses an exclusive resource (unmount -> free -> mount), which means we do not
-	// need wait for those resources to be detached by the Kubelet. In general, resources
-	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
-	// while resources that have participanting components above the API use the pod's
-	// transition to a terminal phase (or full deletion) to release those resources.
-	if transitioningToTerminalPhase {
-		if couldHaveRunningContainers {
-			newPodStatus.Phase = oldPodStatus.Phase
-			newPodStatus.Reason = oldPodStatus.Reason
-			newPodStatus.Message = oldPodStatus.Message
-		}
-	}
-
 	// If the new phase is terminal, explicitly set the ready condition to false for v1.PodReady and v1.ContainersReady.
 	// It may take some time for kubelet to reconcile the ready condition, so explicitly set ready conditions to false if the phase is terminal.
 	// This is done to ensure kubelet does not report a status update with terminal pod phase and ready=true.
@@ -1111,6 +1094,26 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 
 			podReadyCondition := generatePodReadyConditionForTerminalPhase(newPodStatus.Phase)
 			podutil.UpdatePodCondition(&newPodStatus, &podReadyCondition)
+		}
+	}
+
+	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
+	// The Kubelet should never transition a pod to terminal status that could have running
+	// containers and thus actively be leveraging exclusive resources. Note that resources
+	// like volumes are reconciled by a subsystem in the Kubelet and will converge if a new
+	// pod reuses an exclusive resource (unmount -> free -> mount), which means we do not
+	// need wait for those resources to be detached by the Kubelet. In general, resources
+	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
+	// while resources that have participanting components above the API use the pod's
+	// transition to a terminal phase (or full deletion) to release those resources.
+	// Note however, that while the phase is not updated, the ready condition will be
+	// updated above in case the pod is shutting down to reflect that the pod will be
+	// terminated soon.
+	if transitioningToTerminalPhase {
+		if couldHaveRunningContainers {
+			newPodStatus.Phase = oldPodStatus.Phase
+			newPodStatus.Reason = oldPodStatus.Reason
+			newPodStatus.Message = oldPodStatus.Message
 		}
 	}
 
