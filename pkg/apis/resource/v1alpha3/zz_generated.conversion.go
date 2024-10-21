@@ -741,6 +741,7 @@ func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceReques
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 
@@ -754,6 +755,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1alpha3_DeviceReques
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 
