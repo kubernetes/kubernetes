@@ -32,7 +32,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/component-helpers/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
