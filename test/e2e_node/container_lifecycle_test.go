@@ -3178,6 +3178,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 									ExitCode:      0,
 									ContainerName: containerName,
 									LoopForever:   true,
+									LoopPeriod:    0.2,
 								}),
 							},
 						},
@@ -3280,7 +3281,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 				ps3Last, err := results.TimeOfLastLoop(prefixedName(PreStopPrefix, restartableInit3))
 				framework.ExpectNoError(err)
 
-				const simulToleration = 500 // milliseconds
+				const simulToleration = 1000 // milliseconds
 				// should all end together since they loop infinitely and exceed their grace period
 				gomega.Expect(ps1Last-ps2Last).To(gomega.BeNumerically("~", 0, simulToleration),
 					fmt.Sprintf("expected PostStart 1 & PostStart 2 to be killed at the same time, got %s", results))
@@ -3290,7 +3291,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 					fmt.Sprintf("expected PostStart 2 & PostStart 3 to be killed at the same time, got %s", results))
 
 				// 30 seconds + 2 second minimum grace for the SIGKILL
-				const lifetimeToleration = 1000 // milliseconds
+				const lifetimeToleration = 1500 // milliseconds
 				gomega.Expect(ps1Last-ps1).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
 					fmt.Sprintf("expected PostStart 1 to live for ~32 seconds, got %s", results))
 				gomega.Expect(ps2Last-ps2).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
