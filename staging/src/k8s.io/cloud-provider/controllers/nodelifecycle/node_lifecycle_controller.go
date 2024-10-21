@@ -66,13 +66,17 @@ type CloudNodeLifecycleController struct {
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod
 	// set in controller-manager
 	nodeMonitorPeriod time.Duration
+
+	// Period of time after Node creation that the controller will assume the corresponding cloud instance exists
+	instanceExistsGracePeriod time.Duration
 }
 
 func NewCloudNodeLifecycleController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
+	nodeMonitorPeriod time.Duration,
+	instanceExistsGracePeriod time.Duration) (*CloudNodeLifecycleController, error) {
 
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
@@ -89,10 +93,11 @@ func NewCloudNodeLifecycleController(
 	}
 
 	c := &CloudNodeLifecycleController{
-		kubeClient:        kubeClient,
-		nodeLister:        nodeInformer.Lister(),
-		cloud:             cloud,
-		nodeMonitorPeriod: nodeMonitorPeriod,
+		kubeClient:                kubeClient,
+		nodeLister:                nodeInformer.Lister(),
+		cloud:                     cloud,
+		nodeMonitorPeriod:         nodeMonitorPeriod,
+		instanceExistsGracePeriod: instanceExistsGracePeriod,
 	}
 
 	return c, nil
@@ -146,6 +151,12 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 			if err != nil {
 				klog.Errorf("error patching node taints: %v", err)
 			}
+			continue
+		}
+
+		// skip the node if it was recently created, it may not have propagated in cloud provider yet
+		if time.Since(node.CreationTimestamp.Time) < c.instanceExistsGracePeriod {
+			klog.Infof("skipping node %s that was created within grace period (%v)", node.Name, c.instanceExistsGracePeriod)
 			continue
 		}
 
