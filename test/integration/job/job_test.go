@@ -153,7 +153,8 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 		},
 	}
 	podStatusMatchingOnExitCodesTerminateRule := v1.PodStatus{
-		Phase: v1.PodFailed,
+		Phase:    v1.PodFailed,
+		QOSClass: v1.PodQOSBestEffort,
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				Name: "main-container",
@@ -302,7 +303,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	podStatusMatchingOnExitCodesTerminateRule := v1.PodStatus{
-		Phase: v1.PodFailed,
+		Phase:    v1.PodFailed,
+		QOSClass: v1.PodQOSBestEffort,
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				Name: "main-container",
@@ -315,7 +317,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	podStatusMatchingOnExitCodesCountRule := v1.PodStatus{
-		Phase: v1.PodFailed,
+		Phase:    v1.PodFailed,
+		QOSClass: v1.PodQOSBestEffort,
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				Name: "main-container",
@@ -328,7 +331,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	podStatusMatchingOnPodConditionsIgnoreRule := v1.PodStatus{
-		Phase: v1.PodFailed,
+		Phase:    v1.PodFailed,
+		QOSClass: v1.PodQOSBestEffort,
 		Conditions: []v1.PodCondition{
 			{
 				Type:   v1.DisruptionTarget,
@@ -337,7 +341,8 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	podStatusNotMatchingAnyRule := v1.PodStatus{
-		Phase: v1.PodFailed,
+		Phase:    v1.PodFailed,
+		QOSClass: v1.PodQOSBestEffort,
 		ContainerStatuses: []v1.ContainerStatus{
 			{
 				State: v1.ContainerState{
@@ -541,7 +546,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           0,
@@ -576,7 +582,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           0,
@@ -607,7 +614,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           0,
@@ -643,7 +651,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodPending,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodPending,
 					},
 					wantActive:        2,
 					wantActiveIndexes: sets.New(0, 1),
@@ -654,7 +663,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           0,
@@ -690,7 +700,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodPending,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodPending,
 					},
 					wantActive:        2,
 					wantActiveIndexes: sets.New(0, 1),
@@ -701,7 +712,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           0,
@@ -739,7 +751,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        1,
 					wantActiveIndexes: sets.New(1),
@@ -751,7 +764,8 @@ func TestSuccessPolicy(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantActive:           0,
 					wantFailed:           1,
@@ -1614,7 +1628,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 			podTerminations: []podTerminationWithExpectations{
 				{
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:                     2,
 					wantFailed:                     1,
@@ -1645,7 +1660,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 			podTerminations: []podTerminationWithExpectations{
 				{
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:                     2,
 					wantFailed:                     1,
@@ -1656,7 +1672,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				},
 				{
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:                     2,
 					wantFailed:                     2,
@@ -1667,7 +1684,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				},
 				{
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        1,
 					wantFailed:        3,
@@ -1703,7 +1721,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        3,
 					wantFailed:        1,
@@ -1714,7 +1733,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        3,
 					wantFailed:        2,
@@ -1725,7 +1745,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 2,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantFailed:        5,
 					wantFailedIndexes: ptr.To(""),
@@ -1758,7 +1779,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        1,
 					wantFailed:        1,
@@ -1769,7 +1791,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodSucceeded,
 					},
 					wantFailed:           1,
 					wantSucceeded:        1,
@@ -1805,7 +1828,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        2,
 					wantFailed:        1,
@@ -1816,7 +1840,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
+						Phase:    v1.PodFailed,
 					},
 					wantActive:        0,
 					wantFailed:        3,
@@ -1866,7 +1891,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 0,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						Phase:    v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
 						ContainerStatuses: []v1.ContainerStatus{
 							{
 								State: v1.ContainerState{
@@ -1886,7 +1912,8 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				{
 					index: 1,
 					status: v1.PodStatus{
-						Phase: v1.PodFailed,
+						Phase:    v1.PodFailed,
+						QOSClass: v1.PodQOSBestEffort,
 						Conditions: []v1.PodCondition{
 							{
 								Type:   v1.DisruptionTarget,

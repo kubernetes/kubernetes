@@ -47,7 +47,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 		{
 			name: "ready terminating pods",
 			podStatus: corev1.PodStatus{
-				Phase: corev1.PodRunning,
+				Phase:    corev1.PodRunning,
+				QOSClass: corev1.PodQOSBestEffort,
 				Conditions: []corev1.PodCondition{
 					{
 						Type:   corev1.PodReady,
@@ -75,7 +76,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 		{
 			name: "not ready terminating pods",
 			podStatus: corev1.PodStatus{
-				Phase: corev1.PodRunning,
+				Phase:    corev1.PodRunning,
+				QOSClass: corev1.PodQOSBestEffort,
 				Conditions: []corev1.PodCondition{
 					{
 						Type:   corev1.PodReady,

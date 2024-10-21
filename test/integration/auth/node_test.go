@@ -254,7 +254,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			startTime := metav1.NewTime(time.Now())
 			_, err := client.CoreV1().Pods("ns").UpdateStatus(context.TODO(), &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "node2normalpod"},
-				Status:     corev1.PodStatus{StartTime: &startTime},
+				Status:     corev1.PodStatus{StartTime: &startTime, QOSClass: corev1.PodQOSBestEffort},
 			}, metav1.UpdateOptions{})
 			return err
 		}
