@@ -43,14 +43,14 @@ var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.Wit
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 
-	ginkgo.AfterEach(func() {
+	ginkgo.AfterEach(func(ctx context.Context) {
 		if framework.TestContext.PrepullImages {
 			// The test may cause the prepulled images to be evicted,
 			// prepull those images again to ensure this test not affect following tests.
-			PrePullAllImages()
+			err := PrePullAllImages(ctx)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 	})
-
 	ginkgo.Context("when create a system-node-critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("200Mi")
@@ -110,7 +110,8 @@ var _ = SIGDescribe("SystemNodeCriticalPod", framework.WithSlow(), framework.Wit
 					if framework.TestContext.PrepullImages {
 						// The test may cause the prepulled images to be evicted,
 						// prepull those images again to ensure this test not affect following tests.
-						PrePullAllImages()
+						err := PrePullAllImages(ctx)
+						gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 					}
 				}()
 				ginkgo.By("delete the static pod")
