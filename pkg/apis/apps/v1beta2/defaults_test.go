@@ -225,6 +225,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 		},
@@ -251,6 +255,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						Type: appsv1beta2.OnDeleteStatefulSetStrategyType,
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 		},
@@ -278,6 +286,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 		},
@@ -303,6 +315,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -336,6 +352,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -369,6 +389,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -396,6 +420,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			enableMaxUnavailablePolicy: true,
@@ -410,6 +438,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 							Partition:      &notTheDefaultPartition,
 							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
+					},
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
 					},
 				},
 			},
@@ -429,12 +461,16 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						},
 					},
 					RevisionHistoryLimit: ptr.To[int32](10),
+					PersistentVolumeClaimRetentionPolicy: &appsv1beta2.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1beta2.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 				},
 			},
 			enableMaxUnavailablePolicy: true,
 		},
 		{
-			name: "StatefulSetAutoDeletePVC enabled",
+			name: "StatefulSetAutoDeletePVC",
 			original: &appsv1beta2.StatefulSet{
 				Spec: appsv1beta2.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -461,7 +497,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					},
 				},
 			},
-			enableStatefulSetAutoDelete: true,
 		},
 	}
 
@@ -469,7 +504,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enableStatefulSetAutoDelete)
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1beta2.StatefulSet)
 			if !ok {
