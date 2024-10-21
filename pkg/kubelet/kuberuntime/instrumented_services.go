@@ -281,6 +281,15 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(ctx context.Context, ru
 	return err
 }
 
+func (in instrumentedRuntimeService) UpdatePodSandboxResources(ctx context.Context, req *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {
+	const operation = "update_podsandbox"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.UpdatePodSandboxResources(ctx, req)
+	recordError(operation, err)
+	return resp, err
+}
+
 func (in instrumentedImageManagerService) ListImages(ctx context.Context, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	const operation = "list_images"
 	defer recordOperation(operation, time.Now())
