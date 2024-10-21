@@ -20,9 +20,10 @@ limitations under the License.
 package validation
 
 import (
-	"k8s.io/klog/v2"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -34,6 +35,10 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 
 	if kc.CgroupsPerQOS {
 		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
+	}
+
+	if kc.SingleProcessOOMKill != nil {
+		return fmt.Errorf("invalid configuration: singleProcessOOMKill is not supported on Windows")
 	}
 
 	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)

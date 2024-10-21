@@ -28,11 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestApplySandboxResources(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
+	m.singleProcessOOMKill = ptr.To(false)
 
 	config := &runtimeapi.PodSandboxConfig{
 		Linux: &runtimeapi.LinuxPodSandboxConfig{},

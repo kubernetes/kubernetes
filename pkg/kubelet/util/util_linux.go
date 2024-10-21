@@ -1,8 +1,8 @@
-//go:build !windows && !linux
-// +build !windows,!linux
+//go:build freebsd || linux || darwin
+// +build freebsd linux darwin
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,19 +17,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package util
 
 import (
-	"fmt"
-
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
-// validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
-func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
-	if kc.SingleProcessOOMKill != nil {
-		return fmt.Errorf("invalid configuration: singleProcessOOMKill is only supported on linux")
-	}
-
-	return nil
+// IsCgroup2UnifiedMode returns true if the cgroup v2 unified mode is enabled
+func IsCgroup2UnifiedMode() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
