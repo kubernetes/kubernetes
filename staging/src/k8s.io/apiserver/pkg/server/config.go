@@ -1110,7 +1110,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	}
 
 	if c.FeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, componentName, c.FlagSets)
+		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, componentName, flagz.ConvertNamedFlagSetToFlags(c.FlagSets))
 	}
 
 	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)

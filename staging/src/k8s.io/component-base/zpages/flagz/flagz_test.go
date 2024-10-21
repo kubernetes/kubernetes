@@ -24,9 +24,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/spf13/pflag"
-	cliflag "k8s.io/component-base/cli/flag"
 )
 
 const wantTmpl = `
@@ -42,49 +39,28 @@ func TestFlags(t *testing.T) {
 	wantHeader := fmt.Sprintf(wantTmpl, componentName, componentName)
 	tests := []struct {
 		name       string
-		flagset    *cliflag.NamedFlagSets
+		flags      []Flag
 		wantStatus int
 		wantResp   string
 	}{
 		{
+			name:       "nil flags",
+			wantStatus: http.StatusOK,
+			wantResp: strings.Join([]string{
+				wantHeader,
+				"",
+			}, "\n"),
+		}, {
 			name: "common flags",
-			flagset: &cliflag.NamedFlagSets{
-				FlagSets: map[string]*pflag.FlagSet{
-					"commonFlags": flagSet(t, map[string]flagValue{
-						"test-flag-bar": {
-							value:     "test-value-bar",
-							sensitive: false,
-						},
-						"test-flag-foo": {
-							value:     "test-value-foo",
-							sensitive: false,
-						},
-					}),
-				},
+			flags: []Flag{
+				BaseFlag{FName: "test-flag-bar", FValue: "test-value-bar"},
+				BaseFlag{FName: "test-flag-foo", FValue: "test-value-foo"},
 			},
 			wantStatus: http.StatusOK,
 			wantResp: strings.Join([]string{
 				wantHeader,
 				"test-flag-bar=test-value-bar",
 				"test-flag-foo=test-value-foo",
-			}, "\n") + "\n",
-		},
-		{
-			name: "secret flags",
-			flagset: &cliflag.NamedFlagSets{
-				FlagSets: map[string]*pflag.FlagSet{
-					"secretFlags": flagSet(t, map[string]flagValue{
-						"test-flag-foo": {
-							value:     "test-value-foo",
-							sensitive: true,
-						},
-					}),
-				},
-			},
-			wantStatus: http.StatusOK,
-			wantResp: strings.Join([]string{
-				wantHeader,
-				"test-flag-foo=CLASSIFIED",
 			}, "\n") + "\n",
 		},
 	}
@@ -97,8 +73,7 @@ func TestFlags(t *testing.T) {
 				once:     sync.Once{},
 			}
 
-			flags := []*cliflag.NamedFlagSets{test.flagset}
-			Flagz{}.Install(mux, componentName, flags)
+			Flagz{}.Install(mux, componentName, test.flags)
 			req, err := http.NewRequest("GET", "http://example.com/flagz", nil)
 			if err != nil {
 				t.Fatalf("case[%d] Unexpected error: %v", i, err)
@@ -120,25 +95,4 @@ func TestFlags(t *testing.T) {
 			}
 		})
 	}
-}
-
-type flagValue struct {
-	value     string
-	sensitive bool
-}
-
-func flagSet(t *testing.T, flags map[string]flagValue) *pflag.FlagSet {
-	fs := pflag.NewFlagSet("test-set", pflag.ContinueOnError)
-	for flagName, flagVal := range flags {
-		flagValue := ""
-		fs.StringVar(&flagValue, flagName, flagVal.value, "test-usage")
-		if flagVal.sensitive {
-			err := fs.SetAnnotation(flagName, "classified", []string{"true"})
-			if err != nil {
-				t.Fatalf("unexpected error when setting flag annotation: %v", err)
-			}
-		}
-	}
-
-	return fs
 }
