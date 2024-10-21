@@ -137,7 +137,8 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			gomega.Expect(gotStatus.StartTime).ToNot(gomega.BeNil(), "Pod should have a StartTime")
 			gomega.Expect(gotStatus.QOSClass).To(gomega.Equal(pod.Status.QOSClass), "QOSClass should be preserved")
 
-			// other fields should be dropped
+			// This detects if there are any new fields in Status that were dropped by the pod rejection.
+			// These new fields either should be kept by kubelet's admission or added explicitly in the list of fields that are having a different value or must be cleared.
 			expectedStatus := v1.PodStatus{
 				Phase:     gotPod.Status.Phase,
 				Reason:    gotPod.Status.Reason,
