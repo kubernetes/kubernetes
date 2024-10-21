@@ -285,3 +285,7 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, p
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
+func (cm *containerManagerImpl) HasExclusiveCPUs(pod *v1.Pod) bool {
+	return false
+}

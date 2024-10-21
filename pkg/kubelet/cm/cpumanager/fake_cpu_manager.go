@@ -89,6 +89,9 @@ func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	klog.InfoS("GetAllCPUs")
 	return cpuset.CPUSet{}
 }
+func (cm *fakeManager) PodContainsPinnedCpus(*v1.Pod) bool {
+	return false
+}
 
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {

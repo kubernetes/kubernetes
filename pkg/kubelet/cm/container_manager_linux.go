@@ -362,13 +362,26 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			enforceCPULimits:  cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
-			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
-			cpuManagerPolicy:  cm.GetNodeConfig().CPUManagerPolicy,
+			cpuCFSQuotaPeriod:   uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			podContainerManager: cm,
 		}
 	}
 	return &podContainerManagerNoop{
 		cgroupRoot: cm.cgroupRoot,
 	}
+}
+
+func (cm *containerManagerImpl) HasExclusiveCPUs(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		exclusiveCPUs := cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			klog.V(4).InfoS("Pod contains container with pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+	}
+
+	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	return false
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {

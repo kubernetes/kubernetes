@@ -749,6 +749,12 @@ const (
 	//
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
+
+	// owner: @ffromani
+	// beta: v1.31
+	//
+	// Disable CPU Quota for pods which have exclusive CPUs allocated
+	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
 )
 
 func init() {

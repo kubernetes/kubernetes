@@ -55,8 +55,8 @@ type podContainerManagerImpl struct {
 	// cpuCFSQuotaPeriod is the cfs period value, cfs_period_us, setting per
 	// node for all containers in usec
 	cpuCFSQuotaPeriod uint64
-	// cpuManagerPolicy is the cpu manager policy
-	cpuManagerPolicy string
+	// podContainerManager is the ContainerManager running on the machine
+	podContainerManager ContainerManager
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -74,6 +74,10 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	// check if container already exist
 	alreadyExists := m.Exists(pod)
+	enforceCPULimits := m.enforceCPULimits
+	if m.podContainerManager.HasExclusiveCPUs(pod) {
+		enforceCPULimits = false
+	}
 	if !alreadyExists {
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
@@ -84,7 +88,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		podContainerName, _ := m.GetPodContainerName(pod)
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.cpuManagerPolicy),
+			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS),
 		}
 		if m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit

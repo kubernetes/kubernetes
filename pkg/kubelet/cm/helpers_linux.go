@@ -25,10 +25,8 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -120,7 +118,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, cpuManagerPolicy string) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
@@ -147,10 +145,8 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)
 	memoryLimits := int64(0)
-	var cpuRequestQuantity apiresource.Quantity
 
 	if request, found := reqs[v1.ResourceCPU]; found {
-		cpuRequestQuantity = request
 		cpuRequests = request.MilliValue()
 	}
 	if limit, found := limits[v1.ResourceCPU]; found {
@@ -166,11 +162,9 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 
 	qosClass := v1qos.GetPodQOS(pod)
 
-	StaticCPUPolicyConditionsSatisfied := cpumanager.StaticCPUPolicyConditionsSatisfied(cpuManagerPolicy, qosClass, &cpuRequestQuantity)
-
 	// quota is not capped when cfs quota is disabled,
 	// or if static cpu policy conditions are satisfied
-	if !enforceCPULimits || StaticCPUPolicyConditionsSatisfied {
+	if !enforceCPULimits {
 		cpuQuota = int64(-1)
 	}
 
