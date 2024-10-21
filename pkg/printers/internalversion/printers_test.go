@@ -6775,6 +6775,132 @@ func TestPrintScale(t *testing.T) {
 	}
 }
 
+func TestPrintClusterTrustBundle(t *testing.T) {
+	tests := []struct {
+		bundle   certificates.ClusterTrustBundle
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			bundle: certificates.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "k8s.io:foo:",
+				},
+				Spec: certificates.ClusterTrustBundleSpec{
+					SignerName: "k8s.io/foo",
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"k8s.io:foo:", "k8s.io/foo"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printClusterTrustBundle(&test.bundle, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintValidatingAdmissionPolicyBinding(t *testing.T) {
+	tests := []struct {
+		validatingAdmissionPolicyBinding admissionregistration.ValidatingAdmissionPolicyBinding
+		options                          printers.GenerateOptions
+		expected                         []metav1.TableRow
+	}{
+		{
+			validatingAdmissionPolicyBinding: admissionregistration.ValidatingAdmissionPolicyBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "config",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+					PolicyName: "xyzlimit-scale.example.com",
+					ParamRef: &admissionregistration.ParamRef{
+						Name:                    "xyzlimit-scale-setting.example.com",
+						ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+					},
+					MatchResources: &admissionregistration.MatchResources{
+						MatchPolicy: func() *admissionregistration.MatchPolicyType {
+							r := admissionregistration.MatchPolicyType("other")
+							return &r
+						}(),
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"config", "xyzlimit-scale.example.com", "*/xyzlimit-scale-setting.example.com", "5m"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printValidatingAdmissionPolicyBinding(&test.validatingAdmissionPolicyBinding, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintLeaseCandidate(t *testing.T) {
+	tests := []struct {
+		leaseCandidate coordination.LeaseCandidate
+		options        printers.GenerateOptions
+		expected       []metav1.TableRow
+	}{
+		{
+			leaseCandidate: coordination.LeaseCandidate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-leaseCandidate",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: coordination.LeaseCandidateSpec{
+					BinaryVersion:       "test-binary-version",
+					EmulationVersion:    "test-emulation-version",
+					LeaseName:           "test",
+					PreferredStrategies: []coordination.CoordinatedLeaseStrategy{coordination.OldestEmulationVersion},
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test-leaseCandidate", "test", "test-binary-version", "test-emulation-version", "5m"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printLeaseCandidate(&test.leaseCandidate, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -7090,6 +7216,18 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "ResourceSlice",
 			printer: func() ([]metav1.TableRow, error) {
 				return printResourceSlice(&resourceapis.ResourceSlice{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "LeaseCandidate",
+			printer: func() ([]metav1.TableRow, error) {
+				return printLeaseCandidate(&coordination.LeaseCandidate{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ClusterTrustBundle",
+			printer: func() ([]metav1.TableRow, error) {
+				return printClusterTrustBundle(&certificates.ClusterTrustBundle{}, printers.GenerateOptions{})
 			},
 		},
 	}
