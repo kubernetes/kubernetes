@@ -49,6 +49,9 @@ func MkdirAllNewAs(path string, mode os.FileMode, ownerUID, ownerGID int) error 
 		if err := os.Chown(pathComponent, ownerUID, ownerGID); err != nil {
 			return err
 		}
+		if err := os.Chmod(pathComponent, mode); err != nil {
+			return err
+		}
 	}
 	return nil
 }
