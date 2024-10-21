@@ -62,16 +62,6 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	}
 	out.ClientConnection = in.ClientConnection
 	in.Logging.DeepCopyInto(&out.Logging)
-	if in.HealthzBindAddresses != nil {
-		in, out := &in.HealthzBindAddresses, &out.HealthzBindAddresses
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.MetricsBindAddresses != nil {
-		in, out := &in.MetricsBindAddresses, &out.MetricsBindAddresses
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	in.IPVS.DeepCopyInto(&out.IPVS)
 	out.Winkernel = in.Winkernel

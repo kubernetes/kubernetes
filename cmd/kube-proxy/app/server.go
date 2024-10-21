@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -221,8 +220,8 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		Namespace: "",
 	}
 
-	if len(config.HealthzBindAddresses) > 0 {
-		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddresses, config.HealthzBindPort, 2*config.SyncPeriod.Duration)
+	if len(config.HealthzBindAddress) > 0 {
+		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup(ctx)
@@ -278,7 +277,7 @@ func checkBadConfig(s *ProxyServer) error {
 		}
 	}
 
-	// Warn if NodeAddressHandler does not limit connections on all IP families that
+	// Warn if NodePortAddresses does not limit connections on all IP families that
 	// seem to be in use.
 	cidrsByFamily := proxyutil.MapCIDRsByIPFamily(s.Config.NodePortAddresses)
 	if len(s.Config.NodePortAddresses) == 0 {
@@ -313,7 +312,7 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		clusterType = fmt.Sprintf("%s-only", s.PrimaryIPFamily)
 	}
 
-	if badCIDRs(s.Config.DetectLocal.ClusterCIDRs, badFamily, false) {
+	if badCIDRs(s.Config.DetectLocal.ClusterCIDRs, badFamily) {
 		errors = append(errors, fmt.Errorf("cluster is %s but clusterCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR && !dualStackSupported {
 			// This has always been a fatal error
@@ -321,7 +320,7 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		}
 	}
 
-	if badCIDRs(s.podCIDRs, badFamily, false) {
+	if badCIDRs(s.podCIDRs, badFamily) {
 		errors = append(errors, fmt.Errorf("cluster is %s but node.spec.podCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 			// This has always been a fatal error
@@ -336,39 +335,47 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 	// In some cases, wrong-IP-family is only a problem when the secondary IP family
 	// isn't present at all.
 	if !dualStackSupported {
-		if badCIDRs(s.Config.IPVS.ExcludeCIDRs, badFamily, false) {
+		if badCIDRs(s.Config.IPVS.ExcludeCIDRs, badFamily) {
 			errors = append(errors, fmt.Errorf("cluster is %s but ipvs.excludeCIDRs contains only IPv%s addresses", clusterType, badFamily))
 		}
 
-		if badCIDRs(s.Config.HealthzBindAddresses, badFamily, true) {
-			errors = append(errors, fmt.Errorf("cluster is %s but healthzBindAddresses doesn't contain IPv%s cidr", clusterType, badFamily))
+		if badBindAddress(s.Config.HealthzBindAddress, badFamily) {
+			errors = append(errors, fmt.Errorf("cluster is %s but healthzBindAddress is IPv%s", clusterType, badFamily))
 		}
-		if badCIDRs(s.Config.MetricsBindAddresses, badFamily, true) {
-			errors = append(errors, fmt.Errorf("cluster is %s but metricsBindAddresses doesn't contain IPv%s cidr", clusterType, badFamily))
+		if badBindAddress(s.Config.MetricsBindAddress, badFamily) {
+			errors = append(errors, fmt.Errorf("cluster is %s but metricsBindAddress is IPv%s", clusterType, badFamily))
 		}
 	}
 
-	// Note that s.Config.NodeAddressHandler gets checked as part of checkBadConfig()
+	// Note that s.Config.NodePortAddresses gets checked as part of checkBadConfig()
 	// so it doesn't need to be checked here.
 
 	return utilerrors.NewAggregate(errors), fatal
 }
 
 // badCIDRs returns true if cidrs is a non-empty list of CIDRs, all of wrongFamily.
-// If allowUnspecified is false, unspecified addresses '0.0.0.0' and '::' will not be treated
-// as part of either family.
-func badCIDRs(cidrStrings []string, wrongFamily netutils.IPFamily, allowUnspecified bool) bool {
-	if len(cidrStrings) == 0 {
+func badCIDRs(cidrs []string, wrongFamily netutils.IPFamily) bool {
+	if len(cidrs) == 0 {
 		return false
 	}
-	for _, cidrString := range cidrStrings {
-		ip, cidr, _ := netutils.ParseCIDRSloppy(cidrString)
-		maskSize, _ := cidr.Mask.Size()
-		if netutils.IPFamilyOf(ip) != wrongFamily || (allowUnspecified && (ip.IsUnspecified() && maskSize == 0)) {
+	for _, cidr := range cidrs {
+		if netutils.IPFamilyOfCIDRString(cidr) != wrongFamily {
 			return false
 		}
 	}
 	return true
+}
+
+// badBindAddress returns true if bindAddress is an "IP:port" string where IP is a
+// non-zero IP of wrongFamily.
+func badBindAddress(bindAddress string, wrongFamily netutils.IPFamily) bool {
+	if host, _, _ := net.SplitHostPort(bindAddress); host != "" {
+		ip := netutils.ParseIPSloppy(host)
+		if ip != nil && netutils.IPFamilyOf(ip) == wrongFamily && !ip.IsUnspecified() {
+			return true
+		}
+	}
+	return false
 }
 
 // createClient creates a kube client from the given config and masterOverride.
@@ -412,7 +419,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxierHealthServer, errC
 	}
 
 	fn := func() {
-		err := hz.Run(ctx)
+		err := hz.Run()
 		if err != nil {
 			logger.Error(err, "Healthz server failed")
 			if errCh != nil {
@@ -428,9 +435,8 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxierHealthServer, errC
 	go wait.Until(fn, 5*time.Second, ctx.Done())
 }
 
-func serveMetrics(ctx context.Context, cidrStrings []string, port int32, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
-	logger := klog.FromContext(ctx)
-	if len(cidrStrings) == 0 {
+func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
+	if len(bindAddress) == 0 {
 		return
 	}
 
@@ -453,62 +459,18 @@ func serveMetrics(ctx context.Context, cidrStrings []string, port int32, proxyMo
 
 	configz.InstallHandler(proxyMux)
 
-	var nodeIPs []net.IP
-	for _, ipFamily := range []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol} {
-		nah := proxyutil.NewNodeAddressHandler(ipFamily, cidrStrings)
-		if nah.MatchAll() {
-			// Some cloud-providers may assign IPs to a node after kube-proxy
-			// startup. The only way to listen on those IPs is to bind the server
-			// on 0.0.0.0. To handle this case we skip filtering NodeIPs by CIDRs
-			// and listen on 0.0.0.0 if any of the given CIDRs is a zero-cidr.
-			// (ref: https://github.com/kubernetes/kubernetes/pull/126889)
-			nodeIPs = []net.IP{net.IPv4zero}
-			break
-		} else {
-			ips, err := nah.GetNodeIPs(proxyutil.RealNetwork{})
-			nodeIPs = append(nodeIPs, ips...)
-			if err != nil {
-				logger.Error(err, "failed to get node IPs for metrics server", "ipFamily", ipFamily)
-			}
-		}
-		if len(nodeIPs) == 0 {
-			logger.Info("failed to get any node ip matching metricsBindAddresses", "metricsBindAddresses", cidrStrings)
-		}
-	}
-	var addrs []string
-	for _, nodeIP := range nodeIPs {
-		if nodeIP.IsLinkLocalUnicast() || nodeIP.IsLinkLocalMulticast() {
-			continue
-		}
-		addrs = append(addrs, net.JoinHostPort(nodeIP.String(), strconv.Itoa(int(port))))
-	}
-
 	fn := func() {
-		var err error
-		defer func() {
-			if err != nil {
-				err = fmt.Errorf("starting metrics server failed: %w", err)
-				utilruntime.HandleError(err)
-				if errCh != nil {
-					errCh <- err
-					// if in hardfail mode, never retry again
-					blockCh := make(chan error)
-					<-blockCh
-				}
+		err := http.ListenAndServe(bindAddress, proxyMux)
+		if err != nil {
+			err = fmt.Errorf("starting metrics server failed: %w", err)
+			utilruntime.HandleError(err)
+			if errCh != nil {
+				errCh <- err
+				// if in hardfail mode, never retry again
+				blockCh := make(chan error)
+				<-blockCh
 			}
-		}()
-
-		listener, err := netutils.MultiListen(ctx, "tcp", addrs...)
-		if err != nil {
-			return
 		}
-
-		server := &http.Server{Handler: proxyMux}
-		err = server.Serve(listener)
-		if err != nil {
-			return
-		}
-
 	}
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
@@ -550,7 +512,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serveHealthz(ctx, s.HealthzServer, healthzErrCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(ctx, s.Config.MetricsBindAddresses, s.Config.MetricsBindPort, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
+	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {

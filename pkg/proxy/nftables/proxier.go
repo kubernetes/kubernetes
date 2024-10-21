@@ -180,8 +180,8 @@ type Proxier struct {
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxierHealthServer
 
-	// nodeAddressHandler selects the interfaces where nodePort works.
-	nodeAddressHandler *proxyutil.NodeAddressHandler
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer proxyutil.NetworkInterfacer
@@ -240,9 +240,9 @@ func NewProxier(ctx context.Context,
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using nftables mark for masquerade", "mark", masqueradeMark)
 
-	nodeAddressHandler := proxyutil.NewNodeAddressHandler(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodeAddressHandler, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
@@ -262,7 +262,7 @@ func NewProxier(ctx context.Context,
 		recorder:            recorder,
 		serviceHealthServer: serviceHealthServer,
 		healthzServer:       healthzServer,
-		nodeAddressHandler:  nodeAddressHandler,
+		nodePortAddresses:   nodePortAddresses,
 		networkInterfacer:   proxyutil.RealNetwork{},
 		staleChains:         make(map[string]time.Time),
 		logger:              logger,
@@ -574,7 +574,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Type:    ipvX_addr,
 		Comment: ptr.To("IPs that accept NodePort traffic"),
 	})
-	if proxier.nodeAddressHandler.MatchAll() {
+	if proxier.nodePortAddresses.MatchAll() {
 		tx.Delete(&knftables.Set{
 			Name: nodePortIPsSet,
 		})
@@ -582,9 +582,9 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		tx.Flush(&knftables.Set{
 			Name: nodePortIPsSet,
 		})
-		nodeIPs, err := proxier.nodeAddressHandler.GetNodeIPs(proxier.networkInterfacer)
+		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 		if err != nil {
-			proxier.logger.Error(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodeAddressHandler)
+			proxier.logger.Error(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 		}
 		for _, ip := range nodeIPs {
 			if ip.IsLoopback() {
@@ -632,7 +632,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		),
 	})
 
-	if proxier.nodeAddressHandler.MatchAll() {
+	if proxier.nodePortAddresses.MatchAll() {
 		tx.Add(&knftables.Rule{
 			Chain: nodePortEndpointsCheckChain,
 			Rule: knftables.Concat(
@@ -686,7 +686,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 			"vmap", "@", serviceIPsMap,
 		),
 	})
-	if proxier.nodeAddressHandler.MatchAll() {
+	if proxier.nodePortAddresses.MatchAll() {
 		tx.Add(&knftables.Rule{
 			Chain: servicesChain,
 			Rule: knftables.Concat(
