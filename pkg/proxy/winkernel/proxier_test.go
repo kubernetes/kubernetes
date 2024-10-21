@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib/hcn"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1124,6 +1125,159 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 				t.Errorf("IngressLBID %v is not empty.", ingressIP.hnsID)
 			}
 		}
+	}
+}
+
+// TestClusterIPLBWithL4ProxyAnnotationSet test verifies that when L4Proxy annotation is set,
+// createloadbalancer for ClusterIP should also contain the loadbalancerflag set for L4Proxy.
+func TestClusterIPLBWithL4ProxyAnnotationSet(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+
+	if proxier == nil {
+		t.Error()
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+	lbIP := "11.21.31.41"
+
+	testSvc := makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+		svc.Spec.Type = "ClusterIP"
+		svc.Spec.ClusterIP = svcIP
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     svcPortName.Port,
+			Port:     int32(svcPort),
+			Protocol: v1.ProtocolTCP,
+			NodePort: int32(svcNodePort),
+		}}
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+			IP: lbIP,
+		}}
+	})
+
+	testSvc.ObjectMeta.Annotations["l4Proxy"] = "ENABLED"
+
+	makeServiceMap(proxier, testSvc)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+				NodeName:  ptr.To("testhost2"), // This will make this endpoint as a remote endpoint
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	// Checking ClusterIP Loadbalancer is created
+	assert.Equal(t, svcInfo.hnsID, loadbalancerGuid1, "Loadbalancer ID does not match")
+	assert.True(t, svcInfo.l4ProxyEnabled, "l4ProxyEnabled is not enabled for %v", svcInfo.hnsID)
+	loadbalancer, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
+	assert.Nil(t, err, "Failed to get loadbalancer by ID")
+	assert.Equal(t, loadbalancer.Flags, LoadBalancerFlagsL4Proxy, "L4Proxy flag is not set for %v", svcInfo.hnsID)
+	// Verifying NodePort Loadbalancer is not created
+	assert.Empty(t, svcInfo.nodePorthnsID, "NodePortHnsID %v is not empty.", svcInfo.nodePorthnsID)
+	// Verifying ExternalIP Loadbalancer is not created
+	for _, externalIP := range svcInfo.externalIPs {
+		assert.Empty(t, externalIP.hnsID, "ExternalLBID %v is not empty.", externalIP.hnsID)
+	}
+	// Verifying IngressIP Loadbalancer is not created
+	for _, ingressIP := range svcInfo.loadBalancerIngressIPs {
+		assert.Empty(t, ingressIP.hnsID, "IngressLBID %v is not empty.", ingressIP.hnsID)
+	}
+}
+
+// TestClusterIPLBWithL4ProxyAnnotationNotSet test verifies that when L4Proxy annotation is not set,
+// createloadbalancer for ClusterIP should not contain the loadbalancerflag set for L4Proxy.
+func TestClusterIPLBWithL4ProxyAnnotationNotSet(t *testing.T) {
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+
+	if proxier == nil {
+		t.Error()
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+	lbIP := "11.21.31.41"
+
+	testSvc := makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+		svc.Spec.Type = "ClusterIP"
+		svc.Spec.ClusterIP = svcIP
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     svcPortName.Port,
+			Port:     int32(svcPort),
+			Protocol: v1.ProtocolTCP,
+			NodePort: int32(svcNodePort),
+		}}
+		svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+			IP: lbIP,
+		}}
+	})
+
+	testSvc.ObjectMeta.Annotations["l4Proxy"] = "DISABLED"
+
+	makeServiceMap(proxier, testSvc)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+				NodeName:  ptr.To("testhost2"), // This will make this endpoint as a remote endpoint
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	// Checking ClusterIP Loadbalancer is created
+	assert.Equal(t, svcInfo.hnsID, loadbalancerGuid1, "Loadbalancer ID does not match")
+	assert.False(t, svcInfo.l4ProxyEnabled, "l4ProxyEnabled is enabled for %v", svcInfo.hnsID)
+	loadbalancer, err := proxier.hcn.GetLoadBalancerByID(loadbalancerGuid1)
+	assert.Nil(t, err, "Failed to get loadbalancer by ID")
+	assert.NotEqual(t, loadbalancer.Flags, LoadBalancerFlagsL4Proxy, "L4Proxy flag is set for %v", svcInfo.hnsID)
+	// Verifying NodePort Loadbalancer is not created
+	assert.Empty(t, svcInfo.nodePorthnsID, "NodePortHnsID %v is not empty.", svcInfo.nodePorthnsID)
+	// Verifying ExternalIP Loadbalancer is not created
+	for _, externalIP := range svcInfo.externalIPs {
+		assert.Empty(t, externalIP.hnsID, "ExternalLBID %v is not empty.", externalIP.hnsID)
+	}
+	// Verifying IngressIP Loadbalancer is not created
+	for _, ingressIP := range svcInfo.loadBalancerIngressIPs {
+		assert.Empty(t, ingressIP.hnsID, "IngressLBID %v is not empty.", ingressIP.hnsID)
 	}
 }
 

@@ -53,6 +53,8 @@ var (
 	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
 	// LoadBalancerPortMappingFlagsVipExternalIP enables VipExternalIP.
 	LoadBalancerPortMappingFlagsVipExternalIP hcn.LoadBalancerPortMappingFlags = 16
+	// LoadBalancerFlagsL4Proxy enables L4Proxy.
+	LoadBalancerFlagsL4Proxy hcn.LoadBalancerFlags = 4
 )
 
 func getLoadBalancerPolicyFlags(flags loadBalancerFlags) (lbPortMappingFlags hcn.LoadBalancerPortMappingFlags, lbFlags hcn.LoadBalancerFlags) {
@@ -78,6 +80,9 @@ func getLoadBalancerPolicyFlags(flags loadBalancerFlags) (lbPortMappingFlags hcn
 	}
 	if flags.isIPv6 {
 		lbFlags |= LoadBalancerFlagsIPv6
+	}
+	if flags.l4ProxyEnabled {
+		lbFlags |= LoadBalancerFlagsL4Proxy
 	}
 	return
 }
@@ -388,6 +393,9 @@ func (hns hns) getLoadBalancer(endpoints []endpointInfo, flags loadBalancerFlags
 
 	if flags.isIPv6 {
 		lbFlags |= LoadBalancerFlagsIPv6
+	}
+	if flags.l4ProxyEnabled {
+		lbFlags |= LoadBalancerFlagsL4Proxy
 	}
 
 	lbDistributionType := hcn.LoadBalancerDistributionNone
