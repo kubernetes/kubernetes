@@ -169,6 +169,11 @@ type ActualStateOfWorld interface {
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
 
+	// GetAttachedVolume returns the volume that is known to be attached to the node
+	// with the given volume name. If the volume is not found, the second return value
+	// is false.
+	GetAttachedVolume(volumeName v1.UniqueVolumeName) (AttachedVolume, bool)
+
 	// Add the specified volume to ASW as uncertainly attached.
 	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
@@ -1123,6 +1128,18 @@ func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
 	}
 
 	return allAttachedVolumes
+}
+
+func (asw *actualStateOfWorld) GetAttachedVolume(volumeName v1.UniqueVolumeName) (AttachedVolume, bool) {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, ok := asw.attachedVolumes[volumeName]
+	if !ok {
+		return AttachedVolume{}, false
+	}
+
+	return asw.newAttachedVolume(&volumeObj), true
 }
 
 func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
