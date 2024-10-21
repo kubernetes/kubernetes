@@ -109,7 +109,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 		ginkgo.By("waiting for resize to be actuated")
 		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod1, patchedPod, expected, containers, false)
 		ginkgo.By("verifying pod container's cgroup values after resize")
-		framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expected))
+		framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(f, resizedPod, expected))
 
 		ginkgo.By("verifying pod resources after resize")
 		e2epod.VerifyPodResources(resizedPod, expected)
@@ -323,7 +323,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
-		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+		if !e2enode.NodeSupportsInPlacePodVerticalScaling(node) {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
 	})
