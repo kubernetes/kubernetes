@@ -31,6 +31,10 @@ import (
 
 func TestMakeMountsWindows(t *testing.T) {
 	// TODO: remove skip once the failing test has been fixed.
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
 	t.Skip("Skip failing test on Windows.")
 	container := v1.Container{
 		VolumeMounts: []v1.VolumeMount{
@@ -92,7 +96,7 @@ func TestMakeMountsWindows(t *testing.T) {
 	podDir, err := os.MkdirTemp("", "test-rotate-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(podDir)
-	mounts, _, err := makeMounts(&pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil, false, nil)
+	mounts, _, err := kubelet.makeMounts(&pod, podDir, &container, "fakepodname", "", []string{""}, podVolumes, fhu, fsp, nil, false, nil)
 	require.NoError(t, err)
 
 	expectedMounts := []kubecontainer.Mount{
