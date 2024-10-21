@@ -33,6 +33,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cloudprovider "k8s.io/cloud-provider"
 	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -50,6 +51,7 @@ import (
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	netutils "k8s.io/utils/net"
 
 	// add the kubernetes feature gates
@@ -451,6 +453,16 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, utilversion.ValidateKubeEffectiveVersion(s.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)))
+
+	// in-tree cloud providers are disabled since v1.31 (KEP-2395)
+	if len(s.KubeCloudShared.CloudProvider.Name) > 0 && !cloudprovider.IsExternal(s.KubeCloudShared.CloudProvider.Name) {
+		cloudprovider.DisableWarningForProvider(s.KubeCloudShared.CloudProvider.Name)
+		errs = append(errs, cloudprovider.ErrorForDisabledProvider(s.KubeCloudShared.CloudProvider.Name))
+	}
+
+	if len(s.KubeCloudShared.CIDRAllocatorType) > 0 && s.KubeCloudShared.CIDRAllocatorType != string(ipam.RangeAllocatorType) {
+		errs = append(errs, fmt.Errorf("built-in cloud providers are disabled. The ipam %s is not available", s.KubeCloudShared.CIDRAllocatorType))
+	}
 
 	// TODO: validate component config, master and kubeconfig
 

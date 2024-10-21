@@ -461,6 +461,76 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
+func TestValidateFlags(t *testing.T) {
+	testcases := []struct {
+		name    string
+		flags   []string // not a good place to test flagParse error
+		wantErr bool     // this won't apply to flagParse, it only apply to KubeControllerManagerOptions.Validate
+	}{
+		{
+			name:    "empty flags",
+			flags:   []string{},
+			wantErr: false,
+		},
+		{
+			name: "cloud provider empty flag",
+			flags: []string{
+				"--cloud-provider", "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "cloud provider set but not external",
+			flags: []string{
+				"--cloud-provider=gce",
+			},
+			wantErr: true,
+		},
+		{
+			name: "cloud provider set to external",
+			flags: []string{
+				"--cloud-provider=external",
+			},
+			wantErr: false,
+		},
+		{
+			name: "nodeipam to cloudAllocator",
+			flags: []string{
+				"--cidr-allocator-type=CloudAllocator",
+			},
+			wantErr: true,
+		},
+		{
+			name: "nodeipam to rangeAllocator",
+			flags: []string{
+				"--cidr-allocator-type=RangeAllocator",
+			},
+			wantErr: false,
+		},
+		{
+			name: "nodeipam to IPAMFromCloud",
+			flags: []string{
+				"--cidr-allocator-type=IPAMFromCloud",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, s := setupControllerManagerFlagSet(t)
+			err := fs.Parse(tc.flags)
+			checkTestError(t, err, false, "")
+			err = s.Validate([]string{""}, []string{""}, nil)
+			if !tc.wantErr && err != nil {
+				t.Fatal(fmt.Errorf("expected no error, got %w", err))
+			} else if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
+	}
+}
+
 func TestApplyTo(t *testing.T) {
 	fs, s := setupControllerManagerFlagSet(t)
 
