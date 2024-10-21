@@ -170,6 +170,10 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 		return err
 	}
 	stats.MemoryStats.SwapUsage = swapUsage
+	stats.MemoryStats.SwapOnlyUsage = cgroups.MemoryData{
+		Usage:   swapUsage.Usage - memoryUsage.Usage,
+		Failcnt: swapUsage.Failcnt - memoryUsage.Failcnt,
+	}
 	kernelUsage, err := getMemoryData(path, "kmem")
 	if err != nil {
 		return err
