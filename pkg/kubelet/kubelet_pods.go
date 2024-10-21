@@ -1575,7 +1575,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 }
 
 // getPhase returns the phase of a pod given its container info.
-func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.PodPhase {
+func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasInitialized bool) v1.PodPhase {
 	spec := pod.Spec
 	pendingInitialization := 0
 	failedInitialization := 0
@@ -1691,8 +1691,8 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	case pendingInitialization > 0 &&
 		// This is needed to handle the case where the pod has been initialized but
 		// the restartable init containers are restarting and the pod should not be
-		// placed back into v1.PodPending since the regular containers have run.
-		!kubecontainer.HasAnyRegularContainerStarted(&spec, info):
+		// placed back into v1.PodPending.
+		!podHasInitialized:
 		fallthrough
 	case waiting > 0:
 		klog.V(5).InfoS("Pod waiting > 0, pending")
@@ -1783,6 +1783,44 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 	return podResizeStatus
 }
 
+// hasPodInitialized returns true if the pod has initialized for the current
+// pod sandbox with the given conditions of the status.
+func hasPodInitialized(pod *v1.Pod, status *v1.PodStatus) bool {
+	if len(pod.Spec.InitContainers) == 0 {
+		return true
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		// Without PodReadyToStartContainers condition, we can't determine if
+		// the pod has initialized for the current pod sandbox.
+		return false
+	}
+
+	if status == nil {
+		status = &pod.Status
+	}
+
+	_, readyToStartContainersCondition := podutil.GetPodCondition(status, v1.PodReadyToStartContainers)
+	if readyToStartContainersCondition == nil || readyToStartContainersCondition.Status != v1.ConditionTrue {
+		return false
+	}
+
+	_, initializedCondition := podutil.GetPodCondition(status, v1.PodInitialized)
+	if initializedCondition == nil || initializedCondition.Status != v1.ConditionTrue {
+		return false
+	}
+
+	// Both PodReadyToStartContainers and PodInitialized conditions are true.
+	if initializedCondition.LastTransitionTime.Before(&readyToStartContainersCondition.LastTransitionTime) {
+		// If the initialized condition was set after the
+		// readyToStartContainers condition, it means that the current pod
+		// sandbox was recreated for some reason (e.g. node reboot).
+		return false
+	}
+
+	return true
+}
+
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
@@ -1798,7 +1836,11 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(pod, allStatus, podIsTerminal)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		s.Phase = getPhase(pod, allStatus, podIsTerminal, hasPodInitialized(pod, &oldPodStatus))
+	} else {
+		s.Phase = getPhase(pod, allStatus, podIsTerminal, false)
+	}
 	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
 
 	// Perform a three-way merge between the statuses from the status manager,

@@ -2306,7 +2306,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, test.podIsTerminal, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2409,7 +2409,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(test.pod, statusInfo, false)
+		status := getPhase(test.pod, statusInfo, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2428,12 +2428,13 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod           *v1.Pod
-		podIsTerminal bool
-		status        v1.PodPhase
-		test          string
+		pod               *v1.Pod
+		podIsTerminal     bool
+		podHasInitialized bool
+		status            v1.PodPhase
+		test              string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, false, v1.PodPending, "empty, waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, false, false, v1.PodPending, "empty, waiting"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -2443,6 +2444,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodPending,
 			"restartable init container running",
@@ -2457,6 +2459,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			false,
+			false,
 			v1.PodPending,
 			"restartable init container stopped",
 		},
@@ -2469,6 +2472,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodPending,
 			"restartable init container waiting, terminated zero",
@@ -2483,6 +2487,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			false,
+			false,
 			v1.PodPending,
 			"restartable init container waiting, terminated non-zero",
 		},
@@ -2495,6 +2500,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodPending,
 			"restartable init container waiting, not terminated",
@@ -2511,6 +2517,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodPending,
 			"restartable init container started, 1/2 regular container running",
@@ -2529,6 +2536,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			false,
+			false,
 			v1.PodRunning,
 			"restartable init container started, all regular containers running",
 		},
@@ -2537,7 +2545,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				Spec: desiredState,
 				Status: v1.PodStatus{
 					InitContainerStatuses: []v1.ContainerStatus{
-						runningState("containerX"),
+						startedState("containerX"),
 					},
 					ContainerStatuses: []v1.ContainerStatus{
 						runningState("containerA"),
@@ -2545,6 +2553,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodRunning,
 			"restartable init container running, all regular containers running",
@@ -2563,6 +2572,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			false,
+			true,
 			v1.PodRunning,
 			"restartable init container stopped, all regular containers running",
 		},
@@ -2579,6 +2589,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			false,
 			v1.PodRunning,
 			"backoff crashloop restartable init container, all regular containers running",
@@ -2597,6 +2608,7 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			true,
+			false,
 			v1.PodSucceeded,
 			"all regular containers succeeded and restartable init container failed with restart always, but the pod is terminal",
 		},
@@ -2614,14 +2626,53 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 				},
 			},
 			true,
+			false,
 			v1.PodSucceeded,
 			"all regular containers succeeded and restartable init container succeeded with restart always, but the pod is terminal",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
+					},
+				},
+			},
+			false,
+			false,
+			v1.PodPending,
+			"re-initializing the pod that was already initialized before the node reboot",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						// containers have "Terminated" state as they were
+						// initialized before the node reboot
+						failedState("containerA"),
+						failedState("containerB"),
+					},
+				},
+			},
+			false,
+			true,
+			v1.PodRunning,
+			"after initialization, all containers are failed simultaneously",
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(test.pod, statusInfo, test.podIsTerminal)
+		status := getPhase(test.pod, statusInfo, test.podIsTerminal, test.podHasInitialized)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2721,7 +2772,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2824,7 +2875,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(test.pod, statusInfo, false)
+		status := getPhase(test.pod, statusInfo, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2843,11 +2894,12 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod    *v1.Pod
-		status v1.PodPhase
-		test   string
+		pod               *v1.Pod
+		podHasInitialized bool
+		status            v1.PodPhase
+		test              string
 	}{
-		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, v1.PodPending, "empty, waiting"},
+		{&v1.Pod{Spec: desiredState, Status: v1.PodStatus{}}, false, v1.PodPending, "empty, waiting"},
 		{
 			&v1.Pod{
 				Spec: desiredState,
@@ -2857,6 +2909,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container running",
 		},
@@ -2869,6 +2922,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container stopped",
 		},
@@ -2881,6 +2935,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container waiting, terminated zero",
 		},
@@ -2893,6 +2948,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container waiting, terminated non-zero",
 		},
@@ -2905,6 +2961,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container waiting, not terminated",
 		},
@@ -2920,6 +2977,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodPending,
 			"restartable init container started, one main container running",
 		},
@@ -2936,6 +2994,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodRunning,
 			"restartable init container started, main containers succeeded",
 		},
@@ -2952,6 +3011,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			true,
 			v1.PodRunning,
 			"restartable init container running, main containers succeeded",
 		},
@@ -2968,6 +3028,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodSucceeded,
 			"all containers succeeded",
 		},
@@ -2984,6 +3045,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodSucceeded,
 			"restartable init container terminated non-zero, main containers succeeded",
 		},
@@ -3000,6 +3062,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodSucceeded,
 			"backoff crashloop restartable init container, main containers succeeded",
 		},
@@ -3016,6 +3079,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 					},
 				},
 			},
+			false,
 			v1.PodSucceeded,
 			"backoff crashloop with non-zero restartable init container, main containers succeeded",
 		},
@@ -3023,7 +3087,7 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
-		status := getPhase(test.pod, statusInfo, false)
+		status := getPhase(test.pod, statusInfo, false, test.podHasInitialized)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -3136,7 +3200,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses, false, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -6420,5 +6484,157 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 		} else {
 			assert.ErrorContains(t, err, tc.expectedErr)
 		}
+	}
+}
+
+func Test_hasPodInitialized(t *testing.T) {
+	baseTime := time.Now()
+	testCases := []struct {
+		desc string
+
+		pod    *v1.Pod
+		status *v1.PodStatus
+
+		podReadyToStartContainersConditionEnabled bool
+
+		expected bool
+	}{
+		{
+			desc: "Pod does not have init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			status:   &v1.PodStatus{},
+			expected: true,
+		},
+		{
+			desc: "Pod hasn't initialized yet",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init-container1"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			status: &v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodInitialized,
+						Status: v1.ConditionFalse,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "Pod has initialized already but ReadyToStartContainers FG disabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init-container1"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			status: &v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodInitialized,
+						Status: v1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime.Add(1 * time.Second),
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "Pod has initialized already and ReadyToStartContainers FG enabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init-container1"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			status: &v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReadyToStartContainers,
+						Status: v1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime,
+						},
+					},
+					{
+						Type:   v1.PodInitialized,
+						Status: v1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime.Add(1 * time.Second),
+						},
+					},
+				},
+			},
+			podReadyToStartContainersConditionEnabled: true,
+			expected: true,
+		},
+		{
+			desc: "Pod had initialized but restarted and ReadyToStartContainers FG enabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init-container1"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			status: &v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReadyToStartContainers,
+						Status: v1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime.Add(2 * time.Second),
+						},
+					},
+					{
+						Type:   v1.PodInitialized,
+						Status: v1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: baseTime.Add(1 * time.Second),
+						},
+					},
+				},
+			},
+			podReadyToStartContainersConditionEnabled: true,
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, tc.podReadyToStartContainersConditionEnabled)
+			got := hasPodInitialized(tc.pod, tc.status)
+			assert.Equal(t, tc.expected, got)
+		})
 	}
 }
