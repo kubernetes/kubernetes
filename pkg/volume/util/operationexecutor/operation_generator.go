@@ -1088,22 +1088,6 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			}
 		}
 
-		// When kubelet is containerized, devicePath may be a symlink at a place unavailable to
-		// kubelet, so evaluate it on the host and expect that it links to a device in /dev,
-		// which will be available to containerized kubelet. If still it does not exist,
-		// AttachFileDevice will fail. If kubelet is not containerized, eval it anyway.
-		kvh, ok := og.GetVolumePluginMgr().Host.(volume.KubeletVolumeHost)
-		if !ok {
-			eventErr, detailedErr := volumeToMount.GenerateError("MapVolume type assertion error", fmt.Errorf("volume host does not implement KubeletVolumeHost interface"))
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
-		hu := kvh.GetHostUtil()
-		devicePath, err = hu.EvalHostSymlinks(devicePath)
-		if err != nil {
-			eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
-
 		// Update actual state of world with the devicePath again, if devicePath has changed from markedDevicePath
 		// TODO: This can be improved after #82492 is merged and ASW has state.
 		if markedDevicePath != devicePath {
