@@ -175,7 +175,7 @@ func InitDefaultResizePolicy(containers []ResizableContainerInfo) {
 }
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) (v1.Container, v1.ContainerStatus) {
-	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	cmd := "trap exit TERM; grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
 	res, alloc, resizePol := getTestResourceInfo(tcInfo)
 
 	tc := v1.Container{
@@ -370,7 +370,11 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 
 func waitForContainerRestart(ctx context.Context, podClient *PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo, initialContainers []ResizableContainerInfo, isRollback bool) error {
 	ginkgo.GinkgoHelper()
-	var restartContainersExpected []string
+	type restartExpectation struct {
+		cName        string
+		restartCount int32
+	}
+	var restartContainersExpected []restartExpectation
 
 	restartContainers := expectedContainers
 	// if we're rolling back, extract restart counts from test case "expected" containers
@@ -380,7 +384,7 @@ func waitForContainerRestart(ctx context.Context, podClient *PodClient, pod *v1.
 
 	for _, ci := range restartContainers {
 		if ci.RestartCount > 0 {
-			restartContainersExpected = append(restartContainersExpected, ci.Name)
+			restartContainersExpected = append(restartContainersExpected, restartExpectation{cName: ci.Name, restartCount: ci.RestartCount})
 		}
 	}
 	if len(restartContainersExpected) == 0 {
@@ -392,9 +396,9 @@ func waitForContainerRestart(ctx context.Context, podClient *PodClient, pod *v1.
 		return err
 	}
 	restartedContainersCount := 0
-	for _, cName := range restartContainersExpected {
-		cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, cName)
-		if cs.RestartCount < 1 {
+	for _, expect := range restartContainersExpected {
+		cs, _ := podutil.GetContainerStatus(pod.Status.ContainerStatuses, expect.cName)
+		if cs.RestartCount < expect.restartCount {
 			break
 		}
 		restartedContainersCount++
