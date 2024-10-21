@@ -886,8 +886,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	genericApiServerHookName := "generic-apiserver-start-informers"
 	if c.SharedInformerFactory != nil {
 		if !s.isPostStartHookRegistered(genericApiServerHookName) {
-			err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
-				c.SharedInformerFactory.Start(context.StopCh)
+			err := s.AddPostStartHook(genericApiServerHookName, func(hookContext PostStartHookContext) error {
+				c.SharedInformerFactory.Start(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -904,8 +904,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	const priorityAndFairnessConfigConsumerHookName = "priority-and-fairness-config-consumer"
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
-		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
-			go c.FlowControl.Run(context.StopCh)
+		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(hookContext PostStartHookContext) error {
+			go c.FlowControl.Run(hookContext.Done())
 			return nil
 		})
 		if err != nil {
@@ -920,8 +920,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.FlowControl != nil {
 		const priorityAndFairnessFilterHookName = "priority-and-fairness-filter"
 		if !s.isPostStartHookRegistered(priorityAndFairnessFilterHookName) {
-			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(context PostStartHookContext) error {
-				genericfilters.StartPriorityAndFairnessWatermarkMaintenance(context.StopCh)
+			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(hookContext PostStartHookContext) error {
+				genericfilters.StartPriorityAndFairnessWatermarkMaintenance(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -931,8 +931,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	} else {
 		const maxInFlightFilterHookName = "max-in-flight-filter"
 		if !s.isPostStartHookRegistered(maxInFlightFilterHookName) {
-			err := s.AddPostStartHook(maxInFlightFilterHookName, func(context PostStartHookContext) error {
-				genericfilters.StartMaxInFlightWatermarkMaintenance(context.StopCh)
+			err := s.AddPostStartHook(maxInFlightFilterHookName, func(hookContext PostStartHookContext) error {
+				genericfilters.StartMaxInFlightWatermarkMaintenance(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -945,8 +945,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.StorageObjectCountTracker != nil {
 		const storageObjectCountTrackerHookName = "storage-object-count-tracker-hook"
 		if !s.isPostStartHookRegistered(storageObjectCountTrackerHookName) {
-			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(context PostStartHookContext) error {
-				go c.StorageObjectCountTracker.RunUntil(context.StopCh)
+			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(hookContext PostStartHookContext) error {
+				go c.StorageObjectCountTracker.RunUntil(hookContext.Done())
 				return nil
 			}); err != nil {
 				return nil, err
