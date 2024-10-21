@@ -86,9 +86,10 @@ type transformTest struct {
 	restClient        *kubernetes.Clientset
 	ns                *corev1.Namespace
 	secret            *corev1.Secret
+	enableRBAC        bool
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config, enableRBAC bool) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
@@ -97,6 +98,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		TContext:          tCtx,
 		transformerConfig: transformerConfigYAML,
 		storageConfig:     storageConfig,
+		enableRBAC:        enableRBAC,
 	}
 
 	var err error
@@ -286,14 +288,18 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 }
 
 func (e *transformTest) getEncryptionOptions(reload bool) []string {
+	var options []string
 	if e.transformerConfig != "" {
-		return []string{
+		options = append(options, []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount"}
+			"--disable-admission-plugins", "ServiceAccount"}...)
+	}
+	if e.enableRBAC {
+		options = append(options, "--authorization-mode=RBAC")
 	}
 
-	return nil
+	return options
 }
 
 func (e *transformTest) createEncryptionConfig() (
