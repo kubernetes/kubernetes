@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -31,7 +32,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	"k8s.io/kubernetes/pkg/features"
 )
+
+const kubeAPIServerServingSignerName = "kubernetes.io/kube-apiserver-serving"
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -204,6 +208,7 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 		rootCA []byte
 		err    error
 	)
+
 	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
 		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
 			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
@@ -212,11 +217,17 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
 	}
 
+	kubeAPIServerSignerName := ""
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		kubeAPIServerSignerName = kubeAPIServerServingSignerName
+	}
+
 	sac, err := rootcacertpublisher.NewPublisher(
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		controllerContext.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
 		rootCA,
+		kubeAPIServerSignerName,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
