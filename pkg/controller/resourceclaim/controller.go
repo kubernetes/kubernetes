@@ -157,15 +157,15 @@ func NewController(
 	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
-			ec.enqueueResourceClaim(logger, obj, false)
+			ec.enqueueResourceClaim(logger, nil, obj)
 		},
 		UpdateFunc: func(old, updated interface{}) {
 			logger.V(6).Info("updated claim", "claimDump", updated)
-			ec.enqueueResourceClaim(logger, updated, false)
+			ec.enqueueResourceClaim(logger, old, updated)
 		},
 		DeleteFunc: func(obj interface{}) {
 			logger.V(6).Info("deleted claim", "claimDump", obj)
-			ec.enqueueResourceClaim(logger, obj, true)
+			ec.enqueueResourceClaim(logger, obj, nil)
 		},
 	}); err != nil {
 		return nil, err
@@ -326,15 +326,48 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 	return false, "nothing to do"
 }
 
-func (ec *Controller) enqueueResourceClaim(logger klog.Logger, obj interface{}, deleted bool) {
-	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		obj = d.Obj
+func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
+	deleted := newObj != nil
+	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
+		oldObj = d.Obj
 	}
-	claim, ok := obj.(*resourceapi.ResourceClaim)
-	if !ok {
+	oldClaim, ok := oldObj.(*resourceapi.ResourceClaim)
+	if oldObj != nil && !ok {
+		return
+	}
+	newClaim, ok := newObj.(*resourceapi.ResourceClaim)
+	if newObj != nil && !ok {
 		return
 	}
 
+	// Maintain metrics based on what was observed.
+	switch {
+	case oldClaim == nil:
+		// Added.
+		metrics.NumResourceClaims.Inc()
+		if newClaim.Status.Allocation != nil {
+			metrics.NumAllocatedResourceClaims.Inc()
+		}
+	case newClaim == nil:
+		// Deleted.
+		metrics.NumResourceClaims.Dec()
+		if oldClaim.Status.Allocation != nil {
+			metrics.NumAllocatedResourceClaims.Dec()
+		}
+	default:
+		// Updated.
+		switch {
+		case oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil:
+			metrics.NumAllocatedResourceClaims.Inc()
+		case oldClaim.Status.Allocation != nil && newClaim.Status.Allocation == nil:
+			metrics.NumAllocatedResourceClaims.Dec()
+		}
+	}
+
+	claim := newClaim
+	if claim == nil {
+		claim = oldClaim
+	}
 	if !deleted {
 		// When starting up, we have to check all claims to find those with
 		// stale pods in ReservedFor. During an update, a pod might get added
