@@ -114,6 +114,18 @@ func (pl *FakePreemptionScorePostFilterPlugin) OrderedScoreFuncs(ctx context.Con
 	}
 }
 
+type FakeNodeToStatusReader struct {
+	nodes map[string]*framework.Status
+}
+
+func (f *FakeNodeToStatusReader) Get(nodeName string) *framework.Status {
+	return f.nodes[nodeName]
+}
+
+func (f *FakeNodeToStatusReader) NodesForStatusCode(nodeInfoLister framework.NodeInfoLister, code framework.Code) ([]*framework.NodeInfo, error) {
+	return []*framework.NodeInfo{}, nil
+}
+
 func TestDryRunPreemption(t *testing.T) {
 	metrics.Register()
 	tests := []struct {
@@ -351,6 +363,93 @@ func TestSelectCandidate(t *testing.T) {
 				if diff := cmp.Diff(tt.expected, s.Name()); diff != "" {
 					t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
 				}
+			}
+		})
+	}
+}
+
+func TestFindCandidates(t *testing.T) {
+	tests := []struct {
+		name               string
+		allNodes           []*framework.NodeInfo
+		pod                *v1.Pod
+		node               *v1.Node
+		nodeStatuses       map[string]*framework.Status
+		expectedError      bool
+		expectedCandidates int
+	}{
+		{
+			name:               "no available nodes",
+			allNodes:           []*framework.NodeInfo{},
+			pod:                st.MakePod().Name("test-pod").Priority(highPriority).Obj(),
+			node:               st.MakeNode().Name("").Obj(),
+			nodeStatuses:       map[string]*framework.Status{},
+			expectedError:      true,
+			expectedCandidates: 0,
+		},
+		{
+			name: "no potential candidates",
+			allNodes: []*framework.NodeInfo{
+				framework.NewNodeInfo(st.MakePod().Name("victim-pod").Node("node1").Priority(midPriority).Obj()),
+			},
+			pod:  st.MakePod().Name("test-pod").Priority(highPriority).Obj(),
+			node: st.MakeNode().Name("node1").Obj(),
+			nodeStatuses: map[string]*framework.Status{
+				"node1": framework.NewStatus(framework.Success),
+			},
+			expectedError:      false,
+			expectedCandidates: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeToStatus := &FakeNodeToStatusReader{nodes: tt.nodeStatuses}
+
+			nodes := []*v1.Node{tt.node}
+
+			client := clientsetfake.NewClientset()
+			snap := internalcache.NewSnapshot([]*v1.Pod{tt.pod}, nodes)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			var objs = []runtime.Object{tt.pod}
+
+			for _, n := range nodes {
+				objs = append(objs, n)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
+			registeredPlugins := append([]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New)},
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			)
+
+			fwk, err := tf.NewFramework(
+				ctx,
+				registeredPlugins, "",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithSnapshotSharedLister(snap),
+			)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ev := Evaluator{
+				Handler: fwk,
+			}
+
+			gotCandidates, _, err := ev.findCandidates(ctx, tt.allNodes, tt.pod, nodeToStatus)
+			if (err != nil) != tt.expectedError {
+				t.Fatalf("expected error: %v, got: %v", tt.expectedError, err)
+			}
+
+			if len(gotCandidates) != tt.expectedCandidates {
+				t.Errorf("expected %d candidates but got %v", tt.expectedCandidates, gotCandidates)
 			}
 		})
 	}
