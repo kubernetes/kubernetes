@@ -57,3 +57,11 @@ func SetDefaults_ParamRef(obj *admissionregistrationv1alpha1.ParamRef) {
 		obj.ParameterNotFoundAction = &v
 	}
 }
+
+// SetDefaults_MutatingAdmissionPolicySpec sets defaults for MutatingAdmissionPolicySpec
+func SetDefaults_MutatingAdmissionPolicySpec(obj *admissionregistrationv1alpha1.MutatingAdmissionPolicySpec) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1alpha1.Fail
+		obj.FailurePolicy = &policy
+	}
+}
