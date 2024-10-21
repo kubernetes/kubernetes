@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -70,10 +71,11 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder    SchedulerVolumeBinder
-	PVCLister corelisters.PersistentVolumeClaimLister
-	scorer    volumeCapacityScorer
-	fts       feature.Features
+	Binder      SchedulerVolumeBinder
+	PVCLister   corelisters.PersistentVolumeClaimLister
+	classLister storagelisters.StorageClassLister
+	scorer      volumeCapacityScorer
+	fts         feature.Features
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
@@ -470,20 +472,41 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, po
 	if !ok {
 		return 0, nil
 	}
-	// group by storage class
+
 	classResources := make(classResourceMap)
-	for _, staticBinding := range podVolumes.StaticBindings {
-		class := staticBinding.StorageClassName()
-		storageResource := staticBinding.StorageResource()
-		if _, ok := classResources[class]; !ok {
-			classResources[class] = &StorageResource{
-				Requested: 0,
-				Capacity:  0,
+	if len(podVolumes.StaticBindings) != 0 || !pl.fts.EnableStorageCapacityScoring {
+		// group static biding volumes by storage class
+		for _, staticBinding := range podVolumes.StaticBindings {
+			class := staticBinding.StorageClassName()
+			storageResource := staticBinding.StorageResource()
+			if _, ok := classResources[class]; !ok {
+				classResources[class] = &StorageResource{
+					Requested: 0,
+					Capacity:  0,
+				}
 			}
+			classResources[class].Requested += storageResource.Requested
+			classResources[class].Capacity += storageResource.Capacity
 		}
-		classResources[class].Requested += storageResource.Requested
-		classResources[class].Capacity += storageResource.Capacity
+	} else {
+		// group dynamic biding volumes by storage class
+		for _, provision := range podVolumes.DynamicProvisions {
+			if provision.Capacity == nil {
+				continue
+			}
+			class := *provision.PVC.Spec.StorageClassName
+			if _, ok := classResources[class]; !ok {
+				classResources[class] = &StorageResource{
+					Requested: 0,
+					Capacity:  0,
+				}
+			}
+			requestedQty := provision.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+			classResources[class].Requested += requestedQty.Value()
+			classResources[class].Capacity += provision.Capacity.Capacity.Value()
+		}
 	}
+
 	return pl.scorer(classResources), nil
 }
 
@@ -594,9 +617,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		scorer = buildScorerFunction(shape)
 	}
 	return &VolumeBinding{
-		Binder:    binder,
-		PVCLister: pvcInformer.Lister(),
-		scorer:    scorer,
-		fts:       fts,
+		Binder:      binder,
+		PVCLister:   pvcInformer.Lister(),
+		classLister: storageClassInformer.Lister(),
+		scorer:      scorer,
+		fts:         fts,
 	}, nil
 }

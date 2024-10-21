@@ -59,6 +59,22 @@ var (
 		},
 		VolumeBindingMode: &waitForFirstConsumer,
 	}
+	waitSCWithStorageCapacity = &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "wait-sc-with-storage-capacity",
+		},
+		Provisioner:       "driver-with-storage-capacity",
+		VolumeBindingMode: &waitForFirstConsumer,
+	}
+
+	driverWithStorageCapacity = &storagev1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "driver-with-storage-capacity",
+		},
+		Spec: storagev1.CSIDriverSpec{
+			StorageCapacity: ptr.To(true),
+		},
+	}
 
 	defaultShapePoint = []config.UtilizationShapePoint{
 		{
@@ -79,6 +95,7 @@ func TestVolumeBinding(t *testing.T) {
 		nodes                   []*v1.Node
 		pvcs                    []*v1.PersistentVolumeClaim
 		pvs                     []*v1.PersistentVolume
+		capacities              []*storagev1.CSIStorageCapacity
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
 		wantPreFilterResult     *framework.PreFilterResult
@@ -730,6 +747,100 @@ func TestVolumeBinding(t *testing.T) {
 				0,
 			},
 		},
+		{
+			name: "storage capacity score",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "50Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				boundClaims: []*v1.PersistentVolumeClaim{},
+				claimsToBind: []*v1.PersistentVolumeClaim{
+					makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				10,
+				20,
+				100,
+			},
+		},
+		{
+			name: "storage capacity score with static binds",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").withPVCVolume("pvc-static", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+				makePVC("pvc-static", waitSC.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+			},
+			pvs: []*v1.PersistentVolume{
+				makePV("pv-static-a", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-a"}}).PersistentVolume,
+				makePV("pv-static-b", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
+				makePV("pv-static-c", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-c"}}).PersistentVolume,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "50Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				boundClaims: []*v1.PersistentVolumeClaim{},
+				claimsToBind: []*v1.PersistentVolumeClaim{
+					makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+					makePVC("pvc-static", waitSC.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				50,
+				50,
+				50,
+			},
+		},
 	}
 
 	for _, item := range table {
@@ -768,6 +879,9 @@ func TestVolumeBinding(t *testing.T) {
 			client.StorageV1().StorageClasses().Create(ctx, immediateSC, metav1.CreateOptions{})
 			client.StorageV1().StorageClasses().Create(ctx, waitSC, metav1.CreateOptions{})
 			client.StorageV1().StorageClasses().Create(ctx, waitHDDSC, metav1.CreateOptions{})
+			client.StorageV1().StorageClasses().Create(ctx, waitSCWithStorageCapacity, metav1.CreateOptions{})
+
+			client.StorageV1().CSIDrivers().Create(ctx, driverWithStorageCapacity, metav1.CreateOptions{})
 			for _, node := range item.nodes {
 				client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 			}
@@ -776,6 +890,9 @@ func TestVolumeBinding(t *testing.T) {
 			}
 			for _, pv := range item.pvs {
 				client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+			}
+			for _, capacity := range item.capacities {
+				client.StorageV1().CSIStorageCapacities(capacity.Namespace).Create(ctx, capacity, metav1.CreateOptions{})
 			}
 
 			t.Log("Start informer factory after initialization")
