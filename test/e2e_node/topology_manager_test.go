@@ -123,9 +123,11 @@ func getMinRemoteDistanceForNode(nodeToDistances map[int][]int) int {
 }
 
 func detectNUMADistances(numaNodes int) map[int][]int {
+	ginkgo.GinkgoHelper()
+
 	nodeToDistances := make(map[int][]int)
 	for i := 0; i < numaNodes; i++ {
-		outData, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat /sys/devices/system/node/node%d/distance", i)).Output()
+		outData, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/distance", i))
 		framework.ExpectNoError(err)
 
 		nodeToDistances[i] = make([]int, 0, numaNodes)
@@ -905,8 +907,12 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 }
 
 func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
-	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
+	runPreferClosestNUMAOptimalAllocationTest(ctx, f, numaNodes, distances)
+	runPreferClosestNUMASubOptimalAllocationTest(ctx, f, numaNodes, distances)
+}
 
+func runPreferClosestNUMAOptimalAllocationTest(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
+	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
 	podMap := make(map[string]*v1.Pod)
 	for podID := 0; podID < 2; podID++ {
 		numCores := 0
@@ -916,7 +922,7 @@ func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, 
 			// subtract one to accommodate reservedCPUs. It'll only work if more than 2 cpus per NUMA node.
 			cpusPerNUMA := len(cpus)
 			if cpusPerNUMA < 3 {
-				e2eskipper.Skipf("Less than 2 cpus per NUMA node on this system. Skipping test.")
+				e2eskipper.Skipf("Less than 3 cpus per NUMA node on this system. Skipping test.")
 			}
 			numCores += cpusPerNUMA - 1
 		}
@@ -936,6 +942,89 @@ func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, 
 		podMap[podName] = pod
 	}
 
+	valiidatePreferClosestNUMAOptimalAllocation(ctx, f, podMap, numaNodes, distances)
+
+	deletePodsAsync(ctx, f, podMap)
+}
+
+func runPreferClosestNUMASubOptimalAllocationTest(ctx context.Context, f *framework.Framework, numaNodes int, distances map[int][]int) {
+	ginkgo.By("Admit two guaranteed pods. Both consist of 1 containers, each pod asks for cpus from 2 NUMA nodes. CPUs should be assigned from closest NUMA")
+	cntName := "ps-container-0"
+
+	// expect same amount of cpus per NUMA
+	cpusPerNUMA, err := getCPUsPerNUMANode(0)
+	framework.ExpectNoError(err)
+	if len(cpusPerNUMA) < 5 {
+		e2eskipper.Skipf("Less than 5 cpus per NUMA node on this system. Skipping test.")
+	}
+	podMap := make(map[string]*v1.Pod)
+	for podID := 0; podID < 2; podID++ {
+		// asks for all but one cpus from one less than half NUMA nodes, and half from the other
+		// plus add one less than half NUMA nodes, to accommodate for reserved cpus
+		numCores := ((numaNodes/2)-1)*(len(cpusPerNUMA)-1) + (len(cpusPerNUMA) / 2) + (numaNodes/2 - 1)
+		framework.ExpectNoError(err)
+
+		coresReq := fmt.Sprintf("%dm", numCores*1000)
+		ctnAttrs := []tmCtnAttribute{
+			{
+				ctnName:    "ps-container-0",
+				cpuRequest: coresReq,
+				cpuLimit:   coresReq,
+			},
+		}
+		podName := fmt.Sprintf("gu-pod-%d", podID)
+		framework.Logf("creating pod %s", podName)
+		pod := makeTopologyManagerTestPod(podName, ctnAttrs, nil)
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+		framework.Logf("created pod %s", podName)
+		podMap[podName] = pod
+	}
+
+	valiidatePreferClosestNUMAOptimalAllocation(ctx, f, podMap, numaNodes, distances)
+
+	ginkgo.By("Admit one guaranteed pod. Asks for cpus from 2 NUMA nodes. CPUs should be assigned from non closest NUMA")
+	// ask for remaining cpus, it should only fit on sub-optimal NUMA placement.
+	coresReq := fmt.Sprintf("%dm", 2*(len(cpusPerNUMA)/2)*1000)
+	ctnAttrs := []tmCtnAttribute{
+		{
+			ctnName:    cntName,
+			cpuRequest: coresReq,
+			cpuLimit:   coresReq,
+		},
+	}
+	podName := "gu-pod-2"
+	framework.Logf("creating pod %s attrs %v", podName, nil)
+	pod := makeTopologyManagerTestPod(podName, ctnAttrs, nil)
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+	framework.Logf("created pod %s", podName)
+
+	ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cntName, pod.Name))
+
+	logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cntName)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
+
+	framework.Logf("got pod logs: %v", logs)
+	podEnv, err := makeEnvMap(logs)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
+
+	CPUToNUMANode, err := getCPUToNUMANodeMapFromEnv(f, pod, &pod.Spec.Containers[0], podEnv, numaNodes)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cntName, pod.Name)
+
+	numaUsed := sets.New[int]()
+	for _, numa := range CPUToNUMANode {
+		numaUsed.Insert(numa)
+	}
+
+	numaList := numaUsed.UnsortedList()
+	gomega.Expect(numaList).To(gomega.HaveLen(2))
+
+	distance := getMinRemoteDistanceForNode(distances)
+	gomega.Expect(distance).NotTo(gomega.Equal(distances[numaList[0]][numaList[1]]))
+
+	deletePodsAsync(ctx, f, podMap)
+}
+
+func valiidatePreferClosestNUMAOptimalAllocation(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod, numaNodes int, distances map[int][]int) {
 	for _, pod := range podMap {
 		for _, cnt := range pod.Spec.Containers {
 			ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
@@ -962,8 +1051,6 @@ func runPreferClosestNUMATestSuite(ctx context.Context, f *framework.Framework, 
 			gomega.Expect(distance).To(gomega.Equal(distances[numaList[0]][numaList[1]]))
 		}
 	}
-
-	deletePodsAsync(ctx, f, podMap)
 }
 
 func runTopologyManagerTests(f *framework.Framework, topologyOptions map[string]string) {
