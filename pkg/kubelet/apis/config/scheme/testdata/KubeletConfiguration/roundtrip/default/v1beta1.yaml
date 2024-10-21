@@ -69,6 +69,7 @@ maxPods: 110
 memoryManagerPolicy: None
 memorySwap: {}
 memoryThrottlingFactor: 0.9
+metrics: {}
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
