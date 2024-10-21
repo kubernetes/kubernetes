@@ -103,7 +103,7 @@ func (m *podContainerManagerStub) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *podContainerManagerStub) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+func (m *podContainerManagerStub) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	return fmt.Errorf("not implemented")
 }
 

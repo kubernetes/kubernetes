@@ -119,7 +119,7 @@ func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	return nil, nil
 }
 
-func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
+func (cm *FakePodContainerManager) SetPodCgroupConfig(pod *v1.Pod, resourceConfig *ResourceConfig) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
