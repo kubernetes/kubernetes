@@ -92,7 +92,7 @@ import (
 
 ### Creating the published repository
 
-1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)
+1. Create an [issue](https://github.com/kubernetes/org/issues/new?assignees=&labels=area%2Fgithub-repo&projects=&template=repo-create.yml&title=REQUEST%3A+%3CCreate+or+Migrate%3E+%3Cgithub+repo%3E)
 in the `kubernetes/org` repo to request creation of the respective published
 repository in the Kubernetes org. The published repository **must** have an
 initial empty commit. It also needs specific access rules and branch settings.
