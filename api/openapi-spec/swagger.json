@@ -9660,6 +9660,10 @@
           "format": "int64",
           "type": "integer"
         },
+        "seLinuxChangePolicy": {
+          "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod. It has no effect on nodes that do not support SELinux or to volumes does not support SELinux. Valid values are \"MountOption\" and \"Recursive\". If not specified, \"MountOption\" is used. It affects only in-tree iSCSI and FibreChannel volumes, and CSI volumes that announce \"SELinuxMount: true\" in their CSIDriver instance. It affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers. Note that this field cannot be set when spec.os.name is windows.",
+          "type": "string"
+        },
         "seLinuxOptions": {
           "$ref": "#/definitions/io.k8s.api.core.v1.SELinuxOptions",
           "description": "The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows."
