@@ -18,10 +18,9 @@ package emptydir
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
-
-	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
