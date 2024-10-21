@@ -376,7 +376,7 @@ func verifyServeHostnameServiceUp(ctx context.Context, c clientset.Interface, ns
 				}
 			}
 			// TODO: simply checking that the retrieved endpoints is a superset
-			// of the expected allows us to ignore intermitten network flakes that
+			// of the expected allows us to ignore intermittent network flakes that
 			// result in output like "wget timed out", but these should be rare
 			// and we need a better way to track how often it occurs.
 			if gotEndpoints.IsSuperset(expectedEndpoints) {
@@ -2172,7 +2172,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
 		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
 		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service, it MUST be able serve the hostname from any pod of the replica.
-		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		When service's sessionAffinity is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
@@ -2209,7 +2209,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning a "ClusterIP" to the service and allocating NodePort on all the nodes.
 		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
 		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service on node's IP and NodePort, service MUST be able serve the hostname from any pod of the replica.
-		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
+		When service's sessionAffinity is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
@@ -2283,7 +2283,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service-headless in namespace " + ns)
 		svcHeadless := getServeHostnameService("service-headless")
 		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
-		// This should be improved, as we do not want a Headlesss Service to contain an IP...
+		// This should be improved, as we do not want a Headless Service to contain an IP...
 		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
 
@@ -4081,7 +4081,7 @@ var _ = common.SIGDescribe("Services", func() {
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created and a short timeout will be configured so
-// session affinity must change after the timeout expirese.
+// session affinity must change after the timeout expires.
 func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
 	ns := f.Namespace.Name
 	numPods, servicePort, serviceName := 3, defaultServeHostnameServicePort, svc.ObjectMeta.Name

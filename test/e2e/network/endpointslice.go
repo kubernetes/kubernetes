@@ -203,7 +203,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
 		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
 		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
-		The endpointslice controller must create EndpointSlices for Pods mataching a Service.
+		The endpointslice controller must create EndpointSlices for Pods matching a Service.
 	*/
 	framework.ConformanceIt("should create Endpoints and EndpointSlices for Pods matching a Service", func(ctx context.Context) {
 		labelPod1 := "pod1"

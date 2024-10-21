@@ -587,7 +587,7 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 		return
 	}
 	defer func() {
-		// This pod must get deleted before the function returns becaue the test relies on
+		// This pod must get deleted before the function returns because the test relies on
 		// the volume not being in use.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name)
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Name, injectorPod.Namespace, timeouts.PodDelete))

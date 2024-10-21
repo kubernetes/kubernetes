@@ -198,10 +198,10 @@ func PollURL(ctx context.Context, route, host string, timeout time.Duration, int
 	return nil
 }
 
-// CreateIngressComformanceTests generates an slice of sequential test cases:
+// CreateIngressConformanceTests generates an slice of sequential test cases:
 // a simple http ingress, ingress with HTTPS, ingress HTTPS with a modified hostname,
 // ingress https with a modified URLMap
-func CreateIngressComformanceTests(ctx context.Context, jig *TestJig, ns string, annotations map[string]string) []ConformanceTests {
+func CreateIngressConformanceTests(ctx context.Context, jig *TestJig, ns string, annotations map[string]string) []ConformanceTests {
 	manifestPath := filepath.Join(IngressManifestPath, "http")
 	// These constants match the manifests used in IngressManifestPath
 	tlsHost := "foo.bar.com"
@@ -870,7 +870,7 @@ func getPortURL(ctx context.Context, client clientset.Interface, ns, name string
 	if err != nil {
 		return "", err
 	}
-	// This list of nodes must not include the any control plane nodes, which are marked
+	// This list of nodes must not include any control plane nodes which are marked
 	// unschedulable, since control plane nodes don't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
