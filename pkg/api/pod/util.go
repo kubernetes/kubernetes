@@ -677,6 +677,7 @@ func dropDisabledFields(
 	dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec)
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
+	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1216,6 +1217,49 @@ func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) 
 
 		for j := range podSpec.Volumes[i].Projected.Sources {
 			podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle = nil
+		}
+	}
+}
+
+func podCertificateProjectionInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Projected == nil {
+			continue
+		}
+
+		for _, s := range v.Projected.Sources {
+			if s.PodCertificate != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropDisabledPodCertificateProjection(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateProjection) {
+		return
+	}
+	if podSpec == nil {
+		return
+	}
+
+	// If the pod was already using it, it can keep using it.
+	if podCertificateProjectionInUse(oldPodSpec) {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Projected == nil {
+			continue
+		}
+
+		for j := range podSpec.Volumes[i].Projected.Sources {
+			podSpec.Volumes[i].Projected.Sources[j].PodCertificate = nil
 		}
 	}
 }

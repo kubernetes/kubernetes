@@ -395,6 +395,14 @@
                     },
                     "optional": true,
                     "path": "pathValue"
+                  },
+                  "podCertificate": {
+                    "signerName": "signerNameValue",
+                    "keyType": "keyTypeValue",
+                    "maxExpirationSeconds": 3,
+                    "credentialBundlePath": "credentialBundlePathValue",
+                    "keyPath": "keyPathValue",
+                    "certificateChainPath": "certificateChainPathValue"
                   }
                 }
               ],

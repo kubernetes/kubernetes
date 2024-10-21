@@ -49,6 +49,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CertificateSigningRequestList{},
 		&ClusterTrustBundle{},
 		&ClusterTrustBundleList{},
+		&PodCertificateRequest{},
+		&PodCertificateRequestList{},
 	)
 	return nil
 }
