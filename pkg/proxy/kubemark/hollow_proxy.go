@@ -24,7 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
@@ -63,6 +66,12 @@ func NewHollowProxy(
 	broadcaster events.EventBroadcaster,
 	recorder events.EventRecorder,
 ) *HollowProxy {
+	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, 0,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", nodeName).String()
+		}))
+	currentNodeInformerFactory.Start(wait.NeverStop)
+
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
 			Config: &proxyconfigapi.KubeProxyConfiguration{
@@ -83,6 +92,7 @@ func NewHollowProxy(
 				UID:       types.UID(nodeName),
 				Namespace: "",
 			},
+			NodeInformer: currentNodeInformerFactory.Core().V1().Nodes(),
 		},
 	}
 }

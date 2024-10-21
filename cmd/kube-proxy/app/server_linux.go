@@ -32,14 +32,9 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	toolswatch "k8s.io/client-go/tools/watch"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -85,7 +80,7 @@ func (s *ProxyServer) platformSetup(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
 		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.Client, s.Hostname)
+		node, err := waitForPodCIDR(ctx, s.NodeInformer.Lister(), s.Hostname)
 		if err != nil {
 			return err
 		}
@@ -414,48 +409,33 @@ func getConntrackMax(ctx context.Context, config proxyconfigapi.KubeProxyConntra
 	return 0, nil
 }
 
-func waitForPodCIDR(ctx context.Context, client clientset.Interface, nodeName string) (*v1.Node, error) {
+func waitForPodCIDR(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, error) {
+	logger := klog.FromContext(ctx)
 	// since allocators can assign the podCIDR after the node registers, we do a watch here to wait
 	// for podCIDR to be assigned, instead of assuming that the Get() on startup will have it.
 	ctx, cancelFunc := context.WithTimeout(ctx, timeoutForNodePodCIDR)
 	defer cancelFunc()
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().List(ctx, options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().Watch(ctx, options)
-		},
-	}
-	condition := func(event watch.Event) (bool, error) {
-		// don't process delete events
-		if event.Type != watch.Modified && event.Type != watch.Added {
+	var node *v1.Node
+	err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, func(context.Context) (bool, error) {
+		var listerErr error
+		node, listerErr = nodeLister.Get(nodeName)
+		if listerErr != nil {
+			logger.Error(listerErr, "Failed to retrieve node info")
 			return false, nil
 		}
 
-		n, ok := event.Object.(*v1.Node)
-		if !ok {
-			return false, fmt.Errorf("event object not of type Node")
-		}
 		// don't consider the node if is going to be deleted and keep waiting
-		if !n.DeletionTimestamp.IsZero() {
+		if !node.DeletionTimestamp.IsZero() {
+			logger.Info("Node is being deleted", "node", node.Name)
 			return false, nil
 		}
-		return n.Spec.PodCIDR != "" && len(n.Spec.PodCIDRs) > 0, nil
-	}
-
-	evt, err := toolswatch.UntilWithSync(ctx, lw, &v1.Node{}, nil, condition)
+		return node.Spec.PodCIDR != "" && len(node.Spec.PodCIDRs) > 0, nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("timeout waiting for PodCIDR allocation to configure detect-local-mode %v: %v", proxyconfigapi.LocalModeNodeCIDR, err)
 	}
-	if n, ok := evt.Object.(*v1.Node); ok {
-		return n, nil
-	}
-	return nil, fmt.Errorf("event object not of type node")
+	return node, nil
 }
 
 func detectNumCPU() int {

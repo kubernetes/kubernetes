@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -83,25 +84,31 @@ func makeNodeWithAddress(name, primaryIP string) *v1.Node {
 // Test that getNodeIPs retries on failure
 func Test_getNodeIPs(t *testing.T) {
 	var chans [3]chan error
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	client := clientsetfake.NewSimpleClientset(
-		// node1 initially has no IP address.
-		makeNodeWithAddress("node1", ""),
+	client := clientsetfake.NewSimpleClientset()
 
-		// node2 initially has an invalid IP address.
-		makeNodeWithAddress("node2", "invalid-ip"),
-
-		// node3 initially does not exist.
-	)
-
+	informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+	nodeLister := informer.Core().V1().Nodes().Lister()
+	nodeStore := informer.Core().V1().Nodes().Informer().GetStore()
+	// node1 initially has no IP address.
+	err := nodeStore.Add(makeNodeWithAddress("node1", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// node2 initially has an invalid IP address.
+	err = nodeStore.Add(makeNodeWithAddress("node2", "invalid-ip"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := range chans {
 		chans[i] = make(chan error)
 		ch := chans[i]
 		nodeName := fmt.Sprintf("node%d", i+1)
 		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
 		go func() {
-			_, ctx := ktesting.NewTestContext(t)
-			ips := getNodeIPs(ctx, client, nodeName)
+			ips := getNodeIPs(ctx, nodeLister, nodeName)
 			if len(ips) == 0 {
 				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
 			} else if ips[0].String() != expectIP {
@@ -116,18 +123,18 @@ func Test_getNodeIPs(t *testing.T) {
 	// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
 	time.Sleep(1200 * time.Millisecond)
 
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node1", "192.168.0.1"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node2", "192.168.0.2"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().Create(context.TODO(),
-		makeNodeWithAddress("node3", "192.168.0.3"),
-		metav1.CreateOptions{},
-	)
+	err = nodeStore.Add(makeNodeWithAddress("node1", "192.168.0.1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = nodeStore.Add(makeNodeWithAddress("node2", "192.168.0.2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = nodeStore.Add(makeNodeWithAddress("node3", "192.168.0.3"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Ensure each getNodeIP completed as expected
 	for i := range chans {
