@@ -728,7 +728,7 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           "graceful_shutdown_end_time_seconds",
-			Help:           "Last graceful shutdown start time since unix epoch in seconds",
+			Help:           "Last graceful shutdown end time since unix epoch in seconds",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
