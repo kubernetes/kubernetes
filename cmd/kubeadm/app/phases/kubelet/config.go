@@ -17,10 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -34,6 +36,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
@@ -66,7 +69,22 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 		}
 	}
 
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		kubeletBytes, err = applyKubeletConfigPatchFromFile(kubeletBytes, filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName), output)
+		if err != nil {
+			return errors.Wrap(err, "could not apply patches to the KubeletConfiguration")
+		}
+	}
+
 	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
+}
+
+// WriteInstanceConfigToDisk writes the container runtime endpoint configuration
+// to the instance configuration file in the specified kubelet directory.
+func WriteInstanceConfigToDisk(cRISocket string, kubeletDir string) error {
+	instanceFileContent := fmt.Sprintf("%s: %q\n", "containerRuntimeEndpoint", cRISocket)
+
+	return writeInstanceConfigBytesToDisk([]byte(instanceFileContent), kubeletDir)
 }
 
 // ApplyPatchesToConfig applies the patches located in patchesDir to the KubeletConfiguration stored
@@ -203,6 +221,22 @@ func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	return nil
 }
 
+// writeInstanceConfigBytesToDisk writes a byte slice down to disk at the specific location of the Instance kubelet config file
+func writeInstanceConfigBytesToDisk(b []byte, kubeletDir string) error {
+	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+	fmt.Printf("[kubelet-start] Writing instance kubelet configuration to file %q\n", configFile)
+
+	// creates target folder if not already exists
+	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
+		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
+	}
+
+	if err := os.WriteFile(configFile, b, 0644); err != nil {
+		return errors.Wrapf(err, "failed to write instance kubelet configuration to the file %q", configFile)
+	}
+	return nil
+}
+
 // applyKubeletConfigPatches reads patches from a directory and applies them over the input kubeletBytes
 func applyKubeletConfigPatches(kubeletBytes []byte, patchesDir string, output io.Writer) ([]byte, error) {
 	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
@@ -224,4 +258,74 @@ func applyKubeletConfigPatches(kubeletBytes []byte, patchesDir string, output io
 		return nil, err
 	}
 	return kubeletBytes, nil
+}
+
+// applyKubeletConfigPatchFromFile applies the strategic patch from the fixed file "instance-config.yml"
+// located in the given directory to the kubelet configuration.
+func applyKubeletConfigPatchFromFile(kubeletBytes []byte, patchFilePath string, output io.Writer) ([]byte, error) {
+	// Get the patch data from the file.
+	patchBytes, err := patches.GetSinglePatchFromFile(patchFilePath, output)
+	if err != nil {
+		return nil, err
+	}
+
+	// Always convert the target data to JSON.
+	patchData, err := yaml.YAMLToJSON(kubeletBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Define the patch target.
+	patchTarget := &patches.PatchTarget{
+		Name:                      patches.KubeletConfiguration,
+		StrategicMergePatchObject: kubeletconfig.KubeletConfiguration{},
+		Data:                      patchData,
+	}
+
+	// Apply the strategic patch.
+	patchedData, err := patches.ApplyStrategicMergePatch(patchTarget.Data, patchBytes, patchTarget.StrategicMergePatchObject, output)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the patched data back to YAML and return it.
+	kubeletBytes, err = yaml.JSONToYAML(patchedData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert patched data to YAML")
+	}
+
+	return kubeletBytes, nil
+}
+
+// ReadKubeadmFlags reads the --container-runtime-endpoint from the kubeadm-flags.env file.
+func ReadKubeadmFlags(envFilePath string, output io.Writer) (string, error) {
+	file, err := os.Open(envFilePath)
+	if err != nil {
+		return "", fmt.Errorf("could not open kubeadm flags file: %w", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "KUBELET_KUBEADM_ARGS=") {
+			fmt.Fprintf(output, "[info] Reading line: %s\n", line)
+			args := strings.TrimPrefix(line, "KUBELET_KUBEADM_ARGS=")
+			args = strings.Trim(args, `"`)
+			for _, arg := range strings.Split(args, " ") {
+				if strings.HasPrefix(arg, "--container-runtime-endpoint=") {
+					fmt.Fprintf(output, "[info] Found container-runtime-endpoint: %s\n", arg)
+					return strings.TrimPrefix(arg, "--container-runtime-endpoint="), nil
+				}
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading kubeadm flags file: %w", err)
+	}
+
+	return "", fmt.Errorf("container-runtime-endpoint not found")
 }

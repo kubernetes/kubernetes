@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
@@ -28,6 +29,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 const (
@@ -194,5 +196,9 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	if len(kc.config.CgroupDriver) == 0 {
 		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
 		kc.config.CgroupDriver = constants.CgroupDriverSystemd
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		kc.config.ContainerRuntimeEndpoint = nodeRegOpts.CRISocket
 	}
 }
