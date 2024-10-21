@@ -312,7 +312,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	defer func() {
 		if rerr != nil {
 			metrics.CPUManagerPinningErrorsTotal.Inc()
+			return
 		}
+		if !p.options.FullPhysicalCPUsOnly {
+			// increment only if we know we allocate aligned resources
+			return
+		}
+		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 	}()
 
 	if p.options.FullPhysicalCPUsOnly {
