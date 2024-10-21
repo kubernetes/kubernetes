@@ -24,8 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1304,65 +1302,32 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 
 	tests := []struct {
 		requestVersion    schema.GroupVersion
-		allowZero         bool
 		concurrencyShares int32
 		errExpected       field.ErrorList
 	}{{
-		requestVersion:    flowcontrolv1beta1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1beta2.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("assuredConcurrencyShares", 0, "must be positive"),
-	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
-	}, {
-		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		concurrencyShares: 100,
-		errExpected:       nil,
-	}, {
-		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 0,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: -1,
 		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
 	}, {
 		requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 1,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 0,
 		errExpected:       nil,
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: -1,
 		errExpected:       errExpectedFn("nominalConcurrencyShares", -1, "must be a non-negative integer"),
 	}, {
 		requestVersion:    flowcontrolv1.SchemeGroupVersion,
-		allowZero:         true,
 		concurrencyShares: 1,
 		errExpected:       nil,
-	}, {
-		// this should never really happen in real life, the request
-		// context should always contain the request {group, version}
-		requestVersion:    schema.GroupVersion{},
-		concurrencyShares: 0,
-		errExpected:       errExpectedFn("nominalConcurrencyShares", 0, "must be positive"),
 	}}
 
 	for _, test := range tests {
@@ -1375,7 +1340,7 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 			}
 			specPath := field.NewPath("spec").Child("limited")
 
-			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath, PriorityLevelValidationOptions{AllowZeroLimitedNominalConcurrencyShares: test.allowZero})
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath, PriorityLevelValidationOptions{})
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}
