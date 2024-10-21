@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/common/model"
@@ -32,6 +34,47 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+// IMPORTANT: metrics are stored globally so all the tests must run sequentially
+func TestMetricsWrapper(t *testing.T) {
+	tests := []struct {
+		testName string
+		testFunc func(t *testing.T)
+	}{
+		{
+			// IMPORTANT: this test should be run first to ensure that the metrics' allow lists are properly initialized.
+			testName: "test apiserver metrics label with allow list",
+			testFunc: testAPIServerMetricsLabelsWithAllowList,
+		},
+		{
+			testName: "test apiserver process metrics",
+			testFunc: testAPIServerProcessMetrics,
+		},
+		{
+			testName: "test apiserver storage metrics",
+			testFunc: testAPIServerStorageMetrics,
+		},
+		{
+			testName: "test apiserver metrics",
+			testFunc: testAPIServerMetrics,
+		},
+		{
+			testName: "test apiserver metrics labels",
+			testFunc: testAPIServerMetricsLabels,
+		},
+		{
+			testName: "test apiserver metrics pods",
+			testFunc: testAPIServerMetricsPods,
+		},
+		{
+			testName: "test apiserver metrics namespaces",
+			testFunc: testAPIServerMetricsNamespaces,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.testName, test.testFunc)
+	}
+}
 
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {
 	client, err := clientset.NewForConfig(s.ClientConfig)
@@ -56,7 +99,7 @@ func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMet
 	}
 }
 
-func TestAPIServerProcessMetrics(t *testing.T) {
+func testAPIServerProcessMetrics(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
@@ -76,7 +119,7 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 	})
 }
 
-func TestAPIServerStorageMetrics(t *testing.T) {
+func testAPIServerStorageMetrics(t *testing.T) {
 	config := framework.SharedEtcd()
 	config.Transport.ServerList = []string{config.Transport.ServerList[0], config.Transport.ServerList[0]}
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), config)
@@ -100,7 +143,7 @@ func TestAPIServerStorageMetrics(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetrics(t *testing.T) {
+func testAPIServerMetrics(t *testing.T) {
 	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
@@ -131,7 +174,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	})
 }
 
-func TestAPIServerMetricsLabels(t *testing.T) {
+func testAPIServerMetricsLabels(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have service account controller running.
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer s.TearDownFn()
@@ -261,7 +304,90 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetricsPods(t *testing.T) {
+func testAPIServerMetricsLabelsWithAllowList(t *testing.T) {
+	// IMPORTANT: because metrics are store globally, the metrics with allow list should not be tested in other tests.
+	testCases := []struct {
+		name        string
+		metricName  string
+		labelName   model.LabelName
+		allowValues model.LabelValues
+		isHistogram bool
+	}{
+		{
+			name:        "check GaugeVec metric",
+			metricName:  "apiserver_current_inflight_requests",
+			labelName:   "request_kind",
+			allowValues: model.LabelValues{"mutating"},
+		},
+		{
+			name:        "check Histogram metric",
+			metricName:  "apiserver_request_duration_seconds",
+			labelName:   "verb",
+			allowValues: model.LabelValues{"POST", "LIST"},
+			isHistogram: true,
+		},
+	}
+
+	// Assemble the allow-metric-labels flag.
+	var allowMetricLabelFlagStrs []string
+	for _, tc := range testCases {
+		var allowValuesStr []string
+		for _, allowValue := range tc.allowValues {
+			allowValuesStr = append(allowValuesStr, string(allowValue))
+		}
+		allowMetricLabelFlagStrs = append(allowMetricLabelFlagStrs, fmt.Sprintf("\"%s,%s=%s\"", tc.metricName, tc.labelName, strings.Join(allowValuesStr, ",")))
+	}
+	allowMetricLabelsFlag := "--allow-metric-labels=" + strings.Join(allowMetricLabelFlagStrs, ",")
+
+	testServerFlags := framework.DefaultTestServerFlags()
+	testServerFlags = append(testServerFlags, allowMetricLabelsFlag)
+
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	metrics, err := scrapeMetrics(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metricName := tc.metricName
+			if tc.isHistogram {
+				metricName += "_sum"
+			}
+			samples, found := metrics[metricName]
+			if !found {
+				t.Fatalf("metric %q not found", metricName)
+			}
+			for _, sample := range samples {
+				if value, ok := sample.Metric[tc.labelName]; ok {
+					if !slices.Contains(tc.allowValues, value) && value != "unexpected" {
+						t.Fatalf("value %q is not allowed for label %q", value, tc.labelName)
+					}
+				}
+			}
+		})
+
+	}
+
+	t.Run("check cardinality_enforcement_unexpected_categorizations_total", func(t *testing.T) {
+		samples, found := metrics["cardinality_enforcement_unexpected_categorizations_total"]
+		if !found {
+			t.Fatal("metric cardinality_enforcement_unexpected_categorizations_total not found")
+		}
+		if len(samples) != 1 {
+			t.Fatalf("Unexpected number of samples in cardinality_enforcement_unexpected_categorizations_total")
+		}
+		if samples[0].Value <= 0 {
+			t.Fatalf("Unexpected non-positive cardinality_enforcement_unexpected_categorizations_total, got: %s", samples[0].Value)
+		}
+
+	})
+}
+
+func testAPIServerMetricsPods(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -378,7 +504,7 @@ func TestAPIServerMetricsPods(t *testing.T) {
 	}
 }
 
-func TestAPIServerMetricsNamespaces(t *testing.T) {
+func testAPIServerMetricsNamespaces(t *testing.T) {
 	callOrDie := func(_ interface{}, err error) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
