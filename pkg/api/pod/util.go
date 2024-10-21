@@ -385,6 +385,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
+		AllowPodLifecycleSleepActionZeroValue:             utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -415,6 +416,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
+
+		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(podSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -787,6 +790,28 @@ func podLifecycleSleepActionInUse(podSpec *api.PodSpec) bool {
 			return false
 		}
 		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
+}
+
+func podLifecycleSleepActionZeroValueInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.Lifecycle == nil {
+			return true
+		}
+		if c.Lifecycle.PreStop != nil && c.Lifecycle.PreStop.Sleep != nil && c.Lifecycle.PreStop.Sleep.Seconds == 0 {
+			inUse = true
+			return false
+		}
+		if c.Lifecycle.PostStart != nil && c.Lifecycle.PostStart.Sleep != nil && c.Lifecycle.PreStop.Sleep.Seconds == 0 {
 			inUse = true
 			return false
 		}
