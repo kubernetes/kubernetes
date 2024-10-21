@@ -91,10 +91,6 @@ type fakeKubelet struct {
 	streamingRuntime  streaming.Server
 }
 
-func (fk *fakeKubelet) ResyncInterval() time.Duration {
-	return fk.resyncInterval
-}
-
 func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
 	return fk.loopEntryTime
 }
@@ -152,6 +148,19 @@ func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi
 
 func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
 	return nil, nil
+}
+
+func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
+	duration := fk.resyncInterval * 2
+	minDuration := time.Minute * 5
+	if duration < minDuration {
+		duration = minDuration
+	}
+	enterLoopTime := fk.LatestLoopEntryTime()
+	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
+		return fmt.Errorf("sync Loop took longer than expected")
+	}
+	return nil
 }
 
 type fakeRuntime struct {
