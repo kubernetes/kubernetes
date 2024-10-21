@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
+// CreateVolumeSpec creates and returns a mutable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // A volume.Spec that refers to an in-tree plugin spec is translated to refer
 // to a migrated CSI plugin spec if all conditions for CSI migration on a node
