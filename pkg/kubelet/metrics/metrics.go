@@ -32,6 +32,7 @@ import (
 const (
 	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
+	DRASubsystem                       = "dra"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
 	NodeStartupPreKubeletKey           = "node_startup_pre_kubelet_duration_seconds"
@@ -126,6 +127,11 @@ const (
 
 	// Metric for tracking garbage collected images
 	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
+
+	// Metric keys for DRA operations
+	DRAOperationsDurationKey     = "dra_operations_duration_seconds"
+	DRAOperationsErrorsTotalKey  = "dra_operations_errors_total"
+	DRAGRPCOperationsDurationKey = "dra_grpc_operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -917,6 +923,40 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA operations (PrepareResources and UnprepareResources).",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name"},
+	)
+
+	// DRAOperationsErrorsTotal is a counter that tracks the number of errors in the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAOperationsErrorsTotalKey,
+			Help:           "Cumulative number of errors when preparing and unpreparing resources.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name"},
+	)
+
+	DRAGRPCOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAGRPCOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA GRPC operations",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name", "method_name", "grpc_status_code"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1008,6 +1048,12 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			legacyregistry.MustRegister(DRAOperationsDuration)
+			legacyregistry.MustRegister(DRAOperationsErrorsTotal)
+			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
+		}
 	})
 }
 
