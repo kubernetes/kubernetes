@@ -46,8 +46,8 @@ func TestClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error while pop(): %v", err)
 	}
-	aq.addEventIfAnyInFlight(nil, nil, nodeAdd)
-	aq.addEventIfAnyInFlight(nil, nil, csiNodeUpdate)
+	aq.addEventIfAnyInFlight(nil, nil, framework.NodeAdd)
+	aq.addEventIfAnyInFlight(nil, nil, framework.NodeConditionChange)
 
 	if len(aq.listInFlightEvents()) != 4 {
 		t.Fatalf("unexpected number of in-flight events: %v", len(aq.listInFlightEvents()))

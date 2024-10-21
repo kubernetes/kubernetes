@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -1205,7 +1204,7 @@ func TestEventsToRegister(t *testing.T) {
 			for i := range actualClusterEvents {
 				actualClusterEvents[i].QueueingHintFn = nil
 			}
-			if diff := cmp.Diff(test.expectedClusterEvents, actualClusterEvents, cmpopts.EquateComparable(framework.ClusterEvent{})); diff != "" {
+			if diff := cmp.Diff(test.expectedClusterEvents, actualClusterEvents); diff != "" {
 				t.Error("Cluster Events doesn't match extected events (-expected +actual):\n", diff)
 			}
 		})
