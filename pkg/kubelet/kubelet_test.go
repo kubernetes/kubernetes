@@ -3043,6 +3043,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
+		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
 	}
 	var prober volume.DynamicPluginProber
@@ -3205,6 +3206,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		images.NeverVerifyImagePullPolicy, // TODO: maybe we'll need to config this
 		"",
 		"",
 		kubeCfg.CPUCFSQuota,

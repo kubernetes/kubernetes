@@ -30,6 +30,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -265,6 +266,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	default:
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for hairpinMode (--hairpin-mode). Valid options are %q, %q or %q",
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
+	}
+
+	switch kubeletconfigv1beta1.ImagePullCredentialsVerificationPolicy(kc.ImagePullCredentialsVerificationPolicy) {
+	case kubeletconfigv1beta1.NeverVerify,
+		kubeletconfigv1beta1.NeverVerifyPreloadedImages,
+		kubeletconfigv1beta1.NeverVerifyAllowlistedImages,
+		kubeletconfigv1beta1.AlwaysVerify:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for imagePullCredentialsVerificationPolicy (--image-pull-credentials-verification-policy). Valid options are %q, %q, %q or %q",
+			kc.ImagePullCredentialsVerificationPolicy, kubeletconfigv1beta1.NeverVerify, kubeletconfigv1beta1.NeverVerifyPreloadedImages, kubeletconfigv1beta1.NeverVerifyAllowlistedImages, kubeletconfigv1beta1.AlwaysVerify))
 	}
 	if kc.ReservedSystemCPUs != "" {
 		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup

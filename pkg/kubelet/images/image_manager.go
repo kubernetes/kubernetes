@@ -31,6 +31,9 @@ import (
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
+	imagemanager1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/imagemanager/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -44,13 +47,15 @@ type ImagePodPullingTimeRecorder interface {
 
 // imageManager provides the functionalities for image pulling.
 type imageManager struct {
-	recorder       record.EventRecorder
-	imageService   kubecontainer.ImageService
-	backOff        *flowcontrol.Backoff
-	prevPullErrMsg sync.Map
+	recorder         record.EventRecorder
+	imageService     kubecontainer.ImageService
+	imagePullManager ImagePullManager
+	backOff          *flowcontrol.Backoff
+	prevPullErrMsg   sync.Map
 
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
-	puller imagePuller
+	puller      imagePuller
+	nodeKeyring credentialprovider.DockerKeyring
 
 	podPullingTimeRecorder ImagePodPullingTimeRecorder
 }
@@ -58,7 +63,19 @@ type imageManager struct {
 var _ ImageManager = &imageManager{}
 
 // NewImageManager instantiates a new ImageManager object.
-func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder) ImageManager {
+func NewImageManager(
+	recorder record.EventRecorder,
+	nodeKeyring credentialprovider.DockerKeyring,
+	imageService kubecontainer.ImageService,
+	imagePullManager ImagePullManager,
+	imageBackOff *flowcontrol.Backoff,
+	serialized bool,
+	maxParallelImagePulls *int32,
+	qps float32,
+	burst int,
+	podPullingTimeRecorder ImagePodPullingTimeRecorder,
+) ImageManager {
+
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
@@ -70,6 +87,8 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 	return &imageManager{
 		recorder:               recorder,
 		imageService:           imageService,
+		imagePullManager:       imagePullManager,
+		nodeKeyring:            nodeKeyring,
 		backOff:                imageBackOff,
 		puller:                 puller,
 		podPullingTimeRecorder: podPullingTimeRecorder,
@@ -78,33 +97,25 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 
 // imagePullPrecheck inspects the pull policy and checks for image presence accordingly,
 // returning (imageRef, error msg, err) and logging any errors.
-func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectReference, logPrefix string, pullPolicy v1.PullPolicy, spec *kubecontainer.ImageSpec, imgRef string) (imageRef string, msg string, err error) {
+func (m *imageManager) imagePullPrecheck(ctx context.Context, objRef *v1.ObjectReference, logPrefix string, pullPolicy v1.PullPolicy, spec *kubecontainer.ImageSpec, containerImage string) (imageRef string, msg string, err error) {
 	switch pullPolicy {
 	case v1.PullAlways:
 		return "", msg, nil
-	case v1.PullIfNotPresent:
+	case v1.PullIfNotPresent, v1.PullNever:
 		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
 		if err != nil {
 			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
 			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 			return "", msg, ErrImageInspect
 		}
-		return imageRef, msg, nil
-	case v1.PullNever:
-		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
-		if err != nil {
-			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
-			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
-			return "", msg, ErrImageInspect
-		}
-		if imageRef == "" {
-			msg = fmt.Sprintf("Container image %q is not present with pull policy of Never", imgRef)
-			m.logIt(objRef, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, klog.Warning)
-			return "", msg, ErrImageNeverPull
-		}
-		return imageRef, msg, nil
 	}
-	return
+
+	if len(imageRef) == 0 && pullPolicy == v1.PullNever {
+		msg, err = m.imageNotPresentOnNeverPolicyError(logPrefix, objRef, containerImage)
+		return "", msg, err
+	}
+
+	return imageRef, msg, nil
 }
 
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
@@ -116,15 +127,32 @@ func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefi
 	}
 }
 
-// EnsureImageExists pulls the image for the specified pod and imgRef, and returns
+// imageNotPresentOnNeverPolicy error is a utility function that emits an event about
+// an image not being present and returns the appropriate error to be passed on.
+//
+// Called in 2 scenarios:
+//  1. image is not present with `imagePullPolicy: Never“
+//  2. image is present but cannot bne accessed with the presented set of credentials
+//
+// We don't want to reveal the presence of an image if it cannot be accessed, hence we
+// want the same behavior in both the above scenarios.
+//
+// TODO: it feels like error handling refactoring might remove the need for this
+func (m *imageManager) imageNotPresentOnNeverPolicyError(logPrefix string, objRef *v1.ObjectReference, containerImage string) (string, error) {
+	msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", containerImage)
+	m.logIt(objRef, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, klog.Warning)
+	return msg, ErrImageNeverPull
+}
+
+// EnsureImageExists pulls the image for the specified pod and containerImage, and returns
 // (imageRef, error message, error).
-func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, imgRef string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
-	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, imgRef)
+func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, containerImage string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
+	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, containerImage)
 
 	// If the image contains no tag or digest, a default tag should be applied.
-	image, err := applyDefaultImageTag(imgRef)
+	image, err := applyDefaultImageTag(containerImage)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", imgRef, err)
+		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", containerImage, err)
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 		return "", msg, ErrInvalidImageName
 	}
@@ -143,19 +171,98 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		RuntimeHandler: podRuntimeHandler,
 	}
 
-	imageRef, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, imgRef)
+	imageRef, message, err = m.imagePullPrecheck(ctx, objRef, logPrefix, pullPolicy, &spec, containerImage)
 	if err != nil {
 		return "", message, err
 	}
-	if imageRef != "" {
-		msg := fmt.Sprintf("Container image %q already present on machine", imgRef)
-		m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
-		return imageRef, msg, nil
+
+	repoToPull, _, _, err := parsers.ParseImageName(spec.Image)
+	if err != nil {
+		return "", err.Error(), err
 	}
 
-	backOffKey := fmt.Sprintf("%s_%s", pod.UID, imgRef)
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, m.nodeKeyring)
+	if err != nil {
+		return "", err.Error(), err
+	}
+
+	pullCredentials, _ := keyring.Lookup(repoToPull)
+
+	// TODO: the below code should all live in the `if imageRef != "" scope`
+	var imagePullSecrets []imagemanager1alpha1.ImagePullSecret
+	for _, s := range pullCredentials {
+		if s.Source == nil {
+			// we're only interested in creds that are not node accessible
+			continue
+		}
+		credsHash, err := hashImageCredentials(s.AuthConfig)
+		if err != nil { // TODO: do we want to just log the error and continue? Probably.
+			return "", "", err
+		}
+		imagePullSecrets = append(imagePullSecrets, imagemanager1alpha1.ImagePullSecret{
+			UID:            string(s.Source.Secret.UID),
+			Name:           s.Source.Secret.Name,
+			Namespace:      s.Source.Secret.Namespace,
+			CredentialHash: credsHash,
+		})
+	}
+
+	// TODO: should we pass spec.Image instead of containerImage since we'll likely do the parsers.ParseImageName in MustAttemptImagePull, too?
+	if imageRef != "" {
+		pullRequired := m.imagePullManager.MustAttemptImagePull(containerImage, imageRef, imagePullSecrets)
+		switch {
+		case pullRequired && pullPolicy == v1.PullNever:
+			msg, err := m.imageNotPresentOnNeverPolicyError(logPrefix, objRef, containerImage)
+			return "", msg, err
+		case !pullRequired:
+			msg := fmt.Sprintf("Container image %q already present on machine and can be accessed by the pod", containerImage)
+			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+			return imageRef, msg, nil
+		}
+	}
+
+	return m.pullImage(ctx, logPrefix, objRef, pod.UID, containerImage, spec, pullCredentials, podSandboxConfig)
+}
+
+func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {
+	if err := m.imagePullManager.RecordPullIntent(image); err != nil {
+		return "", fmt.Sprintf("Failed to record image pull intent for container image %q: %v", image, err), err
+	}
+
+	var finalPullCredentials *credentialprovider.TrackedAuthConfig
+	defer func() {
+		if err != nil {
+			m.imagePullManager.RecordImagePullFailed(image)
+			return
+		}
+		creds := imagemanager1alpha1.ImagePullCredentials{}
+		switch {
+		case finalPullCredentials == nil, finalPullCredentials.Source == nil:
+			creds.NodePodsAccessible = true
+		default:
+			// FIXME: validate secret coords are complete
+			sourceSecret := finalPullCredentials.Source.Secret
+			hashedCreds, err := hashImageCredentials(finalPullCredentials.AuthConfig) //, sourceSecret.UID)
+			if err != nil {
+				klog.Errorf("failed to hash image pull credentials for secret %s/%s: %v", sourceSecret.Namespace, sourceSecret.Name, err)
+				return
+			}
+			creds.KubernetesSecrets = []imagemanager1alpha1.ImagePullSecret{
+				{
+					UID:            sourceSecret.UID,
+					Name:           sourceSecret.Name,
+					Namespace:      sourceSecret.Namespace,
+					CredentialHash: hashedCreds,
+				},
+			}
+		}
+		// FIXME: image here is the image:tag but we only want the `repoToPull` from the previous function
+		m.imagePullManager.RecordImagePulled(image, imageRef, &creds)
+	}()
+
+	backOffKey := fmt.Sprintf("%s_%s", podUID, image)
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
-		msg := fmt.Sprintf("Back-off pulling image %q", imgRef)
+		msg := fmt.Sprintf("Back-off pulling image %q", image)
 		m.logIt(objRef, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 
 		// Wrap the error from the actual pull if available.
@@ -171,17 +278,17 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	// Ensure that the map cannot grow indefinitely.
 	m.prevPullErrMsg.Delete(backOffKey)
 
-	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
-	m.logIt(objRef, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", imgRef), klog.Info)
+	m.podPullingTimeRecorder.RecordImageStartedPulling(podUID)
+	m.logIt(objRef, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", image), klog.Info)
 	startTime := time.Now()
+
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
+	m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
-		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", imgRef, imagePullResult.err), klog.Warning)
+		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
-
-		msg, err := evalCRIPullErr(imgRef, imagePullResult.err)
+		msg, err := evalCRIPullErr(image, imagePullResult.err)
 
 		// Store the actual pull error for providing that information during
 		// the image pull back-off.
@@ -189,12 +296,14 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 
 		return "", msg, err
 	}
-	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
+	m.podPullingTimeRecorder.RecordImageFinishedPulling(podUID)
 	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
 	m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
-		imgRef, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
+		image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
+	finalPullCredentials = imagePullResult.credentialsUsed
+
 	return imagePullResult.imageRef, "", nil
 }
 

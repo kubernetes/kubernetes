@@ -222,7 +222,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
-			keyring.Add(cfg)
+			keyring.Add(nil, cfg)
 		}
 
 		creds, ok := keyring.Lookup(test.targetURL + "/foo/bar")
@@ -290,7 +290,7 @@ func TestKeyringMiss(t *testing.T) {
 		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
-			keyring.Add(cfg)
+			keyring.Add(nil, cfg)
 		}
 
 		_, ok := keyring.Lookup(test.lookupURL + "/foo/bar")
@@ -318,7 +318,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
-		keyring.Add(cfg)
+		keyring.Add(nil, cfg)
 	}
 
 	val, ok := keyring.Lookup("world.mesos.org/foo/bar")
@@ -344,7 +344,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
-		keyring.Add(cfg)
+		keyring.Add(nil, cfg)
 	}
 
 	creds, ok := keyring.Lookup("google/docker-registry")
@@ -353,7 +353,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 		return
 	}
 	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
+		t.Errorf("Got more hits than expected: %v", creds)
 	}
 	val := creds[0]
 
@@ -385,7 +385,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
-		keyring.Add(cfg)
+		keyring.Add(nil, cfg)
 	}
 
 	creds, ok := keyring.Lookup("jenkins")
@@ -394,7 +394,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 		return
 	}
 	if len(creds) > 1 {
-		t.Errorf("Got more hits than expected: %s", creds)
+		t.Errorf("Got more hits than expected: %v", creds)
 	}
 	val := creds[0]
 
@@ -426,7 +426,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
-		keyring.Add(cfg)
+		keyring.Add(nil, cfg)
 	}
 
 	creds, ok := keyring.Lookup(url + "/google/docker-registry")
@@ -435,7 +435,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 		return
 	}
 	if len(creds) > 2 {
-		t.Errorf("Got more hits than expected: %s", creds)
+		t.Errorf("Got more hits than expected: %v", creds)
 	}
 	val := creds[0]
 
@@ -511,7 +511,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	dk := &BasicDockerKeyring{}
-	dk.Add(DockerConfig{
+	dk.Add(nil, DockerConfig{
 		"bar.example.com/pong": DockerConfigEntry{
 			Username: grace.Username,
 			Password: grace.Password,
@@ -526,27 +526,27 @@ func TestDockerKeyringLookup(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []AuthConfig
+		match []TrackedAuthConfig
 		ok    bool
 	}{
 		// direct match
-		{"bar.example.com", []AuthConfig{ada}, true},
+		{"bar.example.com", []TrackedAuthConfig{{AuthConfig: ada}}, true},
 
 		// direct match deeper than other possible matches
-		{"bar.example.com/pong", []AuthConfig{grace, ada}, true},
+		{"bar.example.com/pong", []TrackedAuthConfig{{AuthConfig: grace}, {AuthConfig: ada}}, true},
 
 		// no direct match, deeper path ignored
-		{"bar.example.com/ping", []AuthConfig{ada}, true},
+		{"bar.example.com/ping", []TrackedAuthConfig{{AuthConfig: ada}}, true},
 
 		// match first part of path token
-		{"bar.example.com/pongz", []AuthConfig{grace, ada}, true},
+		{"bar.example.com/pongz", []TrackedAuthConfig{{AuthConfig: grace}, {AuthConfig: ada}}, true},
 
 		// match regardless of sub-path
-		{"bar.example.com/pong/pang", []AuthConfig{grace, ada}, true},
+		{"bar.example.com/pong/pang", []TrackedAuthConfig{{AuthConfig: grace}, {AuthConfig: ada}}, true},
 
 		// no host match
-		{"example.com", []AuthConfig{}, false},
-		{"foo.example.com", []AuthConfig{}, false},
+		{"example.com", []TrackedAuthConfig{}, false},
+		{"foo.example.com", []TrackedAuthConfig{}, false},
 	}
 
 	for i, tt := range tests {
@@ -572,7 +572,7 @@ func TestIssue3797(t *testing.T) {
 	}
 
 	dk := &BasicDockerKeyring{}
-	dk.Add(DockerConfig{
+	dk.Add(nil, DockerConfig{
 		"https://quay.io/v1/": DockerConfigEntry{
 			Username: rex.Username,
 			Password: rex.Password,
@@ -582,15 +582,15 @@ func TestIssue3797(t *testing.T) {
 
 	tests := []struct {
 		image string
-		match []AuthConfig
+		match []TrackedAuthConfig
 		ok    bool
 	}{
 		// direct match
-		{"quay.io", []AuthConfig{rex}, true},
+		{"quay.io", []TrackedAuthConfig{{AuthConfig: rex}}, true},
 
 		// partial matches
-		{"quay.io/foo", []AuthConfig{rex}, true},
-		{"quay.io/foo/bar", []AuthConfig{rex}, true},
+		{"quay.io/foo", []TrackedAuthConfig{{AuthConfig: rex}}, true},
+		{"quay.io/foo/bar", []TrackedAuthConfig{{AuthConfig: rex}}, true},
 	}
 
 	for i, tt := range tests {
