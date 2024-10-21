@@ -18,133 +18,106 @@ package slice
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 )
 
-func TestCopyStrings(t *testing.T) {
-	var src1 []string
-	dest1 := CopyStrings(src1)
-
-	if !reflect.DeepEqual(src1, dest1) {
-		t.Errorf("%v and %v are not equal", src1, dest1)
-	}
-
-	src2 := []string{}
-	dest2 := CopyStrings(src2)
-
-	if !reflect.DeepEqual(src2, dest2) {
-		t.Errorf("%v and %v are not equal", src2, dest2)
-	}
-
-	src3 := []string{"a", "c", "b"}
-	dest3 := CopyStrings(src3)
-
-	if !reflect.DeepEqual(src3, dest3) {
-		t.Errorf("%v and %v are not equal", src3, dest3)
-	}
-
-	src3[0] = "A"
-	if reflect.DeepEqual(src3, dest3) {
-		t.Errorf("CopyStrings didn't make a copy")
-	}
+type testType[T comparable] struct {
+	typeName       string
+	baseSlice      []T
+	notPresentItem T
+	presentItem    T
 }
 
-func TestSortStrings(t *testing.T) {
-	src := []string{"a", "c", "b"}
-	dest := SortStrings(src)
-	expected := []string{"a", "b", "c"}
-
-	if !reflect.DeepEqual(dest, expected) {
-		t.Errorf("SortString didn't sort the strings")
-	}
-
-	if !reflect.DeepEqual(src, expected) {
-		t.Errorf("SortString didn't sort in place")
-	}
+type testCase[T comparable] struct {
+	testName string
+	input    []T
+	remove   T
+	want     []T
 }
 
-func TestContainsString(t *testing.T) {
-	src := []string{"aa", "bb", "cc"}
-	if !ContainsString(src, "bb", nil) {
-		t.Errorf("ContainsString didn't find the string as expected")
-	}
+func TestRemove(t *testing.T) {
+	t.Run("Strings", func(t *testing.T) {
+		SuiteRemoveT(t, testType[string]{
+			typeName:       "string",
+			baseSlice:      []string{"a", "b", "c", "d"},
+			notPresentItem: "notPresent",
+			presentItem:    "b",
+		})
+	})
 
-	modifier := func(s string) string {
-		if s == "cc" {
-			return "ee"
+	t.Run("Ints", func(t *testing.T) {
+		SuiteRemoveT(t, testType[int]{
+			typeName:       "int",
+			baseSlice:      []int{1, 2, 3, 4},
+			notPresentItem: 5,
+			presentItem:    2,
+		})
+	})
+
+	t.Run("Floats", func(t *testing.T) {
+		SuiteRemoveT(t, testType[float64]{
+			typeName:       "float64",
+			baseSlice:      []float64{1.1, 2.2, 3.3, 4.4},
+			notPresentItem: 5.5,
+			presentItem:    2.2,
+		})
+	})
+
+	t.Run("Structs", func(t *testing.T) {
+		type testStruct struct {
+			A int
+			B string
 		}
-		return s
-	}
-	if !ContainsString(src, "ee", modifier) {
-		t.Errorf("ContainsString didn't find the string by modifier")
-	}
 
-	src = make([]string, 0)
-	if ContainsString(src, "", nil) {
-		t.Errorf("The result returned is not the expected result")
-	}
+		SuiteRemoveT(t, testType[testStruct]{
+			typeName:       "testStruct",
+			baseSlice:      []testStruct{{1, "a"}, {2, "b"}, {3, "c"}, {4, "d"}},
+			notPresentItem: testStruct{5, "e"},
+			presentItem:    testStruct{2, "b"},
+		})
+	})
 }
 
-func TestRemoveString(t *testing.T) {
-	modifier := func(s string) string {
-		if s == "ab" {
-			return "ee"
-		}
-		return s
-	}
-	tests := []struct {
-		testName string
-		input    []string
-		remove   string
-		modifier func(s string) string
-		want     []string
-	}{
+func SuiteRemoveT[T comparable](t *testing.T, toTest testType[T]) {
+	tests := []testCase[T]{
 		{
-			testName: "Nil input slice",
+			testName: "Nil input slice with item that is known to not be present",
 			input:    nil,
-			remove:   "",
-			modifier: nil,
+			remove:   toTest.notPresentItem,
 			want:     nil,
 		},
 		{
-			testName: "Slice doesn't contain the string",
-			input:    []string{"a", "ab", "cdef"},
-			remove:   "NotPresentInSlice",
-			modifier: nil,
-			want:     []string{"a", "ab", "cdef"},
-		},
-		{
-			testName: "All strings removed, result is nil",
-			input:    []string{"a"},
-			remove:   "a",
-			modifier: nil,
+			testName: "Nil input slice with item that is known to be present",
+			input:    nil,
+			remove:   toTest.presentItem,
 			want:     nil,
 		},
 		{
-			testName: "No modifier func, one string removed",
-			input:    []string{"a", "ab", "cdef"},
-			remove:   "ab",
-			modifier: nil,
-			want:     []string{"a", "cdef"},
+			testName: "Nothing changed when using an item that is known to be not present",
+			input:    slices.Clone(toTest.baseSlice),
+			remove:   toTest.notPresentItem,
+			want:     slices.Clone(toTest.baseSlice),
 		},
 		{
-			testName: "No modifier func, all(three) strings removed",
-			input:    []string{"ab", "a", "ab", "cdef", "ab"},
-			remove:   "ab",
-			modifier: nil,
-			want:     []string{"a", "cdef"},
+			testName: "Removing only the matching items",
+			input:    slices.Clone(toTest.baseSlice),
+			remove:   toTest.presentItem,
+			want: slices.DeleteFunc(slices.Clone(toTest.baseSlice), func(item T) bool {
+				return item == toTest.presentItem
+			}),
 		},
 		{
-			testName: "Removed both the string and the modifier func result",
-			input:    []string{"a", "cd", "ab", "ee"},
-			remove:   "ee",
-			modifier: modifier,
-			want:     []string{"a", "cd"},
+			testName: "All items remove",
+			input:    []T{toTest.presentItem, toTest.presentItem, toTest.presentItem},
+			remove:   toTest.presentItem,
+			want:     nil,
 		},
 	}
+
 	for _, tt := range tests {
-		if got := RemoveString(tt.input, tt.remove, tt.modifier); !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("%v: RemoveString(%v, %q, %T) = %v WANT %v", tt.testName, tt.input, tt.remove, tt.modifier, got, tt.want)
+		if got := Remove[[]T, T](tt.input, tt.remove); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("%v: Remove[%s](%v, %v) = %v WANT %v", tt.testName, toTest.typeName, tt.input, tt.remove, got, tt.want)
 		}
 	}
 }
