@@ -227,8 +227,8 @@ type Proxier struct {
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
 	ipsetList map[string]*IPSet
-	// nodeAddressHandler selects the interfaces where nodePort works.
-	nodeAddressHandler *proxyutil.NodeAddressHandler
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer     proxyutil.NetworkInterfacer
@@ -365,9 +365,9 @@ func NewProxier(
 		scheduler = defaultScheduler
 	}
 
-	nodeAddressHandler := proxyutil.NewNodeAddressHandler(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodeAddressHandler, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 
 	// excludeCIDRs has been validated before, here we just parse it to IPNet list
 	parsedExcludeCIDRs, _ := netutils.ParseCIDRs(excludeCIDRs)
@@ -402,7 +402,7 @@ func NewProxier(
 		filterRules:           proxyutil.NewLineBuffer(),
 		netlinkHandle:         NewNetLinkHandle(ipFamily == v1.IPv6Protocol),
 		ipset:                 ipset,
-		nodeAddressHandler:    nodeAddressHandler,
+		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     proxyutil.RealNetwork{},
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		logger:                logger,
@@ -1000,12 +1000,12 @@ func (proxier *Proxier) syncProxyRules() {
 	// can be reused for all nodePort services.
 	var nodeIPs []net.IP
 	if hasNodePort {
-		if proxier.nodeAddressHandler.MatchAll() {
+		if proxier.nodePortAddresses.MatchAll() {
 			for _, ipStr := range nodeAddressSet.UnsortedList() {
 				nodeIPs = append(nodeIPs, netutils.ParseIPSloppy(ipStr))
 			}
 		} else {
-			allNodeIPs, err := proxier.nodeAddressHandler.GetNodeIPs(proxier.networkInterfacer)
+			allNodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 			if err != nil {
 				proxier.logger.Error(err, "Failed to get node IP address matching nodeport cidr")
 			} else {

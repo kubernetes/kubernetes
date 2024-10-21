@@ -17,25 +17,22 @@ limitations under the License.
 package healthcheck
 
 import (
-	"context"
 	"net"
 	"net/http"
-
-	netutils "k8s.io/utils/net"
 )
 
 // listener allows for testing of ServiceHealthServer and ProxierHealthServer.
 type listener interface {
-	// Listen is very much like netutils.MultiListen, except the second arg (network) is
+	// Listen is very much like net.Listen, except the first arg (network) is
 	// fixed to be "tcp".
-	Listen(ctx context.Context, addrs ...string) (net.Listener, error)
+	Listen(addr string) (net.Listener, error)
 }
 
 // httpServerFactory allows for testing of ServiceHealthServer and ProxierHealthServer.
 type httpServerFactory interface {
 	// New creates an instance of a type satisfying HTTPServer.  This is
 	// designed to include http.Server.
-	New(handler http.Handler) httpServer
+	New(addr string, handler http.Handler) httpServer
 }
 
 // httpServer allows for testing of ServiceHealthServer and ProxierHealthServer.
@@ -48,8 +45,8 @@ type httpServer interface {
 // Implement listener in terms of net.Listen.
 type stdNetListener struct{}
 
-func (stdNetListener) Listen(ctx context.Context, addrs ...string) (net.Listener, error) {
-	return netutils.MultiListen(ctx, "tcp", addrs...)
+func (stdNetListener) Listen(addr string) (net.Listener, error) {
+	return net.Listen("tcp", addr)
 }
 
 var _ listener = stdNetListener{}
@@ -57,8 +54,9 @@ var _ listener = stdNetListener{}
 // Implement httpServerFactory in terms of http.Server.
 type stdHTTPServerFactory struct{}
 
-func (stdHTTPServerFactory) New(handler http.Handler) httpServer {
+func (stdHTTPServerFactory) New(addr string, handler http.Handler) httpServer {
 	return &http.Server{
+		Addr:    addr,
 		Handler: handler,
 	}
 }

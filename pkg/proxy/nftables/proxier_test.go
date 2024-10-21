@@ -128,7 +128,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		hostname:            testHostname,
 		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
 		nodeIP:              nodeIP,
-		nodeAddressHandler:  proxyutil.NewNodeAddressHandler(ipFamily, nodePortAddresses),
+		nodePortAddresses:   proxyutil.NewNodePortAddresses(ipFamily, nodePortAddresses),
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
 		serviceCIDRs:        serviceCIDRs,
@@ -959,7 +959,7 @@ func TestNodePorts(t *testing.T) {
 				nodeIP = testNodeIPv6
 			}
 			if tc.nodePortAddresses != nil {
-				fp.nodeAddressHandler = proxyutil.NewNodeAddressHandler(tc.family, tc.nodePortAddresses)
+				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses)
 			}
 
 			makeServiceMap(fp,

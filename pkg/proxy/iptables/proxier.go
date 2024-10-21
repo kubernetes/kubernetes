@@ -205,8 +205,8 @@ type Proxier struct {
 	// conntrackTCPLiberal indicates whether the system sets the kernel nf_conntrack_tcp_be_liberal
 	conntrackTCPLiberal bool
 
-	// nodeAddressHandler selects the interfaces where nodePort works.
-	nodeAddressHandler *proxyutil.NodeAddressHandler
+	// nodePortAddresses selects the interfaces where nodePort works.
+	nodePortAddresses *proxyutil.NodePortAddresses
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer proxyutil.NetworkInterfacer
@@ -244,9 +244,9 @@ func NewProxier(ctx context.Context,
 	initOnly bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
-	nodeAddressHandler := proxyutil.NewNodeAddressHandler(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
-	if !nodeAddressHandler.ContainsIPv4Loopback() {
+	if !nodePortAddresses.ContainsIPv4Loopback() {
 		localhostNodePorts = false
 	}
 	if localhostNodePorts {
@@ -277,7 +277,7 @@ func NewProxier(ctx context.Context,
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using iptables mark for masquerade", "mark", masqueradeMark)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodeAddressHandler, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
 	nfacctRunner, err := nfacct.New()
 	if err != nil {
 		logger.Error(err, "Failed to create nfacct runner, nfacct based metrics won't be available")
@@ -310,7 +310,7 @@ func NewProxier(ctx context.Context,
 		natChains:                proxyutil.NewLineBuffer(),
 		natRules:                 proxyutil.NewLineBuffer(),
 		localhostNodePorts:       localhostNodePorts,
-		nodeAddressHandler:       nodeAddressHandler,
+		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
 		conntrackTCPLiberal:      conntrackTCPLiberal,
 		logger:                   logger,
@@ -1447,7 +1447,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finally, tail-call to the nodePorts chain.  This needs to be after all
 	// other service portal rules.
-	if proxier.nodeAddressHandler.MatchAll() {
+	if proxier.nodePortAddresses.MatchAll() {
 		destinations := []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 		// Block localhost nodePorts if they are not supported. (For IPv6 they never
 		// work, and for IPv4 they only work if we previously set `route_localnet`.)
@@ -1463,9 +1463,9 @@ func (proxier *Proxier) syncProxyRules() {
 			destinations,
 			"-j", string(kubeNodePortsChain))
 	} else {
-		nodeIPs, err := proxier.nodeAddressHandler.GetNodeIPs(proxier.networkInterfacer)
+		nodeIPs, err := proxier.nodePortAddresses.GetNodeIPs(proxier.networkInterfacer)
 		if err != nil {
-			proxier.logger.Error(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodeAddressHandler)
+			proxier.logger.Error(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
 		}
 		for _, ip := range nodeIPs {
 			if ip.IsLoopback() {
