@@ -388,13 +388,12 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		return modified, nil, err
 	}
 	// TODO: use wait
-	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, p.Timeout, true, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, p.Timeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := p.Helper.Get(namespace, name); !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return modified, nil, err
 	}
 	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)
