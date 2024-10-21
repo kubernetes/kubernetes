@@ -583,7 +583,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		if kubeContainerStatus.Resources.CPULimit != nil {
 			currentCPULimit = kubeContainerStatus.Resources.CPULimit.MilliValue()
 		}
-		if kubeContainerStatus.Resources.CPURequest != nil {
+		// kubeContainerStatus can have the minimum value even if no cpu request is configured.
+		if kubeContainerStatus.Resources.CPURequest != nil && desiredCPURequest > 0 {
 			currentCPURequest = kubeContainerStatus.Resources.CPURequest.MilliValue()
 		}
 	}
