@@ -122,6 +122,10 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+			r = rest.WithCorruptObjDeleter(r, options)
+		}
+
 		span.AddEvent("About to delete object from database")
 		wasDeleted := true
 		userInfo, _ := request.UserFrom(ctx)

@@ -200,3 +200,23 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 		return nil
 	}
 }
+
+// WithCorruptObjDeleter wraps the given rest.GracefulDeleter that is used for normal
+// deletion flow with an unsafe deleter to facilitate deletion of corrupt object
+func WithCorruptObjDeleter(deleter GracefulDeleter, opts *metav1.DeleteOptions) GracefulDeleter {
+	if opts == nil {
+		return deleter
+	}
+	if ignore := opts.IgnoreStoreReadErrorWithClusterBreakingPotential; ignore == nil || !*ignore {
+		return deleter
+	}
+
+	provider, ok := deleter.(CorruptObjectDeleterProvider)
+	if !ok {
+		return deleter
+	}
+	if unsafe := provider.GetCorruptObjDeleter(); unsafe != nil {
+		return unsafe
+	}
+	return deleter
+}
