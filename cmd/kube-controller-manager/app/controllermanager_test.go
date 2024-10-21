@@ -229,7 +229,7 @@ func TestNoCloudProviderControllerStarted(t *testing.T) {
 		Cloud:    nil,
 		LoopMode: IncludeCloudLoops,
 	}
-
+	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
 	for _, controller := range NewControllerDescriptors() {
 		if !controller.IsCloudProviderController() {
 			continue
