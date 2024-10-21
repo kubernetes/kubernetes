@@ -20,6 +20,8 @@ limitations under the License.
 package winstats
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"os"
 	"runtime"
 	"strconv"
@@ -177,21 +179,26 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
-	numOfPysicalCores, numOfSockets, topology, err := processorInfo(RelationAll)
-	if err != nil {
-		return nil, err
+	mi := &cadvisorapi.MachineInfo{
+		NumCores:       ProcessorCount(),
+		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
+		MachineID:      hostname,
+		SystemUUID:     systemUUID,
+		BootID:         bootId,
 	}
 
-	return &cadvisorapi.MachineInfo{
-		NumCores:         ProcessorCount(),
-		NumSockets:       numOfSockets,
-		NumPhysicalCores: numOfPysicalCores,
-		MemoryCapacity:   p.nodeInfo.memoryPhysicalCapacityBytes,
-		MachineID:        hostname,
-		SystemUUID:       systemUUID,
-		BootID:           bootId,
-		Topology:         topology,
-	}, nil
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		numOfPysicalCores, numOfSockets, topology, err := processorInfo(RelationAll)
+		if err != nil {
+			return nil, err
+		}
+
+		mi.NumPhysicalCores = numOfPysicalCores
+		mi.NumSockets = numOfSockets
+		mi.Topology = topology
+	}
+
+	return mi, nil
 }
 
 // runtime.NumCPU() will only return the information for a single Processor Group.

@@ -19,6 +19,8 @@ package cpumanager
 import (
 	"context"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"math"
 	"runtime"
@@ -267,7 +269,6 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	klog.InfoS("jjs allocate call")
 	err := m.policy.Allocate(m.state, p, c)
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
@@ -537,9 +538,7 @@ func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string,
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
 
-	if runtime.GOOS == "windows" {
-		klog.Info("Updating windows CPU affinity")
-
+	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		affinities := winstats.CpusToGroupAffinity(cpus.List())
 		var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
 		for _, affinity := range affinities {
