@@ -146,18 +146,10 @@ const (
 	// MaxContainerBackOff is the max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
 
-	// Period for performing global cleanup tasks.
-	housekeepingPeriod = time.Second * 2
-
 	// Duration at which housekeeping failed to satisfy the invariant that
 	// housekeeping should be fast to avoid blocking pod config (while
 	// housekeeping is running no new pods are started or deleted).
 	housekeepingWarningDuration = time.Second * 1
-
-	// Period after which the runtime cache expires - set to slightly longer than
-	// the expected length between housekeeping periods, which explicitly refreshes
-	// the cache.
-	runtimeCacheRefreshPeriod = housekeepingPeriod + housekeepingWarningDuration
 
 	// Period for performing eviction monitoring.
 	// ensure this is kept in sync with internal cadvisor housekeeping.
@@ -576,6 +568,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
+		podHousekeepingPeriod:          kubeCfg.PodHousekeepingPeriod.Duration,
 	}
 
 	if klet.cloud != nil {
@@ -699,6 +692,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
 
+	// Period after which the runtime cache expires - set to slightly longer than
+	// the expected length between housekeeping periods, which explicitly refreshes
+	// the cache.
+	runtimeCacheRefreshPeriod := kubeCfg.PodHousekeepingPeriod.Duration + housekeepingWarningDuration
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
 		return nil, err
@@ -1344,6 +1341,9 @@ type Kubelet struct {
 
 	// Track node startup latencies
 	nodeStartupLatencyTracker util.NodeStartupLatencyTracker
+
+	// podHousekeepingPeriod is the period for performing global pod cleanup tasks
+	podHousekeepingPeriod time.Duration
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2327,7 +2327,7 @@ func (kl *Kubelet) syncLoop(ctx context.Context, updates <-chan kubetypes.PodUpd
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)
 	defer syncTicker.Stop()
-	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	housekeepingTicker := time.NewTicker(kl.podHousekeepingPeriod)
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	const (
