@@ -470,6 +470,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta1.D
 	out.Paused = in.Paused
 	out.RollbackTo = (*apps.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PodReplacementPolicy = (*apps.DeploymentPodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
 	return nil
 }
 
@@ -494,6 +495,7 @@ func autoConvert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(in *apps.Deployme
 	out.Paused = in.Paused
 	out.RollbackTo = (*appsv1beta1.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
 	out.ProgressDeadlineSeconds = (*int32)(unsafe.Pointer(in.ProgressDeadlineSeconds))
+	out.PodReplacementPolicy = (*appsv1beta1.DeploymentPodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
 	return nil
 }
 
@@ -509,6 +511,7 @@ func autoConvert_v1beta1_DeploymentStatus_To_apps_DeploymentStatus(in *appsv1bet
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	out.TerminatingReplicas = in.TerminatingReplicas
 	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
@@ -526,6 +529,7 @@ func autoConvert_apps_DeploymentStatus_To_v1beta1_DeploymentStatus(in *apps.Depl
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	out.TerminatingReplicas = in.TerminatingReplicas
 	out.Conditions = *(*[]appsv1beta1.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil

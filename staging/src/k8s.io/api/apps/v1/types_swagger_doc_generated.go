@@ -168,6 +168,7 @@ var map_DeploymentSpec = map[string]string{
 	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
 	"paused":                  "Indicates that the deployment is paused.",
 	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
+	"podReplacementPolicy":    "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminationStarted policy creates replacement Pods when the old Pods start\n  terminating (has a .metadata.deletionTimestamp). The total number of\n  Deployment Pods can be greater than specified by the Deployment's\n  .spec.replicas and the DeploymentStrategy.\n- TerminationComplete policy creates replacement Pods only when the old Pods\n  are fully terminated (reach Succeeded or Failed phase). The old Pods are\n  subsequently removed. The total number of the Deployment Pods is\n  limited by the Deployment's .spec.replicas and the DeploymentStrategy.\n\nThe default behavior when the policy is not specified depends on the DeploymentStrategy: - Recreate strategy uses TerminationComplete behavior when recreating the deployment,\n  but uses TerminationStarted when scaling the deployment.\n- RollingUpdate strategy uses TerminationStarted behavior for both rolling out and\n  scaling the deployments.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
 }
 
 func (DeploymentSpec) SwaggerDoc() map[string]string {
@@ -177,11 +178,12 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 var map_DeploymentStatus = map[string]string{
 	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
 	"observedGeneration":  "The generation observed by the deployment controller.",
-	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
-	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
-	"readyReplicas":       "readyReplicas is the number of pods targeted by this Deployment with a Ready Condition.",
-	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
+	"replicas":            "Total number of non-terminating pods targeted by this deployment (their labels match the selector).",
+	"updatedReplicas":     "Total number of non-terminating pods targeted by this deployment that have the desired template spec.",
+	"readyReplicas":       "Total number of non-terminating pods targeted by this Deployment with a Ready Condition.",
+	"availableReplicas":   "Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.",
 	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
+	"terminatingReplicas": "Total number of terminating pods (have non-null .metadata.deletionTimestamp) targeted by this deployment.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
 	"conditions":          "Represents the latest available observations of a deployment's current state.",
 	"collisionCount":      "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
 }
@@ -227,7 +229,7 @@ func (ReplicaSetCondition) SwaggerDoc() map[string]string {
 var map_ReplicaSetList = map[string]string{
 	"":         "ReplicaSetList is a collection of ReplicaSets.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-	"items":    "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller",
+	"items":    "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
 }
 
 func (ReplicaSetList) SwaggerDoc() map[string]string {
@@ -236,10 +238,10 @@ func (ReplicaSetList) SwaggerDoc() map[string]string {
 
 var map_ReplicaSetSpec = map[string]string{
 	"":                "ReplicaSetSpec is the specification of a ReplicaSet.",
-	"replicas":        "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+	"replicas":        "Replicas is the number of desired pods. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
 	"minReadySeconds": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"selector":        "Selector is a label query over pods that should match the replica count. Label keys and values that must match in order to be controlled by this replica set. It must match the pod template's labels. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
-	"template":        "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template",
+	"template":        "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template",
 }
 
 func (ReplicaSetSpec) SwaggerDoc() map[string]string {
@@ -248,10 +250,11 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 
 var map_ReplicaSetStatus = map[string]string{
 	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
-	"replicas":             "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
-	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
-	"readyReplicas":        "readyReplicas is the number of pods targeted by this ReplicaSet with a Ready Condition.",
-	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
+	"replicas":             "Replicas is the most recently observed number of non-terminating pods. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
+	"fullyLabeledReplicas": "The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.",
+	"readyReplicas":        "The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.",
+	"availableReplicas":    "The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.",
+	"terminatingReplicas":  "The number of terminating pods (have non-null .metadata.deletionTimestamp) for this replica set.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed ReplicaSet.",
 	"conditions":           "Represents the latest available observations of a replica set's current state.",
 }
