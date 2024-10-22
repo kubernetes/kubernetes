@@ -101,15 +101,6 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// With support for in-place pod resizing, container resources are now mutable.
-		// If container resources are updated with new resource requests values, a pod resize is
-		// desired. The status of this request is reflected by setting Resize field to "Proposed"
-		// as a signal to the caller that the request is being considered.
-		podutil.MarkPodProposedForResize(oldPod, newPod)
-	}
-
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
@@ -283,6 +274,34 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
+type podResizeStrategy struct {
+	podStrategy
+}
+
+// ResizeStrategy wraps and exports the used podStrategy for the storage package.
+var ResizeStrategy = podResizeStrategy{Strategy}
+
+func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+
+	podutil.MarkPodProposedForResize(oldPod, newPod)
+	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return nil 
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podResizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
