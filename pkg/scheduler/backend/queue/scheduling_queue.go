@@ -989,10 +989,10 @@ func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 // may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod, event framework.ClusterEvent) {
 	p.lock.Lock()
-	if event.Resource == framework.Pod && event.ActionType&framework.UpdatePodScaleDown != 0 {
+	if (framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodScaleDown}.Match(event)) {
 		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
 		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
-		p.moveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodUpdate, oldPod, newPod, nil)
+		p.moveAllToActiveOrBackoffQueue(logger, event, oldPod, newPod, nil)
 	} else {
 		// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
 		// because Pod related events only make Pods rejected by cross topology term schedulable.
