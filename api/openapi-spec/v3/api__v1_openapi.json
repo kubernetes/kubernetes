@@ -5666,6 +5666,14 @@
             "x-kubernetes-patch-merge-key": "name",
             "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
+          "resources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements"
+              }
+            ],
+            "description": "Resources is the total amount of compute resources required by all containers in the pod. Currently, only CPU and Memory resources are supported.\n\nThis is an alpha field and requires enabling the PodLevelResources feature gate."
+          },
           "restartPolicy": {
             "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
