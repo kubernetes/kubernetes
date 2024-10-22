@@ -49,7 +49,7 @@ const (
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
 	// owner: @thockin
-	// deprecated: v1.29
+	// Deprecated: v1.29
 	//
 	// Enables Service.status.ingress.loadBanace to be set on
 	// services of types other than LoadBalancer.
