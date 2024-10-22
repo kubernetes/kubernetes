@@ -279,10 +279,34 @@ type podResizeStrategy struct {
 // ResizeStrategy wraps and exports the used podStrategy for the storage package.
 var ResizeStrategy = podResizeStrategy{Strategy}
 
+// dropNonPodResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
+func dropNonPodResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
+	pod := oldPod.DeepCopy()
+	pod.Name = newPod.Name
+	pod.Namespace = newPod.Namespace
+	pod.ResourceVersion = newPod.ResourceVersion
+	pod.UID = newPod.UID
+
+	oldCtrToIndex := make(map[string]int)
+	for idx, ctr := range pod.Spec.Containers {
+		oldCtrToIndex[ctr.Name] = idx
+	}
+	for _, ctr := range newPod.Spec.Containers {
+		idx, ok := oldCtrToIndex[ctr.Name]
+		if !ok {
+			continue
+		}
+		pod.Spec.Containers[idx].Resources = ctr.Resources
+		pod.Spec.Containers[idx].ResizePolicy = ctr.ResizePolicy
+	}
+	return pod
+}
+
 func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 
+	*newPod = *dropNonPodResizeUpdates(newPod, oldPod)
 	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
