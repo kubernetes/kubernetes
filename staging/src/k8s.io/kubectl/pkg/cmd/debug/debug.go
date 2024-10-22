@@ -945,12 +945,12 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 	}
 	if status.State.Terminated != nil {
 		klog.V(1).Info("Ephemeral container terminated, falling back to logs")
-		return logOpts(restClientGetter, pod, opts)
+		return logOpts(ctx, restClientGetter, pod, opts)
 	}
 
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", podName, err)
-		return logOpts(restClientGetter, pod, opts)
+		return logOpts(ctx, restClientGetter, pod, opts)
 	}
 	return nil
 }
@@ -968,7 +968,7 @@ func getContainerStatusByName(pod *corev1.Pod, containerName string) *corev1.Con
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
+func logOpts(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
@@ -979,7 +979,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 	for _, request := range requests {
-		if err := logs.DefaultConsumeRequest(request, opts.Out); err != nil {
+		if err := logs.DefaultConsumeRequest(ctx, request, opts.Out); err != nil {
 			return err
 		}
 	}
