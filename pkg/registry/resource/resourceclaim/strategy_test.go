@@ -133,78 +133,10 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
-var objWithRequestAndStatus = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Spec: resource.ResourceClaimSpec{
-		Devices: resource.DeviceClaim{
-			Requests: []resource.DeviceRequest{
-				{
-					Name:            "test-request",
-					DeviceClassName: "test-device-class",
-					AllocationMode:  resource.DeviceAllocationModeExactCount,
-					Count:           1,
-				},
-			},
-		},
-	},
-	Status: resource.ResourceClaimStatus{
-		Allocation: &resource.AllocationResult{
-			Devices: resource.DeviceAllocationResult{
-				Results: []resource.DeviceRequestAllocationResult{
-					{
-						Request: "test-request",
-						Driver:  "test-driver",
-						Pool:    "test-pool",
-						Device:  "test-device",
-					},
-				},
-			},
-		},
-	},
-}
-
-var objWithGatedStatusFields = &resource.ResourceClaim{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "valid-claim",
-		Namespace: "default",
-	},
-	Spec: resource.ResourceClaimSpec{
-		Devices: resource.DeviceClaim{
-			Requests: []resource.DeviceRequest{
-				{
-					Name:            "test-request",
-					DeviceClassName: "test-device-class",
-					AllocationMode:  resource.DeviceAllocationModeExactCount,
-					Count:           1,
-				},
-			},
-		},
-	},
-	Status: resource.ResourceClaimStatus{
-		Allocation: &resource.AllocationResult{
-			Devices: resource.DeviceAllocationResult{
-				Results: []resource.DeviceRequestAllocationResult{
-					{
-						Request: "test-request",
-						Driver:  "test-driver",
-						Pool:    "test-pool",
-						Device:  "test-device",
-					},
-				},
-			},
-		},
-		Devices: []resource.AllocatedDeviceStatus{
-			{
-				Driver: "test-driver",
-				Pool:   "test-pool",
-				Device: "test-device",
-			},
-		},
-	},
-}
+var testRequest = "test-request"
+var testDriver = "test-driver"
+var testPool = "test-pool"
+var testDevice = "test-device"
 
 func TestStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
@@ -422,20 +354,69 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			}(),
 		},
 		"drop-fields-devices-status": {
-			oldObj:                  objWithRequestAndStatus,
-			newObj:                  objWithGatedStatusFields,
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
 			deviceStatusFeatureGate: false,
-			expectObj:               objWithRequestAndStatus,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
 		},
 		"keep-fields-devices-status": {
-			oldObj:                  objWithRequestAndStatus,
-			newObj:                  objWithGatedStatusFields,
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
 			deviceStatusFeatureGate: true,
-			expectObj: func() *resource.ResourceClaim {
-				expectObj := objWithGatedStatusFields.DeepCopy()
-				// Spec remains unchanged.
-				expectObj.Spec = objWithRequestAndStatus.Spec
-				return expectObj
+			expectObj: func() *resource.ResourceClaim { // Status is still there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+		},
+		"drop-status-deallocated-device": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // device is deallocated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				return obj
 			}(),
 		},
 	}
@@ -468,4 +449,30 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			assert.Equal(t, expectObj, newObj)
 		})
 	}
+}
+
+func addSpecDevicesRequest(resourceClaim *resource.ResourceClaim, request string) {
+	resourceClaim.Spec.Devices.Requests = append(resourceClaim.Spec.Devices.Requests, resource.DeviceRequest{
+		Name: request,
+	})
+}
+
+func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, request string) {
+	if resourceClaim.Status.Allocation == nil {
+		resourceClaim.Status.Allocation = &resource.AllocationResult{}
+	}
+	resourceClaim.Status.Allocation.Devices.Results = append(resourceClaim.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
+		Request: request,
+		Driver:  driver,
+		Pool:    pool,
+		Device:  device,
+	})
+}
+
+func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool string, device string) {
+	resourceClaim.Status.Devices = append(resourceClaim.Status.Devices, resource.AllocatedDeviceStatus{
+		Driver: driver,
+		Pool:   pool,
+		Device: device,
+	})
 }

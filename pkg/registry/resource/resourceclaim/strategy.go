@@ -24,11 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -140,6 +142,7 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	newClaim.Spec = oldClaim.Spec
 	metav1.ResetObjectMetaForStatus(&newClaim.ObjectMeta, &oldClaim.ObjectMeta)
 
+	dropDeallocatedStatusDevices(newClaim, oldClaim)
 	dropDisabledFields(newClaim, oldClaim)
 }
 
@@ -235,6 +238,50 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 
 func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		newClaim.Status.Devices = nil
+	}
+}
+
+// dropDeallocatedStatusDevices removes the status.devices that were allocated
+// in the oldClaim and that have been removed in the newClaim.
+func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		return
+	}
+
+	deallocatedDevices := sets.New[structured.DeviceID]()
+
+	if oldClaim.Status.Allocation != nil {
+		// Get all devices in the oldClaim.
+		for _, result := range oldClaim.Status.Allocation.Devices.Results {
+			deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+			deallocatedDevices.Insert(deviceID)
+		}
+	}
+
+	// Remove devices from deallocatedDevices that are still in newClaim.
+	if newClaim.Status.Allocation != nil {
+		for _, result := range newClaim.Status.Allocation.Devices.Results {
+			deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+			deallocatedDevices.Delete(deviceID)
+		}
+	}
+
+	// Remove from newClaim.Status.Devices.
+	for i := len(newClaim.Status.Devices) - 1; i >= 0; i-- {
+		deviceID := structured.DeviceID{
+			Driver: newClaim.Status.Devices[i].Driver,
+			Pool:   newClaim.Status.Devices[i].Pool,
+			Device: newClaim.Status.Devices[i].Device,
+		}
+		// Device was in the oldClaim.Status.Allocation.Devices but is no longer in the
+		// newClaim.Status.Allocation.Devices so it must be removed from the newClaim.Status.Devices.
+		if deallocatedDevices.Has(deviceID) {
+			newClaim.Status.Devices = append(newClaim.Status.Devices[:i], newClaim.Status.Devices[i+1:]...)
+		}
+	}
+
+	if len(newClaim.Status.Devices) == 0 {
 		newClaim.Status.Devices = nil
 	}
 }
