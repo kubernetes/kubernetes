@@ -1033,7 +1033,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 	}
 
 	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyYAMLPatchType).
 		Namespace("default").
 		Resource("configmaps").
 		Name("large-patch-test-cm").
@@ -1050,6 +1050,79 @@ func TestPatchVeryLargeObject(t *testing.T) {
 		Get()
 	if err == nil {
 		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+}
+
+// TestPatchVeryLargeObjectCBORApply mirrors TestPatchVeryLargeObject using the +cbor structured
+// syntax suffix for application/apply-patch and with CBOR enabled.
+func TestPatchVeryLargeObjectCBORApply(t *testing.T) {
+	framework.EnableCBORServingAndStorageForTest(t)
+	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, false)
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	cfg := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "large-patch-test-cm",
+			Namespace: "default",
+		},
+		Data: map[string]string{"k": "v"},
+	}
+
+	// Create a small config map.
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unable to create configMap: %v", err)
+	}
+
+	patchString := `{"data":{"k":"v"`
+	for i := 0; i < 9999; i++ {
+		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
+		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
+	}
+	patchString = fmt.Sprintf("%s}}", patchString)
+
+	// Should be able to update a small object to be near the object size limit.
+	_, err := client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/api/v1").
+		Namespace(cfg.Namespace).
+		Resource("configmaps").
+		Name(cfg.Name).
+		Body([]byte(patchString)).Do(context.TODO()).Get()
+	if err != nil {
+		t.Errorf("unable to patch configMap: %v", err)
+	}
+
+	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyYAMLPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("large-patch-test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "large-patch-test-cm",
+				"namespace": "default",
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyCBORPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("large-patch-test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte("\xa3\x4aapiVersion\x42v1\x44kind\x49ConfigMap\x48metadata\xa2\x44name\x53large-patch-test-cm\x49namespace\x47default")).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch (cbor), but succeeded")
 	}
 }
 

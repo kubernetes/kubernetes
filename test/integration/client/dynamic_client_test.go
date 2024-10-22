@@ -302,7 +302,54 @@ func unstructuredToEvent(obj *unstructured.Unstructured) (*corev1.Event, error) 
 }
 
 func TestDynamicClientCBOREnablement(t *testing.T) {
-	for _, tc := range []struct {
+	DoCreate := func(t *testing.T, config *rest.Config) error {
+		client, err := dynamic.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+			context.TODO(),
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name": "test-dynamic-client-cbor-enablement",
+					},
+				},
+			},
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		return err
+	}
+
+	DoApply := func(t *testing.T, config *rest.Config) error {
+		client, err := dynamic.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		name := "test-dynamic-client-cbor-enablement"
+		_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Apply(
+			context.TODO(),
+			name,
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Namespace",
+					"metadata": map[string]interface{}{
+						"name": name,
+					},
+				},
+			},
+			metav1.ApplyOptions{
+				FieldManager: "foo-bar",
+				DryRun:       []string{metav1.DryRunAll},
+			},
+		)
+		return err
+	}
+
+	testCases := []struct {
 		name                    string
 		serving                 bool
 		allowed                 bool
@@ -312,6 +359,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 		wantResponseContentType string
 		wantResponseStatus      int
 		wantStatusError         bool
+		doRequest               func(t *testing.T, config *rest.Config) error
 	}{
 		{
 			name:                    "sends cbor accepts both gets cbor",
@@ -323,6 +371,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends cbor accepts both gets 415",
@@ -334,6 +383,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusUnsupportedMediaType,
 			wantStatusError:         true,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends json accepts both gets cbor",
@@ -345,6 +395,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends json accepts both gets json",
@@ -356,6 +407,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends json accepts json gets json with serving enabled",
@@ -367,6 +419,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends json accepts json gets json with serving disabled",
@@ -378,6 +431,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
 		{
 			name:                    "sends json without both gates enabled",
@@ -389,60 +443,92 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
+			doRequest:               DoCreate,
 		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.serving {
+		{
+			name:                    "apply sends cbor accepts both gets cbor",
+			serving:                 true,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/apply-patch+cbor",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoApply,
+		},
+		{
+			name:                    "apply sends json accepts both gets cbor",
+			serving:                 true,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/apply-patch+yaml",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoApply,
+		},
+		{
+			name:                    "apply sends cbor accepts both gets 415",
+			serving:                 false,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/apply-patch+cbor",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusUnsupportedMediaType,
+			wantStatusError:         true,
+			doRequest:               DoApply,
+		},
+	}
+
+	for _, serving := range []bool{true, false} {
+		t.Run(fmt.Sprintf("serving=%t", serving), func(t *testing.T) {
+			if serving {
 				framework.EnableCBORServingAndStorageForTest(t)
 			}
 
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 			defer server.TearDownFn()
 
-			framework.SetTestOnlyCBORClientFeatureGatesForTest(t, tc.allowed, tc.preferred)
+			for _, tc := range testCases {
+				if serving != tc.serving {
+					continue
+				}
 
-			config := rest.CopyConfig(server.ClientConfig)
-			config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-				return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
-					response, err := rt.RoundTrip(request)
-					if got := response.Request.Header.Get("Content-Type"); got != tc.wantRequestContentType {
-						t.Errorf("want request content type %q, got %q", tc.wantRequestContentType, got)
+				t.Run(tc.name, func(t *testing.T) {
+					framework.SetTestOnlyCBORClientFeatureGatesForTest(t, tc.allowed, tc.preferred)
+
+					config := rest.CopyConfig(server.ClientConfig)
+					config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+						return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+							response, err := rt.RoundTrip(request)
+							if got := response.Request.Header.Get("Content-Type"); got != tc.wantRequestContentType {
+								t.Errorf("want request content type %q, got %q", tc.wantRequestContentType, got)
+							}
+							if got := response.Request.Header.Get("Accept"); got != tc.wantRequestAccept {
+								t.Errorf("want request accept %q, got %q", tc.wantRequestAccept, got)
+							}
+							if got := response.Header.Get("Content-Type"); got != tc.wantResponseContentType {
+								t.Errorf("want response content type %q, got %q", tc.wantResponseContentType, got)
+							}
+							if got := response.StatusCode; got != tc.wantResponseStatus {
+								t.Errorf("want response status %d, got %d", tc.wantResponseStatus, got)
+							}
+							return response, err
+						})
+					})
+					err := tc.doRequest(t, config)
+					switch {
+					case tc.wantStatusError && errors.IsUnsupportedMediaType(err):
+						// ok
+					case !tc.wantStatusError && err == nil:
+						// ok
+					default:
+						t.Errorf("unexpected error: %v", err)
 					}
-					if got := response.Request.Header.Get("Accept"); got != tc.wantRequestAccept {
-						t.Errorf("want request accept %q, got %q", tc.wantRequestAccept, got)
-					}
-					if got := response.Header.Get("Content-Type"); got != tc.wantResponseContentType {
-						t.Errorf("want response content type %q, got %q", tc.wantResponseContentType, got)
-					}
-					if got := response.StatusCode; got != tc.wantResponseStatus {
-						t.Errorf("want response status %d, got %d", tc.wantResponseStatus, got)
-					}
-					return response, err
 				})
-			})
-			client, err := dynamic.NewForConfig(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
-				context.TODO(),
-				&unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"metadata": map[string]interface{}{
-							"name": "test-dynamic-client-cbor-enablement",
-						},
-					},
-				},
-				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-			)
-			switch {
-			case tc.wantStatusError && errors.IsUnsupportedMediaType(err):
-				// ok
-			case !tc.wantStatusError && err == nil:
-				// ok
-			default:
-				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

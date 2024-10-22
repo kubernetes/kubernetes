@@ -141,12 +141,23 @@ func TestValidPatchOptions(t *testing.T) {
 			Force:        boolPtr(true),
 			FieldManager: "kubectl",
 		},
-		patchType: types.ApplyPatchType,
+		patchType: types.ApplyYAMLPatchType,
 	}, {
 		opts: metav1.PatchOptions{
 			FieldManager: "kubectl",
 		},
-		patchType: types.ApplyPatchType,
+		patchType: types.ApplyYAMLPatchType,
+	}, {
+		opts: metav1.PatchOptions{
+			Force:        boolPtr(true),
+			FieldManager: "kubectl",
+		},
+		patchType: types.ApplyCBORPatchType,
+	}, {
+		opts: metav1.PatchOptions{
+			FieldManager: "kubectl",
+		},
+		patchType: types.ApplyCBORPatchType,
 	}, {
 		opts:      metav1.PatchOptions{},
 		patchType: types.MergePatchType,
@@ -175,7 +186,12 @@ func TestInvalidPatchOptions(t *testing.T) {
 		// missing manager
 		{
 			opts:      metav1.PatchOptions{},
-			patchType: types.ApplyPatchType,
+			patchType: types.ApplyYAMLPatchType,
+		},
+		// missing manager
+		{
+			opts:      metav1.PatchOptions{},
+			patchType: types.ApplyCBORPatchType,
 		},
 		// force on non-apply
 		{
