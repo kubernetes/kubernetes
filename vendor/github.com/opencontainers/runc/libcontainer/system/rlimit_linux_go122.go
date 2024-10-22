@@ -1,4 +1,4 @@
-//go:build go1.19 && !go1.23
+//go:build !go1.23
 
 // TODO: remove this file once go 1.22 is no longer supported.
 

@@ -1,41 +1,86 @@
 package libcontainer
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/moby/sys/mountinfo"
+	"github.com/moby/sys/userns"
 	"github.com/mrunalp/fileutils"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
-	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/opencontainers/runc/libcontainer/devices"
-	"github.com/opencontainers/runc/libcontainer/userns"
-	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 const defaultMountFlags = unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
 
+// mountConfig contains mount data not specific to a mount point.
 type mountConfig struct {
 	root            string
 	label           string
 	cgroup2Path     string
 	rootlessCgroups bool
 	cgroupns        bool
-	fd              *int
+}
+
+// mountEntry contains mount data specific to a mount point.
+type mountEntry struct {
+	*configs.Mount
+	srcFile *mountSource
+}
+
+// srcName is only meant for error messages, it returns a "friendly" name.
+func (m mountEntry) srcName() string {
+	if m.srcFile != nil {
+		return m.srcFile.file.Name()
+	}
+	return m.Source
+}
+
+func (m mountEntry) srcStat() (os.FileInfo, *syscall.Stat_t, error) {
+	var (
+		st  os.FileInfo
+		err error
+	)
+	if m.srcFile != nil {
+		st, err = m.srcFile.file.Stat()
+	} else {
+		st, err = os.Stat(m.Source)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return st, st.Sys().(*syscall.Stat_t), nil
+}
+
+func (m mountEntry) srcStatfs() (*unix.Statfs_t, error) {
+	var st unix.Statfs_t
+	if m.srcFile != nil {
+		if err := unix.Fstatfs(int(m.srcFile.file.Fd()), &st); err != nil {
+			return nil, os.NewSyscallError("fstatfs", err)
+		}
+	} else {
+		if err := unix.Statfs(m.Source, &st); err != nil {
+			return nil, &os.PathError{Op: "statfs", Path: m.Source, Err: err}
+		}
+	}
+	return &st, nil
 }
 
 // needsSetupDev returns true if /dev needs to be set up.
@@ -51,14 +96,10 @@ func needsSetupDev(config *configs.Config) bool {
 // prepareRootfs sets up the devices, mount points, and filesystems for use
 // inside a new mount namespace. It doesn't set anything as ro. You must call
 // finalizeRootfs after this function to finish setting up the rootfs.
-func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err error) {
+func prepareRootfs(pipe *syncSocket, iConfig *initConfig) (err error) {
 	config := iConfig.Config
 	if err := prepareRoot(config); err != nil {
 		return fmt.Errorf("error preparing rootfs: %w", err)
-	}
-
-	if mountFds != nil && len(mountFds) != len(config.Mounts) {
-		return fmt.Errorf("malformed mountFds slice. Expected size: %v, got: %v. Slice: %v", len(config.Mounts), len(mountFds), mountFds)
 	}
 
 	mountConfig := &mountConfig{
@@ -68,33 +109,59 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 		rootlessCgroups: iConfig.RootlessCgroups,
 		cgroupns:        config.Namespaces.Contains(configs.NEWCGROUP),
 	}
-	setupDev := needsSetupDev(config)
-	for i, m := range config.Mounts {
-		for _, precmd := range m.PremountCmds {
-			if err := mountCmd(precmd); err != nil {
-				return fmt.Errorf("error running premount command: %w", err)
+	for _, m := range config.Mounts {
+		entry := mountEntry{Mount: m}
+		// Figure out whether we need to request runc to give us an
+		// open_tree(2)-style mountfd. For idmapped mounts, this is always
+		// necessary. For bind-mounts, this is only necessary if we cannot
+		// resolve the parent mount (this is only hit if you are running in a
+		// userns -- but for rootless the host-side thread can't help).
+		wantSourceFile := m.IsIDMapped()
+		if m.IsBind() && !config.RootlessEUID {
+			if _, err := os.Stat(m.Source); err != nil {
+				wantSourceFile = true
 			}
 		}
-
-		// Just before the loop we checked that if not empty, len(mountFds) == len(config.Mounts).
-		// Therefore, we can access mountFds[i] without any concerns.
-		if mountFds != nil && mountFds[i] != -1 {
-			mountConfig.fd = &mountFds[i]
-		} else {
-			mountConfig.fd = nil
+		if wantSourceFile {
+			// Request a source file from the host.
+			if err := writeSyncArg(pipe, procMountPlease, m); err != nil {
+				return fmt.Errorf("failed to request mountfd for %q: %w", m.Source, err)
+			}
+			sync, err := readSyncFull(pipe, procMountFd)
+			if err != nil {
+				return fmt.Errorf("mountfd request for %q failed: %w", m.Source, err)
+			}
+			if sync.File == nil {
+				return fmt.Errorf("mountfd request for %q: response missing attached fd", m.Source)
+			}
+			defer sync.File.Close()
+			// Sanity-check to make sure we didn't get the wrong fd back. Note
+			// that while m.Source might contain symlinks, the (*os.File).Name
+			// is based on the path provided to os.OpenFile, not what it
+			// resolves to. So this should never happen.
+			if sync.File.Name() != m.Source {
+				return fmt.Errorf("returned mountfd for %q doesn't match requested mount configuration: mountfd path is %q", m.Source, sync.File.Name())
+			}
+			// Unmarshal the procMountFd argument (the file is sync.File).
+			var src *mountSource
+			if sync.Arg == nil {
+				return fmt.Errorf("sync %q is missing an argument", sync.Type)
+			}
+			if err := json.Unmarshal(*sync.Arg, &src); err != nil {
+				return fmt.Errorf("invalid mount fd response argument %q: %w", string(*sync.Arg), err)
+			}
+			if src == nil {
+				return fmt.Errorf("mountfd request for %q: no mount source info received", m.Source)
+			}
+			src.file = sync.File
+			entry.srcFile = src
 		}
-
-		if err := mountToRootfs(m, mountConfig); err != nil {
+		if err := mountToRootfs(mountConfig, entry); err != nil {
 			return fmt.Errorf("error mounting %q to rootfs at %q: %w", m.Source, m.Destination, err)
-		}
-
-		for _, postcmd := range m.PostmountCmds {
-			if err := mountCmd(postcmd); err != nil {
-				return fmt.Errorf("error running postmount command: %w", err)
-			}
 		}
 	}
 
+	setupDev := needsSetupDev(config)
 	if setupDev {
 		if err := createDevices(config); err != nil {
 			return fmt.Errorf("error creating device nodes: %w", err)
@@ -131,7 +198,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig, mountFds []int) (err
 	s := iConfig.SpecState
 	s.Pid = unix.Getpid()
 	s.Status = specs.StateCreating
-	if err := iConfig.Config.Hooks[configs.CreateContainer].RunHooks(s); err != nil {
+	if err := iConfig.Config.Hooks.Run(configs.CreateContainer, s); err != nil {
 		return err
 	}
 
@@ -200,10 +267,10 @@ func prepareTmp(topTmpDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := mount(tmpdir, tmpdir, "", "bind", unix.MS_BIND, ""); err != nil {
+	if err := mount(tmpdir, tmpdir, "bind", unix.MS_BIND, ""); err != nil {
 		return "", err
 	}
-	if err := mount("", tmpdir, "", "", uintptr(unix.MS_PRIVATE), ""); err != nil {
+	if err := mount("", tmpdir, "", uintptr(unix.MS_PRIVATE), ""); err != nil {
 		return "", err
 	}
 	return tmpdir, nil
@@ -212,16 +279,6 @@ func prepareTmp(topTmpDir string) (string, error) {
 func cleanupTmp(tmpdir string) {
 	_ = unix.Unmount(tmpdir, 0)
 	_ = os.RemoveAll(tmpdir)
-}
-
-func mountCmd(cmd configs.Command) error {
-	command := exec.Command(cmd.Path, cmd.Args[:]...)
-	command.Env = cmd.Env
-	command.Dir = cmd.Dir
-	if out, err := command.CombinedOutput(); err != nil {
-		return fmt.Errorf("%#v failed: %s: %w", cmd, string(out), err)
-	}
-	return nil
 }
 
 func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
@@ -245,18 +302,21 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 		PropagationFlags: m.PropagationFlags,
 	}
 
-	if err := mountToRootfs(tmpfs, c); err != nil {
+	if err := mountToRootfs(c, mountEntry{Mount: tmpfs}); err != nil {
 		return err
 	}
 
 	for _, b := range binds {
 		if c.cgroupns {
+			// We just created the tmpfs, and so we can just use filepath.Join
+			// here (not to mention we want to make sure we create the path
+			// inside the tmpfs, so we don't want to resolve symlinks).
 			subsystemPath := filepath.Join(c.root, b.Destination)
 			subsystemName := filepath.Base(b.Destination)
 			if err := utils.MkdirAllInRoot(c.root, subsystemPath, 0o755); err != nil {
 				return err
 			}
-			if err := utils.WithProcfd(c.root, b.Destination, func(procfd string) error {
+			if err := utils.WithProcfd(c.root, b.Destination, func(dstFd string) error {
 				flags := defaultMountFlags
 				if m.Flags&unix.MS_RDONLY != 0 {
 					flags = flags | unix.MS_RDONLY
@@ -269,12 +329,12 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 					data = cgroups.CgroupNamePrefix + data
 					source = "systemd"
 				}
-				return mount(source, b.Destination, procfd, "cgroup", uintptr(flags), data)
+				return mountViaFds(source, nil, b.Destination, dstFd, "cgroup", uintptr(flags), data)
 			}); err != nil {
 				return err
 			}
 		} else {
-			if err := mountToRootfs(b, c); err != nil {
+			if err := mountToRootfs(c, mountEntry{Mount: b}); err != nil {
 				return err
 			}
 		}
@@ -293,8 +353,8 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 }
 
 func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
-	err := utils.WithProcfd(c.root, m.Destination, func(procfd string) error {
-		return mount(m.Source, m.Destination, procfd, "cgroup2", uintptr(m.Flags), m.Data)
+	err := utils.WithProcfd(c.root, m.Destination, func(dstFd string) error {
+		return mountViaFds(m.Source, nil, m.Destination, dstFd, "cgroup2", uintptr(m.Flags), m.Data)
 	})
 	if err == nil || !(errors.Is(err, unix.EPERM) || errors.Is(err, unix.EBUSY)) {
 		return err
@@ -315,8 +375,7 @@ func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
 		bindM.Source = c.cgroup2Path
 	}
 	// mountToRootfs() handles remounting for MS_RDONLY.
-	// No need to set c.fd here, because mountToRootfs() calls utils.WithProcfd() by itself in mountPropagate().
-	err = mountToRootfs(bindM, c)
+	err = mountToRootfs(c, mountEntry{Mount: bindM})
 	if c.rootlessCgroups && errors.Is(err, unix.ENOENT) {
 		// ENOENT (for `src = c.cgroup2Path`) happens when rootless runc is being executed
 		// outside the userns+mountns.
@@ -330,7 +389,7 @@ func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
 	return err
 }
 
-func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
+func doTmpfsCopyUp(m mountEntry, rootfs, mountLabel string) (Err error) {
 	// Set up a scratch dir for the tmpfs on the host.
 	tmpdir, err := prepareTmp("/tmp")
 	if err != nil {
@@ -347,7 +406,7 @@ func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
 	// m.Destination since we are going to mount *on the host*.
 	oldDest := m.Destination
 	m.Destination = tmpDir
-	err = mountPropagate(m, "/", mountLabel, nil)
+	err = mountPropagate(m, "/", mountLabel)
 	m.Destination = oldDest
 	if err != nil {
 		return err
@@ -360,44 +419,84 @@ func doTmpfsCopyUp(m *configs.Mount, rootfs, mountLabel string) (Err error) {
 		}
 	}()
 
-	return utils.WithProcfd(rootfs, m.Destination, func(procfd string) (Err error) {
+	return utils.WithProcfd(rootfs, m.Destination, func(dstFd string) (Err error) {
 		// Copy the container data to the host tmpdir. We append "/" to force
 		// CopyDirectory to resolve the symlink rather than trying to copy the
 		// symlink itself.
-		if err := fileutils.CopyDirectory(procfd+"/", tmpDir); err != nil {
-			return fmt.Errorf("tmpcopyup: failed to copy %s to %s (%s): %w", m.Destination, procfd, tmpDir, err)
+		if err := fileutils.CopyDirectory(dstFd+"/", tmpDir); err != nil {
+			return fmt.Errorf("tmpcopyup: failed to copy %s to %s (%s): %w", m.Destination, dstFd, tmpDir, err)
 		}
 		// Now move the mount into the container.
-		if err := mount(tmpDir, m.Destination, procfd, "", unix.MS_MOVE, ""); err != nil {
+		if err := mountViaFds(tmpDir, nil, m.Destination, dstFd, "", unix.MS_MOVE, ""); err != nil {
 			return fmt.Errorf("tmpcopyup: failed to move mount: %w", err)
 		}
 		return nil
 	})
 }
 
+const (
+	// The atime "enum" flags (which are mutually exclusive).
+	mntAtimeEnumFlags = unix.MS_NOATIME | unix.MS_RELATIME | unix.MS_STRICTATIME
+	// All atime-related flags.
+	mntAtimeFlags = mntAtimeEnumFlags | unix.MS_NODIRATIME
+	// Flags which can be locked when inheriting mounts in a different userns.
+	// In the kernel, these are the mounts that are locked using MNT_LOCK_*.
+	mntLockFlags = unix.MS_RDONLY | unix.MS_NODEV | unix.MS_NOEXEC |
+		unix.MS_NOSUID | mntAtimeFlags
+)
+
+func statfsToMountFlags(st unix.Statfs_t) int {
+	// From <linux/statfs.h>.
+	const ST_NOSYMFOLLOW = 0x2000 //nolint:revive
+
+	var flags int
+	for _, f := range []struct {
+		st, ms int
+	}{
+		// See calculate_f_flags() in fs/statfs.c.
+		{unix.ST_RDONLY, unix.MS_RDONLY},
+		{unix.ST_NOSUID, unix.MS_NOSUID},
+		{unix.ST_NODEV, unix.MS_NODEV},
+		{unix.ST_NOEXEC, unix.MS_NOEXEC},
+		{unix.ST_MANDLOCK, unix.MS_MANDLOCK},
+		{unix.ST_SYNCHRONOUS, unix.MS_SYNCHRONOUS},
+		{unix.ST_NOATIME, unix.MS_NOATIME},
+		{unix.ST_NODIRATIME, unix.MS_NODIRATIME},
+		{unix.ST_RELATIME, unix.MS_RELATIME},
+		{ST_NOSYMFOLLOW, unix.MS_NOSYMFOLLOW},
+		// There is no ST_STRICTATIME -- see below.
+	} {
+		if int(st.Flags)&f.st == f.st {
+			flags |= f.ms
+		}
+	}
+	// MS_STRICTATIME is a "fake" MS_* flag. It isn't stored in mnt->mnt_flags,
+	// and so it doesn't show up in statfs(2). If none of the other flags in
+	// atime enum are present, the mount is MS_STRICTATIME.
+	if flags&mntAtimeEnumFlags == 0 {
+		flags |= unix.MS_STRICTATIME
+	}
+	return flags
+}
+
 var errRootfsToFile = errors.New("config tries to change rootfs to file")
 
-func createMountpoint(rootfs string, m *configs.Mount, mountFd *int, source string) (string, error) {
+func createMountpoint(rootfs string, m mountEntry) (string, error) {
 	dest, err := securejoin.SecureJoin(rootfs, m.Destination)
 	if err != nil {
 		return "", err
 	}
-	if err := checkProcMount(rootfs, dest, m, source); err != nil {
+	if err := checkProcMount(rootfs, dest, m); err != nil {
 		return "", fmt.Errorf("check proc-safety of %s mount: %w", m.Destination, err)
 	}
 
 	switch m.Device {
 	case "bind":
-		source := m.Source
-		if mountFd != nil {
-			source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
-		}
-
-		fi, err := os.Stat(source)
+		fi, _, err := m.srcStat()
 		if err != nil {
 			// Error out if the source of a bind mount does not exist as we
 			// will be unable to bind anything to it.
-			return "", fmt.Errorf("bind mount source stat: %w", err)
+			return "", err
 		}
 		// If the original source is not a directory, make the target a file.
 		if !fi.IsDir() {
@@ -450,7 +549,7 @@ func createMountpoint(rootfs string, m *configs.Mount, mountFd *int, source stri
 	return dest, nil
 }
 
-func mountToRootfs(m *configs.Mount, c *mountConfig) error {
+func mountToRootfs(c *mountConfig, m mountEntry) error {
 	rootfs := c.root
 
 	// procfs and sysfs are special because we need to ensure they are actually
@@ -463,9 +562,12 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		// TODO: This won't be necessary once we switch to libpathrs and we can
 		//       stop all of these symlink-exchange attacks.
 		dest := filepath.Clean(m.Destination)
-		if !strings.HasPrefix(dest, rootfs) {
+		if !utils.IsLexicallyInRoot(rootfs, dest) {
 			// Do not use securejoin as it resolves symlinks.
 			dest = filepath.Join(rootfs, dest)
+		}
+		if err := checkProcMount(rootfs, dest, m); err != nil {
+			return err
 		}
 		if fi, err := os.Lstat(dest); err != nil {
 			if !os.IsNotExist(err) {
@@ -478,19 +580,18 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 			return err
 		}
 		// Selinux kernels do not support labeling of /proc or /sys.
-		return mountPropagate(m, rootfs, "", nil)
+		return mountPropagate(m, rootfs, "")
 	}
 
-	mountFd := c.fd
-	dest, err := createMountpoint(rootfs, m, mountFd, m.Source)
+	dest, err := createMountpoint(rootfs, m)
 	if err != nil {
-		return fmt.Errorf("create mount destination for %s mount: %w", m.Destination, err)
+		return fmt.Errorf("create mountpoint for %s mount: %w", m.Destination, err)
 	}
 	mountLabel := c.label
 
 	switch m.Device {
 	case "mqueue":
-		if err := mountPropagate(m, rootfs, "", nil); err != nil {
+		if err := mountPropagate(m, rootfs, ""); err != nil {
 			return err
 		}
 		return label.SetFileLabel(dest, mountLabel)
@@ -498,18 +599,106 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		if m.Extensions&configs.EXT_COPYUP == configs.EXT_COPYUP {
 			err = doTmpfsCopyUp(m, rootfs, mountLabel)
 		} else {
-			err = mountPropagate(m, rootfs, mountLabel, nil)
+			err = mountPropagate(m, rootfs, mountLabel)
 		}
+
 		return err
 	case "bind":
-		if err := mountPropagate(m, rootfs, mountLabel, mountFd); err != nil {
+		// open_tree()-related shenanigans are all handled in mountViaFds.
+		if err := mountPropagate(m, rootfs, mountLabel); err != nil {
 			return err
 		}
-		// bind mount won't change mount options, we need remount to make mount options effective.
-		// first check that we have non-default options required before attempting a remount
-		if m.Flags&^(unix.MS_REC|unix.MS_REMOUNT|unix.MS_BIND) != 0 {
-			// only remount if unique mount options are set
-			if err := remount(m, rootfs, mountFd); err != nil {
+
+		// The initial MS_BIND won't change the mount options, we need to do a
+		// separate MS_BIND|MS_REMOUNT to apply the mount options. We skip
+		// doing this if the user has not specified any mount flags at all
+		// (including cleared flags) -- in which case we just keep the original
+		// mount flags.
+		//
+		// Note that the fact we check whether any clearing flags are set is in
+		// contrast to mount(8)'s current behaviour, but is what users probably
+		// expect. See <https://github.com/util-linux/util-linux/issues/2433>.
+		if m.Flags & ^(unix.MS_BIND|unix.MS_REC|unix.MS_REMOUNT) != 0 || m.ClearedFlags != 0 {
+			if err := utils.WithProcfd(rootfs, m.Destination, func(dstFd string) error {
+				flags := m.Flags | unix.MS_BIND | unix.MS_REMOUNT
+				// The runtime-spec says we SHOULD map to the relevant mount(8)
+				// behaviour. However, it's not clear whether we want the
+				// "mount --bind -o ..." or "mount --bind -o remount,..."
+				// behaviour here -- both of which are somewhat broken[1].
+				//
+				// So, if the user has passed "remount" as a mount option, we
+				// implement the "mount --bind -o remount" behaviour, otherwise
+				// we implement the spiritual intent of the "mount --bind -o"
+				// behaviour, which should match what users expect. Maybe
+				// mount(8) will eventually implement this behaviour too..
+				//
+				// [1]: https://github.com/util-linux/util-linux/issues/2433
+
+				// Initially, we emulate "mount --bind -o ..." where we set
+				// only the requested flags (clearing any existing flags). The
+				// only difference from mount(8) is that we do this
+				// unconditionally, regardless of whether any set-me mount
+				// options have been requested.
+				//
+				// TODO: We are not doing any special handling of the atime
+				// flags here, which means that the mount will inherit the old
+				// atime flags if the user didn't explicitly request a
+				// different set of flags. This also has the mount(8) bug where
+				// "nodiratime,norelatime" will result in a
+				// "nodiratime,relatime" mount.
+				mountErr := mountViaFds("", nil, m.Destination, dstFd, "", uintptr(flags), "")
+				if mountErr == nil {
+					return nil
+				}
+
+				// If the mount failed, the mount may contain locked mount
+				// flags. In that case, we emulate "mount --bind -o
+				// remount,...", where we take the existing mount flags of the
+				// mount and apply the request flags (including clearing flags)
+				// on top. The main divergence we have from mount(8) here is
+				// that we handle atimes correctly to make sure we error out if
+				// we cannot fulfil the requested mount flags.
+
+				st, err := m.srcStatfs()
+				if err != nil {
+					return err
+				}
+				srcFlags := statfsToMountFlags(*st)
+				// If the user explicitly request one of the locked flags *not*
+				// be set, we need to return an error to avoid producing mounts
+				// that don't match the user's request.
+				if srcFlags&m.ClearedFlags&mntLockFlags != 0 {
+					return mountErr
+				}
+
+				// If an MS_*ATIME flag was requested, it must match the
+				// existing one. This handles two separate kernel bugs, and
+				// matches the logic of can_change_locked_flags() but without
+				// these bugs:
+				//
+				// * (2.6.30+) Since commit 613cbe3d4870 ("Don't set relatime
+				// when noatime is specified"), MS_RELATIME is ignored when
+				// MS_NOATIME is set. This means that us inheriting MS_NOATIME
+				// from a mount while requesting MS_RELATIME would *silently*
+				// produce an MS_NOATIME mount.
+				//
+				// * (2.6.30+) Since its introduction in commit d0adde574b84
+				// ("Add a strictatime mount option"), MS_STRICTATIME has
+				// caused any passed MS_RELATIME and MS_NOATIME flags to be
+				// ignored which results in us *silently* producing
+				// MS_STRICTATIME mounts even if the user requested MS_RELATIME
+				// or MS_NOATIME.
+				if m.Flags&mntAtimeFlags != 0 && m.Flags&mntAtimeFlags != srcFlags&mntAtimeFlags {
+					return mountErr
+				}
+
+				// Retry the mount with the existing lockable mount flags
+				// applied.
+				flags |= srcFlags & mntLockFlags
+				mountErr = mountViaFds("", nil, m.Destination, dstFd, "", uintptr(flags), "")
+				logrus.Debugf("remount retry: srcFlags=0x%x flagsSet=0x%x flagsClr=0x%x: %v", srcFlags, m.Flags, m.ClearedFlags, mountErr)
+				return mountErr
+			}); err != nil {
 				return err
 			}
 		}
@@ -523,18 +712,15 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 				return err
 			}
 		}
+		return setRecAttr(m.Mount, rootfs)
 	case "cgroup":
 		if cgroups.IsCgroup2UnifiedMode() {
-			return mountCgroupV2(m, c)
+			return mountCgroupV2(m.Mount, c)
 		}
-		return mountCgroupV1(m, c)
+		return mountCgroupV1(m.Mount, c)
 	default:
-		return mountPropagate(m, rootfs, mountLabel, mountFd)
+		return mountPropagate(m, rootfs, mountLabel)
 	}
-	if err := setRecAttr(m, rootfs); err != nil {
-		return err
-	}
-	return nil
 }
 
 func getCgroupMounts(m *configs.Mount) ([]*configs.Mount, error) {
@@ -543,6 +729,9 @@ func getCgroupMounts(m *configs.Mount) ([]*configs.Mount, error) {
 		return nil, err
 	}
 
+	// We don't need to use /proc/thread-self here because runc always runs
+	// with every thread in the same cgroup. This lets us avoid having to do
+	// runtime.LockOSThread.
 	cgroupPaths, err := cgroups.ParseCgroupFile("/proc/self/cgroup")
 	if err != nil {
 		return nil, err
@@ -576,12 +765,11 @@ func getCgroupMounts(m *configs.Mount) ([]*configs.Mount, error) {
 // have this inode number.
 const procRootIno = 1
 
-// checkProcMount checks to ensure that the mount destination is not over the
-// top of /proc. dest is required to be an abs path and have any symlinks
-// resolved before calling this function.
+// checkProcMount checks to ensure that the mount destination is not over the top of /proc.
+// dest is required to be an abs path and have any symlinks resolved before calling this function.
 //
-// source is "" when doing criu restores.
-func checkProcMount(rootfs, dest string, m *configs.Mount, source string) error {
+// If m is nil, don't stat the filesystem.  This is used for restore of a checkpoint.
+func checkProcMount(rootfs, dest string, m mountEntry) error {
 	const procPath = "/proc"
 	path, err := filepath.Rel(filepath.Join(rootfs, procPath), dest)
 	if err != nil {
@@ -592,34 +780,23 @@ func checkProcMount(rootfs, dest string, m *configs.Mount, source string) error 
 		return nil
 	}
 	if path == "." {
-		// Skip this check for criu restores.
-		// NOTE: This is a special case kept from the original implementation,
-		// only present for the 1.1.z branch to avoid any possible breakage in
-		// a patch release. This check was removed in commit cdff09ab8751
-		// ("rootfs: fix 'can we mount on top of /proc' check") in 1.2, because
-		// it doesn't make sense with the new IsBind()-based checks.
-		if source == "" {
-			return nil
-		}
 		// Only allow bind-mounts on top of /proc, and only if the source is a
 		// procfs mount.
 		if m.IsBind() {
-			var fsSt unix.Statfs_t
-			if err := unix.Statfs(source, &fsSt); err != nil {
-				return &os.PathError{Op: "statfs", Path: source, Err: err}
+			fsSt, err := m.srcStatfs()
+			if err != nil {
+				return err
 			}
 			if fsSt.Type == unix.PROC_SUPER_MAGIC {
-				var uSt unix.Stat_t
-				if err := unix.Stat(source, &uSt); err != nil {
-					return &os.PathError{Op: "stat", Path: source, Err: err}
-				}
-				if uSt.Ino != procRootIno {
+				if _, uSt, err := m.srcStat(); err != nil {
+					return err
+				} else if uSt.Ino != procRootIno {
 					// We cannot error out in this case, because we've
 					// supported these kinds of mounts for a long time.
 					// However, we would expect users to bind-mount the root of
 					// a real procfs on top of /proc in the container. We might
 					// want to block this in the future.
-					logrus.Warnf("bind-mount %v (source %v) is of type procfs but is not the root of a procfs (inode %d). Future versions of runc might block this configuration -- please report an issue to <https://github.com/opencontainers/runc> if you see this warning.", dest, source, uSt.Ino)
+					logrus.Warnf("bind-mount %v (source %v) is of type procfs but is not the root of a procfs (inode %d). Future versions of runc might block this configuration -- please report an issue to <https://github.com/opencontainers/runc> if you see this warning.", dest, m.srcName(), uSt.Ino)
 				}
 				return nil
 			}
@@ -659,6 +836,9 @@ func checkProcMount(rootfs, dest string, m *configs.Mount, source string) error 
 }
 
 func setupDevSymlinks(rootfs string) error {
+	// In theory, these should be links to /proc/thread-self, but systems
+	// expect these to be /proc/self and this matches how most distributions
+	// work.
 	links := [][2]string{
 		{"/proc/self/fd", "/dev/fd"},
 		{"/proc/self/fd/0", "/dev/stdin"},
@@ -717,7 +897,6 @@ func reOpenDevNull() error {
 // Create the device nodes in the container.
 func createDevices(config *configs.Config) error {
 	useBindMount := userns.RunningInUserNS() || config.Namespaces.Contains(configs.NEWUSER)
-	oldMask := unix.Umask(0o000)
 	for _, node := range config.Devices {
 
 		// The /dev/ptmx device is setup by setupPtmx()
@@ -728,11 +907,9 @@ func createDevices(config *configs.Config) error {
 		// containers running in a user namespace are not allowed to mknod
 		// devices so we can just bind mount it from the host.
 		if err := createDeviceNode(config.Rootfs, node, useBindMount); err != nil {
-			unix.Umask(oldMask)
 			return err
 		}
 	}
-	unix.Umask(oldMask)
 	return nil
 }
 
@@ -744,8 +921,8 @@ func bindMountDeviceNode(rootfs, dest string, node *devices.Device) error {
 	if f != nil {
 		_ = f.Close()
 	}
-	return utils.WithProcfd(rootfs, dest, func(procfd string) error {
-		return mount(node.Path, dest, procfd, "bind", unix.MS_BIND, "")
+	return utils.WithProcfd(rootfs, dest, func(dstFd string) error {
+		return mountViaFds(node.Path, nil, dest, dstFd, "bind", unix.MS_BIND, "")
 	})
 }
 
@@ -798,6 +975,10 @@ func mknodDevice(dest string, node *devices.Device) error {
 	if err := unix.Mknod(dest, uint32(fileMode), int(dev)); err != nil {
 		return &os.PathError{Op: "mknod", Path: dest, Err: err}
 	}
+	// Ensure permission bits (can be different because of umask).
+	if err := os.Chmod(dest, fileMode); err != nil {
+		return err
+	}
 	return os.Chown(dest, int(node.Uid), int(node.Gid))
 }
 
@@ -835,7 +1016,7 @@ func prepareRoot(config *configs.Config) error {
 	if config.RootPropagation != 0 {
 		flag = config.RootPropagation
 	}
-	if err := mount("", "/", "", "", uintptr(flag), ""); err != nil {
+	if err := mount("", "/", "", uintptr(flag), ""); err != nil {
 		return err
 	}
 
@@ -843,13 +1024,13 @@ func prepareRoot(config *configs.Config) error {
 		return err
 	}
 
-	return mount(config.Rootfs, config.Rootfs, "", "bind", unix.MS_BIND|unix.MS_REC, "")
+	return mount(config.Rootfs, config.Rootfs, "bind", unix.MS_BIND|unix.MS_REC, "")
 }
 
 func setReadonly() error {
 	flags := uintptr(unix.MS_BIND | unix.MS_REMOUNT | unix.MS_RDONLY)
 
-	err := mount("", "/", "", "", flags, "")
+	err := mount("", "/", "", flags, "")
 	if err == nil {
 		return nil
 	}
@@ -858,7 +1039,7 @@ func setReadonly() error {
 		return &os.PathError{Op: "statfs", Path: "/", Err: err}
 	}
 	flags |= uintptr(s.Flags)
-	return mount("", "/", "", "", flags, "")
+	return mount("", "/", "", flags, "")
 }
 
 func setupPtmx(config *configs.Config) error {
@@ -916,7 +1097,7 @@ func pivotRoot(rootfs string) error {
 	// known to cause issues due to races where we still have a reference to a
 	// mount while a process in the host namespace are trying to operate on
 	// something they think has no mounts (devicemapper in particular).
-	if err := mount("", ".", "", "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
+	if err := mount("", ".", "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
 		return err
 	}
 	// Perform the unmount. MNT_DETACH allows us to unmount /proc/self/cwd.
@@ -965,7 +1146,7 @@ func msMoveRoot(rootfs string) error {
 	for _, info := range mountinfos {
 		p := info.Mountpoint
 		// Be sure umount events are not propagated to the host.
-		if err := mount("", p, "", "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
+		if err := mount("", p, "", unix.MS_SLAVE|unix.MS_REC, ""); err != nil {
 			if errors.Is(err, unix.ENOENT) {
 				// If the mountpoint doesn't exist that means that we've
 				// already blasted away some parent directory of the mountpoint
@@ -980,7 +1161,7 @@ func msMoveRoot(rootfs string) error {
 			} else {
 				// If we have not privileges for umounting (e.g. rootless), then
 				// cover the path.
-				if err := mount("tmpfs", p, "", "tmpfs", 0, ""); err != nil {
+				if err := mount("tmpfs", p, "tmpfs", 0, ""); err != nil {
 					return err
 				}
 			}
@@ -988,7 +1169,7 @@ func msMoveRoot(rootfs string) error {
 	}
 
 	// Move the rootfs on top of "/" in our mount namespace.
-	if err := mount(rootfs, "/", "", "", unix.MS_MOVE, ""); err != nil {
+	if err := mount(rootfs, "/", "", unix.MS_MOVE, ""); err != nil {
 		return err
 	}
 	return chroot()
@@ -1006,7 +1187,7 @@ func chroot() error {
 
 // readonlyPath will make a path read only.
 func readonlyPath(path string) error {
-	if err := mount(path, path, "", "", unix.MS_BIND|unix.MS_REC, ""); err != nil {
+	if err := mount(path, path, "", unix.MS_BIND|unix.MS_REC, ""); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
@@ -1019,7 +1200,7 @@ func readonlyPath(path string) error {
 	}
 	flags := uintptr(s.Flags) & (unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC)
 
-	if err := mount(path, path, "", "", flags|unix.MS_BIND|unix.MS_REMOUNT|unix.MS_RDONLY, ""); err != nil {
+	if err := mount(path, path, "", flags|unix.MS_BIND|unix.MS_REMOUNT|unix.MS_RDONLY, ""); err != nil {
 		return err
 	}
 
@@ -1040,7 +1221,7 @@ func remountReadonly(m *configs.Mount) error {
 		// nosuid, etc.). So, let's use that case so that we can do
 		// this re-mount without failing in a userns.
 		flags |= unix.MS_REMOUNT | unix.MS_BIND | unix.MS_RDONLY
-		if err := mount("", dest, "", "", uintptr(flags), ""); err != nil {
+		if err := mount("", dest, "", uintptr(flags), ""); err != nil {
 			if errors.Is(err, unix.EBUSY) {
 				time.Sleep(100 * time.Millisecond)
 				continue
@@ -1058,9 +1239,9 @@ func remountReadonly(m *configs.Mount) error {
 // For files, maskPath bind mounts /dev/null over the top of the specified path.
 // For directories, maskPath mounts read-only tmpfs over the top of the specified path.
 func maskPath(path string, mountLabel string) error {
-	if err := mount("/dev/null", path, "", "", unix.MS_BIND, ""); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := mount("/dev/null", path, "", unix.MS_BIND, ""); err != nil && !errors.Is(err, os.ErrNotExist) {
 		if errors.Is(err, unix.ENOTDIR) {
-			return mount("tmpfs", path, "", "tmpfs", unix.MS_RDONLY, label.FormatMountLabel("", mountLabel))
+			return mount("tmpfs", path, "tmpfs", unix.MS_RDONLY, label.FormatMountLabel("", mountLabel))
 		}
 		return err
 	}
@@ -1074,35 +1255,9 @@ func writeSystemProperty(key, value string) error {
 	return os.WriteFile(path.Join("/proc/sys", keyPath), []byte(value), 0o644)
 }
 
-func remount(m *configs.Mount, rootfs string, mountFd *int) error {
-	source := m.Source
-	if mountFd != nil {
-		source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
-	}
-
-	return utils.WithProcfd(rootfs, m.Destination, func(procfd string) error {
-		flags := uintptr(m.Flags | unix.MS_REMOUNT)
-		err := mount(source, m.Destination, procfd, m.Device, flags, "")
-		if err == nil {
-			return nil
-		}
-		// Check if the source has ro flag...
-		var s unix.Statfs_t
-		if err := unix.Statfs(source, &s); err != nil {
-			return &os.PathError{Op: "statfs", Path: source, Err: err}
-		}
-		if s.Flags&unix.MS_RDONLY != unix.MS_RDONLY {
-			return err
-		}
-		// ... and retry the mount with ro flag set.
-		flags |= unix.MS_RDONLY
-		return mount(source, m.Destination, procfd, m.Device, flags, "")
-	})
-}
-
 // Do the mount operation followed by additional mounts required to take care
 // of propagation flags. This will always be scoped inside the container rootfs.
-func mountPropagate(m *configs.Mount, rootfs string, mountLabel string, mountFd *int) error {
+func mountPropagate(m mountEntry, rootfs string, mountLabel string) error {
 	var (
 		data  = label.FormatMountLabel(m.Data, mountLabel)
 		flags = m.Flags
@@ -1119,22 +1274,17 @@ func mountPropagate(m *configs.Mount, rootfs string, mountLabel string, mountFd 
 	// mutating underneath us, we verify that we are actually going to mount
 	// inside the container with WithProcfd() -- mounting through a procfd
 	// mounts on the target.
-	source := m.Source
-	if mountFd != nil {
-		source = "/proc/self/fd/" + strconv.Itoa(*mountFd)
-	}
-
-	if err := utils.WithProcfd(rootfs, m.Destination, func(procfd string) error {
-		return mount(source, m.Destination, procfd, m.Device, uintptr(flags), data)
+	if err := utils.WithProcfd(rootfs, m.Destination, func(dstFd string) error {
+		return mountViaFds(m.Source, m.srcFile, m.Destination, dstFd, m.Device, uintptr(flags), data)
 	}); err != nil {
 		return err
 	}
 	// We have to apply mount propagation flags in a separate WithProcfd() call
 	// because the previous call invalidates the passed procfd -- the mount
 	// target needs to be re-opened.
-	if err := utils.WithProcfd(rootfs, m.Destination, func(procfd string) error {
+	if err := utils.WithProcfd(rootfs, m.Destination, func(dstFd string) error {
 		for _, pflag := range m.PropagationFlags {
-			if err := mount("", m.Destination, procfd, "", uintptr(pflag), ""); err != nil {
+			if err := mountViaFds("", nil, m.Destination, dstFd, "", uintptr(pflag), ""); err != nil {
 				return err
 			}
 		}

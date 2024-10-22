@@ -2,7 +2,7 @@
 
 This is the standard configuration for version 1 containers.  It includes
 namespaces, standard filesystem setup, a default Linux capability set, and
-information about resource reservations.  It also has information about any 
+information about resource reservations.  It also has information about any
 populated environment settings for the processes running inside a container.
 
 Along with the configuration of how a container is created the standard also
@@ -42,10 +42,10 @@ the binaries and system libraries are local to that directory.  Any binaries
 to be executed must be contained within this rootfs.
 
 Mounts that happen inside the container are automatically cleaned up when the
-container exits as the mount namespace is destroyed and the kernel will 
+container exits as the mount namespace is destroyed and the kernel will
 unmount all the mounts that were setup within that namespace.
 
-For a container to execute properly there are certain filesystems that 
+For a container to execute properly there are certain filesystems that
 are required to be mounted within the rootfs that the runtime will setup.
 
 |     Path    |  Type  |                  Flags                 |                 Data                     |
@@ -58,7 +58,7 @@ are required to be mounted within the rootfs that the runtime will setup.
 | /sys        | sysfs  | MS_NOEXEC,MS_NOSUID,MS_NODEV,MS_RDONLY |                                          |
 
 
-After a container's filesystems are mounted within the newly created 
+After a container's filesystems are mounted within the newly created
 mount namespace `/dev` will need to be populated with a set of device nodes.
 It is expected that a rootfs does not need to have any device nodes specified
 for `/dev` within the rootfs as the container will setup the correct devices
@@ -76,25 +76,25 @@ that are required for executing a container's process.
 
 **ptmx**
 `/dev/ptmx` will need to be a symlink to the host's `/dev/ptmx` within
-the container.  
+the container.
 
 The use of a pseudo TTY is optional within a container and it should support both.
-If a pseudo is provided to the container `/dev/console` will need to be 
+If a pseudo is provided to the container `/dev/console` will need to be
 setup by binding the console in `/dev/` after it has been populated and mounted
 in tmpfs.
 
 |      Source     | Destination  | UID GID | Mode | Type |
 | --------------- | ------------ | ------- | ---- | ---- |
-| *pty host path* | /dev/console | 0 0     | 0600 | bind | 
+| *pty host path* | /dev/console | 0 0     | 0600 | bind |
 
 
 After `/dev/null` has been setup we check for any external links between
 the container's io, STDIN, STDOUT, STDERR.  If the container's io is pointing
-to `/dev/null` outside the container we close and `dup2` the `/dev/null` 
+to `/dev/null` outside the container we close and `dup2` the `/dev/null`
 that is local to the container's rootfs.
 
 
-After the container has `/proc` mounted a few standard symlinks are setup 
+After the container has `/proc` mounted a few standard symlinks are setup
 within `/dev/` for the io.
 
 |    Source       | Destination |
@@ -104,7 +104,7 @@ within `/dev/` for the io.
 | /proc/self/fd/1 | /dev/stdout |
 | /proc/self/fd/2 | /dev/stderr |
 
-A `pivot_root` is used to change the root for the process, effectively 
+A `pivot_root` is used to change the root for the process, effectively
 jailing the process inside the rootfs.
 
 ```c
@@ -151,7 +151,7 @@ so that containers can be paused and resumed.
 
 The parent process of the container's init must place the init pid inside
 the correct cgroups before the initialization begins.  This is done so
-that no processes or threads escape the cgroups.  This sync is 
+that no processes or threads escape the cgroups.  This sync is
 done via a pipe ( specified in the runtime section below ) that the container's
 init process will block waiting for the parent to finish setup.
 
@@ -263,7 +263,7 @@ For example, on a two-socket machine, the schema line could be
 "MB:0=5000;1=7000" which means 5000 MBps memory bandwidth limit on socket 0
 and 7000 MBps memory bandwidth limit on socket 1.
 
-For more information about Intel RDT kernel interface:  
+For more information about Intel RDT kernel interface:
 https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt
 
 ```
@@ -285,7 +285,7 @@ maximum memory bandwidth of 20% on socket 0 and 70% on socket 1.
 }
 ```
 
-### Security 
+### Security
 
 The standard set of Linux capabilities that are set in a container
 provide a good default for security and flexibility for the applications.
@@ -335,8 +335,8 @@ provide a good default for security and flexibility for the applications.
 
 Additional security layers like [apparmor](https://wiki.ubuntu.com/AppArmor)
 and [selinux](http://selinuxproject.org/page/Main_Page) can be used with
-the containers.  A container should support setting an apparmor profile or 
-selinux process and mount labels if provided in the configuration.  
+the containers.  A container should support setting an apparmor profile or
+selinux process and mount labels if provided in the configuration.
 
 Standard apparmor profile:
 ```c
@@ -371,17 +371,17 @@ profile <profile_name> flags=(attach_disconnected,mediate_deleted) {
 
 ### Runtime and Init Process
 
-During container creation the parent process needs to talk to the container's init 
+During container creation the parent process needs to talk to the container's init
 process and have a form of synchronization.  This is accomplished by creating
-a pipe that is passed to the container's init.  When the init process first spawns 
+a pipe that is passed to the container's init.  When the init process first spawns
 it will block on its side of the pipe until the parent closes its side.  This
-allows the parent to have time to set the new process inside a cgroup hierarchy 
-and/or write any uid/gid mappings required for user namespaces.  
+allows the parent to have time to set the new process inside a cgroup hierarchy
+and/or write any uid/gid mappings required for user namespaces.
 The pipe is passed to the init process via FD 3.
 
 The application consuming libcontainer should be compiled statically.  libcontainer
 does not define any init process and the arguments provided are used to `exec` the
-process inside the application.  There should be no long running init within the 
+process inside the application.  There should be no long running init within the
 container spec.
 
 If a pseudo tty is provided to a container it will open and `dup2` the console
@@ -391,10 +391,10 @@ as `/dev/console`.
 An extra set of mounts are provided to a container and setup for use.  A container's
 rootfs can contain some non portable files inside that can cause side effects during
 execution of a process.  These files are usually created and populated with the container
-specific information via the runtime.  
+specific information via the runtime.
 
 **Extra runtime files:**
-* /etc/hosts 
+* /etc/hosts
 * /etc/resolv.conf
 * /etc/hostname
 * /etc/localtime
@@ -407,7 +407,7 @@ these apply to processes within a container.
 
 |       Type          |             Value              |
 | ------------------- | ------------------------------ |
-| Parent Death Signal | SIGKILL                        | 
+| Parent Death Signal | SIGKILL                        |
 | UID                 | 0                              |
 | GID                 | 0                              |
 | GROUPS              | 0, NULL                        |
@@ -420,15 +420,15 @@ these apply to processes within a container.
 ## Actions
 
 After a container is created there is a standard set of actions that can
-be done to the container.  These actions are part of the public API for 
+be done to the container.  These actions are part of the public API for
 a container.
 
 |     Action     |                         Description                                |
 | -------------- | ------------------------------------------------------------------ |
-| Get processes  | Return all the pids for processes running inside a container       | 
+| Get processes  | Return all the pids for processes running inside a container       |
 | Get Stats      | Return resource statistics for the container as a whole            |
 | Wait           | Waits on the container's init process ( pid 1 )                    |
-| Wait Process   | Wait on any of the container's processes returning the exit status | 
+| Wait Process   | Wait on any of the container's processes returning the exit status |
 | Destroy        | Kill the container's init process and remove any filesystem state  |
 | Signal         | Send a signal to the container's init process                      |
 | Signal Process | Send a signal to any of the container's processes                  |

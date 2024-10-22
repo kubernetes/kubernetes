@@ -1,5 +1,4 @@
 //go:build cgo && seccomp
-// +build cgo,seccomp
 
 package seccomp
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp/patchbpf"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 var (
@@ -86,6 +86,27 @@ func InitSeccomp(config *configs.Seccomp) (int, error) {
 		}
 	}
 
+	// Add extra flags.
+	for _, flag := range config.Flags {
+		if err := setFlag(filter, flag); err != nil {
+			return -1, err
+		}
+	}
+
+	// Enable libseccomp binary tree optimization for longer rulesets.
+	//
+	// The number below chosen semi-arbitrarily, considering the following:
+	// 1. libseccomp <= 2.5.4 misbehaves when binary tree optimization
+	// is enabled and there are 0 rules.
+	// 2. All known libseccomp versions (2.5.0 to 2.5.4) generate a binary
+	// tree with 4 syscalls per node.
+	if len(config.Syscalls) > 32 {
+		if err := filter.SetOptimize(2); err != nil {
+			// The error is not fatal and is probably means we have older libseccomp.
+			logrus.Debugf("seccomp binary tree optimization not available: %v", err)
+		}
+	}
+
 	// Unset no new privs bit
 	if err := filter.SetNoNewPrivsBit(false); err != nil {
 		return -1, fmt.Errorf("error setting no new privileges: %w", err)
@@ -108,6 +129,67 @@ func InitSeccomp(config *configs.Seccomp) (int, error) {
 	}
 
 	return seccompFd, nil
+}
+
+type unknownFlagError struct {
+	flag specs.LinuxSeccompFlag
+}
+
+func (e *unknownFlagError) Error() string {
+	return "seccomp flag " + string(e.flag) + " is not known to runc"
+}
+
+func setFlag(filter *libseccomp.ScmpFilter, flag specs.LinuxSeccompFlag) error {
+	switch flag {
+	case flagTsync:
+		// libseccomp-golang always use filterAttrTsync when
+		// possible so all goroutines will receive the same
+		// rules, so there is nothing to do. It does not make
+		// sense to apply the seccomp filter on only one
+		// thread; other threads will be terminated after exec
+		// anyway.
+		return nil
+	case specs.LinuxSeccompFlagLog:
+		if err := filter.SetLogBit(true); err != nil {
+			return fmt.Errorf("error adding log flag to seccomp filter: %w", err)
+		}
+		return nil
+	case specs.LinuxSeccompFlagSpecAllow:
+		if err := filter.SetSSB(true); err != nil {
+			return fmt.Errorf("error adding SSB flag to seccomp filter: %w", err)
+		}
+		return nil
+	}
+	// NOTE when adding more flags above, do not forget to also:
+	// - add new flags to `flags` slice in config.go;
+	// - add new flag values to flags_value() in tests/integration/seccomp.bats;
+	// - modify func filterFlags in patchbpf/ accordingly.
+
+	return &unknownFlagError{flag: flag}
+}
+
+// FlagSupported checks if the flag is known to runc and supported by
+// currently used libseccomp and kernel (i.e. it can be set).
+func FlagSupported(flag specs.LinuxSeccompFlag) error {
+	filter := &libseccomp.ScmpFilter{}
+	err := setFlag(filter, flag)
+
+	// For flags we don't know, setFlag returns unknownFlagError.
+	var uf *unknownFlagError
+	if errors.As(err, &uf) {
+		return err
+	}
+	// For flags that are known to runc and libseccomp-golang but can not
+	// be applied because either libseccomp or the kernel is too old,
+	// seccomp.VersionError is returned.
+	var verErr *libseccomp.VersionError
+	if errors.As(err, &verErr) {
+		// Not supported by libseccomp or the kernel.
+		return err
+	}
+
+	// All other flags are known and supported.
+	return nil
 }
 
 // Convert Libcontainer Action to Libseccomp ScmpAction
