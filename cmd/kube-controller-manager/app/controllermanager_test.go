@@ -225,10 +225,7 @@ func TestNoCloudProviderControllerStarted(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	controllerCtx := ControllerContext{
-		Cloud:    nil,
-		LoopMode: IncludeCloudLoops,
-	}
+	controllerCtx := ControllerContext{}
 	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
 	for _, controller := range NewControllerDescriptors() {
 		if !controller.IsCloudProviderController() {
