@@ -19,9 +19,12 @@ package status
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 type fakeManager struct {
@@ -75,7 +78,15 @@ func (m *fakeManager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, boo
 
 func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 	klog.InfoS("SetPodAllocation()")
-	for _, container := range pod.Spec.Containers {
+	containers := pod.Spec.Containers
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) {
+				containers = append(containers, c)
+			}
+		}
+	}
+	for _, container := range containers {
 		var alloc v1.ResourceList
 		if container.Resources.Requests != nil {
 			alloc = container.Resources.Requests.DeepCopy()

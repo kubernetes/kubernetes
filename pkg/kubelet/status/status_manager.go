@@ -254,7 +254,17 @@ func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
 func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	for _, container := range pod.Spec.Containers {
+	containers := pod.Spec.Containers
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) {
+				containers = append(containers, c)
+			}
+		}
+	}
+
+	for _, container := range containers {
 		var alloc v1.ResourceList
 		if container.Resources.Requests != nil {
 			alloc = container.Resources.Requests.DeepCopy()

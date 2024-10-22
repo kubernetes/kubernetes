@@ -1254,7 +1254,11 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				requests := container.Resources.Requests[resourceToReclaim]
 				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
 					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
-					if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+					containerStatuses := pod.Status.ContainerStatuses
+					if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&container) {
+						containerStatuses = pod.Status.InitContainerStatuses
+					}
+					if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 						requests = cs.AllocatedResources[resourceToReclaim]
 					}
 				}
