@@ -156,6 +156,7 @@ var _ = SIGDescribe("Container Manager Misc", framework.WithSerial(), func() {
 							Containers: []v1.Container{
 								{
 									Image: imageutils.GetE2EImage(imageutils.Agnhost),
+									Args:  []string{"test-webserver"},
 									Name:  podName,
 								},
 							},
