@@ -369,18 +369,20 @@ func (o LogsOptions) RunLogs() error {
 		return err
 	}
 
+	if o.Follow && len(requests) > 1 {
+		if len(requests) > o.MaxFollowConcurrency {
+			return fmt.Errorf(
+				"you are attempting to follow %d log streams, but maximum allowed concurrency is %d, use --max-log-requests to increase the limit",
+				len(requests), o.MaxFollowConcurrency,
+			)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	return intr.Run(func() error {
 		if o.Follow && len(requests) > 1 {
-			if len(requests) > o.MaxFollowConcurrency {
-				return fmt.Errorf(
-					"you are attempting to follow %d log streams, but maximum allowed concurrency is %d, use --max-log-requests to increase the limit",
-					len(requests), o.MaxFollowConcurrency,
-				)
-			}
-
 			return o.parallelConsumeRequest(ctx, requests)
 		}
 
