@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	"k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -62,7 +62,7 @@ var _ = SIGDescribe("kubectl debug", func() {
 
 			ginkgo.By("verifying the pod " + debugPodName + " is running")
 			label := labels.SelectorFromSet(map[string]string{"run": debugPodName})
-			_, err := pod.WaitForPodsWithLabelRunningReady(ctx, c, ns, label, 1, framework.PodStartShortTimeout)
+			_, err := e2epod.WaitForPodsWithLabelRunningReady(ctx, c, ns, label, 1, framework.PodStartShortTimeout)
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", debugPodName, err)
 			}
@@ -92,7 +92,7 @@ env:
 				"sleep 3600")
 
 			ginkgo.By("verifying the container debugger is running")
-			framework.ExpectNoError(pod.WaitForContainerRunning(ctx, c, ns, debugPodName, "debugger", framework.PodStartShortTimeout))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, debugPodName, "debugger", framework.PodStartShortTimeout))
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", debugPodName, "-o", "jsonpath={.spec.ephemeralContainers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")
 			gomega.Expect(output).To(gomega.ContainSubstring("NET_ADMIN"))
@@ -147,7 +147,7 @@ env:
 				"sleep 3600")
 
 			ginkgo.By("verifying the container in pod my-debugger is running")
-			framework.ExpectNoError(pod.WaitForContainerRunning(ctx, c, ns, "my-debugger", "debugger", framework.PodStartShortTimeout))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, c, ns, "my-debugger", "debugger", framework.PodStartShortTimeout))
 
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", "my-debugger", "-o", "jsonpath={.spec.containers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")
