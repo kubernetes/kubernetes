@@ -533,3 +533,49 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 		})
 	}
 }
+
+func TestUnsupportedMediaTypeCircuitBreakerDynamicClient(t *testing.T) {
+	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	config := rest.CopyConfig(server.ClientConfig)
+
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+		context.TODO(),
+		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
+		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+	); !errors.IsUnsupportedMediaType(err) {
+		t.Errorf("expected to receive unsupported media type on first cbor request, got: %v", err)
+	}
+
+	// Requests from this client should fall back from application/cbor to application/json.
+	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+		context.TODO(),
+		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
+		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+	); err != nil {
+		t.Errorf("expected to receive nil error on subsequent cbor request, got: %v", err)
+	}
+
+	// The circuit breaker trips on a per-client basis, so it should not begin tripped for a
+	// fresh client with identical config.
+	client, err = dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+		context.TODO(),
+		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
+		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+	); !errors.IsUnsupportedMediaType(err) {
+		t.Errorf("expected to receive unsupported media type on cbor request with fresh client, got: %v", err)
+	}
+}
