@@ -429,7 +429,7 @@ func (rt *DeclTypeProvider) FindStructType(typeName string) (*types.Type, bool) 
 	declType, found := rt.findDeclType(typeName)
 	if found {
 		expT := declType.CelType()
-		return expT, found
+		return types.NewTypeTypeWithParam(expT), found
 	}
 	return rt.typeProvider.FindStructType(typeName)
 }
