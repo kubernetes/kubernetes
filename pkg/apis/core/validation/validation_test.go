@@ -12493,7 +12493,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Limits: getResources("100m", "0", "1Gi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "cpu limit change",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12508,7 +12508,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Limits: getResourceLimits("100m", "200Mi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "memory limit change",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12538,7 +12538,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("200m", "0"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "cpu request change",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12553,7 +12553,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("0", "100Mi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "memory request change",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12585,7 +12585,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResources("100m", "100Mi", "1Gi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, guaranteed -> guaranteed",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12602,7 +12602,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResources("200m", "200Mi", "1Gi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12618,7 +12618,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12634,7 +12634,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12650,7 +12650,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Limits: getResources("200m", "500Mi", "1Gi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12666,7 +12666,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "200Mi"),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12683,7 +12683,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, guaranteed -> burstable",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12699,7 +12699,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, burstable -> guaranteed",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -12710,7 +12710,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					}))),
 			),
 			old:  *podtest.MakePod("pod"),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, besteffort -> burstable",
 		}, {
 			new: *podtest.MakePod("pod"),
@@ -12721,7 +12721,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, burstable -> besteffort",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -24830,5 +24830,299 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestValidatePodResize(t *testing.T) {
+	tests := []struct {
+		new  core.Pod
+		old  core.Pod
+		err  string
+		test string
+	}{
+		{
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "0", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "0", "1Gi"),
+					}))),
+			),
+			err:  "",
+			test: "cpu limit change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResourceLimits("100m", "200Mi"),
+					}))),
+			),
+			err:  "",
+			test: "memory limit change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "2Gi"),
+					}))),
+			),
+			err:  "spec: Forbidden: pod resize may not change fields other than cpu and memory",
+			test: "storage limit change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "0"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("200m", "0"),
+					}))),
+			),
+			err:  "",
+			test: "cpu request change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("0", "200Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("0", "100Mi"),
+					}))),
+			),
+			err:  "",
+			test: "memory request change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "0", "2Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "0", "1Gi"),
+					}))),
+			),
+			err:  "spec: Forbidden: pod resize may not change fields other than cpu and memory",
+			test: "storage request change",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "400Mi", "1Gi"),
+						Requests: getResources("200m", "400Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("100m", "100Mi", "1Gi"),
+						Requests: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, guaranteed -> guaranteed",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "200Mi", "2Gi"),
+						Requests: getResources("100m", "100Mi", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("400m", "400Mi", "2Gi"),
+						Requests: getResources("200m", "200Mi", "1Gi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, add limits",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("400m", "", "1Gi"),
+						Requests: getResources("300m", "", "1Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "500Mi", "1Gi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, add requests",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("400m", "500Mi", "2Gi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResources("200m", "300Mi", "2Gi"),
+						Requests: getResourceLimits("100m", "200Mi"),
+					}))),
+			),
+			err:  "",
+			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("100m", "100Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, guaranteed -> burstable",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("100m", "100Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, burstable -> guaranteed",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			old:  *podtest.MakePod("pod"),
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, besteffort -> burstable",
+		}, {
+			new: *podtest.MakePod("pod"),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits:   getResourceLimits("200m", "200Mi"),
+						Requests: getResourceLimits("100m", "100Mi"),
+					}))),
+			),
+			err:  "Pod QoS is immutable",
+			test: "Pod QoS change, burstable -> besteffort",
+		},
+	}
+
+	for _, test := range tests {
+		test.new.ObjectMeta.ResourceVersion = "1"
+		test.old.ObjectMeta.ResourceVersion = "1"
+
+		// set required fields if old and new match and have no opinion on the value
+		if test.new.Name == "" && test.old.Name == "" {
+			test.new.Name = "name"
+			test.old.Name = "name"
+		}
+		if test.new.Namespace == "" && test.old.Namespace == "" {
+			test.new.Namespace = "namespace"
+			test.old.Namespace = "namespace"
+		}
+		if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
+			test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+			test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+		}
+		if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
+			test.new.Spec.DNSPolicy = core.DNSClusterFirst
+			test.old.Spec.DNSPolicy = core.DNSClusterFirst
+		}
+		if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
+			test.new.Spec.RestartPolicy = "Always"
+			test.old.Spec.RestartPolicy = "Always"
+		}
+
+		errs := ValidatePodResize(&test.new, &test.old, PodValidationOptions{})
+		if test.err == "" {
+			if len(errs) != 0 {
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			}
+		} else {
+			if len(errs) == 0 {
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+			}
+		}
 	}
 }
