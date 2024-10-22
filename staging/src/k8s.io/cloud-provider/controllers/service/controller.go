@@ -144,7 +144,7 @@ func New(
 			UpdateFunc: func(old, cur interface{}) {
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
-				if ok1 && ok2 && (s.needsUpdate(oldSvc, curSvc) || needsCleanup(curSvc)) {
+				if ok1 && ok2 && (needsUpdate(oldSvc, curSvc) || needsCleanup(curSvc)) {
 					s.enqueueService(cur)
 				}
 			},
@@ -553,19 +553,17 @@ func needsCleanup(service *v1.Service) bool {
 }
 
 // needsUpdate checks if load balancer needs to be updated due to change in attributes.
-func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
+func needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
 	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
 		return false
 	}
 	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "Type", "%v -> %v",
-			oldService.Spec.Type, newService.Spec.Type)
+		klog.V(2).Infof("Service %s wants load balancer changed from %s to %s", klog.KObj(oldService), oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
 
 	if wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadBalancerSourceRanges", "%v -> %v",
-			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
+		klog.V(2).Infof("Service %s LoadBalancerSourceRanges changed from %v to %v", klog.KObj(newService), oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
 		return true
 	}
 
@@ -577,19 +575,16 @@ func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service)
 		return true
 	}
 	if !loadBalancerIPsAreEqual(oldService, newService) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
-			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
+		klog.V(2).Infof("Service %s LoadBalancerIP changed from %s to %s", klog.KObj(newService), oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
 		return true
 	}
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
-			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
+		klog.V(2).Infof("Service %s ExternalIPs' count changed from %v to %v", klog.KObj(newService), len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
 		return true
 	}
 	for i := range oldService.Spec.ExternalIPs {
 		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
-			c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Added: %v",
-				newService.Spec.ExternalIPs[i])
+			klog.V(2).Infof("Service %s ExternalIPs[%d] changed from %v to %v", klog.KObj(newService), i, oldService.Spec.ExternalIPs[i], newService.Spec.ExternalIPs[i])
 			return true
 		}
 	}
@@ -597,18 +592,15 @@ func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service)
 		return true
 	}
 	if oldService.UID != newService.UID {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "UID", "%v -> %v",
-			oldService.UID, newService.UID)
+		klog.V(2).Infof("Service %s UID changed from %s to %s", klog.KObj(newService), oldService.UID, newService.UID)
 		return true
 	}
 	if oldService.Spec.ExternalTrafficPolicy != newService.Spec.ExternalTrafficPolicy {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalTrafficPolicy", "%v -> %v",
-			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
+		klog.V(2).Infof("Service %s ExternalTrafficPolicy changed from %s to %s", klog.KObj(newService), oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
 		return true
 	}
 	if oldService.Spec.HealthCheckNodePort != newService.Spec.HealthCheckNodePort {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "HealthCheckNodePort", "%v -> %v",
-			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
+		klog.V(2).Infof("Service %s HealthCheckNodePort changed from %v to %v", klog.KObj(newService), oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
 		return true
 	}
 
@@ -616,8 +608,7 @@ func (c *Controller) needsUpdate(oldService *v1.Service, newService *v1.Service)
 	// but CAN NOT change primary/secondary clusterIP || ipFamily UNLESS they are changing from/to/ON ExternalName
 	// so not care about order, only need check the length.
 	if len(oldService.Spec.IPFamilies) != len(newService.Spec.IPFamilies) {
-		c.eventRecorder.Eventf(newService, v1.EventTypeNormal, "IPFamilies", "Count: %v -> %v",
-			len(oldService.Spec.IPFamilies), len(newService.Spec.IPFamilies))
+		klog.V(2).Infof("Service %s IPFamilies' count changed from %d to %d", klog.KObj(newService), len(oldService.Spec.IPFamilies), len(newService.Spec.IPFamilies))
 		return true
 	}
 
