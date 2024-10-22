@@ -73,7 +73,7 @@ var _ = utils.SIGDescribe("Retroactive StorageClass Assignment", func() {
 
 		// Create a PVC with nil StorageClass
 		pvc := createPVC(ctx, client, namespace)
-		ginkgo.DeferCleanup(func(cleanupContext context.Context) {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := client.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, *metav1.NewDeleteOptions(0))
 			framework.ExpectNoError(err, "Error deleting PVC")
 		})
