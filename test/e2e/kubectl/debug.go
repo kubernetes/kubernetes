@@ -20,26 +20,23 @@ package kubectl
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	"k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("kubectl debug", func() {
-	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl-debug")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -65,15 +62,15 @@ var _ = SIGDescribe("kubectl debug", func() {
 
 			ginkgo.By("verifying the pod " + debugPodName + " is running")
 			label := labels.SelectorFromSet(map[string]string{"run": debugPodName})
-			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			_, err := pod.WaitForPodsWithLabelRunningReady(ctx, c, ns, label, 1, framework.PodStartShortTimeout)
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", debugPodName, err)
 			}
 
 			tmpDir, err := os.MkdirTemp("", "test-custom-profile-debug")
-			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(err)
 			defer os.Remove(tmpDir) //nolint:errcheck
+			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, customProfileFile), []byte(`
 securityContext:
   capabilities:
@@ -82,7 +79,7 @@ securityContext:
 env:
   - name: REQUIRED_ENV_VAR
     value: value2
-`), os.FileMode(0755)))
+`), os.FileMode(0755)), "creating a custom.yaml in temp directory")
 			ginkgo.By("verifying ephemeral container has correct fields")
 			e2ekubectl.RunKubectlOrDie(ns,
 				"debug",
@@ -95,27 +92,14 @@ env:
 				"sleep 3600")
 
 			ginkgo.By("verifying the container debugger is running")
-			err = wait.PollUntilContextTimeout(ctx, 3*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
-				running := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", debugPodName, "-o", "template", `--template={{if (exists . "status" "ephemeralContainerStatuses")}}{{range .status.ephemeralContainerStatuses}}{{if (and (eq .name "debugger") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`)
-				if running != "true" {
-					return false, nil
-				}
-				return true, nil
-			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(pod.WaitForContainerRunning(ctx, c, ns, debugPodName, "debugger", framework.PodStartShortTimeout))
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", debugPodName, "-o", "jsonpath={.spec.ephemeralContainers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")
-			if !strings.Contains(output, "NET_ADMIN") {
-				framework.Failf("failed to find the expected NET_ADMIN capability")
-			}
+			gomega.Expect(output).To(gomega.ContainSubstring("NET_ADMIN"))
 			ginkgo.By("verifying SYS_PTRACE is overridden")
-			if strings.Contains(output, "SYS_PTRACE") {
-				framework.Failf("unexpected SYS_PTRACE capability")
-			}
+			gomega.Expect(output).NotTo(gomega.ContainSubstring("SYS_PTRACE"))
 			ginkgo.By("verifying REQUIRED_ENV_VAR is added")
-			if !strings.Contains(output, "REQUIRED_ENV_VAR") {
-				framework.Failf("failed to find the expected REQUIRED_ENV_VAR environment variable")
-			}
+			gomega.Expect(output).To(gomega.ContainSubstring("REQUIRED_ENV_VAR"))
 		})
 
 		ginkgo.It("should be applied on static profiles while copying from pod", func(ctx context.Context) {
@@ -138,9 +122,9 @@ env:
 			}
 
 			tmpDir, err := os.MkdirTemp("", "test-custom-profile-debug")
-			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(err)
 			defer os.Remove(tmpDir) //nolint:errcheck
+			customProfileFile := "custom.yaml"
 			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, customProfileFile), []byte(`
 securityContext:
   capabilities:
@@ -149,40 +133,29 @@ securityContext:
 env:
   - name: REQUIRED_ENV_VAR
     value: value2
-`), os.FileMode(0755)))
+`), os.FileMode(0755)), "creating a custom.yaml in temp directory")
 			ginkgo.By("verifying copied pod has correct fields")
 			e2ekubectl.RunKubectlOrDie(ns,
 				"debug",
 				debugPodName,
 				"--image="+imageutils.GetE2EImage(imageutils.Nginx),
 				"--copy-to=my-debugger",
+				"--container=debugger",
 				"--profile=general", // general profile sets capability to SYS_PTRACE and custom should overwrite it to NET_ADMIN
 				"--custom="+filepath.Join(tmpDir, customProfileFile),
 				"--", "sh", "-c",
 				"sleep 3600")
 
 			ginkgo.By("verifying the container in pod my-debugger is running")
-			err = wait.PollUntilContextTimeout(ctx, 3*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
-				running := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", "my-debugger", "-o", "template", fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (ne .name "%s") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`, debugPodName))
-				if running != "true" {
-					return false, nil
-				}
-				return true, nil
-			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(pod.WaitForContainerRunning(ctx, c, ns, "my-debugger", "debugger", framework.PodStartShortTimeout))
+
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", "my-debugger", "-o", "jsonpath={.spec.containers[*]}")
 			ginkgo.By("verifying NET_ADMIN is added")
-			if !strings.Contains(output, "NET_ADMIN") {
-				framework.Failf("failed to find the expected NET_ADMIN capability")
-			}
+			gomega.Expect(output).To(gomega.ContainSubstring("NET_ADMIN"))
 			ginkgo.By("verifying SYS_PTRACE is overridden")
-			if strings.Contains(output, "SYS_PTRACE") {
-				framework.Failf("unexpected SYS_PTRACE capability")
-			}
+			gomega.Expect(output).NotTo(gomega.ContainSubstring("SYS_PTRACE"))
 			ginkgo.By("verifying REQUIRED_ENV_VAR is added")
-			if !strings.Contains(output, "REQUIRED_ENV_VAR") {
-				framework.Failf("failed to find the expected REQUIRED_ENV_VAR environment variable")
-			}
+			gomega.Expect(output).To(gomega.ContainSubstring("REQUIRED_ENV_VAR"))
 		})
 	})
 })
