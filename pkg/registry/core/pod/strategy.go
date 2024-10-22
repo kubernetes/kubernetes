@@ -321,7 +321,7 @@ func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
 	opts.ResourceIsPod = true
-	return nil 
+	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
