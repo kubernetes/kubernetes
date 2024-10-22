@@ -1254,12 +1254,37 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// isRestartableInitContainer returns true if the initContainer has
+// ContainerRestartPolicyAlways.
+func isRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+}
+
 func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
-	for i, c := range newPod.Spec.Containers {
+	oldPodSpecContainers := oldPod.Spec.Containers
+	newPodSpecContainers := newPod.Spec.Containers
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range oldPod.Spec.InitContainers {
+			if isRestartableInitContainer(&c) {
+				oldPodSpecContainers = append(oldPodSpecContainers, c)
+			}
+		}
+		for _, c := range newPod.Spec.InitContainers {
+			if isRestartableInitContainer(&c) {
+				newPodSpecContainers = append(newPodSpecContainers, c)
+			}
+		}
+	}
+
+	for i, c := range newPodSpecContainers {
 		if c.Resources.Requests == nil {
 			continue
 		}
-		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
+		if cmp.Equal(oldPodSpecContainers[i].Resources, c.Resources) {
 			continue
 		}
 		findContainerStatus := func(css []api.ContainerStatus, cName string) (api.ContainerStatus, bool) {
@@ -1270,7 +1295,11 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			}
 			return api.ContainerStatus{}, false
 		}
-		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
+		newPodContainerStatuses := newPod.Status.ContainerStatuses
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isRestartableInitContainer(&c) {
+			newPodContainerStatuses = newPod.Status.InitContainerStatuses
+		}
+		if cs, ok := findContainerStatus(newPodContainerStatuses, c.Name); ok {
 			if !cmp.Equal(c.Resources.Requests, cs.AllocatedResources) {
 				newPod.Status.Resize = api.PodResizeStatusProposed
 				break
