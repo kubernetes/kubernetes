@@ -2574,6 +2574,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.statusManager = status.NewFakeManager()
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2632,14 +2633,40 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			},
 		},
 	}
-	testPod2 := testPod1.DeepCopy()
-	testPod2.UID = "2222"
-	testPod2.Name = "pod2"
-	testPod2.Namespace = "ns2"
+	testPod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "2222",
+			Name:      "pod2",
+			Namespace: "ns2",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:  "c1-init",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			InitContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1-init",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
 	testPod3 := testPod1.DeepCopy()
 	testPod3.UID = "3333"
 	testPod3.Name = "pod3"
-	testPod3.Namespace = "ns2"
+	testPod3.Namespace = "ns3"
 
 	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod1, testPod2, testPod3)
 	kubelet.kubeClient = testKubelet.fakeKubeClient
@@ -2658,71 +2685,77 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		pod                 *v1.Pod
 		newRequests         v1.ResourceList
 		expectedAllocations v1.ResourceList
 		expectedResize      v1.PodResizeStatus
 	}{
 		{
 			name:                "Request CPU and memory decrease - expect InProgress",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
 		},
 		{
 			name:                "Request CPU increase, memory decrease - expect InProgress",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
 		},
 		{
 			name:                "Request CPU decrease, memory increase - expect InProgress",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
 		},
 		{
 			name:                "Request CPU and memory increase beyond current capacity - expect Deferred",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem2500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusDeferred,
 		},
 		{
 			name:                "Request CPU decrease and memory increase beyond current capacity - expect Deferred",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusDeferred,
 		},
 		{
 			name:                "Request memory increase beyond node capacity - expect Infeasible",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem4500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 		},
 		{
 			name:                "Request CPU increase beyond node capacity - expect Infeasible",
-			pod:                 testPod2,
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu5000m, v1.ResourceMemory: mem1000M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 		},
 	}
-
-	for _, tt := range tests {
-		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
-		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
-		kubelet.handlePodResourcesResize(tt.pod)
-		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
-		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
-		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
-		assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
-		testKubelet.fakeKubeClient.ClearActions()
+	for _, isSidecarContainer := range []bool{false, true} {
+		for _, tt := range tests {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, isSidecarContainer)
+			var testPod *v1.Pod
+			if isSidecarContainer {
+				testPod = testPod2.DeepCopy()
+				testPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
+				testPod.Status.InitContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
+			} else {
+				testPod = testPod1.DeepCopy()
+				testPod.Spec.Containers[0].Resources.Requests = tt.newRequests
+				testPod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
+			}
+			kubelet.handlePodResourcesResize(testPod)
+			updatedPod, found := kubelet.podManager.GetPodByName(testPod.Namespace, testPod.Name)
+			assert.True(t, found, "expected to find pod %s", testPod.Name)
+			if isSidecarContainer {
+				assert.Equal(t, tt.expectedAllocations, updatedPod.Status.InitContainerStatuses[0].AllocatedResources, tt.name)
+			} else {
+				assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
+			}
+			assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
+			testKubelet.fakeKubeClient.ClearActions()
+		}
 	}
 }
 

@@ -1742,8 +1742,21 @@ func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirement
 func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
 	specStatusDiffer := false
-	for _, c := range pod.Spec.Containers {
-		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
+	containers := pod.Spec.Containers
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) {
+				containers = append(containers, c)
+			}
+		}
+	}
+
+	for _, c := range containers {
+		containerStatuses := podStatus.ContainerStatuses
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&c) {
+			containerStatuses = podStatus.InitContainerStatuses
+		}
+		if cs, ok := podutil.GetContainerStatus(containerStatuses, c.Name); ok {
 			cResourceCopy := c.Resources.DeepCopy()
 			// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
 			// which are included in convertToAPIContainerStatuses
