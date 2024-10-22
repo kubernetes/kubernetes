@@ -393,7 +393,9 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 	driverResources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
 			d.nodeName: {
-				Devices: resources.Devices,
+				Slices: []resourceslice.Slice{{
+					Devices: resources.Devices,
+				}},
 			},
 		},
 	}
@@ -407,7 +409,13 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")
 		controllerCtx = klog.NewContext(controllerCtx, controllerLogger)
 		var err error
-		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, driverResources); err != nil {
+		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx,
+			resourceslice.Options{
+				DriverName: d.driverName,
+				KubeClient: d.kubeClient,
+				Owner:      &owner,
+				Resources:  driverResources,
+			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}
 		return nil
