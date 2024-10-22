@@ -24817,3 +24817,58 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestMungeCpuMemResources(t *testing.T) {
+	tests := []struct {
+		name            string
+		resourceList    core.ResourceList
+		oldResourceList core.ResourceList
+		expected        core.ResourceList
+	}{
+		{
+			name:            "both nil",
+			resourceList:    nil,
+			oldResourceList: nil,
+			expected:        nil,
+		},
+		{
+			name:            "old nil",
+			resourceList:    core.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("1Gi")},
+			oldResourceList: nil,
+			expected:        nil,
+		},
+		{
+			name:            "new nil",
+			resourceList:    nil,
+			oldResourceList: core.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("1Gi")},
+			expected:        core.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("1Gi")},
+		},
+		{
+			name:            "both present",
+			resourceList:    core.ResourceList{"cpu": resource.MustParse("2"), "memory": resource.MustParse("2Gi"), "storage": resource.MustParse("10Gi")},
+			oldResourceList: core.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("1Gi")},
+			expected:        core.ResourceList{"cpu": resource.MustParse("1"), "memory": resource.MustParse("1Gi"), "storage": resource.MustParse("10Gi")},
+		},
+		{
+			name:            "only cpu in old",
+			resourceList:    core.ResourceList{"memory": resource.MustParse("2Gi"), "storage": resource.MustParse("10Gi")},
+			oldResourceList: core.ResourceList{"cpu": resource.MustParse("1")},
+			expected:        core.ResourceList{"cpu": resource.MustParse("1"), "storage": resource.MustParse("10Gi")},
+		},
+		{
+			name:            "only memory in old",
+			resourceList:    core.ResourceList{"cpu": resource.MustParse("2"), "storage": resource.MustParse("10Gi")},
+			oldResourceList: core.ResourceList{"memory": resource.MustParse("1Gi")},
+			expected:        core.ResourceList{"memory": resource.MustParse("1Gi"), "storage": resource.MustParse("10Gi")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := mungeCpuMemResources(tt.resourceList, tt.oldResourceList)
+			if diff := cmp.Diff(tt.expected, actual); diff != "" {
+				t.Errorf("mungeCpuMemResources() returned unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}

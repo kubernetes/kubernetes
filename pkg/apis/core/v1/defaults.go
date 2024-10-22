@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/pointer"
 )
@@ -182,26 +183,8 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
 			obj.Spec.Containers[i].Resources.Requests != nil {
-			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
-			resizePolicySpecified := make(map[v1.ResourceName]bool)
-			for _, p := range obj.Spec.Containers[i].ResizePolicy {
-				resizePolicySpecified[p.ResourceName] = true
-			}
-			setDefaultResizePolicy := func(resourceName v1.ResourceName) {
-				if _, found := resizePolicySpecified[resourceName]; !found {
-					obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
-						v1.ContainerResizePolicy{
-							ResourceName:  resourceName,
-							RestartPolicy: v1.NotRequired,
-						})
-				}
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceCPU]; exists {
-				setDefaultResizePolicy(v1.ResourceCPU)
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceMemory]; exists {
-				setDefaultResizePolicy(v1.ResourceMemory)
-			}
+			// For normal containers, set resize restart policy to default value (NotRequired), if not specified..
+			setDefaultResizePolicy(&obj.Spec.Containers[i])
 		}
 	}
 	for i := range obj.Spec.InitContainers {
@@ -215,6 +198,10 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&obj.Spec.InitContainers[i]) && obj.Spec.InitContainers[i].Resources.Requests != nil {
+			// For restartable init containers, set resize restart policy to default value (NotRequired), if not specified.
+			setDefaultResizePolicy(&obj.Spec.InitContainers[i])
+		}
 	}
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
@@ -226,6 +213,30 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
 }
+
+// setDefaultResizePolicy set resize restart policy to default value (NotRequired), if not specified.
+func setDefaultResizePolicy(obj *v1.Container) {
+	resizePolicySpecified := make(map[v1.ResourceName]bool)
+	for _, p := range obj.ResizePolicy {
+		resizePolicySpecified[p.ResourceName] = true
+	}
+	defaultResizePolicy := func(resourceName v1.ResourceName) {
+		if _, found := resizePolicySpecified[resourceName]; !found {
+			obj.ResizePolicy = append(obj.ResizePolicy,
+				v1.ContainerResizePolicy{
+					ResourceName:  resourceName,
+					RestartPolicy: v1.NotRequired,
+				})
+		}
+	}
+	if _, exists := obj.Resources.Requests[v1.ResourceCPU]; exists {
+		defaultResizePolicy(v1.ResourceCPU)
+	}
+	if _, exists := obj.Resources.Requests[v1.ResourceMemory]; exists {
+		defaultResizePolicy(v1.ResourceMemory)
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445

@@ -25,7 +25,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // PodResourcesOptions controls the behavior of PodRequests and PodLimits.
@@ -57,6 +60,11 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		for i := range pod.Status.ContainerStatuses {
 			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+			for i := range pod.Status.InitContainerStatuses {
+				containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
+			}
+		}
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -64,11 +72,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		if opts.InPlacePodVerticalScalingEnabled {
 			cs, found := containerStatuses[container.Name]
 			if found {
-				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources.DeepCopy()
-				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
-				}
+				containerReqs = setContainerReqs(pod, container, cs)
 			}
 		}
 
@@ -86,7 +90,6 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	restartableInitContainerReqs := v1.ResourceList{}
 	initContainerReqs := v1.ResourceList{}
 	// init containers define the minimum of any resource
-	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
 	//
 	// Let's say `InitContainerUse(i)` is the resource requirements when the i-th
 	// init container is initializing, then
@@ -95,6 +98,13 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
 	for _, container := range pod.Spec.InitContainers {
 		containerReqs := container.Resources.Requests
+		if opts.InPlacePodVerticalScalingEnabled && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&container) {
+			cs, found := containerStatuses[container.Name]
+			if found {
+				containerReqs = setContainerReqs(pod, container, cs)
+			}
+		}
+
 		if len(opts.NonMissingContainerRequests) > 0 {
 			containerReqs = applyNonMissing(containerReqs, opts.NonMissingContainerRequests)
 		}
@@ -127,6 +137,17 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	return reqs
+}
+
+// setContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
+func setContainerReqs(pod *v1.Pod, container v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
+	cp := v1.ResourceList{}
+	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+		cp = cs.AllocatedResources.DeepCopy()
+	} else {
+		cp = max(container.Resources.Requests, cs.AllocatedResources)
+	}
+	return cp
 }
 
 // applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values
