@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"github.com/google/cel-go/interpreter"
 	"reflect"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -31,52 +30,17 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 )
 
-// filterCompiler implement the interface FilterCompiler.
-type filterCompiler struct {
+// conditionCompiler implement the interface ConditionCompiler.
+type conditionCompiler struct {
 	compiler Compiler
 }
 
-func NewFilterCompiler(env *environment.EnvSet) FilterCompiler {
-	return &filterCompiler{compiler: NewCompiler(env)}
+func NewConditionCompiler(env *environment.EnvSet) ConditionCompiler {
+	return &conditionCompiler{compiler: NewCompiler(env)}
 }
 
-type evaluationActivation struct {
-	object, oldObject, params, request, namespace, authorizer, requestResourceAuthorizer, variables interface{}
-}
-
-// ResolveName returns a value from the activation by qualified name, or false if the name
-// could not be found.
-func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
-	switch name {
-	case ObjectVarName:
-		return a.object, true
-	case OldObjectVarName:
-		return a.oldObject, true
-	case ParamsVarName:
-		return a.params, true // params may be null
-	case RequestVarName:
-		return a.request, true
-	case NamespaceVarName:
-		return a.namespace, true
-	case AuthorizerVarName:
-		return a.authorizer, a.authorizer != nil
-	case RequestResourceAuthorizerVarName:
-		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
-	case VariableVarName: // variables always present
-		return a.variables, true
-	default:
-		return nil, false
-	}
-}
-
-// Parent returns the parent of the current activation, may be nil.
-// If non-nil, the parent will be searched during resolve calls.
-func (a *evaluationActivation) Parent() interpreter.Activation {
-	return nil
-}
-
-// Compile compiles the cel expressions defined in the ExpressionAccessors into a Filter
-func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) Filter {
+// CompileCondition compiles the cel expressions defined in the ExpressionAccessors into a ConditionEvaluator
+func (c *conditionCompiler) CompileCondition(expressionAccessors []ExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) ConditionEvaluator {
 	compilationResults := make([]CompilationResult, len(expressionAccessors))
 	for i, expressionAccessor := range expressionAccessors {
 		if expressionAccessor == nil {
@@ -84,16 +48,16 @@ func (c *filterCompiler) Compile(expressionAccessors []ExpressionAccessor, optio
 		}
 		compilationResults[i] = c.compiler.CompileCELExpression(expressionAccessor, options, mode)
 	}
-	return NewFilter(compilationResults)
+	return NewCondition(compilationResults)
 }
 
-// filter implements the Filter interface
-type filter struct {
+// condition implements the ConditionEvaluator interface
+type condition struct {
 	compilationResults []CompilationResult
 }
 
-func NewFilter(compilationResults []CompilationResult) Filter {
-	return &filter{
+func NewCondition(compilationResults []CompilationResult) ConditionEvaluator {
+	return &condition{
 		compilationResults,
 	}
 }
@@ -123,19 +87,22 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations
 // errors per evaluation are returned on the Evaluation object
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func (f *filter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
-	evaluations := make([]EvaluationResult, len(f.compilationResults))
+	evaluations := make([]EvaluationResult, len(c.compilationResults))
 	var err error
 
-	activation, err := newActivation(ctx, versionedAttr, request, inputs, namespace)
+	// if this activation supports composition, we will need the compositionCtx. It may be nil.
+	compositionCtx, _ := ctx.(CompositionContext)
+
+	activation, err := newActivation(compositionCtx, versionedAttr, request, inputs, namespace)
 	if err != nil {
 		return nil, -1, err
 	}
 
 	remainingBudget := runtimeCELCostBudget
-	for i, compilationResult := range f.compilationResults {
-		evaluations[i], remainingBudget, err = evaluateWithActivation(ctx, activation, compilationResult, remainingBudget)
+	for i, compilationResult := range c.compilationResults {
+		evaluations[i], remainingBudget, err = activation.Evaluate(ctx, compositionCtx, compilationResult, remainingBudget)
 		if err != nil {
 			return nil, -1, err
 		}
@@ -237,10 +204,10 @@ func CreateNamespaceObject(namespace *v1.Namespace) *v1.Namespace {
 	}
 }
 
-// CompilationErrors returns a list of all the errors from the compilation of the evaluator
-func (e *filter) CompilationErrors() []error {
+// CompilationErrors returns a list of all the errors from the compilation of the mutatingEvaluator
+func (c *condition) CompilationErrors() []error {
 	compilationErrors := []error{}
-	for _, result := range e.compilationResults {
+	for _, result := range c.compilationResults {
 		if result.Error != nil {
 			compilationErrors = append(compilationErrors, result.Error)
 		}

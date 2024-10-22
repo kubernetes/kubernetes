@@ -21,12 +21,13 @@ import (
 	json2 "encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
+
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/traits"
 	"google.golang.org/protobuf/types/known/structpb"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-	"reflect"
-	"strconv"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,12 +42,12 @@ import (
 )
 
 // NewJSONPatcher creates a patcher that performs a JSON Patch mutation.
-func NewJSONPatcher(patchEvaluator plugincel.Evaluator) Patcher {
+func NewJSONPatcher(patchEvaluator plugincel.MutatingEvaluator) Patcher {
 	return &jsonPatcher{patchEvaluator}
 }
 
 type jsonPatcher struct {
-	PatchEvaluator plugincel.Evaluator
+	PatchEvaluator plugincel.MutatingEvaluator
 }
 
 func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget int64) (runtime.Object, error) {
@@ -59,7 +60,7 @@ func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget
 	if len(compileErrors) > 0 {
 		return nil, errors.Join(compileErrors...)
 	}
-	patchObj, _, err := e.evaluatePatchExpression(e.PatchEvaluator, runtimeCELCostBudget, ctx, r, admissionRequest)
+	patchObj, _, err := e.evaluatePatchExpression(ctx, e.PatchEvaluator, runtimeCELCostBudget, r, admissionRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget
 	return newVersionedObject, nil
 }
 
-func (e *jsonPatcher) evaluatePatchExpression(patchEvaluator plugincel.Evaluator, remainingBudget int64, ctx context.Context, r Request, admissionRequest *admissionv1.AdmissionRequest) (jsonpatch.Patch, int64, error) {
+func (e *jsonPatcher) evaluatePatchExpression(ctx context.Context, patchEvaluator plugincel.MutatingEvaluator, remainingBudget int64, r Request, admissionRequest *admissionv1.AdmissionRequest) (jsonpatch.Patch, int64, error) {
 	var err error
 	var eval plugincel.EvaluationResult
 	eval, remainingBudget, err = patchEvaluator.ForInput(ctx, r.VersionedAttributes, admissionRequest, r.OptionalVariables, r.Namespace, remainingBudget)

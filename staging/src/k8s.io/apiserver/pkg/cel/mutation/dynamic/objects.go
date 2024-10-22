@@ -19,12 +19,13 @@ package dynamic
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 	"google.golang.org/protobuf/types/known/structpb"
-	"reflect"
-	"strings"
 )
 
 // ObjectType is the implementation of the Object type for use when compiling
@@ -34,28 +35,28 @@ type ObjectType struct {
 	objectType *types.Type
 }
 
-func (r *ObjectType) HasTrait(trait int) bool {
-	return r.objectType.HasTrait(trait)
+func (o *ObjectType) HasTrait(trait int) bool {
+	return o.objectType.HasTrait(trait)
 }
 
 // TypeName returns the name of this ObjectType.
-func (r *ObjectType) TypeName() string {
-	return r.objectType.TypeName()
+func (o *ObjectType) TypeName() string {
+	return o.objectType.TypeName()
 }
 
 // Val returns an instance given the fields.
-func (r *ObjectType) Val(fields map[string]ref.Val) ref.Val {
-	return NewObjectVal(r.objectType, fields)
+func (o *ObjectType) Val(fields map[string]ref.Val) ref.Val {
+	return NewObjectVal(o.objectType, fields)
 }
 
-func (r *ObjectType) Type() *types.Type {
-	return r.objectType
+func (o *ObjectType) Type() *types.Type {
+	return o.objectType
 }
 
 // Field looks up the field by name.
 // This is the unstructured version that allows any name as the field name.
 // The returned field is of DynType type.
-func (r *ObjectType) Field(name string) (*types.FieldType, bool) {
+func (o *ObjectType) Field(name string) (*types.FieldType, bool) {
 	return &types.FieldType{
 		// for unstructured, we do not check for its type,
 		// use DynType for all fields.
@@ -76,7 +77,7 @@ func (r *ObjectType) Field(name string) (*types.FieldType, bool) {
 	}, true
 }
 
-func (r *ObjectType) FieldNames() ([]string, bool) {
+func (o *ObjectType) FieldNames() ([]string, bool) {
 	return nil, true // Field names are not known for dynamic types. All field names are allowed.
 }
 
@@ -146,9 +147,12 @@ func (v *ObjectVal) ConvertToType(typeValue ref.Type) ref.Val {
 // Equal returns true if the `other` value has the same type and content as the implementing struct.
 func (v *ObjectVal) Equal(other ref.Val) ref.Val {
 	if rhs, ok := other.(*ObjectVal); ok {
+		if v.objectType.Equal(rhs.objectType) != types.True {
+			return types.False
+		}
 		return types.Bool(reflect.DeepEqual(v.fields, rhs.fields))
 	}
-	return types.Bool(false)
+	return types.False
 }
 
 // Type returns the TypeValue of the value.

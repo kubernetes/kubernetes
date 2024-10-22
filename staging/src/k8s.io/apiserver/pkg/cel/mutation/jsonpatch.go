@@ -24,7 +24,14 @@ import (
 	"reflect"
 )
 
-var jsonPatchType = types.NewObjectType("JSONPatch")
+var jsonPatchType = types.NewObjectType(JSONPatchTypeName)
+
+var (
+	jsonPatchOp    = "op"
+	jsonPatchPath  = "path"
+	jsonPatchFrom  = "from"
+	jsonPatchValue = "value"
+)
 
 // JSONPatchType and JSONPatchVal are defined entirely from scratch here because JSONPatchVal
 // has a dynamic 'value' field which can not be defined with an OpenAPI schema,
@@ -47,25 +54,25 @@ func (r *JSONPatchType) Val(fields map[string]ref.Val) ref.Val {
 	result := &JSONPatchVal{}
 	for name, value := range fields {
 		switch name {
-		case "op":
+		case jsonPatchOp:
 			if s, ok := value.Value().(string); ok {
 				result.Op = s
 			} else {
 				return types.NewErr("unexpected type %T for JSONPatchType 'op' field", value.Value())
 			}
-		case "path":
+		case jsonPatchPath:
 			if s, ok := value.Value().(string); ok {
 				result.Path = s
 			} else {
 				return types.NewErr("unexpected type %T for JSONPatchType 'path' field", value.Value())
 			}
-		case "from":
+		case jsonPatchFrom:
 			if s, ok := value.Value().(string); ok {
 				result.From = s
 			} else {
 				return types.NewErr("unexpected type %T for JSONPatchType 'from' field", value.Value())
 			}
-		case "value":
+		case jsonPatchValue:
 			result.Val = value
 		default:
 			return types.NewErr("unexpected JSONPatchType field: %s", name)
@@ -81,9 +88,9 @@ func (r *JSONPatchType) Type() *types.Type {
 func (r *JSONPatchType) Field(name string) (*types.FieldType, bool) {
 	var fieldType *types.Type
 	switch name {
-	case "op", "from", "path":
+	case jsonPatchOp, jsonPatchFrom, jsonPatchPath:
 		fieldType = cel.StringType
-	case "value":
+	case jsonPatchValue:
 		fieldType = types.DynType
 	}
 	return &types.FieldType{
@@ -92,7 +99,7 @@ func (r *JSONPatchType) Field(name string) (*types.FieldType, bool) {
 }
 
 func (r *JSONPatchType) FieldNames() ([]string, bool) {
-	return []string{"op", "from", "patch", "value"}, true
+	return []string{jsonPatchOp, jsonPatchFrom, jsonPatchPath, jsonPatchValue}, true
 }
 
 // JSONPatchVal is the ref.Val for a JSONPatch.
@@ -129,13 +136,13 @@ func (p *JSONPatchVal) Equal(other ref.Val) ref.Val {
 func (p *JSONPatchVal) Get(index ref.Val) ref.Val {
 	if name, ok := index.Value().(string); ok {
 		switch name {
-		case "op":
+		case jsonPatchOp:
 			return types.String(p.Op)
-		case "path":
+		case jsonPatchPath:
 			return types.String(p.Path)
-		case "from":
+		case jsonPatchFrom:
 			return types.String(p.From)
-		case "value":
+		case jsonPatchValue:
 			return p.Val
 		default:
 
@@ -147,26 +154,14 @@ func (p *JSONPatchVal) Get(index ref.Val) ref.Val {
 func (p *JSONPatchVal) IsSet(field ref.Val) ref.Val {
 	if name, ok := field.Value().(string); ok {
 		switch name {
-		case "op":
-			if len(p.Op) > 0 {
-				return types.True
-			}
-			return types.False
-		case "path":
-			if len(p.Path) > 0 {
-				return types.True
-			}
-			return types.False
-		case "from":
-			if len(p.From) > 0 {
-				return types.True
-			}
-			return types.False
-		case "value":
-			if p.Val != nil {
-				return types.True
-			}
-			return types.False
+		case jsonPatchOp:
+			return types.Bool(len(p.Op) > 0)
+		case jsonPatchPath:
+			return types.Bool(len(p.Path) > 0)
+		case jsonPatchFrom:
+			return types.Bool(len(p.From) > 0)
+		case jsonPatchValue:
+			return types.Bool(p.Val != nil)
 		}
 	}
 	return types.NewErr("unsupported field: %s", field)

@@ -32,9 +32,10 @@ import (
 
 func TestTypeResolver(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		expression    string
-		expectedValue any
+		name               string
+		expression         string
+		expectedValue      any
+		expectCompileError string
 	}{
 		{
 			name:          "not an object",
@@ -120,11 +121,26 @@ func TestTypeResolver(t *testing.T) {
 			expression:    "Object{spec: Object.spec{replicas: 3}} == Object{spec: Object.spec{replicas: 1 + 2}}",
 			expectedValue: true,
 		},
+		{
+			name:               "invalid type",
+			expression:         "Invalid{}",
+			expectCompileError: "undeclared reference to 'Invalid'",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, option := common.NewResolverTypeProviderAndEnvOption(&DynamicTypeResolver{})
 			env := mustCreateEnv(t, option)
 			ast, issues := env.Compile(tc.expression)
+			if len(tc.expectCompileError) > 0 {
+				if issues == nil {
+					t.Fatalf("expected error %v but got no error", tc.expectCompileError)
+				}
+				if !strings.Contains(issues.String(), tc.expectCompileError) {
+					t.Fatalf("expected error %v but got %v", tc.expectCompileError, issues.String())
+				}
+				return
+			}
+
 			if issues != nil {
 				t.Fatalf("unexpected issues during compilation: %v", issues)
 			}
@@ -238,7 +254,7 @@ func TestCELOptional(t *testing.T) {
 func mustCreateEnv(t testing.TB, envOptions ...cel.EnvOption) *cel.Env {
 	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).
 		Extend(environment.VersionedOptions{
-			IntroducedVersion: version.MajorMinor(1, 30),
+			IntroducedVersion: version.MajorMinor(1, 0), // Always enabled. This is just for test.
 			EnvOptions:        envOptions,
 		})
 	if err != nil {

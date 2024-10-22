@@ -223,8 +223,8 @@ func TestCompositedPolicies(t *testing.T) {
 				t.Fatal(err)
 			}
 			compiler.CompileAndStoreVariables(tc.variables, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: tc.strictCostEnforcement}, environment.NewExpressions)
-			validations := []ExpressionAccessor{&condition{Expression: tc.expression}}
-			f := compiler.Compile(validations, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: tc.strictCostEnforcement}, environment.NewExpressions)
+			validations := []ExpressionAccessor{&testCondition{Expression: tc.expression}}
+			f := compiler.CompileCondition(validations, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: tc.strictCostEnforcement}, environment.NewExpressions)
 			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
 			if err != nil {
 				t.Fatal(err)

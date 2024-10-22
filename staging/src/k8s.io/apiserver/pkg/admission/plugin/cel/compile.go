@@ -228,19 +228,26 @@ func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 	envs := make(variableDeclEnvs, 8) // since the number of variable combinations is small, pre-build a environment for each
 	for _, hasParams := range []bool{false, true} {
 		for _, hasAuthorizer := range []bool{false, true} {
+			var err error
 			for _, strictCost := range []bool{false, true} {
 				decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer, StrictCost: strictCost}
-				envs[decl] = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+				if err != nil {
+					panic(err)
+				}
 			}
 			// We only need this ObjectTypes where strict cost is true
 			decl := OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer, StrictCost: true, HasPatchTypes: true}
-			envs[decl] = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+			envs[decl], err = createEnvForOpts(baseEnv, namespaceType, requestType, decl)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 	return envs
 }
 
-func createEnvForOpts(baseEnv *environment.EnvSet, namespaceType *apiservercel.DeclType, requestType *apiservercel.DeclType, opts OptionalVariableDeclarations) *environment.EnvSet {
+func createEnvForOpts(baseEnv *environment.EnvSet, namespaceType *apiservercel.DeclType, requestType *apiservercel.DeclType, opts OptionalVariableDeclarations) (*environment.EnvSet, error) {
 	var envOpts []cel.EnvOption
 	envOpts = append(envOpts,
 		cel.Variable(ObjectVarName, cel.DynType),
@@ -269,22 +276,22 @@ func createEnvForOpts(baseEnv *environment.EnvSet, namespaceType *apiservercel.D
 		},
 	)
 	if err != nil {
-		panic(fmt.Sprintf("environment misconfigured: %v", err))
+		return nil, fmt.Errorf("environment misconfigured: %w", err)
 	}
 	if opts.StrictCost {
 		extended, err = extended.Extend(environment.StrictCostOpt)
 		if err != nil {
-			panic(fmt.Sprintf("environment misconfigured: %v", err))
+			return nil, fmt.Errorf("environment misconfigured: %w", err)
 		}
 	}
 
 	if opts.HasPatchTypes {
 		extended, err = extended.Extend(hasPatchTypes)
 		if err != nil {
-			panic(fmt.Sprintf("environment misconfigured: %v", err))
+			return nil, fmt.Errorf("environment misconfigured: %w", err)
 		}
 	}
-	return extended
+	return extended, nil
 }
 
 var hasPatchTypes = environment.VersionedOptions{

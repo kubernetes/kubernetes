@@ -40,7 +40,7 @@ func (r *DynamicTypeResolver) Resolve(name string) (common.ResolvedType, bool) {
 	if name == JSONPatchTypeName {
 		return &JSONPatchType{}, true
 	}
-	if strings.HasPrefix(name, ObjectTypeName) {
+	if name == ObjectTypeName || strings.HasPrefix(name, ObjectTypeName+".") {
 		return dynamic.NewObjectType(name), true
 	}
 	return nil, false

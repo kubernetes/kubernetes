@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// A policy invocation is a single policy-binding-param tuple from a Policy Hook
+// PolicyInvocation is a single policy-binding-param tuple from a Policy Hook
 // in the context of a specific request. The params have already been resolved
 // and any error in configuration or setting up the invocation is stored in
 // the Error field.
@@ -155,7 +155,12 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 				continue
 			} else if !matches {
 				continue
-			} else if _, err = versionedAttrAccessor.VersionedAttribute(matchGVK); err != nil {
+			}
+
+			// here the binding matches.
+			// VersionedAttr result will be cached and reused later during parallel
+			// hook calls.
+			if _, err = versionedAttrAccessor.VersionedAttribute(matchGVK); err != nil {
 				// VersionedAttr result will be cached and reused later during parallel
 				// hook calls.
 				addConfigError(err, policyAccessor, nil)
@@ -221,8 +226,8 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 	}
 
 	if len(filteredErrors) > 0 {
-		var err *apierrors.StatusError
-		if !errors.As(admission.NewForbidden(a, fmt.Errorf("admission request denied by policy")), &err) {
+		err, ok := admission.NewForbidden(a, fmt.Errorf("admission request denied by policy")).(*apierrors.StatusError)
+		if !ok {
 			return apierrors.NewInternalError(fmt.Errorf("failed to create status error"))
 		}
 		err.ErrStatus.Message = ""

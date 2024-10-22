@@ -21,6 +21,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -30,9 +31,10 @@ import (
 
 func TestTypeProvider(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		expression    string
-		expectedValue any
+		name               string
+		expression         string
+		expectedValue      any
+		expectCompileError string
 	}{
 		{
 			name:          "not an object",
@@ -44,6 +46,16 @@ func TestTypeProvider(t *testing.T) {
 			expression:    "Test{}",
 			expectedValue: map[string]any{},
 		},
+		{
+			name:          "simple",
+			expression:    "Test{x: 1}",
+			expectedValue: map[string]any{"x": int64(1)},
+		},
+		{
+			name:               "invalid type",
+			expression:         "Objectfoo{}",
+			expectCompileError: "undeclared reference to 'Objectfoo'",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, option := NewResolverTypeProviderAndEnvOption(&mockTypeResolver{})
@@ -51,6 +63,15 @@ func TestTypeProvider(t *testing.T) {
 			ast, issues := env.Compile(tc.expression)
 			if issues != nil {
 				t.Fatalf("unexpected issues during compilation: %v", issues)
+			}
+			if len(tc.expectCompileError) > 0 {
+				if issues == nil {
+					t.Fatalf("expected error %v but got no error", tc.expectCompileError)
+				}
+				if !strings.Contains(issues.String(), tc.expectCompileError) {
+					t.Fatalf("expected error %v but got %v", tc.expectCompileError, issues.String())
+				}
+				return
 			}
 			program, err := env.Program(ast)
 			if err != nil {

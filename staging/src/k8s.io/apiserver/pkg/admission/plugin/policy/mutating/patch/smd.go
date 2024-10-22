@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/structured-merge-diff/v4/value"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -35,12 +36,12 @@ import (
 )
 
 // NewApplyConfigurationPatcher creates a patcher that performs an applyConfiguration mutation.
-func NewApplyConfigurationPatcher(expressionEvaluator plugincel.Evaluator) Patcher {
+func NewApplyConfigurationPatcher(expressionEvaluator plugincel.MutatingEvaluator) Patcher {
 	return &applyConfigPatcher{expressionEvaluator: expressionEvaluator}
 }
 
 type applyConfigPatcher struct {
-	expressionEvaluator plugincel.Evaluator
+	expressionEvaluator plugincel.MutatingEvaluator
 }
 
 func (e *applyConfigPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget int64) (runtime.Object, error) {

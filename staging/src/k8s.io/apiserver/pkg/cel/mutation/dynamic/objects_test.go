@@ -18,6 +18,7 @@ package dynamic
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/cel-go/common/types"
@@ -59,6 +60,106 @@ func TestOptional(t *testing.T) {
 			converted := v.Value()
 			if !reflect.DeepEqual(tc.expected, converted) {
 				t.Errorf("wrong result, expected %v but got %v", tc.expected, converted)
+			}
+		})
+	}
+}
+
+func TestCheckTypeNamesMatchFieldPathNames(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		obj         *ObjectVal
+		expectError string
+	}{
+		{
+			name: "valid",
+			obj: &ObjectVal{
+				objectType: types.NewObjectType("Object"),
+				fields: map[string]ref.Val{
+					"spec": &ObjectVal{
+						objectType: types.NewObjectType("Object.spec"),
+						fields: map[string]ref.Val{
+							"replicas": types.Int(100),
+							"m": types.NewRefValMap(nil, map[ref.Val]ref.Val{
+								types.String("k1"): &ObjectVal{
+									objectType: types.NewObjectType("Object.spec.m"),
+								},
+							}),
+							"l": types.NewRefValList(nil, []ref.Val{
+								&ObjectVal{
+									objectType: types.NewObjectType("Object.spec.l"),
+								},
+							}),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid struct field",
+			obj: &ObjectVal{
+				objectType: types.NewObjectType("Object"),
+				fields: map[string]ref.Val{"invalid": &ObjectVal{
+					objectType: types.NewObjectType("Object.spec"),
+					fields:     map[string]ref.Val{"replicas": types.Int(100)},
+				}},
+			},
+			expectError: "unexpected type name \"Object.spec\", expected \"Object.invalid\"",
+		},
+		{
+			name: "invalid map field",
+			obj: &ObjectVal{
+				objectType: types.NewObjectType("Object"),
+				fields: map[string]ref.Val{
+					"spec": &ObjectVal{
+						objectType: types.NewObjectType("Object.spec"),
+						fields: map[string]ref.Val{
+							"replicas": types.Int(100),
+							"m": types.NewRefValMap(nil, map[ref.Val]ref.Val{
+								types.String("k1"): &ObjectVal{
+									objectType: types.NewObjectType("Object.spec.invalid"),
+								},
+							}),
+						},
+					},
+				},
+			},
+			expectError: "unexpected type name \"Object.spec.invalid\", expected \"Object.spec.m\"",
+		},
+		{
+			name: "invalid list field",
+			obj: &ObjectVal{
+				objectType: types.NewObjectType("Object"),
+				fields: map[string]ref.Val{
+					"spec": &ObjectVal{
+						objectType: types.NewObjectType("Object.spec"),
+						fields: map[string]ref.Val{
+							"replicas": types.Int(100),
+							"l": types.NewRefValList(nil, []ref.Val{
+								&ObjectVal{
+									objectType: types.NewObjectType("Object.spec.invalid"),
+								},
+							}),
+						},
+					},
+				},
+			},
+			expectError: "unexpected type name \"Object.spec.invalid\", expected \"Object.spec.l\"",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.obj.CheckTypeNamesMatchFieldPathNames()
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error")
+				}
+				if !strings.Contains(err.Error(), tc.expectError) {
+					t.Errorf("expected error to contain %v, got %v", tc.expectError, err)
+				}
 			}
 		})
 	}

@@ -19,6 +19,7 @@ package cel
 import (
 	"context"
 	"fmt"
+	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
 
@@ -31,25 +32,20 @@ import (
 
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
-func newActivation(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-	// if this activation supports composition, we will need the compositionCtx. It may be nil.
-	compositionCtx, _ := ctx.(CompositionContext)
-
-	var err error
-
+func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
 	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
 	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
 		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to prepare params variable for evaluation: %w", err)
 		}
 	}
 
@@ -60,11 +56,11 @@ func newActivation(ctx context.Context, versionedAttr *admission.VersionedAttrib
 
 	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
 	}
 	namespaceVal, err := objectToResolveVal(namespace)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to prepare namespace variable for evaluation: %w", err)
 	}
 	va := &evaluationActivation{
 		object:                    objectVal,
@@ -83,12 +79,44 @@ func newActivation(ctx context.Context, versionedAttr *admission.VersionedAttrib
 	return va, nil
 }
 
-// evaluateWithActivation evaluates a compiled CEL admission plugin expression using the provided activation and CEL
-// runtime cost budget.
-func evaluateWithActivation(ctx context.Context, activation *evaluationActivation, compilationResult CompilationResult, remainingBudget int64) (EvaluationResult, int64, error) {
-	// if this evaluation supports composition, we will need the compositionCtx. It may be nil.
-	compositionCtx, _ := ctx.(CompositionContext)
+type evaluationActivation struct {
+	object, oldObject, params, request, namespace, authorizer, requestResourceAuthorizer, variables interface{}
+}
 
+// ResolveName returns a value from the activation by qualified name, or false if the name
+// could not be found.
+func (a *evaluationActivation) ResolveName(name string) (interface{}, bool) {
+	switch name {
+	case ObjectVarName:
+		return a.object, true
+	case OldObjectVarName:
+		return a.oldObject, true
+	case ParamsVarName:
+		return a.params, true // params may be null
+	case RequestVarName:
+		return a.request, true
+	case NamespaceVarName:
+		return a.namespace, true
+	case AuthorizerVarName:
+		return a.authorizer, a.authorizer != nil
+	case RequestResourceAuthorizerVarName:
+		return a.requestResourceAuthorizer, a.requestResourceAuthorizer != nil
+	case VariableVarName: // variables always present
+		return a.variables, true
+	default:
+		return nil, false
+	}
+}
+
+// Parent returns the parent of the current activation, may be nil.
+// If non-nil, the parent will be searched during resolve calls.
+func (a *evaluationActivation) Parent() interpreter.Activation {
+	return nil
+}
+
+// Evaluate runs a compiled CEL admission plugin expression using the provided activation and CEL
+// runtime cost budget.
+func (a *evaluationActivation) Evaluate(ctx context.Context, compositionCtx CompositionContext, compilationResult CompilationResult, remainingBudget int64) (EvaluationResult, int64, error) {
 	var evaluation = EvaluationResult{}
 	if compilationResult.ExpressionAccessor == nil { // in case of placeholder
 		return evaluation, remainingBudget, nil
@@ -111,7 +139,7 @@ func evaluateWithActivation(ctx context.Context, activation *evaluationActivatio
 		return evaluation, remainingBudget, nil
 	}
 	t1 := time.Now()
-	evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, activation)
+	evalResult, evalDetails, err := compilationResult.Program.ContextEval(ctx, a)
 	// budget may be spent due to lazy evaluation of composited variables
 	if compositionCtx != nil {
 		compositionCost := compositionCtx.GetAndResetCost()

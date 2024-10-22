@@ -52,6 +52,7 @@ func TestCompilation(t *testing.T) {
 		object         runtime.Object
 		oldObject      runtime.Object
 		params         runtime.Object
+		namespace      *corev1.Namespace
 		expectedErr    string
 		expectedResult runtime.Object
 	}{
@@ -628,6 +629,19 @@ func TestCompilation(t *testing.T) {
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](11)}},
 		},
 		{
+			name: "apply configuration with params",
+			policy: paramKind(applyConfigurations(policy("d1"),
+				`Object{
+					spec: Object.spec{
+						replicas: int(params.data['k1'])
+					}
+				}`), &v1alpha1.ParamKind{Kind: "ConfigMap", APIVersion: "v1"}),
+			params:         &corev1.ConfigMap{Data: map[string]string{"k1": "100"}},
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](100)}},
+		},
+		{
 			name: "complex apply configuration initialization",
 			policy: applyConfigurations(policy("d1"),
 				`Object{
@@ -730,6 +744,18 @@ func TestCompilation(t *testing.T) {
 			expectedErr: "operation cancelled: actual cost limit exceeded",
 		},
 		{
+			name: "applyConfiguration with excessive cost",
+			policy: variables(applyConfigurations(policy("d1"),
+				`Object{
+					spec: Object.spec{
+						replicas: variables.list.all(x1, variables.list.all(x2, variables.list.all(x3, variables.list.all(x4, variables.list.all(x5, variables.list.all(x5, "0123456789" == "0123456789"))))))? 1 : 0
+					}
+				}`), v1alpha1.Variable{Name: "list", Expression: "[0,1,2,3,4,5,6,7,8,9]"}),
+			gvr:         deploymentGVR,
+			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedErr: "operation cancelled: actual cost limit exceeded",
+		},
+		{
 			name: "request variable",
 			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
 				Expression: `[
@@ -737,6 +763,19 @@ func TestCompilation(t *testing.T) {
 						value: request.kind.group == 'apps' && request.kind.version == 'v1' && request.kind.kind == 'Deployment' ? 10 : 0
 					}
 				]`}),
+			gvr:            deploymentGVR,
+			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](10)}},
+		},
+		{
+			name: "namespace request variable",
+			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+				Expression: `[
+					JSONPatch{op: "replace", path: "/spec/replicas", 
+						value: namespaceObject.metadata.name == 'ns1' ? 10 : 0
+					}
+				]`}),
+			namespace:      &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns1"}},
 			gvr:            deploymentGVR,
 			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](10)}},
@@ -828,6 +867,31 @@ func TestCompilation(t *testing.T) {
 				"different": "false",
 			}}},
 		},
+		{
+			// TODO: This test documents existing behavior that we should be fixed before
+			// MutatingAdmissionPolicy graduates to beta.
+			// It is possible to initialize invalid Object types because we do not yet perform
+			// a full compilation pass with the types fully bound.  Before beta, we should
+			// recompile all expressions with fully bound types before evaluation and report
+			// errors if invalid Object types like this are initialized.
+			name: "object types are not fully type checked",
+			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+				Expression: `[
+					JSONPatch{
+						op: "add", path: "/spec",
+						value: Object.invalid{replicas: 1}
+					}
+				]`,
+			}),
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			expectedResult: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}},
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To[int32](1),
+				},
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -888,7 +952,7 @@ func TestCompilation(t *testing.T) {
 					VersionedAttributes: vAttrs,
 					ObjectInterfaces:    admission.NewObjectInterfacesFromScheme(scheme),
 					OptionalVariables:   cel.OptionalVariableBindings{VersionedParams: tc.params, Authorizer: fakeAuthorizer{}},
-					Namespace:           nil,
+					Namespace:           tc.namespace,
 					TypeConverter:       typeConverter,
 				}
 				obj, err = patcher.Patch(ctx, r, celconfig.RuntimeCELCostBudget)
@@ -961,6 +1025,11 @@ func applyConfigurations(policy *v1alpha1.MutatingAdmissionPolicy, expressions .
 			PatchType:          v1alpha1.PatchTypeApplyConfiguration,
 		})
 	}
+	return policy
+}
+
+func paramKind(policy *v1alpha1.MutatingAdmissionPolicy, paramKind *v1alpha1.ParamKind) *v1alpha1.MutatingAdmissionPolicy {
+	policy.Spec.ParamKind = paramKind
 	return policy
 }
 

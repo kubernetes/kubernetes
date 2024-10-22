@@ -32,7 +32,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,10 +44,9 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	coreinstall "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -494,40 +493,38 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 
 	// Run all tests in a shared apiserver
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
-		"--enable-admission-plugins", "MutatingAdmissionPolicy",
-	}, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
 	require.NoError(t, err)
 	defer server.TearDownFn()
 
-	client, err := clientset.NewForConfig(server.ClientConfig)
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
 	dynClient, err := dynamic.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
-	sch := runtime.NewScheme()
-	coreinstall.Install(sch)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
 	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 
 			// Create the policies, bindings and params.
 			for _, param := range tc.params {
-				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(context.TODO(), param, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(ctx, param, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			for _, p := range tc.policies {
 				// Modify each policy to also mutate marker requests.
 				p = withMutatingWaitReadyConstraintAndExpression(p, fmt.Sprintf("%d-%s", i, p.Name))
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(context.TODO(), p, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			for _, b := range tc.bindings {
 				// After creating each binding, wait until a marker request is successfully mutated.
-				err = createAndWaitReadyMutating(t, client, b, fmt.Sprintf("%d-%s", i, b.Spec.PolicyName))
+				err = createAndWaitReadyMutating(ctx, t, client, b, fmt.Sprintf("%d-%s", i, b.Spec.PolicyName))
 				require.NoError(t, err)
 			}
 
@@ -536,7 +533,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			wipeUncheckedFields(t, unstructuredExpectedObj)
 
 			defer func() {
-				if cleanupErr := cleanupMutatingPolicy(t, client, tc.policies, tc.bindings, tc.params); cleanupErr != nil {
+				if cleanupErr := cleanupMutatingPolicy(ctx, t, client, tc.policies, tc.bindings, tc.params); cleanupErr != nil {
 					t.Logf("error while cleaning up policy and its bindings: %v", cleanupErr)
 				}
 			}()
@@ -548,12 +545,12 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			rsrcClient := clientForType(t, unstructuredRequestObj, tc.requestResource, dynClient)
 			switch tc.requestOperation {
 			case admissionregistrationv1.Create:
-				resultObj, err = rsrcClient.Create(context.TODO(), unstructuredRequestObj, metav1.CreateOptions{
+				resultObj, err = rsrcClient.Create(ctx, unstructuredRequestObj, metav1.CreateOptions{
 					DryRun:       []string{metav1.DryRunAll},
 					FieldManager: "integration-test",
 				}, tc.subresources...)
 			case admissionregistrationv1.Update:
-				resultObj, err = rsrcClient.Update(context.TODO(), unstructuredRequestObj, metav1.UpdateOptions{
+				resultObj, err = rsrcClient.Update(ctx, unstructuredRequestObj, metav1.UpdateOptions{
 					DryRun:       []string{metav1.DryRunAll},
 					FieldManager: "integration-test",
 				}, tc.subresources...)
@@ -1009,39 +1006,37 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
-				"--enable-admission-plugins", "MutatingAdmissionPolicy",
-			}, framework.SharedEtcd())
+			server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
 			require.NoError(t, err)
 			defer server.TearDownFn()
 
-			client, err := clientset.NewForConfig(server.ClientConfig)
+			client, err := kubernetes.NewForConfig(server.ClientConfig)
 			require.NoError(t, err)
 
 			dynClient, err := dynamic.NewForConfig(server.ClientConfig)
 			require.NoError(t, err)
 
-			sch := runtime.NewScheme()
-			coreinstall.Install(sch)
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
 
 			for _, param := range tc.params {
-				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(context.TODO(), param, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.CoreV1().ConfigMaps(param.GetNamespace()).Create(ctx, param, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			for _, p := range tc.policies {
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(context.TODO(), p, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			for _, b := range tc.bindings {
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(context.TODO(), b, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(ctx, b, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			if tc.initialObject != nil {
 				initClient := clientForType(t, tc.initialObject, tc.requestResource, dynClient)
-				_, err = initClient.Create(context.TODO(), toUnstructured(t, tc.initialObject), metav1.CreateOptions{})
+				_, err = initClient.Create(ctx, toUnstructured(t, tc.initialObject), metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -1051,11 +1046,11 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 
 			// Dry Run the request until we get the expected mutated response
 			var resultObj runtime.Object
-			err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (done bool, err error) {
+			err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (done bool, err error) {
 				rsrcClient := clientForType(t, unstructuredRequestObj, tc.requestResource, dynClient)
 				switch tc.requestOperation {
 				case admissionregistrationv1.Create:
-					resultObj, err = rsrcClient.Create(context.TODO(), unstructuredRequestObj, metav1.CreateOptions{
+					resultObj, err = rsrcClient.Create(ctx, unstructuredRequestObj, metav1.CreateOptions{
 						DryRun:       []string{metav1.DryRunAll},
 						FieldManager: "integration-test",
 					}, tc.subresources...)
@@ -1066,7 +1061,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 					wipeUncheckedFields(t, resultObj)
 					return reflect.DeepEqual(unstructuredExpectedObj, resultObj), nil
 				case admissionregistrationv1.Update:
-					resultObj, err = rsrcClient.Update(context.TODO(), unstructuredRequestObj, metav1.UpdateOptions{
+					resultObj, err = rsrcClient.Update(ctx, unstructuredRequestObj, metav1.UpdateOptions{
 						DryRun:       []string{metav1.DryRunAll},
 						FieldManager: "integration-test",
 					}, tc.subresources...)
@@ -1096,10 +1091,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 // tested.
 func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
-		"--enable-admission-plugins", "MutatingAdmissionPolicy",
-	}, framework.SharedEtcd())
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
+	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+	etcd.CreateTestCRDs(t, apiextensions.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1107,10 +1100,13 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 
 	config := server.ClientConfig
 
-	client, err := clientset.NewForConfig(config)
+	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
 	policy := withMutatingFailurePolicy(v1alpha1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1alpha1.IfNeededReinvocationPolicy, v1alpha1.MatchResources{
 		ResourceRules: []v1alpha1.NamedRuleWithOperations{
@@ -1143,12 +1139,12 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	))
 	testID := "policy-equivalent"
 	policy = withMutatingWaitReadyConstraintAndExpression(policy, testID)
-	if _, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+	if _, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	policyBinding := mutatingBinding("match-by-match-policy-equivalent", nil, nil)
-	if err := createAndWaitReadyMutating(t, client, policyBinding, testID); err != nil {
+	if err := createAndWaitReadyMutating(ctx, t, client, policyBinding, testID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1178,8 +1174,8 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	}
 
 	// Wait for CRDs to register
-	err = wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		createdv1, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		createdv1, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(ctx, v1Resource, metav1.CreateOptions{})
 		if err != nil {
 			if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v1, Kind=Panda not found") {
 				return false, nil
@@ -1195,8 +1191,8 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		createdv2, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		createdv2, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(ctx, v2Resource, metav1.CreateOptions{})
 		if err != nil {
 			if strings.Contains(err.Error(), "Resource kind awesome.bears.com/v2, Kind=Panda not found") {
 				return false, nil
@@ -1297,18 +1293,18 @@ func mutatingBinding(policyName string, paramRef *v1alpha1.ParamRef, matchResour
 	}
 }
 
-func createAndWaitReadyMutating(t *testing.T, client clientset.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, testID string) error {
-	return createAndWaitReadyNamespacedWithWarnHandlerMutating(t, client, binding, "default", testID)
+func createAndWaitReadyMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, testID string) error {
+	return createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx, t, client, binding, "default", testID)
 }
 
-func createAndWaitReadyNamespacedWithWarnHandlerMutating(t *testing.T, client clientset.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, ns string, testID string) error {
-	_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(context.TODO(), binding, metav1.CreateOptions{})
+func createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, ns string, testID string) error {
+	_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	marker := &corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "test-marker", Namespace: ns, Labels: map[string]string{"mutation-marker": testID}}}
-	if waitErr := wait.PollUntilContextTimeout(context.TODO(), time.Millisecond*5, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		result, err := client.CoreV1().Endpoints(ns).Create(context.TODO(), marker, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}, FieldManager: "mutation-marker-sender"})
+	if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		result, err := client.CoreV1().Endpoints(ns).Create(ctx, marker, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}, FieldManager: "mutation-marker-sender"})
 		if err != nil {
 			if strings.Contains(err.Error(), "no params found for policy binding") { // wait for params to register
 				return false, nil
@@ -1327,14 +1323,14 @@ func createAndWaitReadyNamespacedWithWarnHandlerMutating(t *testing.T, client cl
 	return nil
 }
 
-func cleanupMutatingPolicy(t *testing.T, client clientset.Interface, policies []*v1alpha1.MutatingAdmissionPolicy, bindings []*v1alpha1.MutatingAdmissionPolicyBinding, params []*corev1.ConfigMap) error {
+func cleanupMutatingPolicy(ctx context.Context, t *testing.T, client kubernetes.Interface, policies []*v1alpha1.MutatingAdmissionPolicy, bindings []*v1alpha1.MutatingAdmissionPolicyBinding, params []*corev1.ConfigMap) error {
 	for _, policy := range policies {
-		if err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Delete(context.TODO(), policy.Name, metav1.DeleteOptions{}); err != nil {
+		if err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Delete(ctx, policy.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 
-		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Get(context.TODO(), policy.Name, metav1.GetOptions{})
+		if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -1345,13 +1341,13 @@ func cleanupMutatingPolicy(t *testing.T, client clientset.Interface, policies []
 	}
 
 	for _, binding := range bindings {
-		err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Delete(context.TODO(), binding.Name, metav1.DeleteOptions{})
+		err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Delete(ctx, binding.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Get(context.TODO(), binding.Name, metav1.GetOptions{})
+		if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Get(ctx, binding.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -1362,14 +1358,14 @@ func cleanupMutatingPolicy(t *testing.T, client clientset.Interface, policies []
 	}
 
 	for _, param := range params {
-		if waitErr := wait.PollUntilContextTimeout(context.TODO(), 25*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-			if err := client.CoreV1().ConfigMaps(param.GetNamespace()).Delete(context.TODO(), param.Name, metav1.DeleteOptions{}); err != nil {
+		if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
+			if err := client.CoreV1().ConfigMaps(param.GetNamespace()).Delete(ctx, param.Name, metav1.DeleteOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
 				}
 				return false, nil
 			}
-			_, err := client.CoreV1().ConfigMaps(param.GetNamespace()).Get(context.TODO(), param.Name, metav1.GetOptions{})
+			_, err := client.CoreV1().ConfigMaps(param.GetNamespace()).Get(ctx, param.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
