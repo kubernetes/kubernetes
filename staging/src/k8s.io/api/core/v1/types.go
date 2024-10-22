@@ -4911,6 +4911,7 @@ type PodStatusResult struct {
 
 // +genclient
 // +genclient:method=UpdateEphemeralContainers,verb=update,subresource=ephemeralcontainers
+// +genclient:method=Resize,verb=update,subresource=resize
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
