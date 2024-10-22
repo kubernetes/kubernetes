@@ -2619,7 +2619,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 			containersToUpdate = append(containersToUpdate, cInfo)
 		}
 		fakeRuntime.Called = []string{}
-		err := m.updatePodContainerResources(pod, tc.resourceName, containersToUpdate)
+		err := m.updatePodContainerResources(pod, tc.resourceName, containersToUpdate, false)
 		assert.NoError(t, err, dsc)
 
 		if tc.invokeUpdateResources {

@@ -171,7 +171,7 @@ func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]
 func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
 	pods := m.activePods()
 	burstablePodCPURequest := int64(0)
-	reuseReqs := make(v1.ResourceList, 4)
+	reuseReqs := make(v1.ResourceList, 5)
 	for i := range pods {
 		pod := pods[i]
 		qosClass := v1qos.GetPodQOS(pod)
@@ -205,7 +205,7 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 
 	// Sum the pod limits for pods in each QOS class
 	pods := m.activePods()
-	reuseReqs := make(v1.ResourceList, 4)
+	reuseReqs := make(v1.ResourceList, 5)
 	for _, pod := range pods {
 		podMemoryRequest := int64(0)
 		qosClass := v1qos.GetPodQOS(pod)

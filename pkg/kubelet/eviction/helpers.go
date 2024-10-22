@@ -1245,8 +1245,12 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	// That’s why only regular, init and restartable init containers are considered
 	// for the eviction message.
 	containers := pod.Spec.Containers
+	containerStatuses := pod.Status.ContainerStatuses
 	if len(pod.Spec.InitContainers) != 0 {
 		containers = append(containers, pod.Spec.InitContainers...)
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.HasRestartableInitContainer(pod) {
+			containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
+		}
 	}
 	for _, containerStats := range podStats.Containers {
 		for _, container := range containers {
@@ -1254,10 +1258,6 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				requests := container.Resources.Requests[resourceToReclaim]
 				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
 					(resourceToReclaim == v1.ResourceMemory || resourceToReclaim == v1.ResourceCPU) {
-					containerStatuses := pod.Status.ContainerStatuses
-					if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&container) {
-						containerStatuses = pod.Status.InitContainerStatuses
-					}
 					if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 						requests = cs.AllocatedResources[resourceToReclaim]
 					}

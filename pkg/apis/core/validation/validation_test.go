@@ -24818,7 +24818,7 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 	}
 }
 
-func TestMungeCpuMemResources(t *testing.T) {
+func TestMungeResizableResources(t *testing.T) {
 	tests := []struct {
 		name            string
 		resourceList    core.ResourceList

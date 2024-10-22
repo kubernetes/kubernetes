@@ -47,6 +47,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -5193,7 +5194,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	for ix, container := range mungedPodSpec.InitContainers {
 		container.Image = oldPod.Spec.InitContainers[ix].Image // +k8s:verify-mutation:reason=clone
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-			if isRestartableInitContainer(&container) {
+			if podutil.IsRestartableInitContainer(&container) {
 				lim := mungeCpuMemResources(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
 				req := mungeCpuMemResources(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
 				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
@@ -5296,13 +5297,6 @@ func mungeCpuMemResources(resourceList, oldResourceList core.ResourceList) core.
 		mungedResourceList[core.ResourceMemory] = mem
 	}
 	return mungedResourceList
-}
-
-func isRestartableInitContainer(initContainer *core.Container) bool {
-	if initContainer.RestartPolicy == nil {
-		return false
-	}
-	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
 }
 
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted

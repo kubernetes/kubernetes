@@ -757,7 +757,7 @@ func TestPodResourceRequests(t *testing.T) {
 				v1.ResourceCPU: resource.MustParse("7"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true, IsSidecarContainersEnabled: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -835,7 +835,7 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("7"),
 			},
-			options: PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			options: PodResourcesOptions{InPlacePodVerticalScalingEnabled: true, IsSidecarContainersEnabled: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -881,7 +881,7 @@ func TestPodResourceRequests(t *testing.T) {
 				v1.ResourceCPU: resource.MustParse("7"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: false},
+			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: false, IsSidecarContainersEnabled: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",

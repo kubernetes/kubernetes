@@ -2297,7 +2297,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 		otherPods := make([]*v1.Pod, 0, len(pods))
 		for _, p := range pods {
 			op := p.DeepCopy()
-			kl.updateContainerResourceAllocation(op)
+			kl.updateContainersResourceAllocation(op)
 
 			otherPods = append(otherPods, op)
 		}
@@ -2580,7 +2580,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				podCopy := pod.DeepCopy()
-				kl.updateContainerResourceAllocation(podCopy)
+				kl.updateContainersResourceAllocation(podCopy)
 
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
@@ -2609,18 +2609,31 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	}
 }
 
-// updateContainerResourceAllocation updates AllocatedResources values
+// updateContainerResourceAllocation updates AllocatedResources values for regular and restartable init containers
 // (for cpu & memory) from checkpoint store
-func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod) {
+func (kl *Kubelet) updateContainersResourceAllocation(pod *v1.Pod) {
 	for _, c := range pod.Spec.Containers {
-		allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
-		if c.Resources.Requests != nil && found {
-			if _, ok := allocatedResources[v1.ResourceCPU]; ok {
-				c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
+		kl.updateContainerResourceAllocation(pod, &c)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) {
+				kl.updateContainerResourceAllocation(pod, &c)
 			}
-			if _, ok := allocatedResources[v1.ResourceMemory]; ok {
-				c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
-			}
+		}
+	}
+}
+
+// updateContainerResourceAllocation updates AllocatedResources values for a container
+// (for cpu & memory) from checkpoint store
+func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod, c *v1.Container) {
+	allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
+	if c.Resources.Requests != nil && found {
+		if _, ok := allocatedResources[v1.ResourceCPU]; ok {
+			c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
+		}
+		if _, ok := allocatedResources[v1.ResourceMemory]; ok {
+			c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
 		}
 	}
 }
@@ -2756,13 +2769,28 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 
 func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 	for _, c := range pod.Spec.Containers {
-		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			if cs.Resources == nil {
-				continue
-			}
-			if !cmp.Equal(c.Resources.Limits, cs.Resources.Limits) || !cmp.Equal(cs.AllocatedResources, cs.Resources.Requests) {
+		if isContainerResourcesChanged(podStatus.ContainerStatuses, &c) {
+			return true
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) && isContainerResourcesChanged(podStatus.InitContainerStatuses, &c) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func isContainerResourcesChanged(containerStatuses []v1.ContainerStatus, container *v1.Container) bool {
+	if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
+		if cs.Resources == nil {
+			return false
+		}
+		if !cmp.Equal(container.Resources.Limits, cs.Resources.Limits) || !cmp.Equal(cs.AllocatedResources, cs.Resources.Requests) {
+			return true
 		}
 	}
 	return false
@@ -2801,6 +2829,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		return false, podCopy, v1.PodResizeStatusDeferred
 	}
 
+	// Set allocated resources in case of non-init containers.
 	for _, container := range podCopy.Spec.Containers {
 		idx, found := podutil.GetIndexOfContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
 		if found {
@@ -2809,6 +2838,21 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 			}
 		}
 	}
+
+	// Set allocated resources in case of restartable init containers.
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, container := range podCopy.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&container) {
+				idx, found := podutil.GetIndexOfContainerStatus(podCopy.Status.InitContainerStatuses, container.Name)
+				if found {
+					for rName, rQuantity := range container.Resources.Requests {
+						podCopy.Status.InitContainerStatuses[idx].AllocatedResources[rName] = rQuantity
+					}
+				}
+			}
+		}
+	}
+
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
@@ -2817,11 +2861,26 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		return pod
 	}
 	podResized := false
-	for _, container := range pod.Spec.Containers {
+	containers := pod.Spec.Containers
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) {
+				containers = append(containers, c)
+			}
+		}
+	}
+
+	for _, container := range containers {
 		if len(container.Resources.Requests) == 0 {
 			continue
 		}
-		containerStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		containerStatuses := pod.Status.ContainerStatuses
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&container) {
+			containerStatuses = pod.Status.InitContainerStatuses
+		}
+
+		containerStatus, found := podutil.GetContainerStatus(containerStatuses, container.Name)
 		if !found {
 			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
 			break

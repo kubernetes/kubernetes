@@ -1050,6 +1050,7 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		IsSidecarContainersEnabled:       utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 	})
 
 	non0Requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{

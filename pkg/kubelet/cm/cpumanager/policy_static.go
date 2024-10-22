@@ -443,11 +443,13 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		containerStatuses := pod.Status.ContainerStatuses
-		//if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && types.IsRestartableInitContainer(container) {
-		//if len(pod.Status.InitContainerStatuses) != 0 {
-		containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
-		//}
-		//}
+		// TODO: Uncomment below code when in-place pod resize is enabled for nodes with static topology policy. See https://github.com/kubernetes/kubernetes/issues/128068
+		// for the detail.
+		/* 		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && types.IsRestartableInitContainer(container) {
+			if len(pod.Status.InitContainerStatuses) != 0 {
+				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
+			}
+		} */
 		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
 		}

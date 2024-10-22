@@ -182,7 +182,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-			obj.Spec.Containers[i].Resources.Requests != nil {
+			(obj.Spec.Containers[i].Resources.Requests != nil || obj.Spec.Containers[i].Resources.Limits != nil) {
 			// For normal containers, set resize restart policy to default value (NotRequired), if not specified..
 			setDefaultResizePolicy(&obj.Spec.Containers[i])
 		}
@@ -198,7 +198,8 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&obj.Spec.InitContainers[i]) && obj.Spec.InitContainers[i].Resources.Requests != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) &&
+			kubetypes.IsRestartableInitContainer(&obj.Spec.InitContainers[i]) && (obj.Spec.InitContainers[i].Resources.Requests != nil || obj.Spec.InitContainers[i].Resources.Limits != nil) {
 			// For restartable init containers, set resize restart policy to default value (NotRequired), if not specified.
 			setDefaultResizePolicy(&obj.Spec.InitContainers[i])
 		}
