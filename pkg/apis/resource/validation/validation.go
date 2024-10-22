@@ -780,6 +780,7 @@ func validateRawExtension(rawExtension *runtime.RawExtension, fldPath *field.Pat
 	if rawExtension == nil {
 		return allErrs
 	}
+	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
 	var v any
 	if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))

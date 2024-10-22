@@ -23,10 +23,12 @@ import (
 
 	"k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 // TestEnableDisableDRAResourceClaimDeviceStatus first test the feature gate disabled
@@ -80,6 +82,17 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "foo",
 				Pool:   "foo",
 				Device: "foo",
+				Data: &runtime.RawExtension{
+					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+				},
+				NetworkData: &v1alpha3.NetworkDeviceData{
+					InterfaceName: ptr.To("net-1"),
+					Addresses: []string{
+						"10.9.8.0/24",
+						"2001:db8::/64",
+					},
+					HWAddress: ptr.To("ea:9f:cb:40:b1:7b"),
+				},
 			},
 		},
 	}
@@ -141,6 +154,17 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
+				Data: &runtime.RawExtension{
+					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+				},
+				NetworkData: &v1alpha3.NetworkDeviceData{
+					InterfaceName: ptr.To("net-1"),
+					Addresses: []string{
+						"10.9.8.0/24",
+						"2001:db8::/64",
+					},
+					HWAddress: ptr.To("ea:9f:cb:40:b1:7b"),
+				},
 			},
 		},
 	}
@@ -166,6 +190,17 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
+				Data: &runtime.RawExtension{
+					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+				},
+				NetworkData: &v1alpha3.NetworkDeviceData{
+					InterfaceName: ptr.To("net-1"),
+					Addresses: []string{
+						"10.9.8.0/24",
+						"2001:db8::/64",
+					},
+					HWAddress: ptr.To("ea:9f:cb:40:b1:7b"),
+				},
 			},
 		},
 	}

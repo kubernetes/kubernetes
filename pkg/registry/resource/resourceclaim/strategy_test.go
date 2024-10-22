@@ -133,6 +133,79 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
+var objWithRequestAndStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "test-request",
+					DeviceClassName: "test-device-class",
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           1,
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "test-request",
+						Driver:  "test-driver",
+						Pool:    "test-pool",
+						Device:  "test-device",
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithGatedStatusFields = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "test-request",
+					DeviceClassName: "test-device-class",
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           1,
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "test-request",
+						Driver:  "test-driver",
+						Pool:    "test-pool",
+						Device:  "test-device",
+					},
+				},
+			},
+		},
+		Devices: []resource.AllocatedDeviceStatus{
+			{
+				Driver: "test-driver",
+				Pool:   "test-pool",
+				Device: "test-device",
+			},
+		},
+	},
+}
+
 func TestStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaim must be namespace scoped")
@@ -275,11 +348,12 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.ResourceClaim
-		newObj                *resource.ResourceClaim
-		adminAccess           bool
-		expectValidationError bool
-		expectObj             *resource.ResourceClaim
+		oldObj                  *resource.ResourceClaim
+		newObj                  *resource.ResourceClaim
+		adminAccess             bool
+		deviceStatusFeatureGate bool
+		expectValidationError   bool
+		expectObj               *resource.ResourceClaim
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -347,11 +421,29 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return oldObj
 			}(),
 		},
+		"drop-fields-devices-status": {
+			oldObj:                  objWithRequestAndStatus,
+			newObj:                  objWithGatedStatusFields,
+			deviceStatusFeatureGate: false,
+			expectObj:               objWithRequestAndStatus,
+		},
+		"keep-fields-devices-status": {
+			oldObj:                  objWithRequestAndStatus,
+			newObj:                  objWithGatedStatusFields,
+			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim {
+				expectObj := objWithGatedStatusFields.DeepCopy()
+				// Spec remains unchanged.
+				expectObj.Spec = objWithRequestAndStatus.Spec
+				return expectObj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatusFeatureGate)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
