@@ -70,7 +70,9 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
 		etcd3.NewDefaultDecoder(codec, versioner),
-		versioner)
+		versioner,
+		etcd3.DefaultListErrorAggregatorFactory,
+	)
 	return server, storage
 }
 

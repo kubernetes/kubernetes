@@ -469,7 +469,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
 	}
 
-	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner, etcd3.DefaultListErrorAggregatorFactory)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
 		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store)
 	}
