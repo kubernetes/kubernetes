@@ -5277,7 +5277,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
-func mungeCpuMemResources(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+func mungeResizableResources(resourceList, oldResourceList core.ResourceList) core.ResourceList {
 	if oldResourceList == nil {
 		return nil
 	}
