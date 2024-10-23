@@ -767,10 +767,10 @@ func TestPodPriorityResolution(t *testing.T) {
 				} else {
 					t.Errorf("Expected pod %v to have priority %v but was nil", pod.Name, test.PriorityClass)
 				}
+				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 			})
 		}
 	}
-	testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
 	testutils.CleanupNodes(cs, t)
 }
 
