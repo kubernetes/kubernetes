@@ -1777,6 +1777,8 @@ var allowedTemplateObjectMetaFields = map[string]bool{
 type PersistentVolumeSpecValidationOptions struct {
 	// Allow users to modify the class of volume attributes
 	EnableVolumeAttributesClass bool
+	// Allow invalid label-value in RequiredNodeSelector
+	AllowInvalidLabelValueInRequiredNodeAffinity bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -1798,10 +1800,16 @@ var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentV
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		EnableVolumeAttributesClass: utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:                  utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		AllowInvalidLabelValueInRequiredNodeAffinity: false,
 	}
 	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
 		opts.EnableVolumeAttributesClass = true
+	}
+	if oldPv != nil && oldPv.Spec.NodeAffinity != nil &&
+		oldPv.Spec.NodeAffinity.Required != nil {
+		terms := oldPv.Spec.NodeAffinity.Required.NodeSelectorTerms
+		opts.AllowInvalidLabelValueInRequiredNodeAffinity = helper.HasInvalidLabelValueInNodeSelectorTerms(terms)
 	}
 	return opts
 }
@@ -1874,7 +1882,7 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 		if validateInlinePersistentVolumeSpec {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeAffinity"), "may not be specified in the context of inline volumes"))
 		} else {
-			nodeAffinitySpecified, errs = validateVolumeNodeAffinity(pvSpec.NodeAffinity, fldPath.Child("nodeAffinity"))
+			nodeAffinitySpecified, errs = validateVolumeNodeAffinity(pvSpec.NodeAffinity, opts, fldPath.Child("nodeAffinity"))
 			allErrs = append(allErrs, errs...)
 		}
 	}
@@ -3865,7 +3873,7 @@ func validateAffinity(affinity *core.Affinity, opts PodValidationOptions, fldPat
 
 	if affinity != nil {
 		if affinity.NodeAffinity != nil {
-			allErrs = append(allErrs, validateNodeAffinity(affinity.NodeAffinity, fldPath.Child("nodeAffinity"))...)
+			allErrs = append(allErrs, validateNodeAffinity(affinity.NodeAffinity, opts, fldPath.Child("nodeAffinity"))...)
 		}
 		if affinity.PodAffinity != nil {
 			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, opts.AllowInvalidLabelValueInSelector, fldPath.Child("podAffinity"))...)
@@ -4053,6 +4061,8 @@ type PodValidationOptions struct {
 	PodLevelResourcesEnabled bool
 	// Allow sidecar containers resize policy for backward compatibility
 	AllowSidecarResizePolicy bool
+	// Allow invalid label-value in RequiredNodeSelector
+	AllowInvalidLabelValueInRequiredNodeAffinity bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4730,14 +4740,14 @@ func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, allowInvalid
 }
 
 // validateNodeAffinity tests that the specified nodeAffinity fields have valid data
-func validateNodeAffinity(na *core.NodeAffinity, fldPath *field.Path) field.ErrorList {
+func validateNodeAffinity(na *core.NodeAffinity, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
 	// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
 	//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 	// }
 	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, true /* TODO: opts.AllowInvalidLabelValueInRequiredNodeAffinity */, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, opts.AllowInvalidLabelValueInRequiredNodeAffinity, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
 		allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
@@ -7783,7 +7793,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 // returns:
 // - true if volumeNodeAffinity is set
 // - errorList if there are validation errors
-func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) (bool, field.ErrorList) {
+func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, opts PersistentVolumeSpecValidationOptions, fldPath *field.Path) (bool, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
 	if nodeAffinity == nil {
@@ -7791,7 +7801,7 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 	}
 
 	if nodeAffinity.Required != nil {
-		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, true /* TODO: opts.AllowInvalidLabelValueInRequiredNodeAffinity */, fldPath.Child("required"))...)
+		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, opts.AllowInvalidLabelValueInRequiredNodeAffinity, fldPath.Child("required"))...)
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath.Child("required"), "must specify required node constraints"))
 	}
