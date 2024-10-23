@@ -782,7 +782,9 @@ func GetDeletableResources(logger klog.Logger, discoveryClient discovery.ServerR
 	preferredResources, lookupErr := discoveryClient.ServerPreferredResources()
 	if lookupErr != nil {
 		if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(lookupErr); isLookupFailure {
-			logger.Info("failed to discover some groups", "groups", groupLookupFailures)
+			// Serialize groupLookupFailures here as map[schema.GroupVersion]error is not json encodable, otherwise the
+			// logger would throw internal error.
+			logger.Info("failed to discover some groups", "groups", fmt.Sprintf("%q", groupLookupFailures))
 		} else {
 			logger.Info("failed to discover preferred resources", "error", lookupErr)
 		}
