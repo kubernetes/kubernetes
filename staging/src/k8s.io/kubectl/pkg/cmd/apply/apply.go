@@ -181,7 +181,7 @@ var (
 
 var ApplySetToolVersion = version.Get().GitVersion
 
-var supportedSubresources = []string{"status", "scale"}
+var supportedSubresources = []string{"status", "scale", "resize"}
 
 // NewApplyFlags returns a default ApplyFlags
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
