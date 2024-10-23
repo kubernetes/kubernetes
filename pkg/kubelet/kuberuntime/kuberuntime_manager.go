@@ -271,9 +271,12 @@ func NewKubeGenericRuntimeManager(
 
 	var imageGCHooks []images.PostImageGCHook
 
-	imagePullManager, err := images.NewFileBasedImagePullManager(ctx, rootDirectory, imagePullPolicy, kubeRuntimeManager)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
+	var imagePullManager images.ImagePullManager = &images.NoopImagePullManager{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		imagePullManager, err = images.NewFileBasedImagePullManager(ctx, rootDirectory, imagePullPolicy, kubeRuntimeManager)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
+		}
 	}
 
 	imageGCHooks = append(imageGCHooks, imagePullManager.PruneUnknownRecords)
