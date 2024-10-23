@@ -2,7 +2,6 @@
 
 approvers:
   - sig-apps-approvers
-  - alculquicondor
   - mimowo
 reviewers:
   - sig-apps-reviewers
@@ -10,3 +9,5 @@ reviewers:
   - kannon92
 labels:
   - sig/apps
+emeritus_approvers:
+  - alculquicondor
