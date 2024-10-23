@@ -610,7 +610,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClaim.ResourceVersion = "1"
-			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
+			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim, ResourceClaimValidationOptions{})
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}

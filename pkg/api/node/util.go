@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
@@ -105,6 +106,17 @@ func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, field
 					msg,
 				),
 			)
+		}
+		for index, value := range expression.Values {
+			for _, msg := range validation.IsValidLabelValue(value) {
+				warnings = append(warnings,
+					fmt.Sprintf(
+						"%s: %s is invalid, %s",
+						fieldPath.Child("matchExpressions").Index(i).Child("values").Index(index),
+						value,
+						msg,
+					))
+			}
 		}
 	}
 	return warnings

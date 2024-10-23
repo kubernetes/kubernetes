@@ -205,7 +205,7 @@ func TestValidateResourceSlice(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateResourceSlice(scenario.slice)
+			errs := ValidateResourceSlice(scenario.slice, ResourceSliceValidationOptions{})
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}
@@ -261,7 +261,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldResourceSlice.ResourceVersion = "1"
-			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice)
+			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice, ResourceSliceValidationOptions{})
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}

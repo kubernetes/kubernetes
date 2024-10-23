@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -499,4 +500,16 @@ func validFirstDigit(str string) bool {
 		return false
 	}
 	return str[0] == '-' || (str[0] == '0' && str == "0") || (str[0] >= '1' && str[0] <= '9')
+}
+
+func HasInvalidLabelValueInNodeSelectorTerms(terms []core.NodeSelectorTerm) bool {
+	for _, term := range terms {
+		for _, expression := range term.MatchExpressions {
+			allErrs := metavalidation.ValidateLabelValues(expression.Values, nil)
+			if len(allErrs) != 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
