@@ -152,11 +152,7 @@ func (p *setnsProcess) start() (retErr error) {
 			}
 		}
 	}
-	// set rlimits, this has to be done here because we lose permissions
-	// to raise the limits once we enter a user-namespace
-	if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
-		return fmt.Errorf("error setting rlimits for process: %w", err)
-	}
+
 	if err := utils.WriteJSON(p.messageSockPair.parent, p.config); err != nil {
 		return fmt.Errorf("error writing config to pipe: %w", err)
 	}
@@ -164,8 +160,14 @@ func (p *setnsProcess) start() (retErr error) {
 	ierr := parseSync(p.messageSockPair.parent, func(sync *syncT) error {
 		switch sync.Type {
 		case procReady:
-			// This shouldn't happen.
-			panic("unexpected procReady in setns")
+			// Set rlimits, this has to be done here because we lose permissions
+			// to raise the limits once we enter a user-namespace
+			if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
+				return fmt.Errorf("error setting rlimits for ready process: %w", err)
+			}
+
+			// Sync with child.
+			return writeSync(p.messageSockPair.parent, procRun)
 		case procHooks:
 			// This shouldn't happen.
 			panic("unexpected procHooks in setns")
@@ -495,7 +497,7 @@ func (p *initProcess) start() (retErr error) {
 				return err
 			}
 		case procReady:
-			// set rlimits, this has to be done here because we lose permissions
+			// Set rlimits, this has to be done here because we lose permissions
 			// to raise the limits once we enter a user-namespace
 			if err := setupRlimits(p.config.Rlimits, p.pid()); err != nil {
 				return fmt.Errorf("error setting rlimits for ready process: %w", err)
