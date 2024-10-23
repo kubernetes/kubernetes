@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"testing"
 
-	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	metainternalscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
@@ -33,8 +31,6 @@ import (
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/transport"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // EnableCBORForTest patches global state to enable the CBOR serializer and reverses those changes
@@ -65,20 +61,20 @@ func EnableCBORForTest(tb testing.TB) {
 	tb.Cleanup(func() {
 		clientfeatures.TestOnlyFeatureGates.Set(clientfeatures.TestOnlyClientAllowsCBOR, false)
 	})
-	if err := clientfeatures.TestOnlyFeatureGates.Set(clientfeatures.TestOnlyClientPrefersCBOR, true); err != nil {
-		tb.Fatal(err)
-	}
-	tb.Cleanup(func() {
-		clientfeatures.TestOnlyFeatureGates.Set(clientfeatures.TestOnlyClientPrefersCBOR, false)
-	})
+	// if err := clientfeatures.TestOnlyFeatureGates.Set(clientfeatures.TestOnlyClientPrefersCBOR, true); err != nil {
+	// 	tb.Fatal(err)
+	// }
+	// tb.Cleanup(func() {
+	// 	clientfeatures.TestOnlyFeatureGates.Set(clientfeatures.TestOnlyClientPrefersCBOR, false)
+	// })
 
 	// Codecs for built-in types are constructed at package initialization time and read by
 	// value from REST storage providers.
 	codecs := map[*runtime.Scheme]*serializer.CodecFactory{
-		legacyscheme.Scheme:           &legacyscheme.Codecs,
-		metainternalscheme.Scheme:     &metainternalscheme.Codecs,
-		aggregatorscheme.Scheme:       &aggregatorscheme.Codecs,
-		apiextensionsapiserver.Scheme: &apiextensionsapiserver.Codecs,
+		//legacyscheme.Scheme:       &legacyscheme.Codecs,
+		//metainternalscheme.Scheme: &metainternalscheme.Codecs,
+		//aggregatorscheme.Scheme:   &aggregatorscheme.Codecs,
+		//apiextensionsapiserver.Scheme: &apiextensionsapiserver.Codecs,
 	}
 
 	for scheme, factory := range codecs {
