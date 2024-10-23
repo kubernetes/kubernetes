@@ -320,7 +320,7 @@ function kube::build::docker_delete_old_containers() {
   done
 }
 
-# Takes $1 and computes a short has for it. Useful for unique tag generation
+# Takes $1 and computes a short hash for it. Useful for unique tag generation
 function kube::build::short_hash() {
   [[ $# -eq 1 ]] || {
     kube::log::error "Internal error.  No data based to short_hash."
