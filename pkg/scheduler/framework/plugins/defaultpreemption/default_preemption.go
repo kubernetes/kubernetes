@@ -103,10 +103,19 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 }
 
 func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	if !pl.fts.EnableAsyncPreemption {
+		return nil
+	}
 	if pl.evaluator.IsPodRunningPreemption(p) {
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates
