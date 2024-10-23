@@ -2589,7 +2589,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 		},
 		{
 			name:           "serviceaccount is authorized for custom verb on current resource",
-			extraAccountFn: serviceAccountClient("default", "extra-acct"),
+			extraAccountFn: authutil.ServiceAccountClient("default", "extra-acct"),
 			extraAccountRbac: &rbacv1.PolicyRule{
 				Verbs:     []string{"anthropomorphize"},
 				APIGroups: []string{""},
@@ -2985,8 +2985,6 @@ contexts:
 	}
 }
 
-type clientFn func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
-
 func secondaryAuthorizationUserClient(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
 	clientConfig = rest.CopyConfig(clientConfig)
 	clientConfig.Impersonate = rest.ImpersonationConfig{
@@ -3002,29 +3000,7 @@ func secondaryAuthorizationUserClient(t *testing.T, adminClient *clientset.Clien
 }
 
 func secondaryAuthorizationServiceAccountClient(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
-	return serviceAccountClient("default", "test-service-acct")(t, adminClient, clientConfig, rules)
-}
-
-func serviceAccountClient(namespace, name string) clientFn {
-	return func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
-		clientConfig = rest.CopyConfig(clientConfig)
-		sa, err := adminClient.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			t.Fatal(err)
-		}
-		uid := sa.UID
-
-		clientConfig.Impersonate = rest.ImpersonationConfig{
-			UserName: "system:serviceaccount:" + namespace + ":" + name,
-			UID:      string(uid),
-		}
-		client := clientset.NewForConfigOrDie(clientConfig)
-
-		for _, rule := range rules {
-			authutil.GrantServiceAccountAuthorization(t, context.TODO(), adminClient, name, namespace, rule)
-		}
-		return client
-	}
+	return authutil.ServiceAccountClient("default", "test-service-acct")(t, adminClient, clientConfig, rules)
 }
 
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1.ValidatingAdmissionPolicy) *admissionregistrationv1.ValidatingAdmissionPolicy {
