@@ -5451,6 +5451,9 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	return allErrs
 }
 
+// ValidatePodResize tests that a user update to pod container resources is valid.
+// newPod and oldPod must only differ in their Containers[*].Resources and
+// Containers[*].ResizePolicy field.
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
@@ -5467,7 +5470,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// newPod.Spec.Containers[].Resources are allowed.
 	specPath := field.NewPath("spec")
 	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
-		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QoS is immutable"))
+		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class must not change"))
 	}
 
 	// Ensure that only CPU and memory resources are mutable.

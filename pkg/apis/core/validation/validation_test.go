@@ -25211,7 +25211,7 @@ func TestValidatePodResize(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "Pod QOS Class must not change",
 			test: "Pod QoS change, guaranteed -> burstable",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -25227,7 +25227,7 @@ func TestValidatePodResize(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "Pod QOS Class must not change",
 			test: "Pod QoS change, burstable -> guaranteed",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -25238,7 +25238,7 @@ func TestValidatePodResize(t *testing.T) {
 					}))),
 			),
 			old:  *podtest.MakePod("pod"),
-			err:  "Pod QoS is immutable",
+			err:  "Pod QOS Class must not change",
 			test: "Pod QoS change, besteffort -> burstable",
 		}, {
 			new: *podtest.MakePod("pod"),
@@ -25249,7 +25249,7 @@ func TestValidatePodResize(t *testing.T) {
 						Requests: getResourceLimits("100m", "100Mi"),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "Pod QOS Class must not change",
 			test: "Pod QoS change, burstable -> besteffort",
 		},
 	}
