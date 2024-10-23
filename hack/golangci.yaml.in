@@ -163,6 +163,7 @@ linters:
     - unused
   {{- if not .Base }}
     - usestdlibvars
+    - whitespace
   {{- end}}
   {{- if .Strict}}
   disable:

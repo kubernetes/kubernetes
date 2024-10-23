@@ -104,6 +104,7 @@ linters:
     - testifylint
     - unused
     - usestdlibvars
+    - whitespace
 
 linters-settings: # please keep this alphabetized
   custom:
