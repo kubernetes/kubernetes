@@ -18,9 +18,11 @@ package features
 
 import (
 	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"sync/atomic"
 )
 
 // NOTE: types Feature, FeatureSpec, prerelease (and its values)
@@ -141,3 +143,43 @@ var (
 	// should use AddFeaturesToExistingFeatureGates followed by ReplaceFeatureGates.
 	featureGates = &atomic.Value{}
 )
+
+// TestOnlyFeatureGates is a distinct registry of pre-alpha client features that must not be
+// included in runtime wiring to command-line flags or environment variables. It exists as a risk
+// mitigation to allow only programmatic enablement of CBOR serialization for integration testing
+// purposes.
+//
+// TODO: Once all required integration test coverage is complete, this will be deleted and the
+// test-only feature gates will be replaced by normal feature gates.
+var TestOnlyFeatureGates = &testOnlyFeatureGates{
+	features: map[Feature]bool{
+		TestOnlyClientAllowsCBOR:  false,
+		TestOnlyClientPrefersCBOR: false,
+	},
+}
+
+type testOnlyFeatureGates struct {
+	lock     sync.RWMutex
+	features map[Feature]bool
+}
+
+func (t *testOnlyFeatureGates) Enabled(feature Feature) bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	enabled, ok := t.features[feature]
+	if !ok {
+		panic(fmt.Sprintf("test-only feature %q not recognized", feature))
+	}
+	return enabled
+}
+
+func (t *testOnlyFeatureGates) Set(feature Feature, enabled bool) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if _, ok := t.features[feature]; !ok {
+		return fmt.Errorf("test-only feature %q not recognized", feature)
+	}
+	t.features[feature] = enabled
+	return nil
+}

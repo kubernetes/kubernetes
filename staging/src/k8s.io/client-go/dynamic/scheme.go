@@ -21,7 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/client-go/features"
 )
 
 var basicScheme = runtime.NewScheme()
@@ -35,11 +37,8 @@ func init() {
 	metav1.AddToGroupVersion(parameterScheme, versionV1)
 }
 
-// basicNegotiatedSerializer is used to handle discovery and error handling serialization
-type basicNegotiatedSerializer struct{}
-
-func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
-	return []runtime.SerializerInfo{
+func newBasicNegotiatedSerializer() basicNegotiatedSerializer {
+	supportedMediaTypes := []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
 			MediaTypeType:    "application",
@@ -54,6 +53,27 @@ func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInf
 			},
 		},
 	}
+	if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) {
+		supportedMediaTypes = append(supportedMediaTypes, runtime.SerializerInfo{
+			MediaType:        "application/cbor",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "cbor",
+			Serializer:       cbor.NewSerializer(unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}),
+			StreamSerializer: &runtime.StreamSerializerInfo{
+				Serializer: cbor.NewSerializer(basicScheme, basicScheme, cbor.Transcode(false)),
+				Framer:     cbor.NewFramer(),
+			},
+		})
+	}
+	return basicNegotiatedSerializer{supportedMediaTypes: supportedMediaTypes}
+}
+
+type basicNegotiatedSerializer struct {
+	supportedMediaTypes []runtime.SerializerInfo
+}
+
+func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return s.supportedMediaTypes
 }
 
 func (s basicNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {

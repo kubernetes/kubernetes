@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/client-go/util/watchlist"
@@ -45,9 +46,17 @@ var _ Interface = &DynamicClient{}
 // appropriate dynamic client defaults set.
 func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
-	config.AcceptContentTypes = "application/json"
+
 	config.ContentType = "application/json"
-	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	config.AcceptContentTypes = "application/json"
+	if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) {
+		config.AcceptContentTypes = "application/json;q=0.9,application/cbor;q=1"
+		if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientPrefersCBOR) {
+			config.ContentType = "application/cbor"
+		}
+	}
+
+	config.NegotiatedSerializer = newBasicNegotiatedSerializer()
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
