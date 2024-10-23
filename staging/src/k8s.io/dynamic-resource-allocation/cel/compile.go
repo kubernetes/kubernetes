@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -93,10 +93,21 @@ func newCompiler() *compiler {
 	return &compiler{envset: mustBuildEnv()}
 }
 
+// Options contains several additional parameters
+// for [CompileCELExpression]. All of them have reasonable
+// defaults.
+type Options struct {
+	// EnvType allows to override the default environment type [environment.StoredExpressions].
+	EnvType *environment.Type
+
+	// CostLimit allows overriding the default runtime cost limit [resourceapi.CELSelectorExpressionMaxCost].
+	CostLimit *uint64
+}
+
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
 //
 // TODO (https://github.com/kubernetes/kubernetes/issues/125826): validate AST to detect invalid attribute names.
-func (c compiler) CompileCELExpression(expression string, envType environment.Type) CompilationResult {
+func (c compiler) CompileCELExpression(expression string, options Options) CompilationResult {
 	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
@@ -107,7 +118,7 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		}
 	}
 
-	env, err := c.envset.Env(envType)
+	env, err := c.envset.Env(ptr.Deref(options.EnvType, environment.StoredExpressions))
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
@@ -131,25 +142,10 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
-		// The Kubernetes CEL base environment sets the VAP cost limit.
-		//
-		// In DRA, the cost check is done only at validation time.  At
-		// runtime, any expression that passed validation gets executed
-		// without interrupting it. The advantage is that it becomes
-		// easier to change the limit because stored expression do not
-		// suddenly fail after an up- or downgrade.  The limit could
-		// even become a configuration parameter of the apiserver
-		// because that is the only place where the limit gets checked
-		//
-		// We cannot unset the cost limit
-		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/cel/options.go#L512-L518). But
-		// we can set a high value that then never triggers
-		// (https://github.com/kubernetes/kubernetes/blob/9568a2ac145cf9be930e3da835f86c1e61f7f7c1/vendor/github.com/google/cel-go/interpreter/runtimecost.go#L104-L106).
-		//
-		// Even better would be to enable cost tracking only during
-		// validation, but for that k8s.io/apiserver/pkg/cel/environment would
-		// have to be changed to not set the limit.
-		cel.CostLimit(math.MaxInt64),
+		// The Kubernetes CEL base environment sets the VAP limit as runtime cost limit.
+		// DRA has its own default cost limit and also allows the caller to change that
+		// limit.
+		cel.CostLimit(ptr.Deref(options.CostLimit, resourceapi.CELSelectorExpressionMaxCost)),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {

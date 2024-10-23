@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/cel/environment"
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
@@ -653,7 +652,7 @@ func (alloc *allocator) isSelectable(r requestIndices, slice *resourceapi.Resour
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.BasicDevice, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
-		expr := cel.GetCompiler().CompileCELExpression(selector.CEL.Expression, environment.StoredExpressions)
+		expr := cel.GetCompiler().CompileCELExpression(selector.CEL.Expression, cel.Options{})
 		if expr.Error != nil {
 			// Could happen if some future apiserver accepted some
 			// future expression and then got downgraded. Normally

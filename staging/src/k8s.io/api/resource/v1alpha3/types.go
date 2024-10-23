@@ -551,8 +551,13 @@ type CELDeviceSelector struct {
 // Validation against this limit and [CELSelectorExpressionMaxLength] happens
 // only when setting an expression for the first time or when changing it. If
 // the limits are changed in a future Kubernetes release, existing users are
-// guaranteed that existing expressions will continue to be valid and won't be
-// interrupted at runtime after an up- or downgrade.
+// guaranteed that existing expressions will continue to be valid.
+//
+// However, the kube-scheduler also applies this cost limit at runtime, so it
+// could happen that a valid expression fails at runtime after an up- or
+// downgrade. This can also happen without version skew when the cost estimate
+// underestimated the actual cost. That this might happen is the reason why
+// kube-scheduler enforces the runtime limit instead of relying on validation.
 //
 // According to
 // https://github.com/kubernetes/kubernetes/blob/4aeaf1e99e82da8334c0d6dddd848a194cd44b4f/staging/src/k8s.io/apiserver/pkg/apis/cel/config.go#L20-L22,

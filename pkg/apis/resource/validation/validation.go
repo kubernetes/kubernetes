@@ -176,7 +176,7 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 		return allErrs
 	}
 
-	result := dracel.GetCompiler().CompileCELExpression(celSelector.Expression, envType)
+	result := dracel.GetCompiler().CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
 	if result.Error != nil {
 		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
 	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {

@@ -23,7 +23,6 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -226,9 +225,10 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			}
 			return attributes
 		}(),
-		expression: `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
-		driver:     "dra.example.com",
-		expectCost: 18446744073709551615, // Exceeds limit!
+		expression:       `device.attributes["dra.example.com"].map(s, s.lowerAscii()).map(s, s.size()).sum() == 0`,
+		driver:           "dra.example.com",
+		expectMatchError: "actual cost limit exceeded",
+		expectCost:       18446744073709551615, // Exceeds limit!
 	},
 }
 
@@ -236,7 +236,7 @@ func TestCEL(t *testing.T) {
 	for name, scenario := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			result := GetCompiler().CompileCELExpression(scenario.expression, environment.StoredExpressions)
+			result := GetCompiler().CompileCELExpression(scenario.expression, Options{})
 			if scenario.expectCompileError != "" && result.Error == nil {
 				t.Fatalf("expected compile error %q, got none", scenario.expectCompileError)
 			}
@@ -294,7 +294,7 @@ func BenchmarkDeviceMatches(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			_, ctx := ktesting.NewTestContext(b)
-			result := GetCompiler().CompileCELExpression(scenario.expression, environment.StoredExpressions)
+			result := GetCompiler().CompileCELExpression(scenario.expression, Options{})
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
 			}
