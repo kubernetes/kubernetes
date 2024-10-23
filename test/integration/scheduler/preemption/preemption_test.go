@@ -491,10 +491,8 @@ func TestPreemption(t *testing.T) {
 						if cond == nil {
 							t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 						}
-					} else {
-						if p.DeletionTimestamp != nil {
-							t.Errorf("Didn't expect pod %v to get preempted.", p.Name)
-						}
+					} else if p.DeletionTimestamp != nil {
+						t.Errorf("Didn't expect pod %v to get preempted.", p.Name)
 					}
 				}
 				// Also check that the preemptor pod gets the NominatedNodeName field set.
