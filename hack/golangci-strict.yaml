@@ -146,6 +146,7 @@ linters:
     - stylecheck
     - testifylint
     - unused
+    - usestdlibvars
   disable:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
     - errcheck
