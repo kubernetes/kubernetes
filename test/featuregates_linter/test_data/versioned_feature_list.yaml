@@ -1228,6 +1228,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+- name: TestOnlyCBORServingAndStorage
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: TopologyAwareHints
   versionedSpecs:
   - default: false

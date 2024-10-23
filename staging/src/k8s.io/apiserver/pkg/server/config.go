@@ -755,6 +755,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
+	allowedMediaTypes := allowedMediaTypes // shadow
+	if utilfeature.TestOnlyFeatureGate.Enabled(genericfeatures.TestOnlyCBORServingAndStorage) {
+		allowedMediaTypes = append(allowedMediaTypes, runtime.ContentTypeCBOR)
+	}
 	for _, info := range c.Serializer.SupportedMediaTypes() {
 		var ok bool
 		for _, mt := range allowedMediaTypes {
