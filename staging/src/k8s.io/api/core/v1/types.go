@@ -3237,7 +3237,7 @@ const (
 	// during scheduling, for example due to nodeAffinity parsing errors.
 	PodReasonSchedulerError = "SchedulerError"
 
-	// TerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
+	// PodReasonTerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
 	// is initiated by kubelet
 	PodReasonTerminationByKubelet = "TerminationByKubelet"
 
