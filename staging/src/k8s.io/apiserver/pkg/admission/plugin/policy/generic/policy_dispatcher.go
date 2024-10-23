@@ -226,8 +226,13 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 	}
 
 	if len(filteredErrors) > 0 {
-		err, ok := admission.NewForbidden(a, fmt.Errorf("admission request denied by policy")).(*apierrors.StatusError)
-		if !ok {
+
+		forbiddenErr := admission.NewForbidden(a, fmt.Errorf("admission request denied by policy"))
+
+		// The forbiddenErr is always a StatusError.
+		var err *apierrors.StatusError
+		if !errors.As(forbiddenErr, &err) {
+			// Should never happen.
 			return apierrors.NewInternalError(fmt.Errorf("failed to create status error"))
 		}
 		err.ErrStatus.Message = ""

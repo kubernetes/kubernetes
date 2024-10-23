@@ -61,9 +61,6 @@ func TestTypeProvider(t *testing.T) {
 			_, option := NewResolverTypeProviderAndEnvOption(&mockTypeResolver{})
 			env := mustCreateEnv(t, option)
 			ast, issues := env.Compile(tc.expression)
-			if issues != nil {
-				t.Fatalf("unexpected issues during compilation: %v", issues)
-			}
 			if len(tc.expectCompileError) > 0 {
 				if issues == nil {
 					t.Fatalf("expected error %v but got no error", tc.expectCompileError)
@@ -72,6 +69,9 @@ func TestTypeProvider(t *testing.T) {
 					t.Fatalf("expected error %v but got %v", tc.expectCompileError, issues.String())
 				}
 				return
+			}
+			if issues != nil {
+				t.Fatalf("unexpected issues during compilation: %v", issues)
 			}
 			program, err := env.Program(ast)
 			if err != nil {

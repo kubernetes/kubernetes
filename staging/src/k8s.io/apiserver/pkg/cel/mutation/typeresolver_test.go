@@ -173,14 +173,14 @@ func TestCELOptional(t *testing.T) {
 			expression: `Object{
 				?existing: optional.none()
 			}`,
-			expectedVal: dynamic.NewObjectVal(nil, map[string]ref.Val{
+			expectedVal: dynamic.NewObjectVal(types.NewObjectType("Object"), map[string]ref.Val{
 				// "existing" field was not set.
 			}),
 		},
 		{
 			name:        "object of zero value, ofNonZeroValue",
 			expression:  `Object{?spec: optional.ofNonZeroValue(Object.spec{?replicas: Object{}.?replicas})}`,
-			expectedVal: dynamic.NewObjectVal(nil, map[string]ref.Val{
+			expectedVal: dynamic.NewObjectVal(types.NewObjectType("Object"), map[string]ref.Val{
 				// "existing" field was not set.
 			}),
 		},
@@ -226,13 +226,17 @@ func TestCELOptional(t *testing.T) {
 			_, option := common.NewResolverTypeProviderAndEnvOption(&DynamicTypeResolver{})
 			env := mustCreateEnvWithOptional(t, option)
 			ast, issues := env.Compile(tc.expression)
-			if issues != nil {
-				if tc.expectedCompileError == "" {
-					t.Fatalf("unexpected issues during compilation: %v", issues)
-				} else if !strings.Contains(issues.String(), tc.expectedCompileError) {
-					t.Fatalf("unexpected compile error, want to contain %q but got %v", tc.expectedCompileError, issues)
+			if len(tc.expectedCompileError) > 0 {
+				if issues == nil {
+					t.Fatalf("expected error %v but got no error", tc.expectedCompileError)
+				}
+				if !strings.Contains(issues.String(), tc.expectedCompileError) {
+					t.Fatalf("expected error %v but got %v", tc.expectedCompileError, issues.String())
 				}
 				return
+			}
+			if issues != nil {
+				t.Fatalf("unexpected issues during compilation: %v", issues)
 			}
 			program, err := env.Program(ast)
 			if err != nil {
@@ -243,7 +247,7 @@ func TestCELOptional(t *testing.T) {
 				t.Fatalf("unexpected error during evaluation: %v", err)
 			}
 			if equals := tc.expectedVal.Equal(r); equals.Value() != true {
-				t.Errorf("expected %v but got %v", tc.expectedVal, r)
+				t.Errorf("expected %#+v but got %#+v", tc.expectedVal, r)
 			}
 		})
 	}
