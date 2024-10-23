@@ -118,6 +118,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -957,6 +958,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
+		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
+		// the kubelet will not be started.
+		klet.healthChecker, err = watchdog.NewHealthChecker(klet)
+		if err != nil {
+			return nil, fmt.Errorf("create health checker: %w", err)
+		}
+	}
 	return klet, nil
 }
 
@@ -1344,6 +1353,9 @@ type Kubelet struct {
 
 	// Track node startup latencies
 	nodeStartupLatencyTracker util.NodeStartupLatencyTracker
+
+	// Health check kubelet
+	healthChecker watchdog.HealthChecker
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1696,6 +1708,10 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start eventedPLEG only if EventedPLEG feature gate is enabled.
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 		kl.eventedPleg.Start()
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
+		kl.healthChecker.Start()
 	}
 
 	kl.syncLoop(ctx, updates, kl)
@@ -2876,6 +2892,20 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 	return val.(time.Time)
 }
 
+// SyncLoopHealthCheck checks if kubelet's sync loop that updates containers is working.
+func (kl *Kubelet) SyncLoopHealthCheck(req *http.Request) error {
+	duration := kl.resyncInterval * 2
+	minDuration := time.Minute * 5
+	if duration < minDuration {
+		duration = minDuration
+	}
+	enterLoopTime := kl.LatestLoopEntryTime()
+	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
+		return fmt.Errorf("sync Loop took longer than expected")
+	}
+	return nil
+}
+
 // updateRuntimeUp calls the container runtime status callback, initializing
 // the runtime dependent modules when the container runtime first comes up,
 // and returns an error if the status check fails.  If the status check is OK,
@@ -2933,11 +2963,6 @@ func (kl *Kubelet) GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
 	kl.recorder.Eventf(kl.nodeRef, v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
-}
-
-// ResyncInterval returns the interval used for periodic syncs.
-func (kl *Kubelet) ResyncInterval() time.Duration {
-	return kl.resyncInterval
 }
 
 // ListenAndServe runs the kubelet HTTP server.
