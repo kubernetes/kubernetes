@@ -145,16 +145,22 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 		DeleteFunc: func(obj interface{}) {
 			// The informer cache no longer has the object, and since Node doesn't have a finalizer,
 			// we don't see the Update with DeletionTimestamp != 0.
-			// TODO: instead of executing the operation directly in the handler, build a small cache with key node.Name
-			// and value PodCIDRs use ReleaseCIDR on the reconcile loop so we can retry on `ReleaseCIDR` failures.
-			if err := ra.ReleaseCIDR(logger, obj.(*v1.Node)); err != nil {
-				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
+			node, ok := obj.(*v1.Node)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+					return
+				}
+				node, ok = tombstone.Obj.(*v1.Node)
+				if !ok {
+					utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
+					return
+				}
 			}
-			// IndexerInformer uses a delta nodeQueue, therefore for deletes we have to use this
-			// key function.
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				ra.queue.Add(key)
+			if err := ra.ReleaseCIDR(logger, node); err != nil {
+				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
+
 			}
 		},
 	})
@@ -270,7 +276,7 @@ func (r *rangeAllocator) syncNode(ctx context.Context, key string) error {
 	// Check the DeletionTimestamp to determine if object is under deletion.
 	if !node.DeletionTimestamp.IsZero() {
 		logger.V(3).Info("node is being deleted", "node", key)
-		return r.ReleaseCIDR(logger, node)
+		return nil
 	}
 	return r.AllocateOrOccupyCIDR(ctx, node)
 }
