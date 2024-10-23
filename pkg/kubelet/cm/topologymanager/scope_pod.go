@@ -62,6 +62,10 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 			return admission.GetPodAdmitResult(err)
 		}
 	}
+	if IsAlignmentGuaranteed(s.policy) {
+		// increment only if we know we allocate aligned resources.
+		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
+	}
 	return admission.GetPodAdmitResult(nil)
 }
 
