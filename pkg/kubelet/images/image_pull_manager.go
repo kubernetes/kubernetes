@@ -274,8 +274,30 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 }
 
 func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
-	// TODO: also cleanup the lock maps for intent/pull records?
-	panic("implement me")
+	f.pulledAccessors.GlobalLock()
+	defer f.pulledAccessors.GlobalUnlock()
+
+	pulledRecords, err := f.recordsAccessor.ListImagePulledRecords()
+	if err != nil {
+		klog.ErrorS(err, "there were errors listing ImagePulledRecords, garbage collection will proceed with incomplete records list")
+	}
+
+	imagesInUse := sets.New(imageList...)
+	for _, imageRecord := range pulledRecords {
+		if !imageRecord.LastUpdatedTime.Time.Before(until) {
+			// the image record was only updated after the GC started
+			continue
+		}
+
+		if imagesInUse.Has(imageRecord.ImageRef) {
+			continue
+		}
+
+		if err := f.recordsAccessor.DeleteImagePulledRecord(imageRecord.ImageRef); err != nil {
+			klog.ErrorS(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
+		}
+	}
+
 }
 
 // initialize gathers all the images from pull intent records that exist
@@ -288,8 +310,7 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 func (f *PullManager) initialize(ctx context.Context) {
 	pullIntents, err := f.recordsAccessor.ListImagePullIntents()
 	if err != nil {
-		klog.ErrorS(err, "there was an error listing ImagePullIntents")
-		return
+		klog.ErrorS(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
 	}
 
 	if len(pullIntents) == 0 {
