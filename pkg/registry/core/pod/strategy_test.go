@@ -2452,7 +2452,7 @@ func (w *warningRecorder) AddWarning(_, text string) {
 	w.warnings = append(w.warnings, text)
 }
 
-func TestDropNonPodResizeUpdates(t *testing.T) {
+func TestPodResizePrepareForUpdate(t *testing.T) {
 	tests := []struct {
 		name     string
 		oldPod   *api.Pod
@@ -2468,9 +2468,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2483,9 +2494,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2498,9 +2520,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2516,9 +2549,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2531,17 +2575,24 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
-									api.ResourceMemory: resource.MustParse("2Gi"),
-								},
-								Limits: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("4"),
-									api.ResourceMemory: resource.MustParse("4Gi"),
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
 							},
 							ResizePolicy: []api.ContainerResizePolicy{
 								{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 								{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2554,17 +2605,24 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
-									api.ResourceMemory: resource.MustParse("2Gi"),
-								},
-								Limits: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("4"),
-									api.ResourceMemory: resource.MustParse("4Gi"),
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
 							},
 							ResizePolicy: []api.ContainerResizePolicy{
 								{ResourceName: "cpu", RestartPolicy: "NotRequired"},
 								{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2580,9 +2638,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2595,7 +2664,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
 							},
@@ -2604,9 +2673,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container2",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2619,9 +2699,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2637,9 +2728,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2652,7 +2754,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("2Gi"),
 								},
 							},
@@ -2661,9 +2763,20 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container2",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2676,9 +2789,21 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("2Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Resize: api.PodResizeStatusProposed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2694,7 +2819,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
 							},
@@ -2703,9 +2828,27 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container2",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("1"),
+									api.ResourceCPU:    resource.MustParse("100m"),
 									api.ResourceMemory: resource.MustParse("1Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2718,7 +2861,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container2",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceCPU:    resource.MustParse("200m"),
 									api.ResourceMemory: resource.MustParse("2Gi"),
 								},
 							},
@@ -2727,9 +2870,27 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceCPU:    resource.MustParse("200m"),
 									api.ResourceMemory: resource.MustParse("4Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2742,7 +2903,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container1",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceCPU:    resource.MustParse("200m"),
 									api.ResourceMemory: resource.MustParse("4Gi"),
 								},
 							},
@@ -2751,9 +2912,28 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 							Name: "container2",
 							Resources: api.ResourceRequirements{
 								Requests: api.ResourceList{
-									api.ResourceCPU:    resource.MustParse("2"),
+									api.ResourceCPU:    resource.MustParse("200m"),
 									api.ResourceMemory: resource.MustParse("2Gi"),
 								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Resize: api.PodResizeStatusProposed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
 							},
 						},
 					},
@@ -2764,6 +2944,7 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			tc.newPod.Name = "test-pod"
 			tc.newPod.Namespace = "test-ns"
 			tc.newPod.ResourceVersion = "123"
@@ -2772,9 +2953,10 @@ func TestDropNonPodResizeUpdates(t *testing.T) {
 			tc.expected.Namespace = "test-ns"
 			tc.expected.ResourceVersion = "123"
 			tc.expected.UID = "abc"
-			got := dropNonPodResizeUpdates(tc.newPod, tc.oldPod)
-			if !cmp.Equal(tc.expected, got) {
-				t.Errorf("dropNonPodResizeUpdates() diff = %v", cmp.Diff(tc.expected, got))
+			ctx := context.Background()
+			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
+			if !cmp.Equal(tc.expected, tc.newPod) {
+				t.Errorf("ResizeStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
 			}
 		})
 	}
