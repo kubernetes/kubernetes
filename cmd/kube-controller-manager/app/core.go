@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -688,11 +687,6 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, true, err
-	}
-
-	ignoredResources := make(map[schema.GroupResource]struct{})
-	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
-		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 
 	garbageCollector, err := garbagecollector.NewComposedGarbageCollector(
