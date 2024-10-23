@@ -157,9 +157,9 @@ func (a *AdmissionOptions) ApplyTo(
 	initializersChain := admission.PluginInitializers{genericInitializer}
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionPostStartHook := func(context server.PostStartHookContext) error {
+	admissionPostStartHook := func(hookContext server.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()
-		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
+		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, hookContext.Done())
 		return nil
 	}
 
