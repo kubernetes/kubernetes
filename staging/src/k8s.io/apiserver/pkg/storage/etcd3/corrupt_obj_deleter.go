@@ -20,10 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/klog/v2"
 )
 
 // NewStoreWithUnsafeCorruptObjectDeletion wraps the given store implementation
@@ -49,6 +52,52 @@ func WithCorruptObjErrorHandlingTransformer(transformer value.Transformer) value
 	return &corruptObjErrorInterpretingTransformer{Transformer: transformer}
 }
 
+// CorruptObjErrAggregatorFactory returns an error aggregator that aggregates
+// corrupt object error(s) that the list operation encounters while
+// retrieving objects from the storage.
+// maxCount: it is the maximum number of error that will be aggregated
+func CorruptObjErrAggregatorFactory(maxCount int) func() ListErrorAggregator {
+	return func() ListErrorAggregator {
+		return &corruptObjErrAggregator{maxCount: maxCount}
+	}
+}
+
+var errTooMany = errors.New("too many errors, the list is truncated")
+
+// aggregate corrupt object errors from the LIST operation
+type corruptObjErrAggregator struct {
+	errs     []error
+	maxCount int
+}
+
+func (a *corruptObjErrAggregator) Aggregate(key string, err error) bool {
+	if len(a.errs) >= a.maxCount {
+		// add a sentinel error to indicate there are more
+		a.errs = append(a.errs, errTooMany)
+		return true
+	}
+	var corruptObjErr *corruptObjectError
+	if !errors.As(err, &corruptObjErr) {
+		// this error does not represent a corrupt object, list
+		// operation should abort
+		return true
+	}
+
+	a.errs = append(a.errs, storage.NewCorruptObjError(key, corruptObjErr))
+	return false
+}
+
+func (a *corruptObjErrAggregator) Err() error {
+	err := utilerrors.NewAggregate(a.errs)
+	if err == nil {
+		return nil
+	}
+	return &aggregatedStorageError{
+		errs:           err,
+		resourcePrefix: "list",
+	}
+}
+
 // corruptObjectDeleter facilitates unsafe deletion of corrupt objects for etcd
 type corruptObjectDeleter struct {
 	storage.Interface
@@ -67,6 +116,20 @@ func (s *corruptObjectDeleter) Get(ctx context.Context, key string, opts storage
 		return storage.NewCorruptObjError(key, corruptObjErr)
 	}
 	return nil
+}
+
+func (s *corruptObjectDeleter) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	err := s.Interface.GetList(ctx, key, opts, listObj)
+	if err == nil {
+		return nil
+	}
+
+	var aggregatedErr *aggregatedStorageError
+	if errors.As(err, &aggregatedErr) {
+		// we have aggregated a list of corrupt objects
+		klog.V(5).ErrorS(aggregatedErr, "corrupt objects")
+	}
+	return err
 }
 
 // corruptObjErrorInterpretingDecoder wraps the error returned by the decorated decoder
@@ -133,4 +196,21 @@ var typeToMessage = map[int]string{
 func (e *corruptObjectError) Unwrap() error { return e.err }
 func (e *corruptObjectError) Error() string {
 	return fmt.Sprintf("%s: %v", typeToMessage[e.errType], e.err)
+}
+
+// aggregatedStorageError holds an aggregated list of storage.StorageError
+type aggregatedStorageError struct {
+	resourcePrefix string
+	errs           utilerrors.Aggregate
+}
+
+func (e *aggregatedStorageError) Error() string {
+	errs := e.errs.Errors()
+	var b strings.Builder
+	fmt.Fprintf(&b, "unable to transform or decode %d objects: {\n", len(errs))
+	for _, err := range errs {
+		fmt.Fprintf(&b, "\t%s\n", err.Error())
+	}
+	b.WriteString("}")
+	return b.String()
 }
