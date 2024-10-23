@@ -18,9 +18,11 @@ package features
 
 import (
 	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"sync/atomic"
 )
 
 // NOTE: types Feature, FeatureSpec, prerelease (and its values)
@@ -141,3 +143,37 @@ var (
 	// should use AddFeaturesToExistingFeatureGates followed by ReplaceFeatureGates.
 	featureGates = &atomic.Value{}
 )
+
+// TODO: explain
+type TestOnlyFeatureGatesImpl struct {
+	lock     sync.RWMutex
+	features map[Feature]bool
+}
+
+func (t *TestOnlyFeatureGatesImpl) Enabled(feature Feature) bool {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	enabled, ok := t.features[feature]
+	if !ok {
+		panic(fmt.Sprintf("test-only feature %q not recognized", feature))
+	}
+	return enabled
+}
+
+func (t *TestOnlyFeatureGatesImpl) Set(feature Feature, enabled bool) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if _, ok := t.features[feature]; !ok {
+		return fmt.Errorf("test-only feature %q not recognized", feature)
+	}
+	t.features[feature] = enabled
+	return nil
+}
+
+var TestOnlyFeatureGates = &TestOnlyFeatureGatesImpl{
+	features: map[Feature]bool{
+		TestOnlyClientAllowsCBOR:  false,
+		TestOnlyClientPrefersCBOR: false,
+	},
+}
