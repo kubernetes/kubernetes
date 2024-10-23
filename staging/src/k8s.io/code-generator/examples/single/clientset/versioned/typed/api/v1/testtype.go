@@ -68,6 +68,7 @@ func newTestTypes(c *ExampleV1Client, namespace string) *testTypes {
 			scheme.ParameterCodec,
 			namespace,
 			func() *apiv1.TestType { return &apiv1.TestType{} },
-			func() *apiv1.TestTypeList { return &apiv1.TestTypeList{} }),
+			func() *apiv1.TestTypeList { return &apiv1.TestTypeList{} },
+		),
 	}
 }

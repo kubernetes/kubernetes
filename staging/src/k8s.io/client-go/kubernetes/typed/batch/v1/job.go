@@ -68,6 +68,8 @@ func newJobs(c *BatchV1Client, namespace string) *jobs {
 			scheme.ParameterCodec,
 			namespace,
 			func() *batchv1.Job { return &batchv1.Job{} },
-			func() *batchv1.JobList { return &batchv1.JobList{} }),
+			func() *batchv1.JobList { return &batchv1.JobList{} },
+			gentype.PrefersProtobuf[*batchv1.Job](),
+		),
 	}
 }

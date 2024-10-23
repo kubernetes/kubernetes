@@ -64,6 +64,8 @@ func newComponentStatuses(c *CoreV1Client) *componentStatuses {
 			scheme.ParameterCodec,
 			"",
 			func() *corev1.ComponentStatus { return &corev1.ComponentStatus{} },
-			func() *corev1.ComponentStatusList { return &corev1.ComponentStatusList{} }),
+			func() *corev1.ComponentStatusList { return &corev1.ComponentStatusList{} },
+			gentype.PrefersProtobuf[*corev1.ComponentStatus](),
+		),
 	}
 }

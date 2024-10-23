@@ -68,6 +68,8 @@ func newValidatingAdmissionPolicyBindings(c *AdmissionregistrationV1alpha1Client
 			},
 			func() *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList {
 				return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding](),
+		),
 	}
 }

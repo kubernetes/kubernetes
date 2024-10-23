@@ -64,6 +64,8 @@ func newEvents(c *EventsV1beta1Client, namespace string) *events {
 			scheme.ParameterCodec,
 			namespace,
 			func() *eventsv1beta1.Event { return &eventsv1beta1.Event{} },
-			func() *eventsv1beta1.EventList { return &eventsv1beta1.EventList{} }),
+			func() *eventsv1beta1.EventList { return &eventsv1beta1.EventList{} },
+			gentype.PrefersProtobuf[*eventsv1beta1.Event](),
+		),
 	}
 }

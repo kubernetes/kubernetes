@@ -64,6 +64,8 @@ func newRuntimeClasses(c *NodeV1beta1Client) *runtimeClasses {
 			scheme.ParameterCodec,
 			"",
 			func() *nodev1beta1.RuntimeClass { return &nodev1beta1.RuntimeClass{} },
-			func() *nodev1beta1.RuntimeClassList { return &nodev1beta1.RuntimeClassList{} }),
+			func() *nodev1beta1.RuntimeClassList { return &nodev1beta1.RuntimeClassList{} },
+			gentype.PrefersProtobuf[*nodev1beta1.RuntimeClass](),
+		),
 	}
 }

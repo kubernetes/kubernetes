@@ -64,6 +64,8 @@ func newPodTemplates(c *CoreV1Client, namespace string) *podTemplates {
 			scheme.ParameterCodec,
 			namespace,
 			func() *corev1.PodTemplate { return &corev1.PodTemplate{} },
-			func() *corev1.PodTemplateList { return &corev1.PodTemplateList{} }),
+			func() *corev1.PodTemplateList { return &corev1.PodTemplateList{} },
+			gentype.PrefersProtobuf[*corev1.PodTemplate](),
+		),
 	}
 }

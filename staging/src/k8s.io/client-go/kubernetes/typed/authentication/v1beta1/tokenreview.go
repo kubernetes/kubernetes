@@ -52,6 +52,8 @@ func newTokenReviews(c *AuthenticationV1beta1Client) *tokenReviews {
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *authenticationv1beta1.TokenReview { return &authenticationv1beta1.TokenReview{} }),
+			func() *authenticationv1beta1.TokenReview { return &authenticationv1beta1.TokenReview{} },
+			gentype.PrefersProtobuf[*authenticationv1beta1.TokenReview](),
+		),
 	}
 }

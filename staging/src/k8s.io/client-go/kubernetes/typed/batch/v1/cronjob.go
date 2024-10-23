@@ -68,6 +68,8 @@ func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 			scheme.ParameterCodec,
 			namespace,
 			func() *batchv1.CronJob { return &batchv1.CronJob{} },
-			func() *batchv1.CronJobList { return &batchv1.CronJobList{} }),
+			func() *batchv1.CronJobList { return &batchv1.CronJobList{} },
+			gentype.PrefersProtobuf[*batchv1.CronJob](),
+		),
 	}
 }
