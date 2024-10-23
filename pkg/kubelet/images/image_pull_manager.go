@@ -30,6 +30,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	imagemanagerv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/imagemanager/v1alpha1"
@@ -44,23 +45,55 @@ var _ ImagePullManager = &FileBasedImagePullManager{}
 // access the same context at the same time, compared to a global lock that
 // would create an unnecessary bottleneck.
 type NamedLockSet struct {
-	locks sync.Map
+	globalLock sync.Mutex
+	locks      map[string]*sync.Mutex
 }
 
 func NewNamedLockSet() *NamedLockSet {
 	return &NamedLockSet{
-		locks: sync.Map{},
+		globalLock: sync.Mutex{},
+		locks:      map[string]*sync.Mutex{},
 	}
 }
 
 func (n *NamedLockSet) Lock(name string) {
-	lock, _ := n.locks.LoadOrStore(name, &sync.Mutex{})
-	lock.(*sync.Mutex).Lock()
+	func() {
+		n.globalLock.Lock()
+		defer n.globalLock.Unlock()
+		if _, ok := n.locks[name]; !ok {
+			n.locks[name] = &sync.Mutex{}
+		}
+	}()
+	// This call cannot be guarded by the global lock as it would block the access
+	// to the other locks
+	n.locks[name].Lock()
 }
 
+// Unlock unlocks the named lock. Can only be called after a previous Lock() call
+// for the same named lock.
 func (n *NamedLockSet) Unlock(name string) {
-	lock, _ := n.locks.Load(name)
-	lock.(*sync.Mutex).Unlock()
+	// cannot be locked by the global lock as it would deadlock once GlobalLock() gets activated
+	if _, ok := n.locks[name]; ok {
+		n.locks[name].Unlock()
+	}
+}
+
+// GlobalLock first locks access to the named locks and then locks all of the
+// set locks
+func (n *NamedLockSet) GlobalLock() {
+	n.globalLock.Lock()
+	for _, l := range n.locks {
+		l.Lock()
+	}
+}
+
+// GlobalUnlock should only be called after GlobalLock(). It unlocks all the locks
+// of the set and then it also unlocks the global lock gating access to the set locks.
+func (n *NamedLockSet) GlobalUnlock() {
+	for _, l := range n.locks {
+		l.Unlock()
+	}
+	n.globalLock.Unlock()
 }
 
 // FileBasedImagePullManager is an implementation of the ImagePullManager. It
@@ -312,8 +345,59 @@ func (f *FileBasedImagePullManager) MustAttemptImagePull(image, imageRef string,
 }
 
 func (f *FileBasedImagePullManager) PruneUnknownRecords(imageList []string, until time.Time) {
-	// TODO: also cleanup the lock maps for intent/pull records?
-	panic("implement me")
+	f.pulledAccessors.GlobalLock()
+	defer f.pulledAccessors.GlobalUnlock()
+
+	var imageRecords []string
+	err := filepath.WalkDir(f.pulledDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == f.pulledDir {
+			return nil
+		}
+
+		if d.IsDir() {
+			klog.V(5).InfoS("path is a directory, skipping", "path", path)
+			return nil
+		}
+
+		fileContent, err := os.ReadFile(path)
+		if err != nil {
+			klog.V(5).InfoS("failed to read file, skipping", "filePath", path, "error", err)
+			return nil
+		}
+
+		pullRecord := imagemanagerv1alpha1.ImagePulledRecord{}
+		if err := json.Unmarshal(fileContent, &pullRecord); err != nil {
+			klog.V(5).InfoS("failed to deserialize, skipping file", "filePath", path, "error", err)
+			return nil
+		}
+
+		if pullRecord.LastUpdatedTime.Time.Before(until) {
+			imageRecords = append(imageRecords, pullRecord.ImageRef)
+		}
+		return nil
+	})
+
+	if err != nil {
+		klog.ErrorS(err, "failed to garbage collect ImagePulledRecord files")
+		return
+	}
+
+	imagesInUse := sets.New(imageList...)
+	for _, ir := range imageRecords {
+		if imagesInUse.Has(ir) {
+			continue
+		}
+
+		recordToRemovePath := filepath.Join(f.pulledDir, cacheFilename(ir))
+		if err := os.Remove(recordToRemovePath); err != nil {
+			klog.ErrorS(err, "failed to remove an ImagePulledRecord file", "filePath", recordToRemovePath)
+		}
+	}
+
 }
 
 // startupHousekeeping gathers all the images from pull intent records that exist
@@ -322,6 +406,9 @@ func (f *FileBasedImagePullManager) PruneUnknownRecords(imageList []string, unti
 // pull intent into a pulled record and the original pull intent is deleted.
 func (f *FileBasedImagePullManager) startupHousekeeping(ctx context.Context) {
 	inFlightPulls := make(map[string]string) // image -> path
+
+	f.pulledAccessors.GlobalLock()
+	defer f.pulledAccessors.GlobalUnlock()
 
 	// walk the pulling directory for any pull intent records
 	err := filepath.WalkDir(f.pullingDir, func(path string, d fs.DirEntry, err error) error {

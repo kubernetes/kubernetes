@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -27,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	imagemanagerv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/imagemanager/v1alpha1"
 )
 
@@ -621,6 +623,104 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 
 			if !reflect.DeepEqual(got, tt.expectedPullRecord) {
 				t.Errorf("expected ImagePulledRecord != got; diff: %s", cmp.Diff(tt.expectedPullRecord, got))
+			}
+		})
+	}
+}
+
+func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
+	tests := []struct {
+		name        string
+		imageList   []string
+		gcStartTime time.Time
+		pulledFiles []string
+		wantFiles   sets.Set[string]
+	}{
+		{
+			name:        "all images present",
+			imageList:   []string{"testimage-anonpull", "testimageref", "testemptycredmapping"},
+			gcStartTime: time.Date(2024, 12, 25, 00, 01, 00, 00, time.UTC),
+			pulledFiles: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			},
+			wantFiles: sets.New(
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			),
+		},
+		{
+			name:        "remove all records on empty list from the GC",
+			imageList:   []string{},
+			gcStartTime: time.Date(2024, 12, 25, 00, 01, 00, 00, time.UTC),
+			pulledFiles: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			},
+		},
+		{
+			name:        "remove all records on list of untracked images from the GC",
+			imageList:   []string{"untracked1", "different-untracked"},
+			gcStartTime: time.Date(2024, 12, 25, 00, 01, 00, 00, time.UTC),
+			pulledFiles: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			},
+		},
+		{
+			name:        "remove records without a match in the image list from the GC",
+			imageList:   []string{"testimage-anonpull", "untracked1", "testimageref", "different-untracked"},
+			gcStartTime: time.Date(2024, 12, 25, 00, 01, 00, 00, time.UTC),
+			pulledFiles: []string{
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			},
+			wantFiles: sets.New(
+				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+			),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDir := t.TempDir()
+			pulledDir := filepath.Join(testDir, "pulled")
+			if err := os.MkdirAll(pulledDir, 0700); err != nil {
+				t.Fatalf("failed to create testing dir %q: %v", pulledDir, err)
+			}
+
+			copyTestData(t, pulledDir, tt.pulledFiles)
+
+			f := &FileBasedImagePullManager{
+				pulledDir:       pulledDir,
+				pulledAccessors: NewNamedLockSet(),
+			}
+			f.PruneUnknownRecords(tt.imageList, tt.gcStartTime)
+
+			filesLeft := sets.New[string]()
+			err := filepath.Walk(pulledDir, func(path string, info fs.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if path == pulledDir {
+					return nil
+				}
+
+				filesLeft.Insert(info.Name())
+				return nil
+			})
+			if err != nil {
+				t.Fatalf("failed to walk the pull dir after prune: %v", err)
+			}
+
+			if !tt.wantFiles.Equal(filesLeft) {
+				t.Errorf("expected equal sets, diff: %s", cmp.Diff(tt.wantFiles, filesLeft))
 			}
 		})
 	}
