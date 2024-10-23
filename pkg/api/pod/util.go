@@ -1268,14 +1268,10 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 	newPodSpecContainers := newPod.Spec.Containers
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for _, c := range oldPod.Spec.InitContainers {
+		for i, c := range oldPod.Spec.InitContainers {
 			if isRestartableInitContainer(&c) {
 				oldPodSpecContainers = append(oldPodSpecContainers, c)
-			}
-		}
-		for _, c := range newPod.Spec.InitContainers {
-			if isRestartableInitContainer(&c) {
-				newPodSpecContainers = append(newPodSpecContainers, c)
+				newPodSpecContainers = append(newPodSpecContainers, newPod.Spec.InitContainers[i])
 			}
 		}
 	}
