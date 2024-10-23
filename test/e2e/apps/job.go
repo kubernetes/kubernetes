@@ -143,6 +143,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Release: v1.32
 		Testname: Ensure pod failure policy allows to ignore failure matching on the exit code
 		Description: This test is using an indexed job. The pod corresponding to each index
 		creates a marker file on the host and runs 'forever' until evicted. Once
@@ -150,7 +151,7 @@ var _ = SIGDescribe("Job", func() {
 		we trigger one failure per index due to eviction, so the Job would be
 		marked as failed, if not for the ignore rule matching on exit codes.
 	*/
-	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on exit code", func(ctx context.Context) {
+	framework.ConformanceIt("should allow to use a pod failure policy to ignore failure matching on exit code", func(ctx context.Context) {
 		// We set the backoffLimit = numPods-1  so that we can tolerate random
 		// failures (like OutOfPods from kubelet). Yet, the Job would fail if the
 		// pod failures were not be ignored.
@@ -217,6 +218,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Release: v1.32
 		Testname: Ensure pod failure policy allows to ignore failure matching on the DisruptionTarget condition
 		Description: This test is using an indexed job. The pod corresponding to each index
 		creates a marker file on the host and runs 'forever' until evicted. Once
@@ -225,7 +227,7 @@ var _ = SIGDescribe("Job", func() {
 		condition is added in the process). The Job would be marked as failed,
 		if not for the ignore rule matching on exit codes.
 	*/
-	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on DisruptionTarget condition", func(ctx context.Context) {
+	framework.ConformanceIt("should allow to use a pod failure policy to ignore failure matching on DisruptionTarget condition", func(ctx context.Context) {
 		// We set the backoffLimit = numPods-1 so that we can tolerate random
 		// failures (like OutOfPods from kubelet). Yet, the Job would fail if the
 		// pod failures were not be ignored.
