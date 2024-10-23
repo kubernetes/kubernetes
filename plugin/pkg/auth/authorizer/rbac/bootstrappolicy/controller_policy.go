@@ -501,6 +501,15 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "selinux-warning-controller"},
+			Rules: []rbacv1.PolicyRule{
+				eventsRule(),
+			},
+		})
+	}
+
 	return controllerRoles, controllerRoleBindings
 }
 

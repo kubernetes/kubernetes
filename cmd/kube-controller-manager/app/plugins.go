@@ -79,6 +79,11 @@ func ProbeProvisionableRecyclableVolumePlugins(logger klog.Logger, config persis
 	})
 }
 
+// ProbePersistentVolumePlugins collects all volume plugins that are actually persistent.
+func ProbePersistentVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration) ([]volume.VolumePlugin, error) {
+	return probeControllerVolumePlugins(logger, config, nil)
+}
+
 // probeControllerVolumePlugins collects all persistent volume plugins
 // used by KCM controllers into an easy to use list.
 func probeControllerVolumePlugins(logger klog.Logger, config persistentvolumeconfig.VolumeConfiguration, filter func(plugin volume.VolumePlugin) bool) ([]volume.VolumePlugin, error) {

@@ -85,4 +85,5 @@ const (
 	VolumeAttributesClassProtectionController    = "volumeattributesclass-protection-controller"
 	ServiceCIDRController                        = "service-cidr-controller"
 	StorageVersionMigratorController             = "storage-version-migrator-controller"
+	SELinuxWarningController                     = "selinux-warning-controller"
 )

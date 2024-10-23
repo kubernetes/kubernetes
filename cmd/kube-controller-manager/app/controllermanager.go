@@ -580,6 +580,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newTaintEvictionControllerDescriptor())
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
+	register(newSELinuxWarningControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {

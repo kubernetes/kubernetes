@@ -27,8 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -40,6 +38,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -64,6 +63,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning"
 	"k8s.io/kubernetes/pkg/controller/volume/vacprotection"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
@@ -141,7 +141,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		// should be dual stack (from different IPFamilies)
 		dualstackServiceCIDR, err := netutils.IsDualStackCIDRs([]*net.IPNet{serviceCIDR, secondaryServiceCIDR})
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to perform dualstack check on serviceCIDR and secondaryServiceCIDR error:%v", err)
+			return nil, false, fmt.Errorf("failed to perform dualstack check on serviceCIDR and secondaryServiceCIDR error: %v", err)
 		}
 		if !dualstackServiceCIDR {
 			return nil, false, fmt.Errorf("serviceCIDR and secondaryServiceCIDR are not dualstack (from different IPfamiles)")
@@ -889,5 +889,45 @@ func startStorageVersionGarbageCollectorController(ctx context.Context, controll
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Internal().V1alpha1().StorageVersions(),
 	).Run(ctx)
+	return nil, true, nil
+}
+
+func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                names.SELinuxWarningController,
+		aliases:             []string{"selinux-warning"},
+		initFunc:            startSELinuxWarningController,
+		isDisabledByDefault: true,
+	}
+}
+
+func startSELinuxWarningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) {
+		return nil, false, nil
+	}
+
+	logger := klog.FromContext(ctx)
+	csiDriverInformer := controllerContext.InformerFactory.Storage().V1().CSIDrivers()
+	plugins, err := ProbePersistentVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting SELinux warning controller: %w", err)
+	}
+
+	ctx = klog.NewContext(ctx, logger)
+	seLinuxController, err :=
+		selinuxwarning.NewController(
+			ctx,
+			controllerContext.ClientBuilder.ClientOrDie(controllerName),
+			controllerContext.InformerFactory.Core().V1().Pods(),
+			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
+			csiDriverInformer,
+			plugins,
+			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start SELinux warning controller: %w", err)
+	}
+	go seLinuxController.Run(ctx, 1)
 	return nil, true, nil
 }
