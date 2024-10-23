@@ -1282,6 +1282,53 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			deviceStatusFeatureGate: false,
 		},
+		"invalid-update-invalid-label-value": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+			},
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim = claim.DeepCopy()
+				claim.Status.Allocation = validAllocatedClaim.Status.Allocation.DeepCopy()
+				claim.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchExpressions: []core.NodeSelectorRequirement{{
+							Key:      "foo",
+							Operator: core.NodeSelectorOpIn,
+							Values:   []string{"-1"},
+						}},
+					}},
+				}
+				return claim
+			},
+		},
+		"valid-update-with-invalid-label-value": {
+			oldClaim: func() *resource.ResourceClaim {
+				claim := validAllocatedClaim.DeepCopy()
+				claim.Status.Allocation = validAllocatedClaim.Status.Allocation.DeepCopy()
+				claim.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchExpressions: []core.NodeSelectorRequirement{{
+							Key:      "foo",
+							Operator: core.NodeSelectorOpIn,
+							Values:   []string{"-1"},
+						}},
+					}},
+				}
+				return claim
+			}(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
+					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
+						resource.ResourceClaimConsumerReference{
+							Resource: "pods",
+							Name:     fmt.Sprintf("foo-%d", i),
+							UID:      types.UID(fmt.Sprintf("%d", i)),
+						})
+				}
+				return claim
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
