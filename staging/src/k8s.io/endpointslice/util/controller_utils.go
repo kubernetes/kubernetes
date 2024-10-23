@@ -61,11 +61,12 @@ func GetPodServiceMemberships(serviceLister v1listers.ServiceLister, pod *v1.Pod
 			// if the service has a nil selector this means selectors match nothing, not everything.
 			continue
 		}
-		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
-		if err != nil {
-			return nil, err
-		}
+
 		if labels.ValidatedSetSelector(service.Spec.Selector).Matches(labels.Set(pod.Labels)) {
+			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(service)
+			if err != nil {
+				return nil, err
+			}
 			set.Insert(key)
 		}
 	}
