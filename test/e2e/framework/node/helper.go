@@ -180,7 +180,7 @@ func IsARM64(node *v1.Node) bool {
 	return false
 }
 
-// patchNode sends a patch request to update k8s Node resource.
+// patchNode sends a patch request to update the Node.
 func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, new *v1.Node) error {
 	oldData, err := json.Marshal(old)
 	if err != nil {
@@ -199,7 +199,7 @@ func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, ne
 	return err
 }
 
-// AddExtendedResource adds a fake resource to k8s Node status.
+// AddExtendedResource adds a fake resource to the Node.
 func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nodeName string, extendedResourceName v1.ResourceName, extendedResourceQuantity resource.Quantity) {
 	extendedResource := v1.ResourceName(extendedResourceName)
 
@@ -229,7 +229,7 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
 }
 
-// RemoveExtendedResource removes a fake resource to k8s Node status.
+// RemoveExtendedResource removes a fake resource from the Node.
 func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, nodeName string, extendedResourceName v1.ResourceName) {
 	extendedResource := v1.ResourceName(extendedResourceName)
 
