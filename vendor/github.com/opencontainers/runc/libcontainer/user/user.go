@@ -197,11 +197,10 @@ func ParseGroupFilter(r io.Reader, filter func(Group) bool) ([]Group, error) {
 		for {
 			var line []byte
 			line, isPrefix, err = rd.ReadLine()
-
 			if err != nil {
 				// We should return no error if EOF is reached
 				// without a match.
-				if err == io.EOF { //nolint:errorlint // comparison with io.EOF is legit, https://github.com/polyfloyd/go-errorlint/pull/12
+				if err == io.EOF {
 					err = nil
 				}
 				return out, err

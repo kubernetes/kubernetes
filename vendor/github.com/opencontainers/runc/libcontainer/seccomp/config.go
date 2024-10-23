@@ -66,6 +66,7 @@ var archs = map[string]string{
 	"SCMP_ARCH_PPC":         "ppc",
 	"SCMP_ARCH_PPC64":       "ppc64",
 	"SCMP_ARCH_PPC64LE":     "ppc64le",
+	"SCMP_ARCH_RISCV64":     "riscv64",
 	"SCMP_ARCH_S390":        "s390",
 	"SCMP_ARCH_S390X":       "s390x",
 }
