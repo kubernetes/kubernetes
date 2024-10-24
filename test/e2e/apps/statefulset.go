@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1155,6 +1156,45 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.Logf("Observed %v event: %+v", object, event.Type)
 				return false, nil
 			})
+		})
+
+		/*
+			Release: v1.32
+			Testname: StatefulSet, PodIndexLabel
+			Description: When Pods for a StatefulSet is created it MUST be created with PodIndexLabel feature
+			Attempt to read the PodIndexLabel key and value
+		*/
+		framework.It("pods for Statefulset should have PodIndexLabel with right index", feature.PodIndexLabel, func(ctx context.Context) {
+			one := int64(1)
+			ssName := "test-ss"
+
+			// Define StatefulSet Labels
+			ssPodLabels := map[string]string{
+				"name": "sample-pod",
+				"pod":  WebserverImageName,
+			}
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, ssPodLabels)
+			setHTTPProbe(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
+			waitForStatus(ctx, c, ss)
+
+			ginkgo.By("checking the index label and value of all pods")
+			pods := e2estatefulset.GetPodList(ctx, c, ss)
+			labelIndices := sets.NewInt()
+			for _, pod := range pods.Items {
+				ix, err := strconv.Atoi(pod.Labels[appsv1.PodIndexLabel])
+				framework.ExpectNoError(err, "failed obtaining pod index in namespace: %s for pod: %s", pod.Namespace, pod.Name)
+				labelIndices.Insert(ix)
+			}
+			wantIndexes := []int{0, 1, 2}
+			gotIndexes := labelIndices.List()
+			gomega.Expect(gotIndexes).To(gomega.Equal(wantIndexes), "expected indexes in namespace: %s for sts %s", ss.Namespace, ss.Name)
+
+			ginkgo.By("Delete all of the StatefulSets")
+			err = c.AppsV1().StatefulSets(ns).Delete(ctx, ssName, metav1.DeleteOptions{GracePeriodSeconds: &one})
+			framework.ExpectNoError(err, "failed to delete StatefulSet")
 		})
 	})
 

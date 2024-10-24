@@ -334,6 +334,8 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StatefulSet = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
 
+	PodIndexLabel = framework.WithFeature(framework.ValidFeatures.Add("PodIndexLabel"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StatefulSetStartOrdinal = framework.WithFeature(framework.ValidFeatures.Add("StatefulSetStartOrdinal"))
 
