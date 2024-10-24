@@ -682,9 +682,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			} else {
 				podCpuResources.CPUShares = podResources.CPUShares
 			}
-			err = pcm.SetPodCgroupConfig(pod, rName, podCpuResources)
+			err = pcm.SetPodCgroupConfig(pod, podCpuResources)
 		case v1.ResourceMemory:
-			err = pcm.SetPodCgroupConfig(pod, rName, podResources)
+			err = pcm.SetPodCgroupConfig(pod, podResources)
 		}
 		if err != nil {
 			klog.ErrorS(err, "Failed to set cgroup config", "resource", rName, "pod", pod.Name)

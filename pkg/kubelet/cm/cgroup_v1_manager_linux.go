@@ -19,14 +19,11 @@ package cm
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -123,22 +120,6 @@ func (c *cgroupV1impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName
 	return nil, fmt.Errorf("unsupported resource %v for cgroup %v", resource, name)
 }
 
-// Set resource config for the specified resource type on the cgroup
-func (c *cgroupV1impl) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
-	cgroupPaths := c.buildCgroupPaths(name)
-	cgroupResourcePath, found := cgroupPaths[string(resource)]
-	if !found {
-		return fmt.Errorf("failed to build %v cgroup fs path for cgroup %v", resource, name)
-	}
-	switch resource {
-	case v1.ResourceCPU:
-		return c.setCgroupCPUConfig(cgroupResourcePath, resourceConfig)
-	case v1.ResourceMemory:
-		return c.setCgroupMemoryConfig(cgroupResourcePath, resourceConfig)
-	}
-	return nil
-}
-
 func (c *cgroupV1impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, error) {
 	cpuQuotaStr, errQ := fscommon.GetCgroupParamString(cgroupPath, "cpu.cfs_quota_us")
 	if errQ != nil {
@@ -157,33 +138,6 @@ func (c *cgroupV1impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 		return nil, fmt.Errorf("failed to read CPU shares for cgroup %v: %w", cgroupPath, errS)
 	}
 	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuQuota, CPUPeriod: &cpuPeriod}, nil
-}
-
-func (c *cgroupV1impl) setCgroupCPUConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	var cpuQuotaStr, cpuPeriodStr, cpuSharesStr string
-	if resourceConfig.CPUQuota != nil {
-		cpuQuotaStr = strconv.FormatInt(*resourceConfig.CPUQuota, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_quota_us"), []byte(cpuQuotaStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuQuotaStr, cgroupPath, err)
-		}
-	}
-	if resourceConfig.CPUPeriod != nil {
-		cpuPeriodStr = strconv.FormatUint(*resourceConfig.CPUPeriod, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.cfs_period_us"), []byte(cpuPeriodStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuPeriodStr, cgroupPath, err)
-		}
-	}
-	if resourceConfig.CPUShares != nil {
-		cpuSharesStr = strconv.FormatUint(*resourceConfig.CPUShares, 10)
-		if err := os.WriteFile(filepath.Join(cgroupPath, "cpu.shares"), []byte(cpuSharesStr), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %w", cpuSharesStr, cgroupPath, err)
-		}
-	}
-	return nil
-}
-
-func (c *cgroupV1impl) setCgroupMemoryConfig(cgroupPath string, resourceConfig *ResourceConfig) error {
-	return writeCgroupMemoryLimit(filepath.Join(cgroupPath, cgroupv1MemLimitFile), resourceConfig)
 }
 
 func (c *cgroupV1impl) getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {

@@ -89,7 +89,7 @@ func (m *unsupportedCgroupManager) GetCgroupConfig(name CgroupName, resource v1.
 	return nil, errNotSupported
 }
 
-func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error {
 	return errNotSupported
 }
 
