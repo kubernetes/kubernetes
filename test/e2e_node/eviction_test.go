@@ -1184,3 +1184,49 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 		},
 	}
 }
+
+/* Additional modifications based on Issue #128288 */
+
+// TestMemoryPressureEviction validates that the eviction manager triggers evictions under memory pressure.
+func TestMemoryPressureEviction(t *testing.T) {
+    memoryPressureCondition := kubeletstatsv1alpha1.MemoryStats{
+        WorkingSetBytes: uint64(5 * 1024 * 1024 * 1024), // 5GB of memory used
+    }
+
+    summaryProvider := mockSummaryProvider(&memoryPressureCondition, nil)
+    config := eviction.Config{MemoryEvictionThreshold: 3 * 1024 * 1024 * 1024} // Set threshold to 3GB
+
+    manager := eviction.NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    go manager.StartManager(ctx)
+
+    time.Sleep(2 * time.Second)
+
+    if len(manager.ThresholdsMet()) == 0 {
+        t.Fatalf("Expected eviction due to memory pressure, but none occurred")
+    }
+}
+
+// TestDiskPressureEviction validates that the eviction manager triggers evictions under disk pressure.
+func TestDiskPressureEviction(t *testing.T) {
+    diskPressureCondition := kubeletstatsv1alpha1.FsStats{
+        AvailableBytes: uint64(1 * 1024 * 1024 * 1024), // 1GB available disk space
+    }
+
+    summaryProvider := mockSummaryProvider(nil, &diskPressureCondition)
+    config := eviction.Config{DiskEvictionThreshold: 2 * 1024 * 1024 * 1024} // Set threshold to 2GB
+
+    manager := eviction.NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    go manager.StartManager(ctx)
+
+    time.Sleep(2 * time.Second)
+
+    if len(manager.ThresholdsMet()) == 0 {
+        t.Fatalf("Expected eviction due to disk pressure, but none occurred")
+    }
+}
