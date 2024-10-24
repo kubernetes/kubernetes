@@ -77,6 +77,8 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	LivenessProbeSuspend                 = "LivenessProbeSuspend"
+	LivenessProbeKeepGoing               = "LivenessProbeKeepGoing"
 )
 
 // Image manager event reason list
