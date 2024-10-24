@@ -67,6 +67,9 @@ func (p *serviceEvaluator) GroupResource() schema.GroupResource {
 
 // Handles returns true of the evaluator should handle the specified operation.
 func (p *serviceEvaluator) Handles(a admission.Attributes) bool {
+	if a.GetSubresource() != "" {
+		return false
+	}
 	operation := a.GetOperation()
 	// We handle create and update because a service type can change.
 	return admission.Create == operation || admission.Update == operation
