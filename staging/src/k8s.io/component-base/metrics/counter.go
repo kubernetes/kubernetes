@@ -21,6 +21,8 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
+
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -39,6 +41,11 @@ var _ Metric = &Counter{}
 
 // All supported exemplar metric types implement the metricWithExemplar interface.
 var _ metricWithExemplar = &Counter{}
+
+// exemplarCounterMetric holds a context to extract exemplar labels from, and a counter metric to attach them to. It implements the metricWithExemplar interface.
+type exemplarCounterMetric struct {
+	*Counter
+}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -105,7 +112,7 @@ func (c *Counter) WithContext(ctx context.Context) CounterMetric {
 
 // withExemplar initializes the exemplarMetric object and sets the exemplar value.
 func (c *Counter) withExemplar(v float64) {
-	(&exemplarMetric{c}).withExemplar(v)
+	(&exemplarCounterMetric{c}).withExemplar(v)
 }
 
 func (c *Counter) Add(v float64) {
@@ -114,6 +121,23 @@ func (c *Counter) Add(v float64) {
 
 func (c *Counter) Inc() {
 	c.withExemplar(1)
+}
+
+// withExemplar attaches an exemplar to the metric.
+func (e *exemplarCounterMetric) withExemplar(v float64) {
+	if m, ok := e.CounterMetric.(prometheus.ExemplarAdder); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			exemplarLabels := prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			}
+			m.AddWithExemplar(v, exemplarLabels)
+			return
+		}
+	}
+
+	e.CounterMetric.Add(v)
 }
 
 // CounterVec is the internal representation of our wrapping struct around prometheus

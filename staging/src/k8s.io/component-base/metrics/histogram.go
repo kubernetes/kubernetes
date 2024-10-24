@@ -21,15 +21,53 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
+	ctx context.Context
 	ObserverMetric
 	*HistogramOpts
 	lazyMetric
 	selfCollector
+}
+
+// exemplarHistogramMetric holds a context to extract exemplar labels from, and a historgram metric to attach them to. It implements the metricWithExemplar interface.
+type exemplarHistogramMetric struct {
+	*Histogram
+}
+
+type exemplarHistogramVec struct {
+	*HistogramVecWithContext
+	observer prometheus.Observer
+}
+
+func (h *Histogram) Observe(v float64) {
+	h.withExemplar(v)
+}
+
+// withExemplar initializes the exemplarMetric object and sets the exemplar value.
+func (h *Histogram) withExemplar(v float64) {
+	(&exemplarHistogramMetric{h}).withExemplar(v)
+}
+
+// withExemplar attaches an exemplar to the metric.
+func (e *exemplarHistogramMetric) withExemplar(v float64) {
+	if m, ok := e.Histogram.ObserverMetric.(prometheus.ExemplarObserver); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			exemplarLabels := prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			}
+			m.ObserveWithExemplar(v, exemplarLabels)
+			return
+		}
+	}
+
+	e.ObserverMetric.Observe(v)
 }
 
 // NewHistogram returns an object which is Histogram-like. However, nothing
@@ -74,6 +112,7 @@ func (h *Histogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
 func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	h.ctx = ctx
 	return h.ObserverMetric
 }
 
@@ -216,12 +255,37 @@ type HistogramVecWithContext struct {
 	ctx context.Context
 }
 
+func (h *exemplarHistogramVec) Observe(v float64) {
+	h.withExemplar(v)
+}
+
+func (h *exemplarHistogramVec) withExemplar(v float64) {
+	if m, ok := h.observer.(prometheus.ExemplarObserver); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(h.HistogramVecWithContext.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			m.ObserveWithExemplar(v, prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			})
+			return
+		}
+	}
+
+	h.observer.Observe(v)
+}
+
 // WithLabelValues is the wrapper of HistogramVec.WithLabelValues.
-func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
-	return vc.HistogramVec.WithLabelValues(lvs...)
+func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) *exemplarHistogramVec {
+	return &exemplarHistogramVec{
+		HistogramVecWithContext: vc,
+		observer:                vc.HistogramVec.WithLabelValues(lvs...),
+	}
 }
 
 // With is the wrapper of HistogramVec.With.
-func (vc *HistogramVecWithContext) With(labels map[string]string) ObserverMetric {
-	return vc.HistogramVec.With(labels)
+func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHistogramVec {
+	return &exemplarHistogramVec{
+		HistogramVecWithContext: vc,
+		observer:                vc.HistogramVec.With(labels),
+	}
 }
