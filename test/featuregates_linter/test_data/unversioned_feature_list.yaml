@@ -1,3 +1,9 @@
+- name: ComponentSLIs
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: ""
 - name: ContextualLogging
   versionedSpecs:
   - default: true
