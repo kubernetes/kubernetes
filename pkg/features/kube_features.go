@@ -717,6 +717,15 @@ const (
 	// Enables In-Place Pod Vertical Scaling
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
 
+	// owner: @tallclair @esotsal
+	// alpha: v1.32
+	//
+	// Allow resource resize for containers in Guaranteed pods with integer CPU requests ( default false ).
+	// Applies only in nodes with InPlacePodVerticalScaling and CPU Manager features enabled, and
+	// CPU Manager Static Policy option set.
+	// Remove after InPlacePodVerticalScaling is GA based on user feedback that should be reflected in #1287 update.
+	InPlacePodVerticalScalingExclusiveCPUs featuregate.Feature = "InPlacePodVerticalScalingExclusiveCPUs"
+
 	// owner: @Sh4d1,@RyanAoh,@rikatz
 	// kep: http://kep.k8s.io/1860
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
