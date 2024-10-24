@@ -35,7 +35,7 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
-	inuserns "github.com/moby/sys/userns"
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -147,7 +147,7 @@ func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, 
 		return err
 	}
 	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	if inuserns.RunningInUserNS() {
+	if libcontaineruserns.RunningInUserNS() {
 		if err == nil {
 			return nil
 		}
