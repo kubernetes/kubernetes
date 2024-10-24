@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	sysruntime "runtime"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -2291,21 +2292,14 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+// allocatedPods should represent the pods that have already been admitted, along with their
+// admitted (allocated) resources.
+func (kl *Kubelet) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Use allocated resources values from checkpoint store (source of truth) to determine fit
-		otherPods := make([]*v1.Pod, 0, len(pods))
-		for _, p := range pods {
-			op, _ := kl.statusManager.UpdatePodFromAllocation(p)
-			otherPods = append(otherPods, op)
-		}
-		attrs.OtherPods = otherPods
-	}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range kl.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 
@@ -2545,7 +2539,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		defer kl.podResizeMutex.Unlock()
 	}
 	for _, pod := range pods {
-		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
 		// not exist in the pod manager, it means that it has been deleted in
@@ -2575,9 +2568,11 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// we simply avoid doing any work.
 		// We also do not try to admit the pod that is already in terminated state.
 		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
-			// We failed pods that we rejected, so activePods include all admitted
+			// We failed pods that we rejected, so allocatedPods include all admitted
 			// pods that are alive.
-			activePods := kl.filterOutInactivePods(existingPods)
+			allocatedPods := kl.getAllocatedPods()
+			// Filter out the pod being evaluated.
+			allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
@@ -2585,7 +2580,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				allocatedPod, _ := kl.statusManager.UpdatePodFromAllocation(pod)
 
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, allocatedPod); !ok {
+				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
@@ -2596,7 +2591,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				}
 			} else {
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+				if ok, reason, message := kl.canAdmitPod(allocatedPods, pod); !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
@@ -2765,10 +2760,9 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool
 }
 
 // canResizePod determines if the requested resize is currently feasible.
+// pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed.
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
-	var otherActivePods []*v1.Pod
-
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		klog.ErrorS(err, "getNodeAnyway function failed")
@@ -2785,14 +2779,10 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 
 	// Treat the existing pod needing resize as a new pod with desired resources seeking admit.
 	// If desired resources don't fit, pod continues to run with currently allocated resources.
-	activePods := kl.GetActivePods()
-	for _, p := range activePods {
-		if p.UID != pod.UID {
-			otherActivePods = append(otherActivePods, p)
-		}
-	}
+	allocatedPods := kl.getAllocatedPods()
+	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
-	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, pod); !ok {
+	if ok, failReason, failMessage := kl.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
 		return false, v1.PodResizeStatusDeferred
