@@ -1297,7 +1297,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			description:        "cpu manager add - no error",
 			updateErr:          nil,
 			policy:             testPolicy,
-			expCPUSet:          cpuset.New(0, 3),
+			expCPUSet:          cpuset.New(2, 3),
 			expAllocateErr:     nil,
 			expAddContainerErr: nil,
 		},

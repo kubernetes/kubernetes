@@ -326,7 +326,7 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) 
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
-	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
+	expAllowedCPUsListRegex = fmt.Sprintf("^1-%d\n$", cpuCap-1)
 	// on the single CPU node the only possible value is 0
 	if cpuCap == 1 {
 		expAllowedCPUsListRegex = "^0\n$"
@@ -441,7 +441,7 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 
 	cpuListString = "0"
 	if cpuAlloc > 2 {
-		cset = mustParseCPUSet(fmt.Sprintf("0-%d", cpuCap-1))
+		cset = mustParseCPUSet(fmt.Sprintf("1-%d", cpuCap-1))
 		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.New(cpu1)))
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
@@ -641,7 +641,9 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName: string(cpumanager.PolicyStatic),
+			// Even though empty reserved CPU set is passed here, we will
+			// reserve 1 CPU in the configureCPUManagerInKubelet.
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)

@@ -207,17 +207,16 @@ func (p *staticPolicy) validateState(s state.State) error {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
 		// state is empty initialize
-		allCPUs := p.topology.CPUDetails.CPUs()
-		s.SetDefaultCPUSet(allCPUs)
+		s.SetDefaultCPUSet(p.GetAllocatableCPUs(s))
 		return nil
 	}
 
 	// State has already been initialized from file (is not empty)
-	// 1. Check if the reserved cpuset is not part of default cpuset because:
+	// 1. Check if any reserved CPU is in default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
-	if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
-		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+	if !p.reservedCPUs.Intersection(tmpDefaultCPUset).IsEmpty() {
+		return fmt.Errorf("none of the reserved cpus: \"%s\" should be present in defaultCpuSet: \"%s\"",
 			p.reservedCPUs.String(), tmpDefaultCPUset.String())
 	}
 
@@ -246,9 +245,11 @@ func (p *staticPolicy) validateState(s state.State) error {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
-	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
+	// Total CPUs in topology = shared default CPUs + assigned exclusive CPUs +
+	// reserved CPUs for system processes.
+	totalKnownCPUs = totalKnownCPUs.Union(append(tmpCPUSets, p.reservedCPUs)...)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
-		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
+		return fmt.Errorf("topology CPU set \"%s\" doesn't match all known CPU set from current CPU state \"%s\"",
 			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
 	}
 
@@ -262,7 +263,7 @@ func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
 
 // GetAvailableCPUs returns the set of unassigned CPUs minus the reserved set.
 func (p *staticPolicy) GetAvailableCPUs(s state.State) cpuset.CPUSet {
-	return s.GetDefaultCPUSet().Difference(p.reservedCPUs)
+	return s.GetDefaultCPUSet()
 }
 
 func (p *staticPolicy) GetAvailablePhysicalCPUs(s state.State) cpuset.CPUSet {
