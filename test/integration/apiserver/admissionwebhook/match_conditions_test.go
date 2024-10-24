@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"io"
-	"k8s.io/apimachinery/pkg/util/version"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/version"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -636,7 +637,7 @@ func TestMatchConditionsWithoutStrictCostEnforcement(t *testing.T) {
 			upCh := recorder.Reset()
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, false)
-			server, err := apiservertesting.StartTestServer(t, &apiservertesting.TestServerInstanceOptions{EmulationVersion: "1.31"}, []string{
+			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--disable-admission-plugins=ServiceAccount",
 			}, framework.SharedEtcd())
 			if err != nil {
