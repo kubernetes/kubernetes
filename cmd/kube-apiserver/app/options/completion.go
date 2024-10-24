@@ -71,6 +71,7 @@ func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
 	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange
 	completed.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 	completed.APIServerServiceIP = apiServerServiceIP
+	completed.FlagSets = opts.Flags()
 
 	if completed.Etcd != nil && completed.Etcd.EnableWatchCache {
 		sizes := kubeapiserver.DefaultWatchCacheSizes()
