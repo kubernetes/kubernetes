@@ -2861,39 +2861,23 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		return pod
 	}
 	podResized := false
-	containers := pod.Spec.Containers
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for _, c := range pod.Spec.InitContainers {
-			if kubetypes.IsRestartableInitContainer(&c) {
-				containers = append(containers, c)
-			}
-		}
-	}
-
-	for _, container := range containers {
-		if len(container.Resources.Requests) == 0 {
-			continue
-		}
-		containerStatuses := pod.Status.ContainerStatuses
-		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && kubetypes.IsRestartableInitContainer(&container) {
-			containerStatuses = pod.Status.InitContainerStatuses
-		}
-
-		containerStatus, found := podutil.GetContainerStatus(containerStatuses, container.Name)
-		if !found {
-			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
-			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
+	for _, c := range pod.Spec.Containers {
+		if kl.isContainerRequestsChanged(pod, pod.Status.ContainerStatuses, &c) {
 			podResized = true
 			break
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range pod.Spec.InitContainers {
+			if kubetypes.IsRestartableInitContainer(&c) && kl.isContainerRequestsChanged(pod, pod.Status.InitContainerStatuses, &c) {
+				podResized = true
+				break
+			}
+		}
+	}
+
 	if !podResized {
 		return pod
 	}
@@ -2924,6 +2908,26 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	kl.podManager.UpdatePod(updatedPod)
 	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
 	return updatedPod
+}
+
+func (kl *Kubelet) isContainerRequestsChanged(pod *v1.Pod, containerStatuses []v1.ContainerStatus, container *v1.Container) bool {
+	if len(container.Resources.Requests) == 0 {
+		return false
+	}
+
+	containerStatus, found := podutil.GetContainerStatus(containerStatuses, container.Name)
+	if !found {
+		klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
+		return false
+	}
+	if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
+		klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
+		return false
+	}
+	if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
+		return true
+	}
+	return false
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.

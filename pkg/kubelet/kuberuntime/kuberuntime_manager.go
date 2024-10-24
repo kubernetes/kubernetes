@@ -660,7 +660,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 			message:   fmt.Sprintf("Container %s resize requires restart", container.Name),
 		}
 		if isRestartableInitContainer {
-			changes.InitContainersToStart = append(changes.ContainersToStart, containerIdx)
+			changes.InitContainersToStart = append(changes.InitContainersToStart, containerIdx)
 		} else {
 			changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
 		}
@@ -735,7 +735,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 				return err
 			}
 		}
-
 		if newPodCgLimValue < currPodCgLimValue {
 			err = setPodCgroupConfig(rName, true)
 		}
@@ -1346,10 +1345,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	}
 
-	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
+	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] or podContainerChanges.InitContainersToUpdate[CPU,Memory] lists, invoke UpdateContainerResources
 	if isInPlacePodVerticalScalingAllowed(pod) {
 		updateInitContainers := utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && len(podContainerChanges.InitContainersToUpdate) > 0
-		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || updateInitContainers {
+		if len(podContainerChanges.ContainersToUpdate) > 0 || updateInitContainers || podContainerChanges.UpdatePodResources {
 			m.doPodResizeAction(pod, podStatus, podContainerChanges, result)
 		}
 	}
