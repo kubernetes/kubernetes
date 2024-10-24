@@ -1067,17 +1067,6 @@
     codes.
   release: v1.32
   file: test/e2e/apps/job.go
-- testname: Ensure pod failure policy allows to ignore failure matching on the exit
-    code
-  codename: '[sig-apps] Job should allow to use a pod failure policy to ignore failure
-    matching on exit code [Conformance]'
-  description: This test is using an indexed job. The pod corresponding to each index
-    creates a marker file on the host and runs 'forever' until evicted. Once the marker
-    file is created the pod succeeds seeing it on restart. Thus, we trigger one failure
-    per index due to eviction, so the Job would be marked as failed, if not for the
-    ignore rule matching on exit codes.
-  release: v1.32
-  file: test/e2e/apps/job.go
 - testname: Verify Pod Failure policy allows to fail job early on exit code.
   codename: '[sig-apps] Job should allow to use the pod failure policy on exit code
     to fail the job early [Conformance]'
