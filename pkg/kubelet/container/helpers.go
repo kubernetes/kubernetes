@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
@@ -301,7 +302,7 @@ func SandboxToContainerState(state runtimeapi.PodSandboxState) State {
 // GetContainerSpec gets the container spec by containerName.
 func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 	var containerSpec *v1.Container
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resource.AllFeatureEnabledContainers(), func(c *v1.Container, containerType resource.ContainerType) bool {
 		if containerName == c.Name {
 			containerSpec = c
 			return false
@@ -314,7 +315,7 @@ func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
 // HasPrivilegedContainer returns true if any of the containers in the pod are privileged.
 func HasPrivilegedContainer(pod *v1.Pod) bool {
 	var hasPrivileged bool
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resource.AllFeatureEnabledContainers(), func(c *v1.Container, containerType resource.ContainerType) bool {
 		if c.SecurityContext != nil && c.SecurityContext.Privileged != nil && *c.SecurityContext.Privileged {
 			hasPrivileged = true
 			return false
@@ -327,7 +328,7 @@ func HasPrivilegedContainer(pod *v1.Pod) bool {
 // HasWindowsHostProcessContainer returns true if any of the containers in a pod are HostProcess containers.
 func HasWindowsHostProcessContainer(pod *v1.Pod) bool {
 	var hasHostProcess bool
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resource.AllFeatureEnabledContainers(), func(c *v1.Container, containerType resource.ContainerType) bool {
 		if sc.HasWindowsHostProcessRequest(pod, c) {
 			hasHostProcess = true
 			return false
@@ -341,7 +342,7 @@ func HasWindowsHostProcessContainer(pod *v1.Pod) bool {
 // AllContainersAreWindowsHostProcess returns true if all containers in a pod are HostProcess containers.
 func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
 	allHostProcess := true
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resource.AllFeatureEnabledContainers(), func(c *v1.Container, containerType resource.ContainerType) bool {
 		if !sc.HasWindowsHostProcessRequest(pod, c) {
 			allHostProcess = false
 			return false

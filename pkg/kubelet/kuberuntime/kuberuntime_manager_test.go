@@ -42,6 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -117,7 +118,7 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 			state:     runtimeapi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resourcehelper.AllFeatureEnabledContainers(), func(c *v1.Container, containerType resourcehelper.ContainerType) bool {
 		containers = append(containers, makeFakeContainer(t, m, newTemplate(c)))
 		return true
 	})

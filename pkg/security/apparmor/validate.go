@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/libcontainer/apparmor"
 )
@@ -58,7 +59,7 @@ func (v *validator) Validate(pod *v1.Pod) error {
 	}
 
 	var retErr error
-	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, resource.AllContainers, func(container *v1.Container, containerType resource.ContainerType) bool {
 		profile := GetProfile(pod, container)
 		if profile == nil {
 			return true
