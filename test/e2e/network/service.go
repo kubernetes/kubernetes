@@ -1682,10 +1682,35 @@ var _ = common.SIGDescribe("Services", func() {
 
 		service := t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-
+		errAllocated := errors.New("provided port is already allocated")
+		noNodePortAvailable := errors.New("no available nodeport found")
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
-		service, err := t.CreateService(service)
+		err := retry.OnError(retry.DefaultRetry, func(e error) bool {
+			if e == nil {
+				return false
+			}
+			if strings.Contains(e.Error(), errAllocated.Error()) ||
+				strings.Contains(e.Error(), noNodePortAvailable.Error()) {
+				return true
+			}
+			return false
+		}, func() error {
+			v, ok := e2eservice.GetUnusedStaticNodePort()
+			if !ok {
+				return noNodePortAvailable
+			}
+			service.Spec.Ports[0].NodePort = int32(v)
+			var err error
+			service, err = t.CreateService(service)
+			return err
+		})
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		nodePort := service.Spec.Ports[0].NodePort
+		ok := e2eservice.ReserveStaticNodePort(int(nodePort))
+		if !ok {
+			framework.Logf("Static node port allocator was not able to reserve nodeport: %d", nodePort)
+		}
+		defer e2eservice.ReleaseStaticNodePort(int(nodePort))
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -1700,7 +1725,6 @@ var _ = common.SIGDescribe("Services", func() {
 		if !e2eservice.NodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
-		nodePort := port.NodePort
 
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
@@ -1724,7 +1748,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = nodePort
+		service.Spec.Ports[0].NodePort = int32(nodePort)
 		_, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
@@ -3931,10 +3955,37 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("creating the service")
-		svc, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+		var svc *v1.Service
+		errAllocated := errors.New("provided port is already allocated")
+		noNodePortAvailable := errors.New("no available nodeport found")
+		err = retry.OnError(retry.DefaultRetry, func(err error) bool {
+			if err == nil {
+				return false
+			}
+			if strings.Contains(err.Error(), errAllocated.Error()) ||
+				strings.Contains(err.Error(), noNodePortAvailable.Error()) {
+				return true
+			}
+			return false
+		}, func() error {
+			staticHealthCheckPort, ok := e2eservice.GetUnusedStaticNodePort()
+			if !ok {
+				return noNodePortAvailable
+			}
+			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				svc.Spec.HealthCheckNodePort = int32(staticHealthCheckPort)
+			})
+			return err
 		})
-		framework.ExpectNoError(err, "creating the service")
+
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", svc.Name, namespace)
+		gomega.Expect(svc).NotTo(gomega.BeNil(), "creating the service")
+		ok := e2eservice.ReserveStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+		if !ok {
+			framework.Logf("Static node port allocator was not able to reserve healthcheckNodePort: %d", svc.Spec.HealthCheckNodePort)
+		}
+		defer e2eservice.ReleaseStaticNodePort(int(svc.Spec.HealthCheckNodePort))
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
 		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)
@@ -4043,7 +4094,6 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
 
-		// FIXME: this is racy; we need to use a reserved HCNP here.
 		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the endpoint node when ExternalTrafficPolicy is Cluster")
 		checkOneHealthCheck(endpointNodeIP, false, "", deadline)
 		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the execpod node when ExternalTrafficPolicy is Cluster")
@@ -4059,12 +4109,23 @@ var _ = common.SIGDescribe("Services", func() {
 		checkOneNodePort(thirdNodeIP, true, v1.ServiceExternalTrafficPolicyCluster, deadline)
 
 		ginkgo.By("changing ExternalTrafficPolicy back to Local")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
-			// FIXME: we need to use a reserved HCNP here.
-			svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
+
+		// retry a few times in case some other service has taken up the static HCNP
+		// despite being reserved and might release soon
+		err = retry.OnError(retry.DefaultRetry, func(err error) bool {
+			if err != nil && strings.Contains(err.Error(), errAllocated.Error()) {
+				return true
+			}
+			return false
+		}, func() error {
+			_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				// Request the same healthCheckNodePort as before, to test the user-requested allocation path
+				svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
+			})
+			return err
 		})
+
 		framework.ExpectNoError(err, "updating ExternalTrafficPolicy and HealthCheckNodePort")
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
 
