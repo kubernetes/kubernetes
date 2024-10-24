@@ -691,6 +691,12 @@ const (
 	// Allows kube-proxy to run in Overlay mode for Windows
 	WinOverlay featuregate.Feature = "WinOverlay"
 
+	// owner: @jsturtevant
+	// kep: https://kep.k8s.io/4888
+	//
+	// Enables the Windows GMSA feature.
+	WindowsCPUAndMemoryAffinity featuregate.Feature = "WindowsCPUAndMemoryAffinity"
+
 	// owner: @marosset
 	// kep: https://kep.k8s.io/3503
 	//

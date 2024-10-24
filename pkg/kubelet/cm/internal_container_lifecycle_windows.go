@@ -21,9 +21,31 @@ package cm
 
 import (
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, container *v1.Container, containerConfig *runtimeapi.ContainerConfig) error {
+	if i.cpuManager != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		klog.Info("PreCreateContainer for Windows")
+		allocatedCPUs := i.cpuManager.GetCPUAffinity(string(pod.UID), container.Name)
+		if !allocatedCPUs.IsEmpty() {
+			klog.Infof("Setting CPU affinity for container %q cpus %v", container.Name, allocatedCPUs.String())
+			var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
+			affinities := winstats.CpusToGroupAffinity(allocatedCPUs.List())
+			for _, affinity := range affinities {
+				klog.Infof("Setting CPU affinity for container %q in group %v with mask %v (processors %v)", container.Name, affinity.Group, affinity.Mask, affinity.Processors())
+				cpuGroupAffinities = append(cpuGroupAffinities, &runtimeapi.WindowsCpuGroupAffinity{
+					CpuGroup: uint32(affinity.Group),
+					CpuMask:  uint64(affinity.Mask),
+				})
+			}
+
+			containerConfig.Windows.Resources.AffinityCpus = cpuGroupAffinities
+		}
+	}
 	return nil
 }
