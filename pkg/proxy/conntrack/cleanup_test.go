@@ -20,61 +20,74 @@ limitations under the License.
 package conntrack
 
 import (
-	"net"
-	"reflect"
+	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 const (
+	testServiceName      = "cleanup-test"
+	testServiceNamespace = "test"
+
 	testIPFamily       = v1.IPv4Protocol
 	testClusterIP      = "172.30.1.1"
 	testExternalIP     = "192.168.99.100"
 	testLoadBalancerIP = "1.2.3.4"
 
-	testEndpointIP = "10.240.0.4"
+	testServingEndpointIP    = "10.240.0.4"
+	testNonServingEndpointIP = "10.240.1.5"
+	testDeletedEndpointIP    = "10.240.2.6"
 
-	testPort         = 53
-	testNodePort     = 5353
-	testEndpointPort = "5300"
+	testPort     = 8000
+	testNodePort = 32000
 )
 
 func TestCleanStaleEntries(t *testing.T) {
-	// We need to construct a proxy.ServicePortMap to pass to CleanStaleEntries.
-	// ServicePortMap is just map[string]proxy.ServicePort, but there are no public
-	// constructors for any implementation of proxy.ServicePort, so we have to either
-	// provide our own implementation of that interface, or else use a
-	// proxy.ServiceChangeTracker to construct them and fill in the map for us.
+	// We need to construct proxy.ServicePortMap and proxy.EndpointsMap to pass to
+	// CleanStaleEntries. ServicePortMap and EndpointsMap are just maps, but there are
+	// no public constructors for any implementation of proxy.ServicePort and
+	// proxy.EndpointsMap, so we have to either provide our own implementation of that
+	// interface, or else use a proxy.ServiceChangeTracker and proxy.NewEndpointsChangeTracker
+	// to construct them and fill in the maps for us.
 
 	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cleanup-test",
-			Namespace: "test",
+			Name:      testServiceName,
+			Namespace: testServiceNamespace,
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP:   testClusterIP,
 			ExternalIPs: []string{testExternalIP},
 			Ports: []v1.ServicePort{
 				{
-					Name:     "dns-tcp",
+					Name:     "test-tcp",
 					Port:     testPort,
 					Protocol: v1.ProtocolTCP,
 				},
 				{
-					Name:     "dns-udp",
+					Name:     "test-udp",
 					Port:     testPort,
 					NodePort: testNodePort,
 					Protocol: v1.ProtocolUDP,
+				},
+				{
+					Name:     "test-sctp",
+					Port:     testPort,
+					NodePort: testNodePort,
+					Protocol: v1.ProtocolSCTP,
 				},
 			},
 		},
@@ -86,14 +99,52 @@ func TestCleanStaleEntries(t *testing.T) {
 			},
 		},
 	}
-	sct.Update(nil, svc)
 
+	sct.Update(nil, svc)
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	// (At this point we are done with sct, and in particular, we don't use sct to
-	// construct UpdateServiceMapResults, because pkg/proxy already has its own tests
-	// for that. Also, svcPortMap is read-only from this point on.)
+	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	eps := &discovery.EndpointSlice{
+		TypeMeta:    metav1.TypeMeta{},
+		AddressType: discovery.AddressTypeIPv4,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-0", testServiceName),
+			Namespace: testServiceNamespace,
+			Labels:    map[string]string{discovery.LabelServiceName: testServiceName},
+		},
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses:  []string{testServingEndpointIP},
+				Conditions: discovery.EndpointConditions{Serving: ptr.To(true)},
+			},
+			{
+				Addresses:  []string{testNonServingEndpointIP},
+				Conditions: discovery.EndpointConditions{Serving: ptr.To(false)},
+			},
+		},
+		Ports: []discovery.EndpointPort{
+			{
+				Name:     ptr.To("test-tcp"),
+				Port:     ptr.To(int32(testPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			},
+			{
+				Name:     ptr.To("test-udp"),
+				Port:     ptr.To(int32(testPort)),
+				Protocol: ptr.To(v1.ProtocolUDP),
+			},
+			{
+				Name:     ptr.To("test-sctp"),
+				Port:     ptr.To(int32(testPort)),
+				Protocol: ptr.To(v1.ProtocolSCTP),
+			},
+		},
+	}
+
+	ect.EndpointSliceUpdate(eps, false)
+	endpointsMap := make(proxy.EndpointsMap)
+	_ = endpointsMap.Update(ect)
 
 	tcpPortName := proxy.ServicePortName{
 		NamespacedName: types.NamespacedName{
@@ -113,227 +164,134 @@ func TestCleanStaleEntries(t *testing.T) {
 		Protocol: svc.Spec.Ports[1].Protocol,
 	}
 
-	unknownPortName := udpPortName
-	unknownPortName.Namespace = "unknown"
+	sctpPortName := proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		},
+		Port:     svc.Spec.Ports[2].Name,
+		Protocol: svc.Spec.Ports[2].Protocol,
+	}
 
-	// Sanity-check to make sure we constructed the map correctly
-	if len(svcPortMap) != 2 {
+	// Sanity-check to make sure we constructed the ServicePortMap correctly
+	if len(svcPortMap) != 3 {
 		t.Fatalf("expected svcPortMap to have 2 entries, got %+v", svcPortMap)
 	}
 	servicePort := svcPortMap[tcpPortName]
-	if servicePort == nil || servicePort.String() != "172.30.1.1:53/TCP" {
-		t.Fatalf("expected svcPortMap[%q] to be \"172.30.1.1:53/TCP\", got %q", tcpPortName.String(), servicePort.String())
+	if servicePort == nil || servicePort.String() != "172.30.1.1:8000/TCP" {
+		t.Fatalf("expected svcPortMap[%q] to be \"172.30.1.1:8000/TCP\", got %q", tcpPortName.String(), servicePort.String())
 	}
 	servicePort = svcPortMap[udpPortName]
-	if servicePort == nil || servicePort.String() != "172.30.1.1:53/UDP" {
-		t.Fatalf("expected svcPortMap[%q] to be \"172.30.1.1:53/UDP\", got %q", udpPortName.String(), servicePort.String())
+	if servicePort == nil || servicePort.String() != "172.30.1.1:8000/UDP" {
+		t.Fatalf("expected svcPortMap[%q] to be \"172.30.1.1:8000/UDP\", got %q", udpPortName.String(), servicePort.String())
+	}
+	servicePort = svcPortMap[sctpPortName]
+	if servicePort == nil || servicePort.String() != "172.30.1.1:8000/SCTP" {
+		t.Fatalf("expected svcPortMap[%q] to be \"172.30.1.1:8000/SCTP\", got %q", sctpPortName.String(), servicePort.String())
 	}
 
-	testCases := []struct {
-		description string
-
-		serviceUpdates   proxy.UpdateServiceMapResult
-		endpointsUpdates proxy.UpdateEndpointsMapResult
-
-		result FakeInterface
-	}{
-		{
-			description: "DeletedUDPClusterIPs clears entries for given clusterIPs (only)",
-
-			serviceUpdates: proxy.UpdateServiceMapResult{
-				// Note: this isn't testClusterIP; it's the IP of some
-				// unknown (because deleted) service.
-				DeletedUDPClusterIPs: sets.New("172.30.99.99"),
-			},
-			endpointsUpdates: proxy.UpdateEndpointsMapResult{},
-
-			result: FakeInterface{
-				ClearedIPs: sets.New("172.30.99.99"),
-
-				ClearedPorts:    sets.New[int](),
-				ClearedNATs:     map[string]string{},
-				ClearedPortNATs: map[int]string{},
-			},
-		},
-		{
-			description: "DeletedUDPEndpoints clears NAT entries for all IPs and NodePorts",
-
-			serviceUpdates: proxy.UpdateServiceMapResult{
-				DeletedUDPClusterIPs: sets.New[string](),
-			},
-			endpointsUpdates: proxy.UpdateEndpointsMapResult{
-				DeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-					Endpoint:        net.JoinHostPort(testEndpointIP, testEndpointPort),
-					ServicePortName: udpPortName,
-				}},
-			},
-
-			result: FakeInterface{
-				ClearedIPs:   sets.New[string](),
-				ClearedPorts: sets.New[int](),
-
-				ClearedNATs: map[string]string{
-					testClusterIP:      testEndpointIP,
-					testExternalIP:     testEndpointIP,
-					testLoadBalancerIP: testEndpointIP,
-				},
-				ClearedPortNATs: map[int]string{
-					testNodePort: testEndpointIP,
-				},
-			},
-		},
-		{
-			description: "NewlyActiveUDPServices clears entries for all IPs and NodePorts",
-
-			serviceUpdates: proxy.UpdateServiceMapResult{
-				DeletedUDPClusterIPs: sets.New[string](),
-			},
-			endpointsUpdates: proxy.UpdateEndpointsMapResult{
-				DeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-				NewlyActiveUDPServices: []proxy.ServicePortName{
-					udpPortName,
-				},
-			},
-
-			result: FakeInterface{
-				ClearedIPs:   sets.New(testClusterIP, testExternalIP, testLoadBalancerIP),
-				ClearedPorts: sets.New(testNodePort),
-
-				ClearedNATs:     map[string]string{},
-				ClearedPortNATs: map[int]string{},
-			},
-		},
-
-		{
-			description: "DeletedUDPEndpoints for unknown Service has no effect",
-
-			serviceUpdates: proxy.UpdateServiceMapResult{
-				DeletedUDPClusterIPs: sets.New[string](),
-			},
-			endpointsUpdates: proxy.UpdateEndpointsMapResult{
-				DeletedUDPEndpoints: []proxy.ServiceEndpoint{{
-					Endpoint:        "10.240.0.4:80",
-					ServicePortName: unknownPortName,
-				}},
-				NewlyActiveUDPServices: []proxy.ServicePortName{},
-			},
-
-			result: FakeInterface{
-				ClearedIPs:      sets.New[string](),
-				ClearedPorts:    sets.New[int](),
-				ClearedNATs:     map[string]string{},
-				ClearedPortNATs: map[int]string{},
-			},
-		},
-		{
-			description: "NewlyActiveUDPServices for unknown Service has no effect",
-
-			serviceUpdates: proxy.UpdateServiceMapResult{
-				DeletedUDPClusterIPs: sets.New[string](),
-			},
-			endpointsUpdates: proxy.UpdateEndpointsMapResult{
-				DeletedUDPEndpoints: []proxy.ServiceEndpoint{},
-				NewlyActiveUDPServices: []proxy.ServicePortName{
-					unknownPortName,
-				},
-			},
-
-			result: FakeInterface{
-				ClearedIPs:      sets.New[string](),
-				ClearedPorts:    sets.New[int](),
-				ClearedNATs:     map[string]string{},
-				ClearedPortNATs: map[int]string{},
-			},
-		},
+	// Sanity-check to make sure we constructed the EndpointsMap map correctly
+	if len(endpointsMap) != 3 {
+		t.Fatalf("expected endpointsMap to have 3 entries, got %+v", endpointsMap)
+	}
+	for _, svcPortName := range []proxy.ServicePortName{tcpPortName, udpPortName, sctpPortName} {
+		if len(endpointsMap[svcPortName]) != 2 {
+			t.Fatalf("expected endpointsMap[%q] to have 2 entries, got %+v", svcPortName.String(), endpointsMap[svcPortName])
+		}
+		if endpointsMap[svcPortName][0].IP() != "10.240.0.4" {
+			t.Fatalf("expected endpointsMap[%q][0] IP to be \"10.240.0.4\", got \"%s\"", svcPortName.String(), endpointsMap[svcPortName][0].IP())
+		}
+		if endpointsMap[svcPortName][1].IP() != "10.240.1.5" {
+			t.Fatalf("expected endpointsMap[%q][1] IP to be \"10.240.1.5\", got \"%s\"", svcPortName.String(), endpointsMap[svcPortName][1].IP())
+		}
+		if !endpointsMap[svcPortName][0].IsServing() {
+			t.Fatalf("expected endpointsMap[%q][0] to be serving", svcPortName.String())
+		}
+		if endpointsMap[svcPortName][1].IsServing() {
+			t.Fatalf("expected endpointsMap[%q][1] to be not serving", svcPortName.String())
+		}
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			fake := NewFake()
-			CleanStaleEntries(fake, testIPFamily, svcPortMap, tc.serviceUpdates, tc.endpointsUpdates)
-			if !fake.ClearedIPs.Equal(tc.result.ClearedIPs) {
-				t.Errorf("Expected ClearedIPs=%v, got %v", tc.result.ClearedIPs, fake.ClearedIPs)
+	// mock existing entries before cleanup
+	// we create 36 fake flow entries ( 3 Endpoints * 3 Protocols * ( 3 (ServiceIPs) + 1 (NodePort))
+	var mockEntries []*netlink.ConntrackFlow
+	// expectedEntries are the entries on which we will assert the cleanup logic
+	var expectedEntries []*netlink.ConntrackFlow
+	for _, dnatDest := range []string{testServingEndpointIP, testNonServingEndpointIP, testDeletedEndpointIP} {
+		for _, proto := range []uint8{unix.IPPROTO_TCP, unix.IPPROTO_UDP, unix.IPPROTO_SCTP} {
+			for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+				entry := &netlink.ConntrackFlow{
+					FamilyType: unix.AF_INET,
+					Forward: netlink.IPTuple{
+						DstIP:    netutils.ParseIPSloppy(origDest),
+						Protocol: proto,
+					},
+					Reverse: netlink.IPTuple{
+						Protocol: proto,
+						SrcIP:    netutils.ParseIPSloppy(dnatDest),
+					},
+				}
+				mockEntries = append(mockEntries, entry)
+				// we do not expect deleted or non-serving UDP endpoints flows to be present after cleanup
+				if !(proto == unix.IPPROTO_UDP && (dnatDest == testNonServingEndpointIP || dnatDest == testDeletedEndpointIP)) {
+					expectedEntries = append(expectedEntries, entry)
+				}
 			}
-			if !fake.ClearedPorts.Equal(tc.result.ClearedPorts) {
-				t.Errorf("Expected ClearedPorts=%v, got %v", tc.result.ClearedPorts, fake.ClearedPorts)
+			entry := &netlink.ConntrackFlow{
+				FamilyType: unix.AF_INET,
+				Forward: netlink.IPTuple{
+					DstPort:  testNodePort,
+					Protocol: proto,
+				},
+				Reverse: netlink.IPTuple{
+					Protocol: proto,
+					SrcIP:    netutils.ParseIPSloppy(dnatDest),
+				},
 			}
-			if !reflect.DeepEqual(fake.ClearedNATs, tc.result.ClearedNATs) {
-				t.Errorf("Expected ClearedNATs=%v, got %v", tc.result.ClearedNATs, fake.ClearedNATs)
+			mockEntries = append(mockEntries, entry)
+			// we do not expect deleted or non-serving UDP endpoints entries to be present after cleanup
+			if !(proto == unix.IPPROTO_UDP && (dnatDest == testNonServingEndpointIP || dnatDest == testDeletedEndpointIP)) {
+				expectedEntries = append(expectedEntries, entry)
 			}
-			if !reflect.DeepEqual(fake.ClearedPortNATs, tc.result.ClearedPortNATs) {
-				t.Errorf("Expected ClearedPortNATs=%v, got %v", tc.result.ClearedPortNATs, fake.ClearedPortNATs)
-			}
-		})
-	}
-}
-
-func TestFilterForIP(t *testing.T) {
-	testCases := []struct {
-		name           string
-		ip             string
-		protocol       v1.Protocol
-		expectedFamily netlink.InetFamily
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:     "ipv4 + UDP",
-			ip:       "10.96.0.10",
-			protocol: v1.ProtocolUDP,
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
-			},
-		},
-		{
-			name:     "ipv6 + TCP",
-			ip:       "2001:db8:1::2",
-			protocol: v1.ProtocolTCP,
-			expectedFilter: &conntrackFilter{
-				protocol: 6,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
-			},
-		},
+		}
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForIP(tc.ip, tc.protocol))
-		})
-	}
-}
-
-func TestFilterForPort(t *testing.T) {
-	testCases := []struct {
-		name           string
-		port           int
-		protocol       v1.Protocol
-		expectedFilter *conntrackFilter
-	}{
-		{
-			name:     "UDP",
-			port:     5000,
-			protocol: v1.ProtocolUDP,
-
-			expectedFilter: &conntrackFilter{
-				protocol: 17,
-				original: &connectionTuple{dstPort: 5000},
+	// add some non-DNATed mock entries which should be cleared up by reconciler
+	// These will exist if the proxy don't have DROP/REJECT rule for service with
+	// no endpoints, --orig-dst and --reply-src will be same for these entries.
+	for _, ip := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		entry := &netlink.ConntrackFlow{
+			FamilyType: unix.AF_INET,
+			Forward: netlink.IPTuple{
+				DstIP:    netutils.ParseIPSloppy(ip),
+				Protocol: unix.IPPROTO_UDP,
 			},
-		},
-		{
-			name:     "SCTP",
-			port:     3000,
-			protocol: v1.ProtocolSCTP,
-			expectedFilter: &conntrackFilter{
-				protocol: 132,
-				original: &connectionTuple{dstPort: 3000},
+			Reverse: netlink.IPTuple{
+				Protocol: unix.IPPROTO_UDP,
+				SrcIP:    netutils.ParseIPSloppy(ip),
 			},
-		},
+		}
+		mockEntries = append(mockEntries, entry)
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForPort(tc.port, tc.protocol))
-		})
+	fake := NewFake()
+	fake.entries = mockEntries
+	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
+
+	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+	require.Equal(t, len(expectedEntries), len(actualEntries))
+
+	// sort the actual flows before comparison
+	sort.Slice(actualEntries, func(i, j int) bool {
+		return actualEntries[i].String() < actualEntries[j].String()
+	})
+	// sort the expected flows before comparison
+	sort.Slice(expectedEntries, func(i, j int) bool {
+		return expectedEntries[i].String() < expectedEntries[j].String()
+	})
+
+	for i := 0; i < len(expectedEntries); i++ {
+		require.Equal(t, expectedEntries[i], actualEntries[i])
 	}
 }
 

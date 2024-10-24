@@ -20,77 +20,42 @@ limitations under the License.
 package conntrack
 
 import (
-	"fmt"
-
 	"github.com/vishvananda/netlink"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // FakeInterface implements Interface by just recording entries that have been cleared.
 type FakeInterface struct {
-	ClearedIPs      sets.Set[string]
-	ClearedPorts    sets.Set[int]
-	ClearedNATs     map[string]string // origin -> dest
-	ClearedPortNATs map[int]string    // port -> dest
+	entries []*netlink.ConntrackFlow
 }
 
 var _ Interface = &FakeInterface{}
 
 // NewFake creates a new FakeInterface
 func NewFake() *FakeInterface {
-	fake := &FakeInterface{}
-	fake.Reset()
-	return fake
+	return &FakeInterface{entries: make([]*netlink.ConntrackFlow, 0)}
 }
 
-// Reset clears fake's sets/maps
-func (fake *FakeInterface) Reset() {
-	fake.ClearedIPs = sets.New[string]()
-	fake.ClearedPorts = sets.New[int]()
-	fake.ClearedNATs = make(map[string]string)
-	fake.ClearedPortNATs = make(map[int]string)
+// ListEntries is part of Interface
+func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
+	return fake.entries, nil
 }
 
 // ClearEntries is part of Interface
-func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) error {
-	for _, anyFilter := range filters {
-		filter := anyFilter.(*conntrackFilter)
-		if filter.protocol != protocolMap[v1.ProtocolUDP] {
-			return fmt.Errorf("FakeInterface currently only supports UDP")
-		}
-
-		// record IP and Port entries
-		if filter.original != nil && filter.reply == nil {
-			if filter.original.dstIP != nil {
-				fake.ClearedIPs.Insert(filter.original.dstIP.String())
-			}
-			if filter.original.dstPort != 0 {
-				fake.ClearedPorts.Insert(int(filter.original.dstPort))
+func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
+	var flows []*netlink.ConntrackFlow
+	before := len(fake.entries)
+	for _, flow := range fake.entries {
+		var matched bool
+		for _, filter := range filters {
+			matched = filter.MatchConntrackFlow(flow)
+			if matched {
+				break
 			}
 		}
-
-		// record NAT and NATPort entries
-		if filter.original != nil && filter.reply != nil {
-			if filter.original.dstIP != nil && filter.reply.srcIP != nil {
-				origin := filter.original.dstIP.String()
-				dest := filter.reply.srcIP.String()
-				if previous, exists := fake.ClearedNATs[origin]; exists && previous != dest {
-					return fmt.Errorf("filter for NAT passed with same origin (%s), different destination (%s / %s)", origin, previous, dest)
-				}
-				fake.ClearedNATs[filter.original.dstIP.String()] = filter.reply.srcIP.String()
-			}
-
-			if filter.original.dstPort != 0 && filter.reply.srcIP != nil {
-				dest := filter.reply.srcIP.String()
-				port := int(filter.original.dstPort)
-				if previous, exists := fake.ClearedPortNATs[port]; exists && previous != dest {
-					return fmt.Errorf("filter for PortNAT passed with same port (%d), different destination (%s / %s)", port, previous, dest)
-				}
-				fake.ClearedPortNATs[port] = dest
-			}
+		if !matched {
+			flows = append(flows, flow)
 		}
 	}
-	return nil
+	fake.entries = flows
+	return before - len(fake.entries), nil
 }
