@@ -32,6 +32,7 @@ import (
 const (
 	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
+	DRASubsystem                       = "dra"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
 	NodeStartupPreKubeletKey           = "node_startup_pre_kubelet_duration_seconds"
@@ -131,6 +132,10 @@ const (
 	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
 	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
+
+	// Metric keys for DRA operations
+	DRAOperationsDurationKey     = "dra_operations_duration_seconds"
+	DRAGRPCOperationsDurationKey = "dra_grpc_operations_duration_seconds"
 
 	// Values used in metric labels
 	Container          = "container"
@@ -938,6 +943,30 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.
+	DRAOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA operations (PrepareResources and UnprepareResources).",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_name", "is_error"},
+	)
+
+	// DRAGRPCOperationsDuration tracks the duration of the DRA GRPC operations.
+	DRAGRPCOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      DRASubsystem,
+			Name:           DRAGRPCOperationsDurationKey,
+			Help:           "Duration in seconds of the DRA GRPC operations",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name", "method_name", "grpc_status_code"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1030,6 +1059,11 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			legacyregistry.MustRegister(DRAOperationsDuration)
+			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
+		}
 	})
 }
 

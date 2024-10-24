@@ -27,10 +27,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
@@ -51,6 +53,7 @@ func NewDRAPluginClient(pluginName string) (*Plugin, error) {
 }
 
 type Plugin struct {
+	name          string
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
@@ -85,6 +88,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
 	)
 	if err != nil {
 		return nil, err
@@ -143,4 +147,13 @@ func (p *Plugin) NodeUnprepareResources(
 	response, err := nodeClient.NodeUnprepareResources(ctx, req)
 	logger.V(4).Info("Done calling NodeUnprepareResources rpc", "response", response, "err", err)
 	return response, err
+}
+
+func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, conn *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		start := time.Now()
+		err := invoker(ctx, method, req, reply, conn, opts...)
+		metrics.DRAGRPCOperationsDuration.WithLabelValues(pluginName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
+		return err
+	}
 }
