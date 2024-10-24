@@ -250,6 +250,9 @@ func (o *objectCountEvaluator) Constraints(required []corev1.ResourceName, item 
 
 // Handles returns true if the object count evaluator needs to track this attributes.
 func (o *objectCountEvaluator) Handles(a admission.Attributes) bool {
+	if a.GetSubresource() != "" {
+		return false
+	}
 	operation := a.GetOperation()
 	return operation == admission.Create
 }
