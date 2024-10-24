@@ -163,7 +163,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := corev1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/api"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
