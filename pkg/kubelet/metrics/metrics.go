@@ -142,6 +142,8 @@ const (
 
 	AlignedPhysicalCPU = "physical_cpu"
 	AlignedNUMANode    = "numa_node"
+	// Metrics to track container resizing
+	KubeletResizeRequestsTotalKey = "kubelet_resize_requests_total"
 )
 
 type imageSizeBucket struct {
@@ -938,6 +940,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// KubeletResizeRequestsTotal is a CounterVec that tracks the total number of resize requests observed by the Kubelet.
+	KubeletResizeRequestsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           KubeletResizeRequestsTotalKey,
+			Help:           "Total number of resize requests observed by the Kubelet.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"state"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1030,6 +1043,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
 		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 		legacyregistry.MustRegister(CgroupVersion)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			legacyregistry.MustRegister(KubeletResizeRequestsTotal)
+		}
 	})
 }
 
