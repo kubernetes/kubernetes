@@ -135,7 +135,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 
 		ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
 		_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-			resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{})
+			resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{}, "resize")
 		gomega.Expect(pErrExceedCPU).To(gomega.HaveOccurred(), "exceeded quota: %s, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
 			resourceQuota.Name)
 
