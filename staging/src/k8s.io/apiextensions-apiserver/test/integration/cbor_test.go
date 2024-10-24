@@ -17,9 +17,13 @@ limitations under the License.
 package integration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"path"
 	"testing"
+
+	"github.com/google/uuid"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -31,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -38,6 +43,138 @@ import (
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
+
+func TestCBORStorageEnablement(t *testing.T) {
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "bars.mygroup.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "mygroup.example.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+				Schema:  fixtures.AllowAllSchema(),
+			}},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   "bars",
+				Singular: "bar",
+				Kind:     "Bar",
+				ListKind: "BarList",
+			},
+			Scope: apiextensionsv1.ClusterScoped,
+		},
+	}
+
+	etcdPrefix := uuid.New().String()
+
+	func() {
+		t.Log("starting server with feature gate disabled")
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, false)
+		tearDown, apiExtensionsClientset, dynamicClient, etcdClient, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tearDown()
+
+		if _, err := fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionsClientset, dynamicClient); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "mygroup.example.com", Version: "v1beta1", Resource: "bars"}).Create(
+			context.TODO(),
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "mygroup.example.com/v1beta1",
+					"kind":       "Bar",
+					"metadata": map[string]interface{}{
+						"name": "test-storage-json",
+					},
+				}},
+			metav1.CreateOptions{},
+		); err != nil {
+			t.Fatal(err)
+		}
+
+		response, err := etcdClient.KV.Get(context.TODO(), path.Join("/", etcdPrefix, crd.Spec.Group, crd.Spec.Names.Plural, "test-storage-json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := len(response.Kvs); n != 1 {
+			t.Fatalf("expected 1 kv, got %d", n)
+		}
+		if err := json.Unmarshal(response.Kvs[0].Value, new(interface{})); err != nil {
+			t.Fatalf("failed to decode stored custom resource as json: %v", err)
+		}
+	}()
+
+	func() {
+		t.Log("starting server with feature gate enabled")
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, true)
+		tearDown, _, dynamicClient, etcdClient, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tearDown()
+
+		if _, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "mygroup.example.com", Version: "v1beta1", Resource: "bars"}).Create(
+			context.TODO(),
+			&unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "mygroup.example.com/v1beta1",
+					"kind":       "Bar",
+					"metadata": map[string]interface{}{
+						"name": "test-storage-cbor",
+					},
+				}},
+			metav1.CreateOptions{},
+		); err != nil {
+			t.Fatal(err)
+		}
+
+		response, err := etcdClient.KV.Get(context.TODO(), path.Join("/", etcdPrefix, crd.Spec.Group, crd.Spec.Names.Plural, "test-storage-cbor"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n := len(response.Kvs); n != 1 {
+			t.Fatalf("expected 1 kv, got %d", n)
+		}
+		if !bytes.HasPrefix(response.Kvs[0].Value, []byte{0xd9, 0xd9, 0xf7}) {
+			// Check for the encoding of the "self-described CBOR" tag which acts as a
+			// "magic number" for distinguishing CBOR from JSON. Valid CBOR data items
+			// do not require this prefix, but the Kubernetes CBOR serializer guarantees
+			// it.
+			t.Fatalf(`stored custom resource lacks required "self-described CBOR" tag (prefix 0x%x)`, response.Kvs[0].Value[:3])
+		}
+		if err := cbor.Unmarshal(response.Kvs[0].Value, new(interface{})); err != nil {
+			t.Fatalf("failed to decode stored custom resource as cbor: %v", err)
+		}
+
+		for _, name := range []string{"test-storage-json", "test-storage-cbor"} {
+			_, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "mygroup.example.com", Version: "v1beta1", Resource: "bars"}).Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("failed to get cr %q: %v", name, err)
+			}
+		}
+	}()
+
+	func() {
+		t.Log("starting server with feature gate disabled")
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, false)
+		tearDown, _, dynamicClient, _, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tearDown()
+
+		for _, name := range []string{"test-storage-json", "test-storage-cbor"} {
+			_, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "mygroup.example.com", Version: "v1beta1", Resource: "bars"}).Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("failed to get cr %q: %v", name, err)
+			}
+		}
+	}()
+
+}
 
 func TestCBORServingEnablement(t *testing.T) {
 	for _, tc := range []struct {
