@@ -24,8 +24,9 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// NodePortAddresses is used to handle the --nodeport-addresses flag
-type NodePortAddresses struct {
+// NodeAddressHandler is used to handle NodePortAddresses,
+// HealthzBindAddresses and MetricsBindAddresses.
+type NodeAddressHandler struct {
 	cidrStrings []string
 
 	cidrs                []*net.IPNet
@@ -36,64 +37,65 @@ type NodePortAddresses struct {
 // RFC 5735 127.0.0.0/8 - This block is assigned for use as the Internet host loopback address
 var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
 
-// NewNodePortAddresses takes an IP family and the `--nodeport-addresses` value (which is
+// NewNodeAddressHandler takes an IP family and the CIDR strings (
+// NodePortAddresses, HealthzBindAddresses or MetricsBindAddresses, which is
 // assumed to contain only valid CIDRs, potentially of both IP families) and returns a
-// NodePortAddresses object for the given family. If there are no CIDRs of the given
+// NodeAddressHandler object for the given family. If there are no CIDRs of the given
 // family then the CIDR "0.0.0.0/0" or "::/0" will be added (even if there are CIDRs of
 // the other family).
-func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAddresses {
-	npa := &NodePortAddresses{}
+func NewNodeAddressHandler(family v1.IPFamily, cidrStrings []string) *NodeAddressHandler {
+	nah := &NodeAddressHandler{}
 
 	// Filter CIDRs to correct family
 	for _, str := range cidrStrings {
 		if (family == v1.IPv4Protocol) == netutils.IsIPv4CIDRString(str) {
-			npa.cidrStrings = append(npa.cidrStrings, str)
+			nah.cidrStrings = append(nah.cidrStrings, str)
 		}
 	}
-	if len(npa.cidrStrings) == 0 {
+	if len(nah.cidrStrings) == 0 {
 		if family == v1.IPv4Protocol {
-			npa.cidrStrings = []string{IPv4ZeroCIDR}
+			nah.cidrStrings = []string{IPv4ZeroCIDR}
 		} else {
-			npa.cidrStrings = []string{IPv6ZeroCIDR}
+			nah.cidrStrings = []string{IPv6ZeroCIDR}
 		}
 	}
 
 	// Now parse
-	for _, str := range npa.cidrStrings {
+	for _, str := range nah.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
 
 		if netutils.IsIPv4CIDR(cidr) {
 			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
-				npa.containsIPv4Loopback = true
+				nah.containsIPv4Loopback = true
 			}
 		}
 
 		if IsZeroCIDR(str) {
 			// Ignore everything else
-			npa.cidrs = []*net.IPNet{cidr}
-			npa.matchAll = true
+			nah.cidrs = []*net.IPNet{cidr}
+			nah.matchAll = true
 			break
 		}
 
-		npa.cidrs = append(npa.cidrs, cidr)
+		nah.cidrs = append(nah.cidrs, cidr)
 	}
 
-	return npa
+	return nah
 }
 
-func (npa *NodePortAddresses) String() string {
-	return fmt.Sprintf("%v", npa.cidrStrings)
+func (nah *NodeAddressHandler) String() string {
+	return fmt.Sprintf("%v", nah.cidrStrings)
 }
 
-// MatchAll returns true if npa matches all node IPs (of npa's given family)
-func (npa *NodePortAddresses) MatchAll() bool {
-	return npa.matchAll
+// MatchAll returns true if nah matches all node IPs (of nah's given family)
+func (nah *NodeAddressHandler) MatchAll() bool {
+	return nah.matchAll
 }
 
-// GetNodeIPs return all matched node IP addresses for npa's CIDRs. If no matching
+// GetNodeIPs return all matched node IP addresses for nah's CIDRs. If no matching
 // IPs are found, it returns an empty list.
 // NetworkInterfacer is injected for test purpose.
-func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error) {
+func (nah *NodeAddressHandler) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error) {
 	addrs, err := nw.InterfaceAddrs()
 	if err != nil {
 		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
@@ -101,7 +103,7 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 
 	// Use a map to dedup matches
 	addresses := make(map[string]net.IP)
-	for _, cidr := range npa.cidrs {
+	for _, cidr := range nah.cidrs {
 		for _, addr := range addrs {
 			var ip net.IP
 			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
@@ -128,7 +130,7 @@ func (npa *NodePortAddresses) GetNodeIPs(nw NetworkInterfacer) ([]net.IP, error)
 	return ips, nil
 }
 
-// ContainsIPv4Loopback returns true if npa's CIDRs contain an IPv4 loopback address.
-func (npa *NodePortAddresses) ContainsIPv4Loopback() bool {
-	return npa.containsIPv4Loopback
+// ContainsIPv4Loopback returns true if nah's CIDRs contain an IPv4 loopback address.
+func (nah *NodeAddressHandler) ContainsIPv4Loopback() bool {
+	return nah.containsIPv4Loopback
 }
