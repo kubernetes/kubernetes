@@ -1179,6 +1179,71 @@ func VerifyDatesInOrder(
 	}
 }
 
+func TestDescribeResources(t *testing.T) {
+	testCases := []struct {
+		resources        *corev1.ResourceRequirements
+		expectedElements map[string]int
+	}{
+		{
+			resources:        &corev1.ResourceRequirements{},
+			expectedElements: map[string]int{},
+		},
+		{
+			resources: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1000"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1000"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedElements: map[string]int{"cpu": 2, "memory": 2, "Requests": 1, "Limits": 1, "1k": 2, "100Mi": 2},
+		},
+		{
+			resources: &corev1.ResourceRequirements{
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1000"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Limits": 1, "1k": 1, "100Mi": 1},
+		},
+		{
+			resources: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1000"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Requests": 1, "1k": 1, "100Mi": 1},
+		},
+	}
+
+	for i, testCase := range testCases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			out := new(bytes.Buffer)
+			writer := NewPrefixWriter(out)
+			describeResources(testCase.resources, writer, LEVEL_1)
+			output := out.String()
+			gotElements := make(map[string]int)
+			for key, val := range testCase.expectedElements {
+				count := strings.Count(output, key)
+				if count == 0 {
+					t.Errorf("expected to find %q in output: %q", val, output)
+					continue
+				}
+				gotElements[key] = count
+			}
+
+			if !reflect.DeepEqual(gotElements, testCase.expectedElements) {
+				t.Errorf("Expected %v, got %v in output string: %q", testCase.expectedElements, gotElements, output)
+			}
+		})
+	}
+}
+
 func TestDescribeContainers(t *testing.T) {
 	trueVal := true
 	testCases := []struct {
