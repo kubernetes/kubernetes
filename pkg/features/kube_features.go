@@ -48,6 +48,13 @@ const (
 	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
+	// owner: @thockin
+	// Deprecated: v1.29
+	//
+	// Enables Service.status.ingress.loadBanace to be set on
+	// services of types other than LoadBalancer.
+	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
+
 	// owner: @bswartz
 	//
 	// Enables usage of any object for volume data source in PVCs
