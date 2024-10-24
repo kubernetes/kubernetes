@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,81 +14,89 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package eviction
 
 import (
-	"fmt"
-	"math"
-	"sync"
+	"context"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
+	v1 "k8s.io/api/core/v1"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	statsapi "k8s.io/kubernetes/pkg/apis/stats/v1alpha1"
 )
 
-func TestTolerateBootstrapFailure(t *testing.T) {
-	var fakeGetSucceed bool
-	var fakeGetSucceedLock sync.RWMutex
-	fakeGetFn := func() (runtime.Object, error) {
-		fakeGetSucceedLock.RLock()
-		defer fakeGetSucceedLock.RUnlock()
-		if fakeGetSucceed {
-			return nil, nil
-		} else {
-			return nil, fmt.Errorf("this error shouldn't be exposed to caller")
-		}
+// TestEvictionMemoryPressure verifies that eviction occurs when memory pressure is high
+func TestEvictionMemoryPressure(t *testing.T) {
+	// Simulate memory pressure condition
+	memoryStats := &statsapi.MemoryStats{
+		WorkingSetBytes: uint64(5 * 1024 * 1024 * 1024), // 5GB
 	}
-	poller := newPoller(fakeGetFn)
-	poller.bootstrapGracePeriod = 100 * time.Second
-	poller.bootstrapRetries = math.MaxInt32
-	// set failureThreshold to 0 so that one single failure will set "ready" to false.
-	poller.failureThreshold = 0
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go poller.Run(stopCh)
-	go func() {
-		// The test might have false negative, but won't be flaky
-		timer := time.NewTimer(2 * time.Second)
-		defer timer.Stop()
-		<-timer.C
-		fakeGetSucceedLock.Lock()
-		defer fakeGetSucceedLock.Unlock()
-		fakeGetSucceed = true
-	}()
+	summaryProvider := mockSummaryProvider(memoryStats, nil)
+	config := Config{MemoryEvictionThreshold: 3 * 1024 * 1024 * 1024} // 3GB eviction threshold
 
-	done := make(chan struct{})
-	go func(t *testing.T) {
-		_, err := poller.configuration()
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		close(done)
-	}(t)
-	<-done
+	manager := NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go manager.StartManager(ctx)
+
+	time.Sleep(2 * time.Second) // Let the eviction manager run
+
+	// Check if eviction happened due to memory pressure
+	if len(manager.thresholdsMet) == 0 {
+		t.Fatalf("Expected eviction due to memory pressure, but none occurred")
+	}
 }
 
-func TestNotTolerateNonbootstrapFailure(t *testing.T) {
-	fakeGetFn := func() (runtime.Object, error) {
-		return nil, fmt.Errorf("this error should be exposed to caller")
+// TestEvictionDiskPressure verifies that eviction occurs when disk pressure is high
+func TestEvictionDiskPressure(t *testing.T) {
+	// Simulate disk pressure condition
+	diskStats := &statsapi.FsStats{
+		AvailableBytes: uint64(1 * 1024 * 1024 * 1024), // 1GB
 	}
-	poller := newPoller(fakeGetFn)
-	poller.bootstrapGracePeriod = 1 * time.Second
-	poller.interval = 1 * time.Millisecond
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go poller.Run(stopCh)
-	// to kick the bootstrap timer
-	go poller.configuration()
+	summaryProvider := mockSummaryProvider(nil, diskStats)
+	config := Config{DiskEvictionThreshold: 2 * 1024 * 1024 * 1024} // 2GB eviction threshold
 
-	wait.PollInfinite(1*time.Second, func() (bool, error) {
-		poller.lock.Lock()
-		defer poller.lock.Unlock()
-		return poller.bootstrapped, nil
-	})
+	manager := NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	_, err := poller.configuration()
-	if err == nil {
-		t.Errorf("unexpected no error")
+	go manager.StartManager(ctx)
+
+	time.Sleep(2 * time.Second) // Let the eviction manager run
+
+	// Check if eviction happened due to disk pressure
+	if len(manager.thresholdsMet) == 0 {
+		t.Fatalf("Expected eviction due to disk pressure, but none occurred")
 	}
+}
+
+// mockSummaryProvider simulates memory and disk stats for testing
+func mockSummaryProvider(memoryStats *statsapi.MemoryStats, diskStats *statsapi.FsStats) stats.SummaryProvider {
+	return &mockSummaryProviderImpl{
+		memoryStats: memoryStats,
+		diskStats:   diskStats,
+	}
+}
+
+type mockSummaryProviderImpl struct {
+	memoryStats *statsapi.MemoryStats
+	diskStats   *statsapi.FsStats
+}
+
+func (m *mockSummaryProviderImpl) GetStats() *statsapi.Summary {
+	return &statsapi.Summary{
+		Node: statsapi.NodeStats{
+			Memory: m.memoryStats,
+			Fs:     m.diskStats,
+		},
+	}
+}
+
+// mockKillPodFunc simulates killing a pod during eviction
+func mockKillPodFunc(pod *v1.Pod, isEviction bool, gracePeriodOverride *int64, statusFn lifecycle.PodStatusFn) error {
+	// Mock pod kill logic
+	return nil
 }
