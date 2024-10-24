@@ -751,3 +751,49 @@ func (n *noRetriesRESTClient) Post() *restclient.Request {
 	n.postCalls++
 	return n.Interface.Post().MaxRetries(0)
 }
+
+/* Additional modifications based on Issue #128288 */
+
+// TestMemoryPressureEviction verifies that evictions are triggered under memory pressure.
+func TestMemoryPressureEviction(t *testing.T) {
+    memoryPressureCondition := v1.MemoryStats{
+        WorkingSetBytes: uint64(5 * 1024 * 1024 * 1024), // 5GB memory pressure
+    }
+
+    summaryProvider := mockSummaryProvider(&memoryPressureCondition, nil)
+    config := eviction.Config{MemoryEvictionThreshold: 3 * 1024 * 1024 * 1024} // Set eviction threshold to 3GB
+
+    manager := eviction.NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    go manager.StartManager(ctx)
+
+    time.Sleep(2 * time.Second)
+
+    if len(manager.ThresholdsMet()) == 0 {
+        t.Fatalf("Expected eviction due to memory pressure, but none occurred")
+    }
+}
+
+// TestDiskPressureEviction verifies that evictions are triggered under disk pressure.
+func TestDiskPressureEviction(t *testing.T) {
+    diskPressureCondition := v1.FsStats{
+        AvailableBytes: uint64(1 * 1024 * 1024 * 1024), // 1GB disk space available
+    }
+
+    summaryProvider := mockSummaryProvider(nil, &diskPressureCondition)
+    config := eviction.Config{DiskEvictionThreshold: 2 * 1024 * 1024 * 1024} // Set eviction threshold to 2GB
+
+    manager := eviction.NewManager(summaryProvider, config, mockKillPodFunc, nil, nil, nil, nil, nil, false)
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    go manager.StartManager(ctx)
+
+    time.Sleep(2 * time.Second)
+
+    if len(manager.ThresholdsMet()) == 0 {
+        t.Fatalf("Expected eviction due to disk pressure, but none occurred")
+    }
+}
