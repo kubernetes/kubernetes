@@ -5182,8 +5182,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
-			lim := mungeCpuMemResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
-			req := mungeCpuMemResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
+			lim := mungeResizableResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
+			req := mungeResizableResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
 			container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 		}
 		newContainers = append(newContainers, container)
@@ -5195,8 +5195,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		container.Image = oldPod.Spec.InitContainers[ix].Image // +k8s:verify-mutation:reason=clone
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 			if podutil.IsRestartableInitContainer(&container) {
-				lim := mungeCpuMemResources(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
-				req := mungeCpuMemResources(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
+				lim := mungeResizableResources(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
+				req := mungeResizableResources(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
 				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 			}
 		}
@@ -5278,7 +5278,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
-func mungeCpuMemResources(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+func mungeResizableResources(resourceList, oldResourceList core.ResourceList) core.ResourceList {
 	if oldResourceList == nil {
 		return nil
 	}
