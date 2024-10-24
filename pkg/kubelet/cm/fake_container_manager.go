@@ -53,7 +53,7 @@ func NewFakeContainerManager() *FakeContainerManager {
 	}
 }
 
-func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "Start")
@@ -124,10 +124,10 @@ func (cm *FakeContainerManager) GetCapacity(localStorageCapacityIsolation bool) 
 	return c
 }
 
-func (cm *FakeContainerManager) GetPluginRegistrationHandler() cache.PluginHandler {
+func (cm *FakeContainerManager) GetPluginRegistrationHandlers() map[string]cache.PluginHandler {
 	cm.Lock()
 	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandler")
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandlers")
 	return nil
 }
 

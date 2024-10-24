@@ -57,12 +57,14 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
+type GetNodeFunc func() (*v1.Node, error)
+
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(context.Context, *v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -115,10 +117,10 @@ type ContainerManager interface {
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
 
-	// GetPluginRegistrationHandler returns a plugin registration handler
+	// GetPluginRegistrationHandlers returns a set of plugin registration handlers
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.
-	GetPluginRegistrationHandler() cache.PluginHandler
+	GetPluginRegistrationHandlers() map[string]cache.PluginHandler
 
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
