@@ -142,6 +142,43 @@ func (f *fakePodWorkers) IsPodForMirrorPodTerminatingByFullName(podFullname stri
 	return f.terminatingStaticPods[podFullname]
 }
 
+type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
+type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
+type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
+type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
+
+// testPodSyncerFuncs implements podSyncer and accepts functions for each method.
+type testPodSyncerFuncs struct {
+	syncPod                   syncPodFnType
+	syncTerminatingPod        syncTerminatingPodFnType
+	syncTerminatingRuntimePod syncTerminatingRuntimePodFnType
+	syncTerminatedPod         syncTerminatedPodFnType
+}
+
+func newTestPodSyncerFuncs(s podSyncer) testPodSyncerFuncs {
+	return testPodSyncerFuncs{
+		syncPod:                   s.SyncPod,
+		syncTerminatingPod:        s.SyncTerminatingPod,
+		syncTerminatingRuntimePod: s.SyncTerminatingRuntimePod,
+		syncTerminatedPod:         s.SyncTerminatedPod,
+	}
+}
+
+var _ podSyncer = testPodSyncerFuncs{}
+
+func (f testPodSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
+	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
+}
+func (f testPodSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
+}
+func (f testPodSyncerFuncs) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
+	return f.syncTerminatingRuntimePod(ctx, runningPod)
+}
+func (f testPodSyncerFuncs) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	return f.syncTerminatedPod(ctx, pod, podStatus)
+}
+
 type TestingInterface interface {
 	Errorf(format string, args ...interface{})
 }
@@ -397,7 +434,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 	fakeQueue := &fakeQueue{}
 	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
 	w := newPodWorkers(
-		&podSyncerFuncs{
+		&testPodSyncerFuncs{
 			syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 				func() {
 					lock.Lock()
@@ -1026,8 +1063,8 @@ func TestTerminalPhaseTransition(t *testing.T) {
 	podWorkers, _, _ := createPodWorkers()
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
-	terminalPhaseSyncer := newTerminalPhaseSync(podWorkers.podSyncer.(*podSyncerFuncs).syncPod)
-	podWorkers.podSyncer.(*podSyncerFuncs).syncPod = terminalPhaseSyncer.SyncPod
+	terminalPhaseSyncer := newTerminalPhaseSync(podWorkers.podSyncer.(*testPodSyncerFuncs).syncPod)
+	podWorkers.podSyncer.(*testPodSyncerFuncs).syncPod = terminalPhaseSyncer.SyncPod
 
 	// start pod
 	podWorkers.UpdatePod(UpdatePodOptions{
@@ -1935,7 +1972,7 @@ func TestFakePodWorkers(t *testing.T) {
 
 	kubeletForRealWorkers := &simpleFakeKubelet{}
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
-	realPodSyncer := newPodSyncerFuncs(kubeletForRealWorkers)
+	realPodSyncer := newTestPodSyncerFuncs(kubeletForRealWorkers)
 	realPodSyncer.syncPod = kubeletForRealWorkers.SyncPodWithWaitGroup
 
 	realPodWorkers := newPodWorkers(

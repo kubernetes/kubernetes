@@ -312,7 +312,7 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider())
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, nil, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider())
 	assert.NoError(t, err)
 	kubelet.imageManager = &fakeImageGCManager{
 		fakeImageService: fakeRuntime,
@@ -3043,6 +3043,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
 		ContainerLogMaxFiles:                      5,
+		ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
 		MemoryThrottlingFactor:                    ptr.To[float64](0),
 	}
 	var prober volume.DynamicPluginProber
@@ -3188,7 +3189,7 @@ func TestSyncPodSpans(t *testing.T) {
 	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
 	assert.NoError(t, err)
 
-	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
 		kubelet.recorder,
 		kubelet.livenessManager,
 		kubelet.readinessManager,
@@ -3205,6 +3206,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		images.NeverVerifyImagePullPolicy, // TODO: maybe we'll need to config this
 		"",
 		"",
 		kubeCfg.CPUCFSQuota,

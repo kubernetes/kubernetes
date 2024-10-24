@@ -155,6 +155,9 @@ type KubeletConfiguration struct {
 	// pulls to burst to this number, while still not exceeding registryPullQPS.
 	// Only used if registryPullQPS > 0.
 	RegistryBurst int32
+	// TODO: doc the two fields below
+	ImagePullCredentialsVerificationPolicy string
+	PreloadedImagesVerificationAllowlist   []string
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
 	EventRecordQPS int32

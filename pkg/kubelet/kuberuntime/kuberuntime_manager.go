@@ -106,9 +106,6 @@ type kubeGenericRuntimeManager struct {
 	// Container GC manager
 	containerGC *containerGC
 
-	// Keyring for pulling images
-	keyring credentialprovider.DockerKeyring
-
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
 
@@ -198,6 +195,7 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullPolicy images.ImagePullPolicyEnforcer,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	cpuCFSQuota bool,
@@ -213,7 +211,7 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
-) (KubeGenericRuntime, error) {
+) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
@@ -246,7 +244,7 @@ func NewKubeGenericRuntimeManager(
 	typedVersion, err := kubeRuntimeManager.getTypedVersion(ctx)
 	if err != nil {
 		klog.ErrorS(err, "Get runtime version failed")
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Only matching kubeRuntimeAPIVersion is supported now
@@ -255,7 +253,7 @@ func NewKubeGenericRuntimeManager(
 		klog.ErrorS(err, "This runtime api version is not supported",
 			"apiVersion", typedVersion.Version,
 			"supportedAPIVersion", kubeRuntimeAPIVersion)
-		return nil, ErrVersionNotSupported
+		return nil, nil, ErrVersionNotSupported
 	}
 
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
@@ -270,11 +268,25 @@ func NewKubeGenericRuntimeManager(
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
 
+	var imageGCHooks []images.PostImageGCHook
+
+	var imagePullManager images.ImagePullManager = &images.NoopImagePullManager{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		imagePullManager, err = images.NewFileBasedImagePullManager(ctx, rootDirectory, imagePullPolicy, kubeRuntimeManager)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
+		}
+	}
+
+	imageGCHooks = append(imageGCHooks, imagePullManager.PruneUnknownRecords)
+
+	nodeKeyring := credentialprovider.NewDockerKeyring()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
+		nodeKeyring,
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,
@@ -292,7 +304,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	return kubeRuntimeManager, nil
+	return kubeRuntimeManager, imageGCHooks, nil
 }
 
 // Type returns the type of the container runtime.
