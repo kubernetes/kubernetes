@@ -3635,6 +3635,24 @@ func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 	}
 }
 
+func TestValidateVolumesForPVCs(t *testing.T) {
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	fldPath := field.NewPath("field")
+	_, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	if len(v1err) == 0 {
+		t.Errorf("Invalid test volumes - expected failed %v", field.Duplicate(fldPath.Child("persistentVolumeClaim").Child("claimName"), "testclaim1"))
+		return
+	}
+
+	if v1err[0].Type != field.ErrorTypeDuplicate {
+		t.Errorf("unexpected error type: got %v, want %v", v1err[0].Type, field.ErrorTypeDuplicate)
+	}
+}
+
 // This test is a little too top-to-bottom.  Ideally we would test each volume
 // type on its own, but we want to also make sure that the logic works through
 // the one-of wrapper, so we just do it all in one place.
