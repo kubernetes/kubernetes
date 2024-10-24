@@ -267,6 +267,11 @@ func (w *logWriter) write(msg *logMessage, addPrefix bool) error {
 	default:
 		return fmt.Errorf("unexpected stream type %q", msg.stream)
 	}
+	// Since v1.32, either w.stdout or w.stderr may be nil if the stream is not requested.
+	// In such case, we should neither count the bytes nor write to the stream.
+	if stream == nil {
+		return nil
+	}
 	n, err := stream.Write(line)
 	w.remain -= int64(n)
 	if err != nil {

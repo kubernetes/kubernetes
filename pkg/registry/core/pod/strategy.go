@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	netutils "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,8 +53,6 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	netutils "k8s.io/utils/net"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // podStrategy implements behavior for Pods
@@ -491,6 +492,15 @@ func LogLocation(
 	}
 	if opts.LimitBytes != nil {
 		params.Add("limitBytes", strconv.FormatInt(*opts.LimitBytes, 10))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SplitStdoutAndStderr) {
+		if opts.Stream != nil {
+			params.Add("stream", string(*opts.Stream))
+		}
+	} else {
+		if opts.Stream != nil && *opts.Stream != api.LogStreamTypeAll {
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("unable to return the given log stream: %q. Please enable SplitStdoutAndStderr feature gate in kube-apiserver", *opts.Stream))
+		}
 	}
 	loc := &url.URL{
 		Scheme:   nodeInfo.Scheme,

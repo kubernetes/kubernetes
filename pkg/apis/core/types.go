@@ -5452,6 +5452,18 @@ type Preconditions struct {
 	UID *types.UID
 }
 
+// LogStreamType represents the desired log stream type.
+type LogStreamType string
+
+const (
+	// LogStreamTypeStdout is the stream type for stdout.
+	LogStreamTypeStdout LogStreamType = "stdout"
+	// LogStreamTypeStderr is the stream type for stderr.
+	LogStreamTypeStderr LogStreamType = "stderr"
+	// LogStreamTypeAll represents the combined stdout and stderr.
+	LogStreamTypeAll LogStreamType = "All"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodLogOptions is the query options for a Pod's logs REST call
@@ -5478,7 +5490,8 @@ type PodLogOptions struct {
 	// of log output.
 	Timestamps bool
 	// If set, the number of lines from the end of the logs to show. If not specified,
-	// logs are shown from the creation of the container or sinceSeconds or sinceTime
+	// logs are shown from the creation of the container or sinceSeconds or sinceTime.
+	// Note that when "TailLines" is specified, "Stream" can only be set to "All".
 	TailLines *int64
 	// If set, the number of bytes to read from the server before terminating the
 	// log output. This may not display a complete final line of logging, and may return
@@ -5493,6 +5506,14 @@ type PodLogOptions struct {
 	// the actual log data coming from the real kubelet).
 	// +optional
 	InsecureSkipTLSVerifyBackend bool
+
+	// Specify which container log stream to return to the client.
+	// Acceptable values are "All", "stdout" and "stderr". If not specified, "All" is used, and both stdout and stderr
+	// are returned interleaved.
+	// Note that when "TailLines" is specified, "Stream" can only be set to "All".
+	// +featureGate=SplitStdoutAndStderr
+	// +optional
+	Stream *LogStreamType
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

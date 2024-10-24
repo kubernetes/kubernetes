@@ -47,6 +47,8 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	netutils "k8s.io/utils/net"
+
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -57,7 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	netutils "k8s.io/utils/net"
 )
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
@@ -7464,6 +7465,12 @@ func validateOS(podSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOp
 	return allErrs
 }
 
+var supportedLogStreamType = sets.New[core.LogStreamType](
+	core.LogStreamTypeStdout,
+	core.LogStreamTypeStderr,
+	core.LogStreamTypeAll,
+)
+
 func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
@@ -7478,6 +7485,13 @@ func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	case opts.Stream != nil:
+		if !supportedLogStreamType.Has(*opts.Stream) {
+			allErrs = append(allErrs, field.NotSupported(field.NewPath("stream"), *opts.Stream, supportedLogStreamType.UnsortedList()))
+		}
+		if *opts.Stream != core.LogStreamTypeAll && opts.TailLines != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "`tailLines` and specific `stream` are mutually exclusive for now"))
 		}
 	}
 	return allErrs
