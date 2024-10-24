@@ -54,6 +54,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -62,6 +63,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	epsController := endpointslice.NewController(
 		tCtx,
+		"endpointslice-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -72,6 +74,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	epsmController := endpointslicemirroring.NewController(
 		tCtx,
+		"endpointslice-mirroring-controller",
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -327,6 +330,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epsmController := endpointslicemirroring.NewController(
 		tCtx,
+		"endpointslice-mirroring-controller",
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -502,6 +506,7 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epsmController := endpointslicemirroring.NewController(
 		tCtx,
+		"endpointslice-mirroring-controller",
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),

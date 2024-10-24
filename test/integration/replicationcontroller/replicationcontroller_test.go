@@ -126,6 +126,7 @@ func rmSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 
 	rm := replication.NewReplicationManager(
 		tCtx,
+		"replicationcontroller-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replication-controller")),

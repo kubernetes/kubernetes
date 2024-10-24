@@ -350,6 +350,7 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		ctx,
+		"persistentvolume-attach-detach-controller",
 		testClient,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),

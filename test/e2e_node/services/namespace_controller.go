@@ -76,12 +76,12 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 
 	nc := namespacecontroller.NewNamespaceController(
 		ctx,
+		"namespace-controller",
 		client,
 		metadataClient,
 		discoverResourcesFn,
 		informerFactory.Core().V1().Namespaces(),
-		ncResyncPeriod, v1.FinalizerKubernetes,
-	)
+		ncResyncPeriod, v1.FinalizerKubernetes)
 	informerFactory.Start(n.stopCh)
 	go nc.Run(ctx, ncConcurrency)
 	return nil

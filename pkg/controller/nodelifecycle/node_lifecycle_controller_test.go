@@ -141,6 +141,7 @@ func newNodeLifecycleControllerFromClient(
 
 	nc, err := NewNodeLifecycleController(
 		ctx,
+		"node-lifecycle-controller",
 		leaseInformer,
 		factory.Core().V1().Pods(),
 		nodeInformer,

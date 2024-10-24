@@ -219,7 +219,7 @@ func setupStorageVersionGC(ctx context.Context, kubeClientSet *kubernetes.Client
 	go leaseInformer.Informer().Run(ctx.Done())
 	go storageVersionInformer.Informer().Run(ctx.Done())
 
-	controller := storageversiongc.NewStorageVersionGC(ctx, kubeClientSet, leaseInformer, storageVersionInformer)
+	controller := storageversiongc.NewStorageVersionGC(ctx, "storage-version-migrator-controller", kubeClientSet, leaseInformer, storageVersionInformer)
 	go controller.Run(ctx)
 }
 

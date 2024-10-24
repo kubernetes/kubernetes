@@ -55,6 +55,7 @@ func newController(ctx context.Context, batchPeriod time.Duration) (*fake.Client
 
 	esController := NewController(
 		ctx,
+		"endpointslice-mirroring-controller",
 		informerFactory.Core().V1().Endpoints(),
 		informerFactory.Discovery().V1().EndpointSlices(),
 		informerFactory.Core().V1().Services(),

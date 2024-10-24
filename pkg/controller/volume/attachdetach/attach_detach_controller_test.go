@@ -50,6 +50,7 @@ func createADC(t testing.TB, tCtx ktesting.TContext, fakeKubeClient *fake.Client
 
 	adcObj, err := NewAttachDetachController(
 		tCtx,
+		"persistentvolume-attach-detach-controller",
 		fakeKubeClient,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
@@ -291,6 +292,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	logger, tCtx := ktesting.NewTestContext(t)
 	adcObj, err := NewAttachDetachController(
 		tCtx,
+		"persistentvolume-attach-detach-controller",
 		fakeKubeClient,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),

@@ -38,7 +38,7 @@ func setupController(ctx context.Context, clientset kubernetes.Interface) {
 	leaseInformer := informerFactory.Coordination().V1().Leases()
 	storageVersionInformer := informerFactory.Internal().V1alpha1().StorageVersions()
 
-	controller := NewStorageVersionGC(ctx, clientset, leaseInformer, storageVersionInformer)
+	controller := NewStorageVersionGC(ctx, "storage-version-migrator-controller", clientset, leaseInformer, storageVersionInformer)
 	go controller.Run(context.Background())
 	informerFactory.Start(nil)
 }

@@ -97,7 +97,7 @@ func setupNewController(ctx context.Context, fakeClientSet *fake.Clientset) (*Co
 	informerFactory := informers.NewSharedInformerFactory(fakeClientSet, 0)
 	podIndexer := informerFactory.Core().V1().Pods().Informer().GetIndexer()
 	nodeIndexer := informerFactory.Core().V1().Nodes().Informer().GetIndexer()
-	mgr, _ := New(ctx, fakeClientSet, informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Nodes(), "taint-eviction-controller")
+	mgr, _ := New(ctx, "taint-eviction-controller", fakeClientSet, informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Nodes())
 	mgr.podListerSynced = alwaysReady
 	mgr.nodeListerSynced = alwaysReady
 	mgr.getPodsAssignedToNode = getPodsAssignedToNode(ctx, fakeClientSet)
