@@ -36,15 +36,27 @@ import (
 
 const VariablesTypeName = "kubernetes.variables"
 
+// CompositedCompiler compiles expressions with variable composition.
 type CompositedCompiler struct {
 	Compiler
-	FilterCompiler
+	ConditionCompiler
+	MutatingCompiler
 
 	CompositionEnv *CompositionEnv
 }
 
-type CompositedFilter struct {
-	Filter
+// CompositedConditionEvaluator provides evaluation of a condition expression with variable composition.
+// The expressions must return a boolean.
+type CompositedConditionEvaluator struct {
+	ConditionEvaluator
+
+	compositionEnv *CompositionEnv
+}
+
+// CompositedEvaluator provides evaluation of a single expression with variable composition.
+// The types that may returned by the expression is determined at compilation time.
+type CompositedEvaluator struct {
+	MutatingEvaluator
 
 	compositionEnv *CompositionEnv
 }
@@ -64,11 +76,13 @@ func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompi
 		CompiledVariables: map[string]CompilationResult{},
 	}
 	compiler := NewCompiler(context.EnvSet)
-	filterCompiler := NewFilterCompiler(context.EnvSet)
+	conditionCompiler := &conditionCompiler{compiler}
+	mutation := &mutatingCompiler{compiler}
 	return &CompositedCompiler{
-		Compiler:       compiler,
-		FilterCompiler: filterCompiler,
-		CompositionEnv: context,
+		Compiler:          compiler,
+		ConditionCompiler: conditionCompiler,
+		MutatingCompiler:  mutation,
+		CompositionEnv:    context,
 	}
 }
 
@@ -85,11 +99,20 @@ func (c *CompositedCompiler) CompileAndStoreVariable(variable NamedExpressionAcc
 	return result
 }
 
-func (c *CompositedCompiler) Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Filter {
-	filter := c.FilterCompiler.Compile(expressions, optionalDecls, envType)
-	return &CompositedFilter{
-		Filter:         filter,
-		compositionEnv: c.CompositionEnv,
+func (c *CompositedCompiler) CompileCondition(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) ConditionEvaluator {
+	condition := c.ConditionCompiler.CompileCondition(expressions, optionalDecls, envType)
+	return &CompositedConditionEvaluator{
+		ConditionEvaluator: condition,
+		compositionEnv:     c.CompositionEnv,
+	}
+}
+
+// CompileEvaluator compiles an mutatingEvaluator for the given expression, options and environment.
+func (c *CompositedCompiler) CompileMutatingEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) MutatingEvaluator {
+	mutation := c.MutatingCompiler.CompileMutatingEvaluator(expression, optionalDecls, envType)
+	return &CompositedEvaluator{
+		MutatingEvaluator: mutation,
+		compositionEnv:    c.CompositionEnv,
 	}
 }
 
@@ -160,9 +183,9 @@ func (c *compositionContext) Variables(activation any) ref.Val {
 	return lazyMap
 }
 
-func (f *CompositedFilter) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
+func (f *CompositedConditionEvaluator) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	ctx = f.compositionEnv.CreateContext(ctx)
-	return f.Filter.ForInput(ctx, versionedAttr, request, optionalVars, namespace, runtimeCELCostBudget)
+	return f.ConditionEvaluator.ForInput(ctx, versionedAttr, request, optionalVars, namespace, runtimeCELCostBudget)
 }
 
 func (c *compositionContext) reportCost(cost int64) {

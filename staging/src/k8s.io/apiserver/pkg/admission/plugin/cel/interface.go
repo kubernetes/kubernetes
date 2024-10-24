@@ -63,12 +63,15 @@ type OptionalVariableDeclarations struct {
 	HasAuthorizer bool
 	// StrictCost specifies if the CEL cost limitation is strict for extended libraries as well as native libraries.
 	StrictCost bool
+	// HasPatchTypes specifies if JSONPatch, Object, Object.metadata and similar types are available in CEL. These can be used
+	// to initialize the typed objects in CEL required to create patches.
+	HasPatchTypes bool
 }
 
-// FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.
-type FilterCompiler interface {
-	// Compile is used for the cel expression compilation
-	Compile(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) Filter
+// ConditionCompiler contains a function to assist with converting types and values to/from CEL-typed values.
+type ConditionCompiler interface {
+	// CompileCondition is used for the cel expression compilation
+	CompileCondition(expressions []ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) ConditionEvaluator
 }
 
 // OptionalVariableBindings provides expression bindings for optional CEL variables.
@@ -82,16 +85,38 @@ type OptionalVariableBindings struct {
 	Authorizer authorizer.Authorizer
 }
 
-// Filter contains a function to evaluate compiled CEL-typed values
+// ConditionEvaluator contains the result of compiling a CEL expression
+// that evaluates to a condition. This is used both for validation and pre-conditions.
 // It expects the inbound object to already have been converted to the version expected
 // by the underlying CEL code (which is indicated by the match criteria of a policy definition).
 // versionedParams may be nil.
-type Filter interface {
+type ConditionEvaluator interface {
 	// ForInput converts compiled CEL-typed values into evaluated CEL-typed value.
 	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-	// If cost budget is calculated, the filter should return the remaining budget.
+	// If cost budget is calculated, the condition should return the remaining budget.
 	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error)
 
-	// CompilationErrors returns a list of errors from the compilation of the evaluator
+	// CompilationErrors returns a list of errors from the compilation of the mutatingEvaluator
+	CompilationErrors() []error
+}
+
+// MutatingCompiler contains a function to assist with converting types and values to/from CEL-typed values.
+type MutatingCompiler interface {
+	// CompileMutatingEvaluator is used for the cel expression compilation
+	CompileMutatingEvaluator(expression ExpressionAccessor, optionalDecls OptionalVariableDeclarations, envType environment.Type) MutatingEvaluator
+}
+
+// MutatingEvaluator contains the result of compiling a CEL expression
+// that evaluates to a mutation.
+// It expects the inbound object to already have been converted to the version expected
+// by the underlying CEL code (which is indicated by the match criteria of a policy definition).
+// versionedParams may be nil.
+type MutatingEvaluator interface {
+	// ForInput converts compiled CEL-typed values into a CEL-typed value representing a mutation.
+	// runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
+	// If cost budget is calculated, the condition should return the remaining budget.
+	ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *v1.AdmissionRequest, optionalVars OptionalVariableBindings, namespace *corev1.Namespace, runtimeCELCostBudget int64) (EvaluationResult, int64, error)
+
+	// CompilationErrors returns a list of errors from the compilation of the mutatingEvaluator
 	CompilationErrors() []error
 }

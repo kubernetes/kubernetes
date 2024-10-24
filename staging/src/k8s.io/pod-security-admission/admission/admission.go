@@ -191,7 +191,7 @@ func (a *Admission) ValidateConfiguration() error {
 		return fmt.Errorf("PodSpecExtractor required")
 	}
 	if a.Evaluator == nil {
-		return fmt.Errorf("Evaluator required")
+		return fmt.Errorf("MutatingEvaluator required")
 	}
 	if a.NamespaceGetter == nil {
 		return fmt.Errorf("NamespaceGetter required")

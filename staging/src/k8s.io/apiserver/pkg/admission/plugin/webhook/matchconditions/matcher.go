@@ -54,14 +54,14 @@ var _ Matcher = &matcher{}
 
 // matcher evaluates compiled cel expressions and determines if they match the given request or not
 type matcher struct {
-	filter      celplugin.Filter
+	filter      celplugin.ConditionEvaluator
 	failPolicy  v1.FailurePolicyType
 	matcherType string
 	matcherKind string
 	objectName  string
 }
 
-func NewMatcher(filter celplugin.Filter, failPolicy *v1.FailurePolicyType, matcherKind, matcherType, objectName string) Matcher {
+func NewMatcher(filter celplugin.ConditionEvaluator, failPolicy *v1.FailurePolicyType, matcherKind, matcherType, objectName string) Matcher {
 	var f v1.FailurePolicyType
 	if failPolicy == nil {
 		f = v1.Fail

@@ -41,13 +41,13 @@ import (
 // validator implements the Validator interface
 type validator struct {
 	celMatcher            matchconditions.Matcher
-	validationFilter      cel.Filter
-	auditAnnotationFilter cel.Filter
-	messageFilter         cel.Filter
+	validationFilter      cel.ConditionEvaluator
+	auditAnnotationFilter cel.ConditionEvaluator
+	messageFilter         cel.ConditionEvaluator
 	failPolicy            *v1.FailurePolicyType
 }
 
-func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
+func NewValidator(validationFilter cel.ConditionEvaluator, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.ConditionEvaluator, failPolicy *v1.FailurePolicyType) Validator {
 	return &validator{
 		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
