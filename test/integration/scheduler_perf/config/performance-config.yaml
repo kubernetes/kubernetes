@@ -688,8 +688,8 @@
 #      initPods: 20000
 #      measurePods: 5000
 
-# Measure throughput of regular schedulable pods that are interleaved by high priority preemption pods scheduled at 20/s rate.
-# Implementation of asynchrounous preemption feature https://github.com/kubernetes/kubernetes/issues/126858 is supposed to increase the trhoughput of the measured pods as all heavy operations (apiserver communication) will be performed asyncronously, wihtout blocking the scheduler loop.
+# Measure throughput of regular schedulable pods that are interleaved by high priority preemption pods scheduled at 5/s rate.
+# Implementation of asynchronous preemption feature https://github.com/kubernetes/kubernetes/issues/126858 is supposed to increase the throughput of the measured pods as all heavy operations (apiserver communication) will be performed asynchronously, without blocking the scheduler loop.
 # How is it achieved:
 # 1. There are X initial nodes with 4 low priority pods each, consuming 3.6 CPU out of the total 4 available.
 # 2. High priority preemption which need to preempt 3 of 4 low priority pods to fit (require 3 CPU).
@@ -705,7 +705,7 @@
     mode: create
     templatePaths:
     - config/templates/pod-high-priority-large-cpu.yaml
-    intervalMilliseconds: 50
+    intervalMilliseconds: 200
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/templates/pod-default.yaml
@@ -725,7 +725,7 @@
       measurePods: 500
   - name: 5000Nodes
     labels: [performance]
-    threshold: 200
+    threshold: 120
     params:
       initNodes: 5000
       initPods: 20000
@@ -763,7 +763,7 @@
       measurePods: 1000
   - name: 5kNodes/10kPods
     labels: [performance]
-    threshold: 400
+    threshold: 250
     params:
       initNodes: 5000
       measurePods: 10000
