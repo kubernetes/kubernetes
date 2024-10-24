@@ -22,7 +22,9 @@ import (
 	"testing"
 
 	jsonpath "github.com/exponent-io/jsonpath"
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -193,7 +195,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	}
 }
 
-func TestPatchSubresource(t *testing.T) {
+func TestPatchStatusSubresource(t *testing.T) {
 	pod := cmdtesting.SubresourceTestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -238,5 +240,82 @@ func TestPatchSubresource(t *testing.T) {
 	// check the status.phase value is updated in the response
 	if actualStatus != expectedStatus {
 		t.Errorf("unexpected pod status to be set to %s got: %s", expectedStatus, actualStatus)
+	}
+}
+
+func TestPatchResizeSubresource(t *testing.T) {
+	pod := cmdtesting.SubresourceTestData()
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "container1",
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resourceapi.MustParse("100m"),
+					corev1.ResourceMemory: resourceapi.MustParse("1Gi"),
+				},
+			},
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	expectedResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resourceapi.MustParse("200m"),
+			corev1.ResourceMemory: resourceapi.MustParse("2Gi"),
+		},
+	}
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods/foo/resize" && (m == "PATCH" || m == "GET"):
+				obj := pod
+
+				// ensure patched object reflects successful
+				// patch edits from the client
+				if m == "PATCH" {
+					obj.Spec.Containers[0].Resources = expectedResources
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	stream, _, buf, _ := genericiooptions.NewTestIOStreams()
+
+	cmd := NewCmdPatch(tf, stream)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("patch", `{
+				"spec":{
+					"containers":[
+						{
+							"name":"container1",
+							"resources": {
+								"requests": {
+									"cpu":"200m",
+									"memory":"2Gi",
+								}
+							}
+						}
+					]
+				}
+			}`)
+	cmd.Flags().Set("output", "json")
+	cmd.Flags().Set("subresource", "resize")
+	cmd.Run(cmd, []string{"pod/foo"})
+
+	decoder := jsonpath.NewDecoder(buf)
+	var actualResources corev1.ResourceRequirements
+	decoder.SeekTo("spec", "containers", 0, "resources")
+	decoder.Decode(&actualResources)
+	if diff := cmp.Diff(expectedResources, actualResources); diff != "" {
+		t.Errorf("unexpected pod container resource to be set:\n%s", diff)
 	}
 }

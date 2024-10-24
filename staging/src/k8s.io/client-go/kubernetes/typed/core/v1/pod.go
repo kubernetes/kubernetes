@@ -52,6 +52,7 @@ type PodInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.Pod, err error)
 	UpdateEphemeralContainers(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error)
+	Resize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (*corev1.Pod, error)
 
 	PodExpansion
 }
@@ -85,6 +86,21 @@ func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, po
 		Resource("pods").
 		Name(podName).
 		SubResource("ephemeralcontainers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(pod).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Resize takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *pods) Resize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
+	result = &corev1.Pod{}
+	err = c.GetClient().Put().
+		Namespace(c.GetNamespace()).
+		Resource("pods").
+		Name(podName).
+		SubResource("resize").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).

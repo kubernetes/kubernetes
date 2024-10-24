@@ -55,7 +55,7 @@ import (
 	"k8s.io/kubectl/pkg/util/slice"
 )
 
-var SupportedSubresources = []string{"status"}
+var SupportedSubresources = []string{"status", "resize"}
 
 // EditOptions contains all the options for running edit cli command.
 type EditOptions struct {
