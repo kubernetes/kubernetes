@@ -2603,7 +2603,7 @@ filename | sha512 hash
     * A sample cloud provider configure is: '{"vmType": "vmss", "useInstanceMetadata": true}'.
 * Volumes specified in a pod but not used in it are no longer unnecessarily formatted, mounted and reported in `node.status.volumesInUse`. ([#81163](https://github.com/kubernetes/kubernetes/pull/81163), [@jsafrane](https://github.com/jsafrane))
 * kubeadm: use etcd's /health endpoint for a HTTP liveness probe on localhost instead of having a custom health check using etcdctl ([#81385](https://github.com/kubernetes/kubernetes/pull/81385), [@neolit123](https://github.com/neolit123))
-* kubeamd: use the --pod-network-cidr flag to init or use the podSubnet field in the kubeadm config to pass a comma separated list of pod CIDRs.  ([#79033](https://github.com/kubernetes/kubernetes/pull/79033), [@Arvinderpal](https://github.com/Arvinderpal))
+* kubeadm: use the --pod-network-cidr flag to init or use the podSubnet field in the kubeadm config to pass a comma separated list of pod CIDRs.  ([#79033](https://github.com/kubernetes/kubernetes/pull/79033), [@Arvinderpal](https://github.com/Arvinderpal))
 * Update to use go 1.12.9 ([#81489](https://github.com/kubernetes/kubernetes/pull/81489), [@BenTheElder](https://github.com/BenTheElder))
 * Update Azure SDK + go-autorest API versions ([#79574](https://github.com/kubernetes/kubernetes/pull/79574), [@justaugustus](https://github.com/justaugustus))
 * Extender bind should respect IsInterested ([#79804](https://github.com/kubernetes/kubernetes/pull/79804), [@yqwang-ms](https://github.com/yqwang-ms))

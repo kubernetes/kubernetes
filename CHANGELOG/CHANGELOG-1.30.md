@@ -318,7 +318,7 @@ name | architectures
   cause DNS problems when DNS pods were restarted. ([#127807](https://github.com/kubernetes/kubernetes/pull/127807), [@danwinship](https://github.com/danwinship)) [SIG Network]
 - Kubeadm: ensure that Pods from the upgrade preflight check `CreateJob` are properly terminated after a timeout. ([#127346](https://github.com/kubernetes/kubernetes/pull/127346), [@yuyabee](https://github.com/yuyabee)) [SIG Cluster Lifecycle]
 - Kubeadm: fix wrong member list reported when removing an etcd member ([#127961](https://github.com/kubernetes/kubernetes/pull/127961), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
-- Kubeadm: when adding new control plane nodes with "kubeamd join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127620](https://github.com/kubernetes/kubernetes/pull/127620), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
+- Kubeadm: when adding new control plane nodes with "kubeadm join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127620](https://github.com/kubernetes/kubernetes/pull/127620), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 
 ### Other (Cleanup or Flake)
 

@@ -368,7 +368,7 @@ name | architectures
   to deleted pods did not get cleaned up correctly, which could (among other things)
   cause DNS problems when DNS pods were restarted. ([#127808](https://github.com/kubernetes/kubernetes/pull/127808), [@danwinship](https://github.com/danwinship)) [SIG Network]
 - Kubeadm: fix wrong member list reported when removing an etcd member ([#127962](https://github.com/kubernetes/kubernetes/pull/127962), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
-- Kubeadm: when adding new control plane nodes with "kubeamd join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127621](https://github.com/kubernetes/kubernetes/pull/127621), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
+- Kubeadm: when adding new control plane nodes with "kubeadm join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127621](https://github.com/kubernetes/kubernetes/pull/127621), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 - The scheduling queue didn't notice any extenders' failures, it could miss some cluster events,
   and it could end up Pods rejected by Extenders stuck in unschedulable pod pool in 5min in the worst-case scenario.
   Now, the scheduling queue notices extenders' failures and requeue Pods rejected by Extenders appropriately. ([#122022](https://github.com/kubernetes/kubernetes/pull/122022), [@sanposhiho](https://github.com/sanposhiho)) [SIG Scheduling]

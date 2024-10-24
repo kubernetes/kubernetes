@@ -471,7 +471,7 @@ name | architectures
 - Ensure daemonset controller to count old unhealthy pods towards max unavailable budget ([#127776](https://github.com/kubernetes/kubernetes/pull/127776), [@ncdc](https://github.com/ncdc)) [SIG Apps]
 - Fix a bug on the endpoints controller that does not reconcile the Endpoint object after this is truncated (it gets more than 1000 endpoints addresses) ([#127417](https://github.com/kubernetes/kubernetes/pull/127417), [@aojea](https://github.com/aojea)) [SIG Apps, Network and Testing]
 - Kubeadm: fix wrong member list reported when removing an etcd member ([#127963](https://github.com/kubernetes/kubernetes/pull/127963), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
-- Kubeadm: when adding new control plane nodes with "kubeamd join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127622](https://github.com/kubernetes/kubernetes/pull/127622), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
+- Kubeadm: when adding new control plane nodes with "kubeadm join", ensure that the etcd member addition is performed only if a given member URL does not already exist in the list of members. Similarly, on "kubeadm reset" only remove an etcd member if its ID exists. ([#127622](https://github.com/kubernetes/kubernetes/pull/127622), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 
 ### Other (Cleanup or Flake)
 
