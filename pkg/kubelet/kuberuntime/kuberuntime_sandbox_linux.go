@@ -22,9 +22,10 @@ package kuberuntime
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
@@ -35,7 +36,7 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 
 		// For overhead, we do not differentiate between requests and limits. Treat this overhead
 		// as "guaranteed", with requests == limits
-		resources = m.calculateLinuxResources(cpu, cpu, memory)
+		resources = m.calculateLinuxResources(cpu, cpu, memory, true)
 	}
 
 	return resources
@@ -51,7 +52,14 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runt
 	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = req.Cpu()
 	}
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory())
+
+	// If pod has exclusive cpu the sandbox will not have cfs quote enforced
+	enforceCfsQuota := true
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.HasExclusiveCPUs(pod) {
+		enforceCfsQuota = false
+	}
+
+	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), enforceCfsQuota)
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
