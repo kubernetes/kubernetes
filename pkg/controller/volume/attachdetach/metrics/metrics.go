@@ -181,7 +181,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount(logger klog.Log
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, pod, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpecWithNodeMigration(logger, podVolume, pod, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}

@@ -202,12 +202,15 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
 	} else {
 		// set CSIDriverLister and volumeAttachmentLister
+		seLinuxHost, ok := host.(volume.SELinuxControllerVolumeHost)
+		if ok {
+			p.csiDriverLister = seLinuxHost.CSIDriverLister()
+			if p.csiDriverLister == nil {
+				klog.Error(log("CSIDriverLister not found on SELinuxControllerVolumeHost"))
+			}
+		}
 		adcHost, ok := host.(volume.AttachDetachVolumeHost)
 		if ok {
-			p.csiDriverLister = adcHost.CSIDriverLister()
-			if p.csiDriverLister == nil {
-				klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
-			}
 			p.volumeAttachmentLister = adcHost.VolumeAttachmentLister()
 			if p.volumeAttachmentLister == nil {
 				klog.Error(log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))

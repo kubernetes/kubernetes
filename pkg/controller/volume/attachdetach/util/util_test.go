@@ -243,7 +243,7 @@ func Test_CreateVolumeSpec(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			plugMgr, intreeToCSITranslator, csiTranslator, pvLister, pvcLister := setup(testNodeName, t)
-			actualSpec, err := CreateVolumeSpec(logger, test.pod.Spec.Volumes[0], test.pod, test.createNodeName, plugMgr, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
+			actualSpec, err := CreateVolumeSpecWithNodeMigration(logger, test.pod.Spec.Volumes[0], test.pod, test.createNodeName, plugMgr, pvcLister, pvLister, intreeToCSITranslator, csiTranslator)
 
 			if actualSpec == nil && (test.wantPersistentVolume != nil || test.wantVolume != nil) {
 				t.Errorf("got volume spec is nil")

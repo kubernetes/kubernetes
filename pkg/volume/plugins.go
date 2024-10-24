@@ -309,15 +309,19 @@ type KubeletVolumeHost interface {
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 }
 
+// SELinuxControllerVolumeHost is a SELinux warning Controller specific interface that plugins can use
+// to access methods on the SELinux warning Controller.
+type SELinuxControllerVolumeHost interface {
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelistersv1.CSIDriverLister
+}
+
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
 // to access methods on the Attach Detach Controller.
 type AttachDetachVolumeHost interface {
+	SELinuxControllerVolumeHost
 	// CSINodeLister returns the informer lister for the CSINode API Object
 	CSINodeLister() storagelistersv1.CSINodeLister
-
-	// CSIDriverLister returns the informer lister for the CSIDriver API Object
-	CSIDriverLister() storagelistersv1.CSIDriverLister
-
 	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
 	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
