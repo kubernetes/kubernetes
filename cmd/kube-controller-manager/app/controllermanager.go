@@ -53,7 +53,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -93,16 +92,6 @@ const (
 	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
-)
-
-// ControllerLoopMode is the kube-controller-manager's mode of running controller loops that are cloud provider dependent
-type ControllerLoopMode int
-
-const (
-	// IncludeCloudLoops means the kube-controller-manager include the controller loops that are cloud provider dependent
-	IncludeCloudLoops ControllerLoopMode = iota
-	// ExternalLoops means the kube-controller-manager exclude the controller loops that are cloud provider dependent
-	ExternalLoops
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -396,15 +385,6 @@ type ControllerContext struct {
 	// requested.
 	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
 
-	// Cloud is the cloud provider interface for the controllers to use.
-	// It must be initialized and ready to use.
-	Cloud cloudprovider.Interface
-
-	// Control for which control loops to be run
-	// IncludeCloudLoops is for a kube-controller-manager running all loops
-	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
-	LoopMode ControllerLoopMode
-
 	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
 	// for an individual controller to start the shared informers. Before it is closed, they should not.
 	InformersStarted chan struct{}
@@ -644,20 +624,12 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		restMapper.Reset()
 	}, 30*time.Second, ctx.Done())
 
-	cloud, loopMode, err := createCloudProvider(klog.FromContext(ctx), s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
-		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
-	if err != nil {
-		return ControllerContext{}, err
-	}
-
 	controllerContext := ControllerContext{
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,
-		Cloud:                           cloud,
-		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
@@ -700,12 +672,6 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 			// HealthChecker should be present when controller has started
 			controllerChecks = append(controllerChecks, check)
 		}
-	}
-
-	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
-	// has started in case the cloud provider uses the client builder.
-	if controllerCtx.Cloud != nil {
-		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
 	}
 
 	// Each controller is passed a context where the logger has the name of
@@ -751,8 +717,8 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 		}
 	}
 
-	if controllerDescriptor.IsCloudProviderController() && controllerCtx.LoopMode != IncludeCloudLoops {
-		logger.Info("Skipping a cloud provider controller", "controller", controllerName, "loopMode", controllerCtx.LoopMode)
+	if controllerDescriptor.IsCloudProviderController() {
+		logger.Info("Skipping a cloud provider controller", "controller", controllerName)
 		return nil, nil
 	}
 
