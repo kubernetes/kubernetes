@@ -23,7 +23,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var obj = &resource.ResourceClaim{
@@ -32,6 +35,11 @@ var obj = &resource.ResourceClaim{
 		Namespace: "default",
 	},
 }
+
+var testRequest = "test-request"
+var testDriver = "test-driver"
+var testPool = "test-pool"
+var testDevice = "test-device"
 
 func TestStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
@@ -141,10 +149,11 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	testcases := map[string]struct {
-		oldObj                *resource.ResourceClaim
-		newObj                *resource.ResourceClaim
-		expectValidationError bool
-		expectObj             *resource.ResourceClaim
+		oldObj                  *resource.ResourceClaim
+		newObj                  *resource.ResourceClaim
+		expectValidationError   bool
+		expectObj               *resource.ResourceClaim
+		deviceStatusFeatureGate bool
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -172,10 +181,78 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			}(),
 			expectObj: obj,
 		},
+		"drop-fields-devices-status": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
+		},
+		"keep-fields-devices-status": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim { // Status is still there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+		},
+		"drop-status-deallocated-device": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // device is deallocated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatusFeatureGate)
+
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
@@ -199,4 +276,30 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			assert.Equal(t, expectObj, newObj)
 		})
 	}
+}
+
+func addSpecDevicesRequest(resourceClaim *resource.ResourceClaim, request string) {
+	resourceClaim.Spec.Devices.Requests = append(resourceClaim.Spec.Devices.Requests, resource.DeviceRequest{
+		Name: request,
+	})
+}
+
+func addStatusAllocationDevicesResults(resourceClaim *resource.ResourceClaim, driver string, pool string, device string, request string) {
+	if resourceClaim.Status.Allocation == nil {
+		resourceClaim.Status.Allocation = &resource.AllocationResult{}
+	}
+	resourceClaim.Status.Allocation.Devices.Results = append(resourceClaim.Status.Allocation.Devices.Results, resource.DeviceRequestAllocationResult{
+		Request: request,
+		Driver:  driver,
+		Pool:    pool,
+		Device:  device,
+	})
+}
+
+func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool string, device string) {
+	resourceClaim.Status.Devices = append(resourceClaim.Status.Devices, resource.AllocatedDeviceStatus{
+		Driver: driver,
+		Pool:   pool,
+		Device: device,
+	})
 }
