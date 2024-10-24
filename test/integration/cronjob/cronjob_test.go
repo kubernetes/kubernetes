@@ -48,11 +48,11 @@ func setup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc
 	}
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "cronjob-informers")), resyncPeriod)
-	cjc, err := cronjob.NewControllerV2(ctx, informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
+	cjc, err := cronjob.NewControllerV2(ctx, "cronjob-controller", informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
-	jc, err := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc, err := job.NewController(ctx, "job-controller", informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	if err != nil {
 		t.Fatalf("Error creating Job controller: %v", err)
 	}

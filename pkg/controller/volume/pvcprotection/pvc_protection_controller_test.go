@@ -513,7 +513,7 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Create the controller
 		logger, _ := ktesting.NewTestContext(t)
-		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
+		ctrl, err := NewPVCProtectionController(logger, "persistentvolumeclaim-protection-controller", pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

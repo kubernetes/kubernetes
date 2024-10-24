@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -139,7 +139,7 @@ func TestTTLAnnotations(t *testing.T) {
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()
 	_, ctx := ktesting.NewTestContext(t)
-	ttlc := ttl.NewTTLController(ctx, nodeInformer, testClient)
+	ttlc := ttl.NewTTLController(ctx, "ttl-controller", nodeInformer, testClient)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

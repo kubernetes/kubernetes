@@ -127,6 +127,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
 				testCtx.Ctx,
+				"node-lifecycle-controller",
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -155,10 +156,10 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			if test.startStandaloneTaintEvictionController {
 				tm, _ := tainteviction.New(
 					testCtx.Ctx,
+					names.TaintEvictionController,
 					testCtx.ClientSet,
 					externalInformers.Core().V1().Pods(),
 					externalInformers.Core().V1().Nodes(),
-					names.TaintEvictionController,
 				)
 				go tm.Run(testCtx.Ctx)
 			}
@@ -339,6 +340,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
 				testCtx.Ctx,
+				"node-lifecycle-controller",
 				externalInformers.Coordination().V1().Leases(),
 				externalInformers.Core().V1().Pods(),
 				externalInformers.Core().V1().Nodes(),
@@ -367,10 +369,10 @@ func TestTaintBasedEvictions(t *testing.T) {
 			if test.enableSeparateTaintEvictionController {
 				tm, _ := tainteviction.New(
 					testCtx.Ctx,
+					names.TaintEvictionController,
 					testCtx.ClientSet,
 					externalInformers.Core().V1().Pods(),
 					externalInformers.Core().V1().Nodes(),
-					names.TaintEvictionController,
 				)
 				go tm.Run(testCtx.Ctx)
 			}

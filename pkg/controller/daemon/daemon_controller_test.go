@@ -317,6 +317,7 @@ func newTestController(ctx context.Context, initialObjects ...runtime.Object) (*
 
 	dsc, err := NewDaemonSetsController(
 		ctx,
+		"daemonset-controller",
 		informerFactory.Apps().V1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		informerFactory.Core().V1().Pods(),
@@ -490,6 +491,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	dsc, err := NewDaemonSetsController(
 		ctx,
+		"daemonset-controller",
 		f.Apps().V1().DaemonSets(),
 		f.Apps().V1().ControllerRevisions(),
 		f.Core().V1().Pods(),

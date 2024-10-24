@@ -178,6 +178,7 @@ func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, 
 
 	sc := statefulset.NewStatefulSetController(
 		tCtx,
+		"statefulset-controller",
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),

@@ -83,6 +83,7 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
 	dc, err := daemon.NewDaemonSetsController(
 		tCtx,
+		"daemonset-controller",
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),

@@ -91,6 +91,7 @@ func TestDualStackEndpoints(t *testing.T) {
 
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -99,6 +100,7 @@ func TestDualStackEndpoints(t *testing.T) {
 
 	epsController := endpointslice.NewController(
 		tCtx,
+		"endpointslice-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),

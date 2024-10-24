@@ -343,6 +343,7 @@ func patchSecret(ctx context.Context, c clientset.Interface, t *testing.T, lastU
 
 func startLegacyServiceAccountTokenCleaner(ctx context.Context, client clientset.Interface, fakeClock clock.Clock, informers clientinformers.SharedInformerFactory) {
 	legacySATokenCleaner, _ := serviceaccountcontroller.NewLegacySATokenCleaner(
+		"legacy-serviceaccount-token-cleaner-controller",
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		informers.Core().V1().Pods(),

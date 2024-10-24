@@ -115,6 +115,7 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 
 	dc, err := deployment.NewDeploymentController(
 		ctx,
+		"deployment-controller",
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
@@ -125,6 +126,7 @@ func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 	}
 	rm := replicaset.NewReplicaSetController(
 		ctx,
+		"replicaset-controller",
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),

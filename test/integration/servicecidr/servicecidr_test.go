@@ -63,6 +63,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
 		ctx,
+		"service-cidr-controller",
 		informerFactory.Networking().V1beta1().ServiceCIDRs(),
 		informerFactory.Networking().V1beta1().IPAddresses(),
 		client,
@@ -165,6 +166,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
 		ctx,
+		"service-cidr-controller",
 		informerFactory.Networking().V1beta1().ServiceCIDRs(),
 		informerFactory.Networking().V1beta1().IPAddresses(),
 		client,

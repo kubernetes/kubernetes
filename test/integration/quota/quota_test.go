@@ -81,6 +81,7 @@ func TestQuota(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
 		ctx,
+		"replicationcontroller-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -310,6 +311,7 @@ plugins:
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
 		tCtx,
+		"replicationcontroller-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,
@@ -436,6 +438,7 @@ plugins:
 	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	rm := replicationcontroller.NewReplicationManager(
 		tCtx,
+		"replicationcontroller-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().ReplicationControllers(),
 		clientset,

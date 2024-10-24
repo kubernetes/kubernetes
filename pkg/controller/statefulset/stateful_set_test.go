@@ -922,6 +922,7 @@ func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime
 	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 	ssc := NewStatefulSetController(
 		ctx,
+		"statufset-controller",
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Apps().V1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),

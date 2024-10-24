@@ -67,6 +67,7 @@ func testNewReplicaSetControllerFromClient(tb testing.TB, client clientset.Inter
 	tCtx := ktesting.Init(tb)
 	ret := NewReplicaSetController(
 		tCtx,
+		"replicaset-controller",
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -631,6 +632,7 @@ func TestWatchControllers(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	manager := NewReplicaSetController(
 		tCtx,
+		"replicaset-controller",
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		client,
@@ -1198,6 +1200,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	logger := tCtx.Logger()
 	manager := NewReplicaSetController(
 		tCtx,
+		"replicaset-controller",
 		f.Apps().V1().ReplicaSets(),
 		f.Core().V1().Pods(),
 		client,

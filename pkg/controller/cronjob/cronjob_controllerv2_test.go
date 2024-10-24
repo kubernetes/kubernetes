@@ -1645,7 +1645,7 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 			defer cancel()
 			kubeClient := fake.NewSimpleClientset()
 			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(ctx, "cronjob-controller", sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -1753,7 +1753,7 @@ func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 			for _, job := range tt.jobs {
 				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			jm, err := NewControllerV2(ctx, sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			jm, err := NewControllerV2(ctx, "cronjob-controller", sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -1860,7 +1860,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 				_ = informerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
 
-			jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+			jm, err := NewControllerV2(ctx, "cronjob-controller", informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
 				return
@@ -1912,7 +1912,7 @@ func TestControllerV2JobAlreadyExistsButNotInActiveStatus(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
 
-	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	jm, err := NewControllerV2(ctx, "cronjob-controller", informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -1969,7 +1969,7 @@ func TestControllerV2JobAlreadyExistsButDifferentOwner(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	_ = informerFactory.Batch().V1().CronJobs().Informer().GetIndexer().Add(cjCopy)
 
-	jm, err := NewControllerV2(ctx, informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
+	jm, err := NewControllerV2(ctx, "cronjob-controller", informerFactory.Batch().V1().Jobs(), informerFactory.Batch().V1().CronJobs(), client)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}

@@ -53,7 +53,7 @@ func NewFromClient(ctx context.Context, kubeClient clientset.Interface, terminat
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(ctx, "pod-garbage-collector-controller", kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }

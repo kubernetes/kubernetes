@@ -65,7 +65,7 @@ func TestStorageVersionGarbageCollection(t *testing.T) {
 	storageVersionInformer := informers.Internal().V1alpha1().StorageVersions()
 
 	_, ctx := ktesting.NewTestContext(t)
-	controller := storageversiongc.NewStorageVersionGC(ctx, kubeclient, leaseInformer, storageVersionInformer)
+	controller := storageversiongc.NewStorageVersionGC(ctx, "storage-version-migrator-controller", kubeclient, leaseInformer, storageVersionInformer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,6 +40,7 @@ const ControllerName = "validatingadmissionpolicy-status"
 // Controller is the ValidatingAdmissionPolicy Status controller that reconciles the Status field of each policy object.
 // This controller runs type checks against referred types for each policy definition.
 type Controller struct {
+	controllerName string
 	policyInformer informerv1.ValidatingAdmissionPolicyInformer
 	policyQueue    workqueue.TypedRateLimitingInterface[string]
 	policySynced   cache.InformerSynced
@@ -54,7 +55,7 @@ type Controller struct {
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
-	if !cache.WaitForNamedCacheSync(ControllerName, ctx.Done(), c.policySynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.policySynced) {
 		return
 	}
 
@@ -66,8 +67,9 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
+func NewController(controllerName string, policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
 	c := &Controller{
+		controllerName: controllerName,
 		policyInformer: policyInformer,
 		policyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),

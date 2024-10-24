@@ -197,6 +197,7 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 	_, ctx := ktesting.NewTestContext(t)
 	controller := namespace.NewNamespaceController(
 		ctx,
+		"namespace-controller",
 		clientSet,
 		metadataClient,
 		discoverResourcesFn,

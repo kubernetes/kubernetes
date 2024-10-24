@@ -186,7 +186,7 @@ func newFixture(t testing.TB) *fixture {
 func (f *fixture) newController(ctx context.Context) (*DeploymentController, informers.SharedInformerFactory, error) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
-	c, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
+	c, err := NewDeploymentController(ctx, "deployment-controller", informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
 	if err != nil {
 		return nil, nil, err
 	}
