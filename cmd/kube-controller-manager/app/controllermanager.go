@@ -803,6 +803,7 @@ func startServiceAccountTokenController(ctx context.Context, controllerContext C
 		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		rootClientBuilder.ClientOrDie("tokens-controller"),

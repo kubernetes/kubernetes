@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const (
@@ -29,6 +30,7 @@ const (
 )
 
 func BenchmarkListener(b *testing.B) {
+	_, ctx := ktesting.NewTestContext(b)
 	var notification addNotification
 
 	var swg sync.WaitGroup
@@ -43,8 +45,8 @@ func BenchmarkListener(b *testing.B) {
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop
-	wg.Start(pl.run)
-	wg.Start(pl.pop)
+	wg.StartWithContext(ctx, pl.run)
+	wg.StartWithContext(ctx, pl.pop)
 
 	b.ReportAllocs()
 	b.ResetTimer()
