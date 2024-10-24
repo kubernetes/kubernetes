@@ -99,7 +99,7 @@ func ensureAllJobPodsRunning(ctx context.Context, c clientset.Interface, ns, job
 
 // ensureJobRunning uses c to check if the Job named jobName in ns is running,
 // (not completed, nor failed, nor suspended) returning an error if it can't
-// read the job or when it's not runnig
+// read the job or when it's not running
 func ensureJobRunning(ctx context.Context, c clientset.Interface, ns, jobName string) error {
 	job, err := e2ejob.GetJob(ctx, c, ns, jobName)
 	if err != nil {

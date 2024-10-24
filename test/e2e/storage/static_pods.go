@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("StaticPods", feature.Kind, func() {
 	)
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		// Install a CSI driver. Using csi-driver-hospath here.
+		// Install a CSI driver. Using csi-driver-hostpath here.
 		driver = drivers.InitHostPathCSIDriver().(storageframework.DynamicPVTestDriver)
 		testConfig = driver.PrepareTest(ctx, f)
 	})

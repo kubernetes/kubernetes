@@ -331,7 +331,7 @@ var _ = SIGDescribe("Security Context", func() {
 	/*
 		Release: v1.21
 		Testname: Security Context, test RunAsGroup at container level
-		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at containr level. Pod MUST be in Succeeded phase.
+		Description: Container is created with runAsUser and runAsGroup option by passing uid 1001 and gid 2002 at container level. Pod MUST be in Succeeded phase.
 		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 	*/
 	framework.ConformanceIt("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]", func(ctx context.Context) {

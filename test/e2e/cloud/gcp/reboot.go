@@ -218,12 +218,12 @@ func printStatusAndLogsForNotReadyPods(ctx context.Context, c clientset.Interfac
 		framework.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
-			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
+			cIdentifier := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
 			log, err := e2epod.GetPodLogs(ctx, c, p.Namespace, p.Name, container.Name)
-			printFn(cIdentifer, log, err, false)
+			printFn(cIdentifier, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
-				printFn(cIdentifer, log, err, true)
+				printFn(cIdentifier, log, err, true)
 			}
 		}
 	}

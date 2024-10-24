@@ -101,7 +101,7 @@ type PersistentVolumeConfig struct {
 	// [Optional] Prebind lets you specify a PVC to bind this PV to before
 	// creation
 	Prebind *v1.PersistentVolumeClaim
-	// [Optiona] ReclaimPolicy defaults to "Reclaim" if unset
+	// [Optional] ReclaimPolicy defaults to "Reclaim" if unset
 	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
 	StorageClassName string
 	// [Optional] NodeAffinity defines constraints that limit what nodes this

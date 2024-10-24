@@ -44,7 +44,7 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
-		//Only for Windows containers
+		// Only for Windows containers
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
@@ -74,7 +74,7 @@ var _ = sigDescribe("Services", skipUnlessWindows(func() {
 		_, err = jig.Run(ctx, windowsNodeSelectorTweak)
 		framework.ExpectNoError(err)
 
-		//using hybrid_network methods
+		// using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		testPod := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
 		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
