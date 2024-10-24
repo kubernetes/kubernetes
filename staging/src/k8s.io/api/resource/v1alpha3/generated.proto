@@ -112,6 +112,10 @@ message CELDeviceSelector {
   //
   //     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
   //
+  // The length of the expression must be smaller or equal to 10 Ki. The
+  // cost of evaluating it is also limited based on the estimated number
+  // of logical steps.
+  //
   // +required
   optional string expression = 1;
 }
