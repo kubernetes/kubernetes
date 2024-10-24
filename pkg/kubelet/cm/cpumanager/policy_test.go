@@ -38,9 +38,10 @@ var (
 	}
 
 	topoDualSocketHT = &topology.CPUTopology{
-		NumCPUs:    12,
-		NumSockets: 2,
-		NumCores:   6,
+		NumCPUs:        12,
+		NumSockets:     2,
+		NumCores:       6,
+		NumUncoreCache: 1,
 		CPUDetails: map[int]topology.CPUInfo{
 			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
 			1:  {CoreID: 1, SocketID: 1, NUMANodeID: 1},
@@ -54,6 +55,106 @@ var (
 			9:  {CoreID: 3, SocketID: 1, NUMANodeID: 1},
 			10: {CoreID: 4, SocketID: 0, NUMANodeID: 0},
 			11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+		},
+	}
+
+	topoUncoreDualSocketNoSMT = &topology.CPUTopology{
+		NumCPUs:        16,
+		NumSockets:     2,
+		NumCores:       16,
+		NumUncoreCache: 4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			8:  {CoreID: 8, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 2},
+			9:  {CoreID: 9, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 2},
+			10: {CoreID: 10, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 2},
+			11: {CoreID: 11, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 2},
+			12: {CoreID: 12, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 3},
+			13: {CoreID: 13, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 3},
+			14: {CoreID: 14, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 3},
+			15: {CoreID: 15, SocketID: 1, NUMANodeID: 0, UncoreCacheID: 3},
+		},
+	}
+
+	topoUncoreSingleSocketMultiNuma = &topology.CPUTopology{
+		NumCPUs:        16,
+		NumSockets:     1,
+		NumCores:       16,
+		NumUncoreCache: 4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			10: {CoreID: 10, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			11: {CoreID: 11, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 2},
+			12: {CoreID: 12, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+			13: {CoreID: 13, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+			14: {CoreID: 14, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+			15: {CoreID: 15, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 3},
+		},
+	}
+
+	topoUncoreSingleSocketSMT = &topology.CPUTopology{
+		NumCPUs:        16,
+		NumSockets:     1,
+		NumCores:       8,
+		NumUncoreCache: 2,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			8:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			9:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			10: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			11: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			12: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			13: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			14: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			15: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+		},
+	}
+
+	topoUncoreSingleSocketNoSMT = &topology.CPUTopology{
+		NumCPUs:        16,
+		NumSockets:     1,
+		NumCores:       16,
+		NumUncoreCache: 4,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 1},
+			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 2},
+			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
+			13: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
+			14: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
+			15: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 3},
 		},
 	}
 
