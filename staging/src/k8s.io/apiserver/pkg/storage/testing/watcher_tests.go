@@ -674,7 +674,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				watchKey += "/" + tt.requestedName
 			}
 
-			predicate := createPodPredicate(tt.fieldSelector, false, tt.indexFields)
+			predicate := CreatePodPredicate(tt.fieldSelector, false, tt.indexFields)
 
 			list := &example.PodList{}
 			opts := storage.ListOptions{
@@ -988,7 +988,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				}
 			}
 
-			predicate := createPodPredicate(tt.fieldSelector, true, tt.indexFields)
+			predicate := CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
 
 			list := &example.PodList{}
 			opts := storage.ListOptions{
@@ -1654,45 +1654,6 @@ type testWatchStruct struct {
 	obj         *example.Pod
 	expectEvent bool
 	watchType   watch.EventType
-}
-
-func createPodPredicate(field fields.Selector, namespaceScoped bool, indexField []string) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:       labels.Everything(),
-		Field:       field,
-		GetAttrs:    determinePodGetAttrFunc(namespaceScoped, indexField),
-		IndexFields: indexField,
-	}
-}
-
-func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.AttrFunc {
-	if indexField != nil {
-		if namespaceScoped {
-			return namespacedScopedNodeNameAttrFunc
-		}
-		return clusterScopedNodeNameAttrFunc
-	}
-	if namespaceScoped {
-		return storage.DefaultNamespaceScopedAttr
-	}
-	return storage.DefaultClusterScopedAttr
-}
-
-func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod := obj.(*example.Pod)
-	return nil, fields.Set{
-		"spec.nodeName":      pod.Spec.NodeName,
-		"metadata.name":      pod.ObjectMeta.Name,
-		"metadata.namespace": pod.ObjectMeta.Namespace,
-	}, nil
-}
-
-func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod := obj.(*example.Pod)
-	return nil, fields.Set{
-		"spec.nodeName": pod.Spec.NodeName,
-		"metadata.name": pod.ObjectMeta.Name,
-	}, nil
 }
 
 func basePod(podName string) *example.Pod {

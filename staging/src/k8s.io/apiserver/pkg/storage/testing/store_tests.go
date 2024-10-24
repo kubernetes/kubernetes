@@ -2761,3 +2761,312 @@ func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interfac
 		t.Errorf("unexpected items: %#v", names)
 	}
 }
+
+func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage.Interface) {
+	tests := []struct {
+		name               string
+		requestedNamespace string
+		recursive          bool
+		fieldSelector      fields.Selector
+		indexFields        []string
+		inputPods          []example.Pod
+		expectPods         []example.Pod
+	}{
+		{
+			name:          "request without namespace, without field selector",
+			recursive:     true,
+			fieldSelector: fields.Everything(),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t1-foo1", "t1-ns1"),
+				*baseNamespacedPod("t1-foo2", "t1-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t1-foo1", "t1-ns1"),
+				*baseNamespacedPod("t1-foo2", "t1-ns2"),
+			},
+		},
+		{
+			name:          "request without namespace, field selector with metadata.namespace",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=t2-ns1"),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t2-foo1", "t2-ns1"),
+				*baseNamespacedPod("t2-foo1", "t2-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t2-foo1", "t2-ns1"),
+			},
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=t3-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPodAssigned("t3-foo1", "t3-ns1", "t3-bar1"),
+				*baseNamespacedPodAssigned("t3-foo2", "t3-ns2", "t3-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t3-foo1", "t3-ns1", "t3-bar1"),
+			},
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename to filter out",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName!=t4-bar1"),
+			indexFields:   []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPodAssigned("t4-foo1", "t4-ns1", "t4-bar1"),
+				*baseNamespacedPodAssigned("t4-foo2", "t4-ns2", "t4-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t4-foo2", "t4-ns2", "t4-bar2"),
+			},
+		},
+		{
+			name:               "request with namespace, without field selector",
+			requestedNamespace: "t5-ns1",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t5-foo1", "t5-ns1"),
+				*baseNamespacedPod("t5-foo1", "t5-ns2"),
+				*baseNamespacedPod("t5-foo2", "t5-ns1"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t5-foo1", "t5-ns1"),
+				*baseNamespacedPod("t5-foo2", "t5-ns1"),
+			},
+		},
+		{
+			name:               "request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "t6-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t6-ns1"),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t6-foo1", "t6-ns1"),
+				*baseNamespacedPod("t6-foo1", "t6-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t6-foo1", "t6-ns1"),
+			},
+		},
+		{
+			name:               "request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "t7-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=t7-ns2"),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t7-foo1", "t7-ns1"),
+				*baseNamespacedPod("t7-foo1", "t7-ns2"),
+				*baseNamespacedPodUpdated("t7-foo2", "t7-ns1"),
+				*baseNamespacedPodUpdated("t7-foo2", "t7-ns2"),
+			},
+			expectPods: []example.Pod{},
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename",
+			requestedNamespace: "t8-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName=t8-bar2"),
+			indexFields:        []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPodAssigned("t8-foo1", "t8-ns1", "t8-bar1"),
+				*baseNamespacedPodAssigned("t8-foo1", "t8-ns2", "t8-bar2"),
+				*baseNamespacedPodAssigned("t8-foo2", "t8-ns1", "t8-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t8-foo2", "t8-ns1", "t8-bar2"),
+			},
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename to filter out",
+			requestedNamespace: "t9-ns2",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=t9-bar1"),
+			indexFields:        []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t9-foo1", "t9-ns1"),
+				*baseNamespacedPod("t9-foo1", "t9-ns2"),
+				*baseNamespacedPodAssigned("t9-foo3", "t9-ns2", "t9-bar1"),
+				*baseNamespacedPodAssigned("t9-foo2", "t9-ns2", "t9-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t9-foo1", "t9-ns2"),
+				*baseNamespacedPodAssigned("t9-foo2", "t9-ns2", "t9-bar2"),
+			},
+		},
+		{
+			name:          "request without namespace, field selector with metadata.name",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=t10-foo1"),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t10-foo1", "t10-ns1"),
+				*baseNamespacedPod("t10-foo1", "t10-ns2"),
+				*baseNamespacedPod("t10-foo2", "t10-ns1"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t10-foo1", "t10-ns1"),
+				*baseNamespacedPod("t10-foo1", "t10-ns2"),
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t11-foo1",
+				"metadata.namespace": "t11-ns1",
+			}),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t11-foo1", "t11-ns1"),
+				*baseNamespacedPod("t11-foo2", "t11-ns1"),
+				*baseNamespacedPod("t11-foo1", "t11-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t11-foo1", "t11-ns1"),
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and spec.nodeName",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name": "t12-foo1",
+				"spec.nodeName": "t12-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPodAssigned("t12-foo1", "t12-ns1", "t12-bar1"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t12-foo1", "t12-ns1", "t12-bar1"),
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			recursive: true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t15-bar1"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t15-foo1"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t15-foo1", "t15-ns1"),
+				*baseNamespacedPod("t15-foo2", "t15-ns1"),
+				*baseNamespacedPodAssigned("t15-foo1", "t15-ns2", "t15-bar1"),
+				*baseNamespacedPodAssigned("t15-foo2", "t15-ns2", "t15-bar1"),
+				*baseNamespacedPodAssigned("t15-foo1", "t15-ns3", "t15-bar2"),
+				*baseNamespacedPodAssigned("t15-foo2", "t15-ns3", "t15-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t15-foo1", "t15-ns1"),
+				*baseNamespacedPodAssigned("t15-foo1", "t15-ns3", "t15-bar2"),
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name",
+			requestedNamespace: "t16-ns1",
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=t16-foo1"),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t16-foo1", "t16-ns1"),
+				*baseNamespacedPod("t16-foo2", "t16-ns1"),
+				*baseNamespacedPod("t16-foo1", "t16-ns2"),
+				*baseNamespacedPod("t16-foo2", "t16-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t16-foo1", "t16-ns1"),
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
+			requestedNamespace: "t17-ns1",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t17-foo1",
+				"metadata.namespace": "t17-ns1",
+			}),
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t17-foo1", "t17-ns1"),
+				*baseNamespacedPod("t17-foo2", "t17-ns1"),
+				*baseNamespacedPod("t17-foo1", "t17-ns2"),
+				*baseNamespacedPod("t17-foo2", "t17-ns2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPod("t17-foo1", "t17-ns1"),
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedNamespace: "t18-ns2",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "t18-foo2",
+				"metadata.namespace": "t18-ns2",
+				"spec.nodeName":      "t18-bar1",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t18-foo1", "t18-ns1"),
+				*baseNamespacedPod("t18-foo2", "t18-ns1"),
+				*baseNamespacedPod("t18-foo1", "t18-ns2"),
+				*baseNamespacedPodAssigned("t18-foo2", "t18-ns2", "t18-bar1"),
+				*baseNamespacedPodAssigned("t18-foo1", "t18-ns3", "t18-bar1"),
+				*baseNamespacedPodAssigned("t18-foo2", "t18-ns3", "t18-bar1"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t18-foo2", "t18-ns2", "t18-bar1"),
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "t19-ns2",
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=t19-bar2"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "t19-foo1", "metadata.namespace": "t19-ns2"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+			inputPods: []example.Pod{
+				*baseNamespacedPod("t19-foo1", "t19-ns1"),
+				*baseNamespacedPod("t19-foo2", "t19-ns1"),
+				*baseNamespacedPodAssigned("t19-foo1", "t19-ns2", "t19-bar1"),
+				*baseNamespacedPodAssigned("t19-foo2", "t19-ns2", "t19-bar2"),
+				*baseNamespacedPodAssigned("t19-foo1", "t19-ns3", "t19-bar2"),
+			},
+			expectPods: []example.Pod{
+				*baseNamespacedPodAssigned("t19-foo1", "t19-ns2", "t19-bar1"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podNames := map[string]struct{}{}
+			for _, pod := range tt.inputPods {
+				out := &example.Pod{}
+				key := computePodKey(&pod)
+				podNames[key] = struct{}{}
+				err := store.Create(ctx, key, &pod, out, 0)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+			}
+			opts := storage.ListOptions{
+				ResourceVersion: "",
+				Predicate:       CreatePodPredicate(tt.fieldSelector, true, tt.indexFields),
+				Recursive:       true,
+			}
+			listOut := &example.PodList{}
+			if err := store.GetList(ctx, "/pods/"+tt.requestedNamespace, opts, listOut); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			i := 0
+			for _, pod := range listOut.Items {
+				if _, found := podNames[computePodKey(&pod)]; !found {
+					continue
+				}
+				pod.ResourceVersion = ""
+				listOut.Items[i] = pod
+				i++
+			}
+			listOut.Items = listOut.Items[:i]
+
+			expectNoDiff(t, "incorrect list pods", tt.expectPods, listOut.Items)
+		})
+	}
+}

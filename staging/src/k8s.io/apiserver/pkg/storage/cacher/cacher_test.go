@@ -256,6 +256,12 @@ func TestListResourceVersionMatch(t *testing.T) {
 	// TODO(#109831): Enable use of this test and run it.
 }
 
+func TestNamespaceScopedList(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
+}
+
 func TestGuaranteedUpdate(t *testing.T) {
 	// TODO(#109831): Enable use of this test and run it.
 }
