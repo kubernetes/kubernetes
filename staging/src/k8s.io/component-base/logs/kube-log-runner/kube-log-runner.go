@@ -26,10 +26,14 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"k8s.io/component-base/logs/logrotation"
 )
 
 var (
 	logFilePath    = flag.String("log-file", "", "If non-empty, save stdout to this file")
+	logFileSize    = flag.Uint("log-file-size", 0, "Useful with log-file, if non-zero, rotate log file when it reaches this size in MB")
+	logFileAge     = flag.Uint("log-file-age", 0, "Useful with log-file-size, if non-zero, remove log files older than this many days")
 	alsoToStdOut   = flag.Bool("also-stdout", false, "useful with log-file, log to standard output as well as the log file")
 	redirectStderr = flag.Bool("redirect-stderr", true, "treat stderr same as stdout")
 )
@@ -54,7 +58,8 @@ func configureAndRun() error {
 	}
 
 	if logFilePath != nil && *logFilePath != "" {
-		logFile, err := os.OpenFile(*logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		logFile, err := logrotation.Open(*logFilePath, *logFileSize, *logFileAge)
+
 		if err != nil {
 			return fmt.Errorf("failed to create log file %v: %w", *logFilePath, err)
 		}
