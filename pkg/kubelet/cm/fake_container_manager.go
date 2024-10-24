@@ -124,10 +124,10 @@ func (cm *FakeContainerManager) GetCapacity(localStorageCapacityIsolation bool) 
 	return c
 }
 
-func (cm *FakeContainerManager) GetPluginRegistrationHandler() cache.PluginHandler {
+func (cm *FakeContainerManager) GetPluginRegistrationHandlers(getNode func() (*v1.Node, error)) map[string]cache.PluginHandler {
 	cm.Lock()
 	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandler")
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandlers")
 	return nil
 }
 

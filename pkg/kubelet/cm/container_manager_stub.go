@@ -91,7 +91,7 @@ func (cm *containerManagerStub) GetCapacity(localStorageCapacityIsolation bool) 
 	return c
 }
 
-func (cm *containerManagerStub) GetPluginRegistrationHandler() cache.PluginHandler {
+func (cm *containerManagerStub) GetPluginRegistrationHandlers(getNode func() (*v1.Node, error)) map[string]cache.PluginHandler {
 	return nil
 }
 

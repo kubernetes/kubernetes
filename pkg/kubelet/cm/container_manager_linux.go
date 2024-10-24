@@ -46,12 +46,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
+	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
@@ -132,6 +134,8 @@ type containerManagerImpl struct {
 	topologyManager topologymanager.Manager
 	// Interface for Dynamic Resource Allocation management.
 	draManager dra.Manager
+	// kubeClient is the interface to the Kubernetes API server. May be nil if the kubelet is running in standalone mode.
+	kubeClient clientset.Interface
 }
 
 type features struct {
@@ -312,6 +316,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, err
 		}
 	}
+	cm.kubeClient = kubeClient
 
 	// Initialize CPU manager
 	cm.cpuManager, err = cpumanager.NewManager(
@@ -649,8 +654,14 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
-	return cm.deviceManager.GetWatcherHandler()
+func (cm *containerManagerImpl) GetPluginRegistrationHandlers(getNode func() (*v1.Node, error)) map[string]cache.PluginHandler {
+	res := map[string]cache.PluginHandler{pluginwatcherapi.DevicePlugin: cm.deviceManager.GetWatcherHandler()}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		res[pluginwatcherapi.DRAPlugin] = cache.PluginHandler(draplugin.NewRegistrationHandler(cm.kubeClient, getNode))
+	}
+
+	return res
 }
 
 // TODO: move the GetResources logic to PodContainerManager.
