@@ -5183,7 +5183,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		// When the feature-gate is turned off, any new requests attempting to update CPU or memory
 		// resource values will result in validation failure.
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeRequestValid {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
 			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
@@ -5296,6 +5296,12 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 }
 
 func isPodResizeRequestValid(pod core.Pod) bool {
+	// TODO: Remove this after GA+3 releases of InPlacePodVerticalScaling
+	// This code handles the version skew as described in the KEP.
+	// For handling version skew we're only allowing to update the Pod's Resources
+	// if the Pod already has Pod.Status.ContainerStatuses[i].Resources. This means
+	// that the apiserver would only allow updates to Pods running on Nodes with 
+	// the InPlacePodVerticalScaling feature gate enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false
 	}
