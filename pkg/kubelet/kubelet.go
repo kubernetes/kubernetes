@@ -45,6 +45,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 
 	inuserns "github.com/moby/sys/userns"
 	v1 "k8s.io/api/core/v1"
@@ -661,6 +662,20 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.podCache,
 	)
 
+	var singleProcessOOMKill *bool
+	if sysruntime.GOOS == "linux" {
+		if !util.IsCgroup2UnifiedMode() {
+			if kubeCfg.SingleProcessOOMKill != nil {
+				klog.V(2).InfoS("Warning: the congigured SingleProcessOOMKill is ignored and always true in cgroup v1", "SingleProcessOOMKill", *kubeCfg.SingleProcessOOMKill)
+			}
+			// This is a default behavior for cgroups v1.
+			singleProcessOOMKill = ptr.To(true)
+		}
+		if kubeCfg.SingleProcessOOMKill == nil {
+			singleProcessOOMKill = ptr.To(false)
+		}
+	}
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -680,6 +695,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		int(kubeCfg.RegistryBurst),
 		imageCredentialProviderConfigFile,
 		imageCredentialProviderBinDir,
+		singleProcessOOMKill,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
 		kubeDeps.RemoteRuntimeService,

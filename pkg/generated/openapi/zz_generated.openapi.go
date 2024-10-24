@@ -61941,6 +61941,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"singleProcessOOMKill": {
+						SchemaProps: spec.SchemaProps{
+							Description: "singleProcessOOMKill, if true, will prevent the `memory.oom.group` flag from being set for container cgroups in cgroups v2. This causes processes in the container to be OOM killed individually instead of as a group. It means that if true, the behavior aligns with the behavior of cgroups v1. The default value is determined automatically when you don't specify. On non-linux such as windows, only nil is allowed. On cgroup v1 linux, the value set is ignored and always true. On cgroup v2 linux, nil, true and false are allowed. The default value is false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"cpuManagerPolicyOptions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "cpuManagerPolicyOptions is a set of key=value which \tallows to set extra options to fine tune the behaviour of the cpu manager policies. Requires  both the \"CPUManager\" and \"CPUManagerPolicyOptions\" feature gates to be enabled. Default: nil",

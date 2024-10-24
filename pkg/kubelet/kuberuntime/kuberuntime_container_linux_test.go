@@ -249,12 +249,13 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		cpuReq        *resource.Quantity
-		cpuLim        *resource.Quantity
-		memLim        *resource.Quantity
-		expected      *runtimeapi.LinuxContainerResources
-		cgroupVersion CgroupVersion
+		name                 string
+		cpuReq               *resource.Quantity
+		cpuLim               *resource.Quantity
+		memLim               *resource.Quantity
+		expected             *runtimeapi.LinuxContainerResources
+		cgroupVersion        CgroupVersion
+		singleProcessOOMKill bool
 	}{
 		{
 			name:   "Request128MBLimit256MB",
@@ -322,6 +323,20 @@ func TestCalculateLinuxResources(t *testing.T) {
 			cgroupVersion: cgroupV2,
 		},
 		{
+			name:   "Request128MBLimit256MBSingleProcess",
+			cpuReq: generateResourceQuantity("1"),
+			cpuLim: generateResourceQuantity("2"),
+			memLim: generateResourceQuantity("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+			cgroupVersion:        cgroupV2,
+			singleProcessOOMKill: true,
+		},
+		{
 			name:   "RequestNoMemory",
 			cpuReq: generateResourceQuantity("2"),
 			cpuLim: generateResourceQuantity("8"),
@@ -365,6 +380,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 	}
 	for _, test := range tests {
 		setCgroupVersionDuringTest(test.cgroupVersion)
+		m.singleProcessOOMKill = ptr.To(test.singleProcessOOMKill)
 		linuxContainerResources := m.calculateLinuxResources(test.cpuReq, test.cpuLim, test.memLim)
 		assert.Equal(t, test.expected, linuxContainerResources)
 	}
@@ -809,16 +825,18 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name          string
-		scalingFg     bool
-		limits        v1.ResourceList
-		requests      v1.ResourceList
-		cStatus       []v1.ContainerStatus
-		expected      *runtimeapi.LinuxContainerResources
-		cgroupVersion CgroupVersion
+		name                 string
+		scalingFg            bool
+		singleProcessOOMKill bool
+		limits               v1.ResourceList
+		requests             v1.ResourceList
+		cStatus              []v1.ContainerStatus
+		expected             *runtimeapi.LinuxContainerResources
+		cgroupVersion        CgroupVersion
 	}{
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
+			true,
 			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
@@ -829,6 +847,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - no container status",
 			true,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
@@ -837,6 +856,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		},
 		{
 			"best-effort qos - no container status",
+			true,
 			true,
 			nil,
 			nil,
@@ -847,6 +867,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - empty resources container status",
 			true,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
@@ -855,6 +876,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - empty resources container status",
+			true,
 			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
@@ -865,6 +887,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"best-effort qos - empty resources container status",
 			true,
+			true,
 			nil,
 			nil,
 			[]v1.ContainerStatus{{Name: "c1"}},
@@ -873,6 +896,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
+			true,
 			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
@@ -888,6 +912,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
 			true,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -902,6 +927,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
 			false,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
@@ -911,6 +937,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
 			false,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -925,6 +952,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
 			false,
+			true,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -939,6 +967,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"best-effort qos - no container status",
 			false,
+			true,
 			nil,
 			nil,
 			[]v1.ContainerStatus{},
@@ -948,6 +977,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
@@ -957,6 +987,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - no container status",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
@@ -966,6 +997,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"best-effort qos - no container status",
 			true,
+			false,
 			nil,
 			nil,
 			[]v1.ContainerStatus{},
@@ -975,6 +1007,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - empty resources container status",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
@@ -984,6 +1017,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - empty resources container status",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
@@ -993,6 +1027,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"best-effort qos - empty resources container status",
 			true,
+			false,
 			nil,
 			nil,
 			[]v1.ContainerStatus{{Name: "c1"}},
@@ -1002,6 +1037,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -1016,6 +1052,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
 			true,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -1030,6 +1067,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
 			false,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
@@ -1038,6 +1076,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
+			false,
 			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
@@ -1053,6 +1092,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
 			false,
+			false,
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{
@@ -1066,6 +1106,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		},
 		{
 			"best-effort qos - no container status",
+			false,
 			false,
 			nil,
 			nil,
@@ -1085,6 +1126,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			if len(tc.cStatus) > 0 {
 				pod.Status.ContainerStatuses = tc.cStatus
 			}
+			m.singleProcessOOMKill = ptr.To(tc.singleProcessOOMKill)
 			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
 			if !cmp.Equal(resources, tc.expected) {
