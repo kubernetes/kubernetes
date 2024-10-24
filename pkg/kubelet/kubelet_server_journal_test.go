@@ -17,7 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"context"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -27,6 +31,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/ptr"
 )
 
 func Test_getLoggingCmd(t *testing.T) {
@@ -92,15 +97,15 @@ func Test_newNodeLogQuery(t *testing.T) {
 		{query: url.Values{"untilTime": []string{validTimeValue}},
 			want: &nodeLogQuery{options: options{UntilTime: &validT}}},
 
-		{query: url.Values{"tailLines": []string{"100"}}, want: &nodeLogQuery{options: options{TailLines: intPtr(100)}}},
+		{query: url.Values{"tailLines": []string{"100"}}, want: &nodeLogQuery{options: options{TailLines: ptr.To(100)}}},
 		{query: url.Values{"tailLines": []string{"foo"}}, wantErr: true},
 		{query: url.Values{"tailLines": []string{" "}}, wantErr: true},
 
 		{query: url.Values{"pattern": []string{"foo"}}, want: &nodeLogQuery{options: options{Pattern: "foo"}}},
 
 		{query: url.Values{"boot": []string{""}}, want: nil},
-		{query: url.Values{"boot": []string{"0"}}, want: &nodeLogQuery{options: options{Boot: intPtr(0)}}},
-		{query: url.Values{"boot": []string{"-23"}}, want: &nodeLogQuery{options: options{Boot: intPtr(-23)}}},
+		{query: url.Values{"boot": []string{"0"}}, want: &nodeLogQuery{options: options{Boot: ptr.To(0)}}},
+		{query: url.Values{"boot": []string{"-23"}}, want: &nodeLogQuery{options: options{Boot: ptr.To(-23)}}},
 		{query: url.Values{"boot": []string{"foo"}}, wantErr: true},
 		{query: url.Values{"boot": []string{" "}}, wantErr: true},
 
@@ -128,14 +133,15 @@ func Test_newNodeLogQuery(t *testing.T) {
 
 func Test_validateServices(t *testing.T) {
 	var (
-		service1 = "svc1"
-		service2 = "svc2"
-		service3 = "svc.foo"
-		service4 = "svc_foo"
-		service5 = "svc@foo"
-		service6 = "svc:foo"
-		invalid1 = "svc\n"
-		invalid2 = "svc.foo\n"
+		service1                 = "svc1"
+		service2                 = "svc2"
+		serviceDot               = "svc.foo"
+		serviceUnderscore        = "svc_foo"
+		serviceAt                = "svc@foo"
+		serviceColon             = "svc:foo"
+		invalidServiceNewline    = "svc\n"
+		invalidServiceNewlineDot = "svc.foo\n"
+		invalidServiceSlash      = "svc/foo"
 	)
 	tests := []struct {
 		name     string
@@ -144,14 +150,15 @@ func Test_validateServices(t *testing.T) {
 	}{
 		{name: "one service", services: []string{service1}},
 		{name: "two services", services: []string{service1, service2}},
-		{name: "dot service", services: []string{service3}},
-		{name: "underscore service", services: []string{service4}},
-		{name: "at service", services: []string{service5}},
-		{name: "colon service", services: []string{service6}},
-		{name: "invalid service new line", services: []string{invalid1}, wantErr: true},
-		{name: "invalid service with dot", services: []string{invalid2}, wantErr: true},
+		{name: "dot service", services: []string{serviceDot}},
+		{name: "underscore service", services: []string{serviceUnderscore}},
+		{name: "at service", services: []string{serviceAt}},
+		{name: "colon service", services: []string{serviceColon}},
+		{name: "invalid service new line", services: []string{invalidServiceNewline}, wantErr: true},
+		{name: "invalid service with dot", services: []string{invalidServiceNewlineDot}, wantErr: true},
+		{name: "invalid service with slash", services: []string{invalidServiceSlash}, wantErr: true},
 		{name: "long service", services: []string{strings.Repeat(service1, 100)}, wantErr: true},
-		{name: "max number of services", services: []string{service1, service2, service3, service4, service5}, wantErr: true},
+		{name: "max number of services", services: []string{service1, service2, serviceDot, serviceUnderscore, serviceAt}, wantErr: true},
 	}
 	for _, tt := range tests {
 		errs := validateServices(tt.services)
@@ -198,10 +205,10 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},
 			wantErr: true},
 		// boot is not supported on Windows.
-		{name: "boot", Services: []string{service1}, options: options{Boot: intPtr(-1)}, wantErr: runtime.GOOS == "windows"},
-		{name: "boot out of range", Services: []string{service1}, options: options{Boot: intPtr(1)}, wantErr: true},
-		{name: "tailLines", Services: []string{service1}, options: options{TailLines: intPtr(100)}},
-		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: intPtr(100000)}},
+		{name: "boot", Services: []string{service1}, options: options{Boot: ptr.To(-1)}, wantErr: runtime.GOOS == "windows"},
+		{name: "boot out of range", Services: []string{service1}, options: options{Boot: ptr.To(1)}, wantErr: true},
+		{name: "tailLines", Services: []string{service1}, options: options{TailLines: ptr.To(100)}},
+		{name: "tailLines out of range", Services: []string{service1}, options: options{TailLines: ptr.To(100000)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,6 +226,63 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 	}
 }
 
-func intPtr(i int) *int {
-	return &i
+func Test_heuristicsCopyFileLogs(t *testing.T) {
+	ctx := context.TODO()
+	buf := &bytes.Buffer{}
+
+	dir, err := os.MkdirTemp("", "logs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
+	// Check missing logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	if !strings.Contains(buf.String(), "log not found for service.log") {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check missing service logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if !strings.Contains(buf.String(), "log not found for service") {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check explicitly-named files
+	if err := os.WriteFile(filepath.Join(dir, "service.log"), []byte("valid logs"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service.log")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check service logs
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check that a directory doesn't cause errors
+	if err := os.Mkdir(filepath.Join(dir, "service"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
+	buf.Reset()
+
+	// Check that service logs return the first matching file
+	if err := os.WriteFile(filepath.Join(dir, "service", "service.log"), []byte("error"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	heuristicsCopyFileLogs(ctx, buf, dir, "service")
+	if buf.String() != "valid logs" {
+		t.Fail()
+	}
 }
