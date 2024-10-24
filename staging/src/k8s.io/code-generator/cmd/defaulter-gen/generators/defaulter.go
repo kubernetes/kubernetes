@@ -222,7 +222,7 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
-	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, args.GeneratedBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
