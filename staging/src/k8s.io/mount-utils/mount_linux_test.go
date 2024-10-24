@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"golang.org/x/sys/unix"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
@@ -872,5 +874,127 @@ func makeFakeCommandAction(stdout string, err error, cmdFn func()) testexec.Fake
 	}
 	return func(cmd string, args ...string) utilexec.Cmd {
 		return testexec.InitFakeCmd(&c, cmd, args...)
+	}
+}
+
+func makeLink(link, target string) error {
+	if output, err := exec.Command("ln", "-s", target, link).CombinedOutput(); err != nil {
+		return fmt.Errorf("mklink failed: %v, link(%q) target(%q) output: %q", err, link, target, string(output))
+	}
+	return nil
+}
+
+func removeLink(link string) error {
+	if output, err := exec.Command("rm", "-rf", link).CombinedOutput(); err != nil {
+		return fmt.Errorf("rmlink failed: %v, output: %q", err, string(output))
+	}
+	return nil
+}
+
+func TestIsLikelyNotMountPoint(t *testing.T) {
+	mounter := Mounter{"fake/path", pointer.BoolPtr(true), true, true}
+
+	tests := []struct {
+		fileName       string
+		targetLinkName string
+		setUp          func(base, fileName, targetLinkName string) error
+		cleanUp        func(base, fileName, targetLinkName string) error
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			"Dir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return os.Mkdir(filepath.Join(base, fileName), 0o750)
+			},
+			func(base, fileName, targetLinkName string) error {
+				return os.Remove(filepath.Join(base, fileName))
+			},
+			true,
+			false,
+		},
+		{
+			"InvalidDir",
+			"",
+			func(base, fileName, targetLinkName string) error {
+				return nil
+			},
+			func(base, fileName, targetLinkName string) error {
+				return nil
+			},
+			true,
+			true,
+		},
+		{
+			"ValidSymLink",
+			"targetSymLink",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0o750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return nil
+			},
+			func(base, fileName, targetLinkName string) error {
+				if err := removeLink(filepath.Join(base, fileName)); err != nil {
+					return err
+				}
+				return removeLink(filepath.Join(base, targetLinkName))
+			},
+			true,
+			false,
+		},
+		{
+			"InvalidSymLink",
+			"targetSymLink2",
+			func(base, fileName, targetLinkName string) error {
+				targeLinkPath := filepath.Join(base, targetLinkName)
+				if err := os.Mkdir(targeLinkPath, 0o750); err != nil {
+					return err
+				}
+
+				filePath := filepath.Join(base, fileName)
+				if err := makeLink(filePath, targeLinkPath); err != nil {
+					return err
+				}
+				return removeLink(targeLinkPath)
+			},
+			func(base, fileName, targetLinkName string) error {
+				return removeLink(filepath.Join(base, fileName))
+			},
+			true,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		// test with absolute and relative path
+		baseList := []string{t.TempDir(), "./"}
+		for _, base := range baseList {
+			if err := test.setUp(base, test.fileName, test.targetLinkName); err != nil {
+				t.Fatalf("unexpected error in setUp(%s, %s): %v", test.fileName, test.targetLinkName, err)
+			}
+
+			filePath := filepath.Join(base, test.fileName)
+			result, err := mounter.IsLikelyNotMountPoint(filePath)
+			assert.Equal(t, result, test.expectedResult, "Expect result not equal with IsLikelyNotMountPoint(%s) return: %q, expected: %q",
+				filePath, result, test.expectedResult)
+
+			if base == "./" {
+				defer test.cleanUp(base, test.fileName, test.targetLinkName)
+			}
+
+			if test.expectError {
+				assert.NotNil(t, err, "Expect error during IsLikelyNotMountPoint(%s)", filePath)
+			} else {
+				assert.Nil(t, err, "Expect error is nil during IsLikelyNotMountPoint(%s): %v", filePath, err)
+			}
+		}
 	}
 }

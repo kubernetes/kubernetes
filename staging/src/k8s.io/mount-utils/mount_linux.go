@@ -439,7 +439,7 @@ func (*Mounter) List() ([]MountPoint, error) {
 
 func statx(file string) (unix.Statx_t, error) {
 	var stat unix.Statx_t
-	if err := unix.Statx(0, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
+	if err := unix.Statx(unix.AT_FDCWD, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
 		if err == unix.ENOSYS {
 			return stat, errStatxNotSupport
 		}
