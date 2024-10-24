@@ -742,7 +742,7 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 	return c.Config.Complete(c.SharedInformerFactory)
 }
 
-var allowedMediaTypes = []string{
+var AllowedMediaTypes = []string{
 	runtime.ContentTypeJSON,
 	runtime.ContentTypeYAML,
 	runtime.ContentTypeProtobuf,
@@ -757,14 +757,14 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 	for _, info := range c.Serializer.SupportedMediaTypes() {
 		var ok bool
-		for _, mt := range allowedMediaTypes {
+		for _, mt := range AllowedMediaTypes {
 			if info.MediaType == mt {
 				ok = true
 				break
 			}
 		}
 		if !ok {
-			return nil, fmt.Errorf("refusing to create new apiserver %q with support for media type %q (allowed media types are: %s)", name, info.MediaType, strings.Join(allowedMediaTypes, ", "))
+			return nil, fmt.Errorf("refusing to create new apiserver %q with support for media type %q (allowed media types are: %s)", name, info.MediaType, strings.Join(AllowedMediaTypes, ", "))
 		}
 	}
 	if c.LoopbackClientConfig == nil {

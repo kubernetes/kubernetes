@@ -35,11 +35,10 @@ func init() {
 	metav1.AddToGroupVersion(parameterScheme, versionV1)
 }
 
-// basicNegotiatedSerializer is used to handle discovery and error handling serialization
-type basicNegotiatedSerializer struct{}
+var ExtraSerializers []func(runtime.ObjectCreater, runtime.ObjectTyper) runtime.SerializerInfo
 
-func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
-	return []runtime.SerializerInfo{
+func newBasicNegotiatedSerializer() basicNegotiatedSerializer {
+	supportedMediaTypes := []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
 			MediaTypeType:    "application",
@@ -54,6 +53,18 @@ func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInf
 			},
 		},
 	}
+	for _, f := range ExtraSerializers {
+		supportedMediaTypes = append(supportedMediaTypes, f(unstructuredCreater{basicScheme}, unstructuredTyper{basicScheme}))
+	}
+	return basicNegotiatedSerializer{supportedMediaTypes: supportedMediaTypes}
+}
+
+type basicNegotiatedSerializer struct {
+	supportedMediaTypes []runtime.SerializerInfo
+}
+
+func (s basicNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
+	return s.supportedMediaTypes
 }
 
 func (s basicNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {

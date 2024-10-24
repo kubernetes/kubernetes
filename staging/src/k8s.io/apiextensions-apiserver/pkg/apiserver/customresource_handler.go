@@ -600,6 +600,8 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
+var ExtraSerializers []func(runtime.ObjectCreater, runtime.ObjectTyper) runtime.SerializerInfo
+
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
 // Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
 func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
@@ -892,6 +894,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				},
 			},
 		}
+
+		for _, f := range ExtraSerializers {
+			negotiatedSerializer.supportedMediaTypes = append(negotiatedSerializer.supportedMediaTypes, f(creator, typer))
+		}
+
 		var standardSerializers []runtime.SerializerInfo
 		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
 			if s.MediaType == runtime.ContentTypeProtobuf {
@@ -955,7 +962,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
-		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
+		var opts []serializer.CodecFactoryOptionsMutator
+		for _, f := range ExtraSerializers {
+			opts = append(opts, serializer.WithSerializer(f))
+		}
+		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme(), opts...)
 		scaleScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 		scaleScope.Namer = handlers.ContextBasedNaming{
 			Namer:         meta.NewAccessor(),

@@ -41,13 +41,18 @@ type DynamicClient struct {
 
 var _ Interface = &DynamicClient{}
 
+var (
+	AcceptContentTypes = "application/json"
+	ContentType        = "application/json"
+)
+
 // ConfigFor returns a copy of the provided config with the
 // appropriate dynamic client defaults set.
 func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
-	config.AcceptContentTypes = "application/json"
-	config.ContentType = "application/json"
-	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	config.AcceptContentTypes = AcceptContentTypes
+	config.ContentType = ContentType
+	config.NegotiatedSerializer = newBasicNegotiatedSerializer()
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
