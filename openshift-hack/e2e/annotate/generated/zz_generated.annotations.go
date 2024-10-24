@@ -2067,6 +2067,10 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:Example] Secret should create a pod that reads a secret": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-node] [Feature:GPUDevicePlugin] Sanity test for Nvidia Device should run gpu based matrix multiplication": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-node] [Feature:GPUDevicePlugin] Sanity test for Nvidia Device should run nvidia-smi cli": " [Disabled:SpecialConfig] [Suite:k8s]",
+
 	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action ignore terminated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
