@@ -46,7 +46,6 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	netutils "k8s.io/utils/net"
 
-	inuserns "github.com/moby/sys/userns"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -114,6 +113,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
+	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
