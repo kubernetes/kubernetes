@@ -50,22 +50,45 @@ func WriteFile(dir, file, data string) error {
 		return err
 	}
 	defer fd.Close()
-	if err := retryingWriteFile(fd, data); err != nil {
+	if _, err := fd.WriteString(data); err != nil {
 		// Having data in the error message helps in debugging.
 		return fmt.Errorf("failed to write %q: %w", data, err)
 	}
 	return nil
 }
 
-func retryingWriteFile(fd *os.File, data string) error {
-	for {
-		_, err := fd.Write([]byte(data))
-		if errors.Is(err, unix.EINTR) {
-			logrus.Infof("interrupted while writing %s to %s", data, fd.Name())
-			continue
-		}
+// WriteFileByLine is the same as WriteFile, except if data contains newlines,
+// it is written line by line.
+func WriteFileByLine(dir, file, data string) error {
+	i := strings.Index(data, "\n")
+	if i == -1 {
+		return WriteFile(dir, file, data)
+	}
+
+	fd, err := OpenFile(dir, file, unix.O_WRONLY)
+	if err != nil {
 		return err
 	}
+	defer fd.Close()
+	start := 0
+	for {
+		var line string
+		if i == -1 {
+			line = data[start:]
+		} else {
+			line = data[start : start+i+1]
+		}
+		_, err := fd.WriteString(line)
+		if err != nil {
+			return fmt.Errorf("failed to write %q: %w", line, err)
+		}
+		if i == -1 {
+			break
+		}
+		start += i + 1
+		i = strings.Index(data[start:], "\n")
+	}
+	return nil
 }
 
 const (
@@ -90,7 +113,7 @@ func prepareOpenat2() error {
 		})
 		if err != nil {
 			prepErr = &os.PathError{Op: "openat2", Path: cgroupfsDir, Err: err}
-			if err != unix.ENOSYS { //nolint:errorlint // unix errors are bare
+			if err != unix.ENOSYS {
 				logrus.Warnf("falling back to securejoin: %s", prepErr)
 			} else {
 				logrus.Debug("openat2 not available, falling back to securejoin")
@@ -148,8 +171,9 @@ func openFile(dir, file string, flags int) (*os.File, error) {
 		//
 		// TODO: if such usage will ever be common, amend this
 		// to reopen cgroupRootHandle and retry openat2.
-		fdStr := strconv.Itoa(int(cgroupRootHandle.Fd()))
-		fdDest, _ := os.Readlink("/proc/self/fd/" + fdStr)
+		fdPath, closer := utils.ProcThreadSelf("fd/" + strconv.Itoa(int(cgroupRootHandle.Fd())))
+		defer closer()
+		fdDest, _ := os.Readlink(fdPath)
 		if fdDest != cgroupfsDir {
 			// Wrap the error so it is clear that cgroupRootHandle
 			// is opened to an unexpected/wrong directory.

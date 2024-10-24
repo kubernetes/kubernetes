@@ -7,22 +7,33 @@ import (
 )
 
 var (
-	errNoUIDMap   = errors.New("User namespaces enabled, but no uid mappings found.")
-	errNoUserMap  = errors.New("User namespaces enabled, but no user mapping found.")
-	errNoGIDMap   = errors.New("User namespaces enabled, but no gid mappings found.")
-	errNoGroupMap = errors.New("User namespaces enabled, but no group mapping found.")
+	errNoUIDMap = errors.New("user namespaces enabled, but no uid mappings found")
+	errNoGIDMap = errors.New("user namespaces enabled, but no gid mappings found")
 )
+
+// Please check https://man7.org/linux/man-pages/man2/personality.2.html for const details.
+// https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/linux/personality.h
+const (
+	PerLinux   = 0x0000
+	PerLinux32 = 0x0008
+)
+
+type LinuxPersonality struct {
+	// Domain for the personality
+	// can only contain values "LINUX" and "LINUX32"
+	Domain int `json:"domain"`
+}
 
 // HostUID gets the translated uid for the process on host which could be
 // different when user namespaces are enabled.
 func (c Config) HostUID(containerId int) (int, error) {
 	if c.Namespaces.Contains(NEWUSER) {
-		if c.UidMappings == nil {
+		if len(c.UIDMappings) == 0 {
 			return -1, errNoUIDMap
 		}
-		id, found := c.hostIDFromMapping(int64(containerId), c.UidMappings)
+		id, found := c.hostIDFromMapping(int64(containerId), c.UIDMappings)
 		if !found {
-			return -1, errNoUserMap
+			return -1, fmt.Errorf("user namespaces enabled, but no mapping found for uid %d", containerId)
 		}
 		// If we are a 32-bit binary running on a 64-bit system, it's possible
 		// the mapped user is too large to store in an int, which means we
@@ -47,12 +58,12 @@ func (c Config) HostRootUID() (int, error) {
 // different when user namespaces are enabled.
 func (c Config) HostGID(containerId int) (int, error) {
 	if c.Namespaces.Contains(NEWUSER) {
-		if c.GidMappings == nil {
+		if len(c.GIDMappings) == 0 {
 			return -1, errNoGIDMap
 		}
-		id, found := c.hostIDFromMapping(int64(containerId), c.GidMappings)
+		id, found := c.hostIDFromMapping(int64(containerId), c.GIDMappings)
 		if !found {
-			return -1, errNoGroupMap
+			return -1, fmt.Errorf("user namespaces enabled, but no mapping found for gid %d", containerId)
 		}
 		// If we are a 32-bit binary running on a 64-bit system, it's possible
 		// the mapped user is too large to store in an int, which means we

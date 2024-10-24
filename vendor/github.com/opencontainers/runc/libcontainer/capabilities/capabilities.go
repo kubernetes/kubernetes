@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package capabilities
 
@@ -64,9 +63,6 @@ func New(capConfig *configs.Capabilities) (*Caps, error) {
 		capability.AMBIENT:     capSlice(capConfig.Ambient, unknownCaps),
 	}
 	if c.pid, err = capability.NewPid2(0); err != nil {
-		return nil, err
-	}
-	if err = c.pid.Load(); err != nil {
 		return nil, err
 	}
 	if len(unknownCaps) > 0 {

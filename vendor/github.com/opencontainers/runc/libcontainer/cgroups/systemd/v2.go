@@ -20,7 +20,11 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type unifiedManager struct {
+const (
+	cpuIdleSupportedVersion = 252
+)
+
+type UnifiedManager struct {
 	mu      sync.Mutex
 	cgroups *configs.Cgroup
 	// path is like "/sys/fs/cgroup/user.slice/user-1001.slice/session-1.scope"
@@ -29,8 +33,8 @@ type unifiedManager struct {
 	fsMgr cgroups.Manager
 }
 
-func NewUnifiedManager(config *configs.Cgroup, path string) (cgroups.Manager, error) {
-	m := &unifiedManager{
+func NewUnifiedManager(config *configs.Cgroup, path string) (*UnifiedManager, error) {
+	m := &UnifiedManager{
 		cgroups: config,
 		path:    path,
 		dbus:    newDbusConnManager(config.Rootless),
@@ -46,6 +50,14 @@ func NewUnifiedManager(config *configs.Cgroup, path string) (cgroups.Manager, er
 	m.fsMgr = fsMgr
 
 	return m, nil
+}
+
+func shouldSetCPUIdle(cm *dbusConnManager, v string) bool {
+	// The only valid values for cpu.idle are 0 and 1. As it is
+	// not possible to directly set cpu.idle to 0 via systemd,
+	// ignore 0. Ignore other values as we'll error out later
+	// in Set() while calling fsMgr.Set().
+	return v == "1" && systemdVersion(cm) >= cpuIdleSupportedVersion
 }
 
 // unifiedResToSystemdProps tries to convert from Cgroup.Resources.Unified
@@ -64,8 +76,7 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 		if strings.Contains(k, "/") {
 			return nil, fmt.Errorf("unified resource %q must be a file name (no slashes)", k)
 		}
-		sk := strings.SplitN(k, ".", 2)
-		if len(sk) != 2 {
+		if strings.IndexByte(k, '.') <= 0 {
 			return nil, fmt.Errorf("unified resource %q must be in the form CONTROLLER.PARAMETER", k)
 		}
 		// Kernel is quite forgiving to extra whitespace
@@ -73,6 +84,14 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 		v = strings.TrimSpace(v)
 		// Please keep cases in alphabetical order.
 		switch k {
+		case "cpu.idle":
+			if shouldSetCPUIdle(cm, v) {
+				// Setting CPUWeight to 0 tells systemd
+				// to set cpu.idle to 1.
+				props = append(props,
+					newProp("CPUWeight", uint64(0)))
+			}
+
 		case "cpu.max":
 			// value: quota [period]
 			quota := int64(0) // 0 means "unlimited" for addCpuQuota, if period is set
@@ -98,6 +117,12 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 			addCpuQuota(cm, &props, quota, period)
 
 		case "cpu.weight":
+			if shouldSetCPUIdle(cm, strings.TrimSpace(res["cpu.idle"])) {
+				// Do not add duplicate CPUWeight property
+				// (see case "cpu.idle" above).
+				logrus.Warn("unable to apply both cpu.weight and cpu.idle to systemd, ignoring cpu.weight")
+				continue
+			}
 			num, err := strconv.ParseUint(v, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("unified resource %q value conversion error: %w", k, err)
@@ -174,7 +199,14 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 	return props, nil
 }
 
-func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
+func genV2ResourcesProperties(dirPath string, r *configs.Resources, cm *dbusConnManager) ([]systemdDbus.Property, error) {
+	// We need this check before setting systemd properties, otherwise
+	// the container is OOM-killed and the systemd unit is removed
+	// before we get to fsMgr.Set().
+	if err := fs2.CheckMemoryUsage(dirPath, r); err != nil {
+		return nil, err
+	}
+
 	var properties []systemdDbus.Property
 
 	// NOTE: This is of questionable correctness because we insert our own
@@ -182,7 +214,7 @@ func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 	//       aren't the end of the world, but it is a bit concerning. However
 	//       it's unclear if systemd removes all eBPF programs attached when
 	//       doing SetUnitProperties...
-	deviceProperties, err := generateDeviceProperties(r, systemdVersion(cm))
+	deviceProperties, err := generateDeviceProperties(r, cm)
 	if err != nil {
 		return nil, err
 	}
@@ -206,9 +238,21 @@ func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 			newProp("MemorySwapMax", uint64(swap)))
 	}
 
-	if r.CpuWeight != 0 {
+	idleSet := false
+	// The logic here is the same as in shouldSetCPUIdle.
+	if r.CPUIdle != nil && *r.CPUIdle == 1 && systemdVersion(cm) >= cpuIdleSupportedVersion {
 		properties = append(properties,
-			newProp("CPUWeight", r.CpuWeight))
+			newProp("CPUWeight", uint64(0)))
+		idleSet = true
+	}
+	if r.CpuWeight != 0 {
+		if idleSet {
+			// Ignore CpuWeight if CPUIdle is already set.
+			logrus.Warn("unable to apply both CPUWeight and CpuIdle to systemd, ignoring CPUWeight")
+		} else {
+			properties = append(properties,
+				newProp("CPUWeight", r.CpuWeight))
+		}
 	}
 
 	addCpuQuota(cm, &properties, r.CpuQuota, r.CpuPeriod)
@@ -237,7 +281,7 @@ func genV2ResourcesProperties(r *configs.Resources, cm *dbusConnManager) ([]syst
 	return properties, nil
 }
 
-func (m *unifiedManager) Apply(pid int) error {
+func (m *UnifiedManager) Apply(pid int) error {
 	var (
 		c          = m.cgroups
 		unitName   = getUnitName(c)
@@ -340,7 +384,7 @@ func cgroupFilesToChown() ([]string, error) {
 	return filesToChown, nil
 }
 
-func (m *unifiedManager) Destroy() error {
+func (m *UnifiedManager) Destroy() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -359,13 +403,13 @@ func (m *unifiedManager) Destroy() error {
 	return nil
 }
 
-func (m *unifiedManager) Path(_ string) string {
+func (m *UnifiedManager) Path(_ string) string {
 	return m.path
 }
 
 // getSliceFull value is used in initPath.
 // The value is incompatible with systemdDbus.PropSlice.
-func (m *unifiedManager) getSliceFull() (string, error) {
+func (m *UnifiedManager) getSliceFull() (string, error) {
 	c := m.cgroups
 	slice := "system.slice"
 	if c.Rootless {
@@ -393,7 +437,7 @@ func (m *unifiedManager) getSliceFull() (string, error) {
 	return slice, nil
 }
 
-func (m *unifiedManager) initPath() error {
+func (m *UnifiedManager) initPath() error {
 	if m.path != "" {
 		return nil
 	}
@@ -417,27 +461,27 @@ func (m *unifiedManager) initPath() error {
 	return nil
 }
 
-func (m *unifiedManager) Freeze(state configs.FreezerState) error {
+func (m *UnifiedManager) Freeze(state configs.FreezerState) error {
 	return m.fsMgr.Freeze(state)
 }
 
-func (m *unifiedManager) GetPids() ([]int, error) {
+func (m *UnifiedManager) GetPids() ([]int, error) {
 	return cgroups.GetPids(m.path)
 }
 
-func (m *unifiedManager) GetAllPids() ([]int, error) {
+func (m *UnifiedManager) GetAllPids() ([]int, error) {
 	return cgroups.GetAllPids(m.path)
 }
 
-func (m *unifiedManager) GetStats() (*cgroups.Stats, error) {
+func (m *UnifiedManager) GetStats() (*cgroups.Stats, error) {
 	return m.fsMgr.GetStats()
 }
 
-func (m *unifiedManager) Set(r *configs.Resources) error {
+func (m *UnifiedManager) Set(r *configs.Resources) error {
 	if r == nil {
 		return nil
 	}
-	properties, err := genV2ResourcesProperties(r, m.dbus)
+	properties, err := genV2ResourcesProperties(m.fsMgr.Path(""), r, m.dbus)
 	if err != nil {
 		return err
 	}
@@ -449,24 +493,24 @@ func (m *unifiedManager) Set(r *configs.Resources) error {
 	return m.fsMgr.Set(r)
 }
 
-func (m *unifiedManager) GetPaths() map[string]string {
+func (m *UnifiedManager) GetPaths() map[string]string {
 	paths := make(map[string]string, 1)
 	paths[""] = m.path
 	return paths
 }
 
-func (m *unifiedManager) GetCgroups() (*configs.Cgroup, error) {
+func (m *UnifiedManager) GetCgroups() (*configs.Cgroup, error) {
 	return m.cgroups, nil
 }
 
-func (m *unifiedManager) GetFreezerState() (configs.FreezerState, error) {
+func (m *UnifiedManager) GetFreezerState() (configs.FreezerState, error) {
 	return m.fsMgr.GetFreezerState()
 }
 
-func (m *unifiedManager) Exists() bool {
+func (m *UnifiedManager) Exists() bool {
 	return cgroups.PathExists(m.path)
 }
 
-func (m *unifiedManager) OOMKillCount() (uint64, error) {
+func (m *UnifiedManager) OOMKillCount() (uint64, error) {
 	return m.fsMgr.OOMKillCount()
 }

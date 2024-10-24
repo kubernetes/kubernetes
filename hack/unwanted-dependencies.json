@@ -216,8 +216,8 @@
       ],
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
-        "github.com/cilium/ebpf",
         "github.com/google/cel-go",
+        "github.com/opencontainers/runc",
         "k8s.io/mount-utils"
       ],
       "google.golang.org/appengine": [

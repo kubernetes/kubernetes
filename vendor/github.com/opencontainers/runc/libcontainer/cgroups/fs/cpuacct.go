@@ -91,7 +91,7 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	// TODO: use strings.SplitN instead.
+
 	fields := strings.Fields(data)
 	if len(fields) < 4 || fields[0] != userField || fields[2] != systemField {
 		return 0, 0, malformedLine(path, file, data)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -21,12 +20,13 @@ import (
 )
 
 type linuxStandardInit struct {
-	pipe          *os.File
+	pipe          *syncSocket
 	consoleSocket *os.File
+	pidfdSocket   *os.File
 	parentPid     int
-	fifoFd        int
-	logFd         int
-	mountFds      []int
+	fifoFile      *os.File
+	logPipe       *os.File
+	dmzExe        *os.File
 	config        *initConfig
 }
 
@@ -43,7 +43,7 @@ func (l *linuxStandardInit) getSessionRingParams() (string, uint32, uint32) {
 
 	// Create a unique per session container name that we can join in setns;
 	// However, other containers can also join it.
-	return "_ses." + l.config.ContainerId, 0xffffffff, newperms
+	return "_ses." + l.config.ContainerID, 0xffffffff, newperms
 }
 
 func (l *linuxStandardInit) Init() error {
@@ -87,18 +87,7 @@ func (l *linuxStandardInit) Init() error {
 	// initialises the labeling system
 	selinux.GetEnabled()
 
-	// We don't need the mountFds after prepareRootfs() nor if it fails.
-	err := prepareRootfs(l.pipe, l.config, l.mountFds)
-	for _, m := range l.mountFds {
-		if m == -1 {
-			continue
-		}
-
-		if err := unix.Close(m); err != nil {
-			return fmt.Errorf("Unable to close mountFds fds: %w", err)
-		}
-	}
-
+	err := prepareRootfs(l.pipe, l.config)
 	if err != nil {
 		return err
 	}
@@ -115,6 +104,12 @@ func (l *linuxStandardInit) Init() error {
 		}
 	}
 
+	if l.pidfdSocket != nil {
+		if err := setupPidfd(l.pidfdSocket, "standard"); err != nil {
+			return fmt.Errorf("failed to setup pidfd: %w", err)
+		}
+	}
+
 	// Finish the rootfs setup.
 	if l.config.Config.Namespaces.Contains(configs.NEWNS) {
 		if err := finalizeRootfs(l.config.Config); err != nil {
@@ -125,6 +120,11 @@ func (l *linuxStandardInit) Init() error {
 	if hostname := l.config.Config.Hostname; hostname != "" {
 		if err := unix.Sethostname([]byte(hostname)); err != nil {
 			return &os.SyscallError{Syscall: "sethostname", Err: err}
+		}
+	}
+	if domainname := l.config.Config.Domainname; domainname != "" {
+		if err := unix.Setdomainname([]byte(domainname)); err != nil {
+			return &os.SyscallError{Syscall: "setdomainname", Err: err}
 		}
 	}
 	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
@@ -153,6 +153,17 @@ func (l *linuxStandardInit) Init() error {
 	if l.config.NoNewPrivileges {
 		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
 			return &os.SyscallError{Syscall: "prctl(SET_NO_NEW_PRIVS)", Err: err}
+		}
+	}
+
+	if l.config.Config.Scheduler != nil {
+		if err := setupScheduler(l.config.Config); err != nil {
+			return err
+		}
+	}
+	if l.config.Config.IOPriority != nil {
+		if err := setIOPriority(l.config.Config.IOPriority); err != nil {
+			return err
 		}
 	}
 
@@ -200,13 +211,6 @@ func (l *linuxStandardInit) Init() error {
 	if err != nil {
 		return err
 	}
-	// exec.LookPath in Go < 1.20 might return no error for an executable
-	// residing on a file system mounted with noexec flag, so perform this
-	// extra check now while we can still return a proper error.
-	// TODO: remove this once go < 1.20 is not supported.
-	if err := eaccess(name); err != nil {
-		return &os.PathError{Op: "eaccess", Path: name, Err: err}
-	}
 
 	// Set seccomp as close to execve as possible, so as few syscalls take
 	// place afterward (reducing the amount of syscalls that users need to
@@ -223,20 +227,31 @@ func (l *linuxStandardInit) Init() error {
 			return err
 		}
 	}
+
+	// Set personality if specified.
+	if l.config.Config.Personality != nil {
+		if err := setupPersonality(l.config.Config); err != nil {
+			return err
+		}
+	}
+
 	// Close the pipe to signal that we have completed our init.
 	logrus.Debugf("init: closing the pipe to signal completion")
 	_ = l.pipe.Close()
 
 	// Close the log pipe fd so the parent's ForwardLogs can exit.
-	if err := unix.Close(l.logFd); err != nil {
-		return &os.PathError{Op: "close log pipe", Path: "fd " + strconv.Itoa(l.logFd), Err: err}
+	logrus.Debugf("init: about to wait on exec fifo")
+	if err := l.logPipe.Close(); err != nil {
+		return fmt.Errorf("close log pipe: %w", err)
 	}
+
+	fifoPath, closer := utils.ProcThreadSelfFd(l.fifoFile.Fd())
+	defer closer()
 
 	// Wait for the FIFO to be opened on the other side before exec-ing the
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
 	// was given to us was an O_PATH fd to the fifo itself. Linux allows us to
 	// re-open an O_PATH fd through /proc.
-	fifoPath := "/proc/self/fd/" + strconv.Itoa(l.fifoFd)
 	fd, err := unix.Open(fifoPath, unix.O_WRONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return &os.PathError{Op: "open exec fifo", Path: fifoPath, Err: err}
@@ -251,15 +266,19 @@ func (l *linuxStandardInit) Init() error {
 	// N.B. the core issue itself (passing dirfds to the host filesystem) has
 	// since been resolved.
 	// https://github.com/torvalds/linux/blob/v4.9/fs/exec.c#L1290-L1318
-	_ = unix.Close(l.fifoFd)
+	_ = l.fifoFile.Close()
 
 	s := l.config.SpecState
 	s.Pid = unix.Getpid()
 	s.Status = specs.StateCreated
-	if err := l.config.Config.Hooks[configs.StartContainer].RunHooks(s); err != nil {
+	if err := l.config.Config.Hooks.Run(configs.StartContainer, s); err != nil {
 		return err
 	}
 
+	if l.dmzExe != nil {
+		l.config.Args[0] = name
+		return system.Fexecve(l.dmzExe.Fd(), l.config.Args, os.Environ())
+	}
 	// Close all file descriptors we are not passing to the container. This is
 	// necessary because the execve target could use internal runc fds as the
 	// execve path, potentially giving access to binary files from the host
@@ -278,5 +297,5 @@ func (l *linuxStandardInit) Init() error {
 	if err := utils.UnsafeCloseFrom(l.config.PassedFilesCount + 3); err != nil {
 		return err
 	}
-	return system.Exec(name, l.config.Args[0:], os.Environ())
+	return system.Exec(name, l.config.Args, os.Environ())
 }
