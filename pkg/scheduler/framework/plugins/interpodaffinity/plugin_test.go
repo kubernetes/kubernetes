@@ -157,15 +157,10 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		oldNode, newNode *v1.Node
 		expectedHint     framework.QueueingHint
 	}{
+		// affinity
 		{
 			name:         "add a new node with matched pod affinity topologyKey",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-			expectedHint: framework.Queue,
-		},
-		{
-			name:         "add a new node with matched pod anti-affinity topologyKey",
-			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
 			expectedHint: framework.Queue,
 		},
@@ -176,18 +171,73 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 		},
 		{
-			name:         "update node topologyKey",
+			name:         "update node label but not topologyKey",
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("aaa", "a").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("aaa", "b").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "update node label that isn't related to the pod affinity",
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("unrelated-label", "unrelated").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "update node with different affinity topologyKey value",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone2").Obj(),
 			expectedHint: framework.Queue,
 		},
 		{
-			name:         "update node lable but not topologyKey",
+			name:         "update node to have the affinity topology label",
 			pod:          st.MakePod().Name("p").PodAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("aaa", "a").Obj(),
-			newNode:      st.MakeNode().Name("node-a").Label("aaa", "b").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.Queue,
+		},
+		// anti-affinity
+		{
+			name:         "add a new node with matched pod anti-affinity topologyKey",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "add a new node without matched pod anti-affinity topologyKey",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newNode:      st.MakeNode().Name("node-a").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "update node label that isn't related to the pod anti-affinity",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("unrelated-label", "unrelated").Obj(),
 			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "update node with different anti-affinity topologyKey value",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone2").Obj(),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "update node to have the anti-affinity topology label",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("aaa", "a").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "update node label not to have anti-affinity topology label",
+			pod:          st.MakePod().Name("p").PodAntiAffinity("zone", &metav1.LabelSelector{MatchLabels: map[string]string{"another": "label"}}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+			newNode:      st.MakeNode().Name("node-a").Label("aaa", "a").Obj(),
+			expectedHint: framework.Queue,
 		},
 	}
 	for _, tc := range testcases {
