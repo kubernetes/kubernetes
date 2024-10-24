@@ -369,7 +369,7 @@ func ControllerNames(controllerInitFuncConstructors map[string]ControllerInitFun
 
 var (
 	// ControllersDisabledByDefault is the controller disabled default when starting cloud-controller managers.
-	ControllersDisabledByDefault = sets.NewString()
+	ControllersDisabledByDefault = sets.NewString().Insert(names.CloudNodeCSRApprover)
 
 	// AllWebhooks represents the list of all webhook options configured in
 	// this package.  This is empty because no webhooks are currently
@@ -415,6 +415,13 @@ func StartCloudNodeLifecycleControllerWrapper(initContext ControllerInitContext,
 	}
 }
 
+// StartCloudNodeCSRApproverWrapper is used to take cloud config as input and start cloud node csr approver
+func StartCloudNodeCSRApproverWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
+	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
+		return startCloudNodeCSRApprover(ctx, initContext, controllerContext, completedConfig, cloud)
+	}
+}
+
 // StartServiceControllerWrapper is used to take cloud config as input and start service controller
 func StartServiceControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
@@ -452,11 +459,11 @@ var DefaultInitFuncConstructors = map[string]ControllerInitFuncConstructor{
 		},
 		Constructor: StartServiceControllerWrapper,
 	},
-	names.NodeRouteController: {
+	names.CloudNodeCSRApprover: {
 		InitContext: ControllerInitContext{
-			ClientName: "route-controller",
+			ClientName: "node-csr-approver",
 		},
-		Constructor: StartRouteControllerWrapper,
+		Constructor: StartCloudNodeCSRApproverWrapper,
 	},
 }
 
