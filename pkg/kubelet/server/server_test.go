@@ -78,7 +78,7 @@ type fakeKubelet struct {
 	podsFunc            func() []*v1.Pod
 	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
 	logFunc             func(w http.ResponseWriter, req *http.Request)
-	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string, timeout time.Duration) ([]byte, error)
 	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
 	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
@@ -131,8 +131,8 @@ func (fk *fakeKubelet) GetHostname() string {
 	return fk.hostnameFunc()
 }
 
-func (fk *fakeKubelet) RunInContainer(_ context.Context, podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
-	return fk.runFunc(podFullName, uid, containerName, cmd)
+func (fk *fakeKubelet) RunInContainer(_ context.Context, podFullName string, uid types.UID, containerName string, cmd []string, timeout time.Duration) ([]byte, error) {
+	return fk.runFunc(podFullName, uid, containerName, cmd, timeout)
 }
 
 func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
@@ -422,7 +422,7 @@ func TestServeRunInContainer(t *testing.T) {
 	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
-	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
+	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string, timeout time.Duration) ([]byte, error) {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
@@ -463,7 +463,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
-	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
+	fw.fakeKubelet.runFunc = func(podFullName string, uid types.UID, containerName string, cmd []string, timeout time.Duration) ([]byte, error) {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
