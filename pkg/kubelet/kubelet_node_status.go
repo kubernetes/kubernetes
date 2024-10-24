@@ -753,6 +753,9 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.NodeFeatures(kl.runtimeState.runtimeFeatures),
 	)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		setters = append(setters, nodestatus.SwapPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderSwapPressure, kl.recordNodeStatusEvent))
+	}
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
