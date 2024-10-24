@@ -28,25 +28,34 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    threshold: 270
     params:
       initNodes: 5000
       initPods: 1000
-      measurePods: 1000
-  - name: 5000Nodes_10000Pods
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 270
     params:
@@ -70,25 +79,34 @@
     collectMetrics: true
     namespace: sched-1
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 1
-      measurePods: 4
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 100
-      measurePods: 400
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 1
+  #     measurePods: 4
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 100
+  #     measurePods: 400
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 1000
+  - name: 5000Nodes_2000Pods
+    labels: [performance]
+    threshold: 70
     params:
       initNodes: 5000
       initPods: 1000
-      measurePods: 1000
-  - name: 5000Nodes_2000Pods
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 70
     params:
@@ -107,25 +125,34 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    threshold: 260
     params:
       initNodes: 5000
-      initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_10000Pods
+      initPods: 1000
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 260
     params:
@@ -147,25 +174,34 @@
     persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
-      initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_2000Pods
+      initPods: 1000
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 90
     params:
@@ -196,24 +232,24 @@
     persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance]
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 1000
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
   - name: 5000Nodes_5000Pods
     labels: [performance]
     threshold: 35
@@ -221,6 +257,16 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 35
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+
 
 - name: SchedulingCSIPVs
   workloadTemplate:
@@ -243,25 +289,34 @@
     persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 48
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 48
     params:
@@ -289,25 +344,34 @@
     namespace: sched-1
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
+    labels: [performance]
+    threshold: 35
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 35
     params:
@@ -331,25 +395,34 @@
     namespace: sched-1
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 90
     params:
@@ -373,25 +446,34 @@
     namespace: sched-1
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
+    labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 90
     params:
@@ -420,12 +502,20 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      measurePods: 10
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     measurePods: 10
   - name: 15000Nodes
+    labels: [performance, short]
+    threshold: 390
+    params:
+      initNodes: 15000
+      measurePods: 30000
+  - name: 15000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 390
     params:
@@ -447,25 +537,34 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 500
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 5
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 500
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    threshold: 220
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 1000
-  - name: 5000Nodes_10000Pods
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 220
     params:
@@ -489,25 +588,34 @@
     podTemplatePath: config/templates/pod-with-topology-spreading.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 10
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 1000
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 10
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 1000
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 2000
+  - name: 5000Nodes_5000Pods
+    labels: [performance]
+    threshold: 85
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 2000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 85
     params:
@@ -531,25 +639,34 @@
     podTemplatePath: config/templates/pod-with-preferred-topology-spreading.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 10
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 1000
-      measurePods: 1000
-  - name: 5000Nodes
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 10
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 1000
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 2000
+  - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 125
     params:
       initNodes: 5000
       initPods: 5000
-      measurePods: 2000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 125
     params:
@@ -592,25 +709,34 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 5
-      initPods: 2
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 200
-      measurePods: 1000
-  - name: 5000Nodes
+  # - name: 5Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 2
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPods: 200
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 2000
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 140
     params:
       initNodes: 5000
       initPods: 2000
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 140
     params:
@@ -630,13 +756,22 @@
     podTemplatePath: config/templates/pod-high-priority.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 20
-      measurePods: 5
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 20
+  #     measurePods: 5
   - name: 500Nodes
+    labels: [performance, short]
+    threshold: 18
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+  - name: 500Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 18
     params:
@@ -666,13 +801,22 @@
     persistentVolumeClaimTemplatePath: config/templates/pvc.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 20
-      measurePods: 5
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     initPods: 20
+  #     measurePods: 5
   - name: 500Nodes
+    labels: [performance, short]
+    threshold: 18
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+  - name: 500Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 18
     params:
@@ -694,42 +838,51 @@
 # 1. There are X initial nodes with 4 low priority pods each, consuming 3.6 CPU out of the total 4 available.
 # 2. High priority preemption which need to preempt 3 of 4 low priority pods to fit (require 3 CPU).
 # 3. Measured pods are always schedulable, as they require 0.1 CPU only.
-- name: PreemptionAsync
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $initNodes
-  - opcode: createPods
-    countParam: $initPods
-    podTemplatePath: config/templates/pod-low-priority.yaml
-  - opcode: churn
-    mode: create
-    templatePaths:
-    - config/templates/pod-high-priority-large-cpu.yaml
-    intervalMilliseconds: 50
-  - opcode: createPods
-    countParam: $measurePods
-    podTemplatePath: config/templates/pod-default.yaml
-    collectMetrics: true
-  workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      initPods: 20
-      measurePods: 5
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPods: 2000
-      measurePods: 500
-  - name: 5000Nodes
-    labels: [performance]
-    threshold: 200
-    params:
-      initNodes: 5000
-      initPods: 20000
-      measurePods: 5000
+# - name: PreemptionAsync
+#   workloadTemplate:
+#   - opcode: createNodes
+#     countParam: $initNodes
+#   - opcode: createPods
+#     countParam: $initPods
+#     podTemplatePath: config/templates/pod-low-priority.yaml
+#   - opcode: churn
+#     mode: create
+#     templatePaths:
+#     - config/templates/pod-high-priority-large-cpu.yaml
+#     intervalMilliseconds: 50
+#   - opcode: createPods
+#     countParam: $measurePods
+#     podTemplatePath: config/templates/pod-default.yaml
+#     collectMetrics: true
+#   workloads:
+#   - name: 5Nodes
+#     labels: [integration-test, performance, short]
+#     params:
+#       initNodes: 5
+#       initPods: 20
+#       measurePods: 5
+#   - name: 500Nodes
+#     labels: [performance, short]
+#     params:
+#       initNodes: 500
+#       initPods: 2000
+#       measurePods: 500
+#   - name: 5000Nodes
+#     labels: [performance]
+#     threshold: 200
+#     params:
+#       initNodes: 5000
+#       initPods: 20000
+#       measurePods: 5000
+#   - name: 5000Nodes_QueueingHintsEnabled
+#     featureGates:
+#       SchedulerQueueingHints: true
+#     labels: [performance]
+#     threshold: 200
+#     params:
+#       initNodes: 5000
+#       initPods: 20000
+#       measurePods: 5000
 
 # Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 100/s rate.
 - name: Unschedulable
@@ -746,24 +899,32 @@
     podTemplatePath: config/templates/pod-default.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes/10Pods
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 5
-      measurePods: 10
-  - name: 500Nodes/1kPods
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      measurePods: 1000
-  - name: 5kNodes/1kPods
-    labels: [performance, short]
-    params:
-      initNodes: 5000
-      measurePods: 1000
+  # - name: 5Nodes/10Pods
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 5
+  #     measurePods: 10
+  # - name: 500Nodes/1kPods
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     measurePods: 1000
+  # - name: 5kNodes/1kPods
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     measurePods: 1000
   - name: 5kNodes/10kPods
     labels: [performance]
-    threshold: 400
+    threshold: 200
+    params:
+      initNodes: 5000
+      measurePods: 10000
+  - name: 5kNodes/10kPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 200
     params:
       initNodes: 5000
       measurePods: 10000
@@ -785,22 +946,30 @@
     podTemplatePath: config/templates/pod-default.yaml
     collectMetrics: true
   workloads:
-  - name: 10Nodes
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 10
-      measurePods: 100
-  - name: 1000Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 1000
-      measurePods: 1000
-  - name: 5000Nodes
-    labels: [performance, short]
+  # - name: 10Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 10
+  #     measurePods: 100
+  # - name: 1000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 1000
+  #     measurePods: 1000
+  # - name: 5000Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 5000
+  #     measurePods: 2000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    threshold: 265
     params:
       initNodes: 5000
-      measurePods: 2000
-  - name: 5000Nodes_10000Pods
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 265
     params:
@@ -831,28 +1000,38 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
-  - name: 10Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 10
-      initPodsPerNamespace: 2
-      initNamespaces: 2
-      measurePods: 6
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPodsPerNamespace: 4
-      initNamespaces: 10
-      measurePods: 100
-  - name: 5000Nodes
+  # - name: 10Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 10
+  #     initPodsPerNamespace: 2
+  #     initNamespaces: 2
+  #     measurePods: 6
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPodsPerNamespace: 4
+  #     initNamespaces: 10
+  #     measurePods: 100
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 40
+  #     initNamespaces: 100
+  #     measurePods: 1000
+  - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 24
     params:
-      initNodes: 5000
+      initNodes: 6000
       initPodsPerNamespace: 40
       initNamespaces: 100
-      measurePods: 1000
-  - name: 5000Nodes_2000Pods
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 24
     params:
@@ -885,28 +1064,38 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
-  - name: 10Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 10
-      initPodsPerNamespace: 2
-      initNamespaces: 2
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPodsPerNamespace: 4
-      initNamespaces: 10
-      measurePods: 100
-  - name: 5000Nodes
+  # - name: 10Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 10
+  #     initPodsPerNamespace: 2
+  #     initNamespaces: 2
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPodsPerNamespace: 4
+  #     initNamespaces: 10
+  #     measurePods: 100
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 40
+  #     initNamespaces: 100
+  #     measurePods: 1000
+  - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 55
     params:
       initNodes: 5000
       initPodsPerNamespace: 40
       initNamespaces: 100
-      measurePods: 1000
-  - name: 5000Nodes_2000Pods
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 55
     params:
@@ -942,28 +1131,38 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
-  - name: 10Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 10
-      initPodsPerNamespace: 2
-      initNamespaces: 2
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPodsPerNamespace: 4
-      initNamespaces: 10
-      measurePods: 100
-  - name: 5000Nodes
+  # - name: 10Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 10
+  #     initPodsPerNamespace: 2
+  #     initNamespaces: 2
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPodsPerNamespace: 4
+  #     initNamespaces: 10
+  #     measurePods: 100
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 50
+  #     initNamespaces: 100
+  #     measurePods: 1000
+  - name: 5000Nodes_2000Pods
     labels: [performance]
+    threshold: 35
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
       initNamespaces: 100
-      measurePods: 1000
-  - name: 5000Nodes_2000Pods
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 35
     params:
@@ -996,28 +1195,38 @@
     collectMetrics: true
     namespace: measure-ns-0
   workloads:
-  - name: 10Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 10
-      initPodsPerNamespace: 2
-      initNamespaces: 2
-      measurePods: 10
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      initNodes: 500
-      initPodsPerNamespace: 4
-      initNamespaces: 10
-      measurePods: 100
-  - name: 5000Nodes
+  # - name: 10Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 10
+  #     initPodsPerNamespace: 2
+  #     initNamespaces: 2
+  #     measurePods: 10
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     initNodes: 500
+  #     initPodsPerNamespace: 4
+  #     initNamespaces: 10
+  #     measurePods: 100
+  # - name: 5000Nodes
+  #   labels: [performance]
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 50
+  #     initNamespaces: 100
+  #     measurePods: 1000
+  - name: 5000Nodes_5000Pods
     labels: [performance]
+    threshold: 90
     params:
       initNodes: 5000
       initPodsPerNamespace: 50
       initNamespaces: 100
-      measurePods: 1000
-  - name: 5000Nodes_5000Pods
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance]
     threshold: 90
     params:
@@ -1040,19 +1249,28 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 5Nodes
-    labels: [integration-test, performance, short]
-    params:
-      taintNodes: 1
-      normalNodes: 4
-      measurePods: 4
-  - name: 500Nodes
-    labels: [performance, short]
-    params:
-      taintNodes: 100
-      normalNodes: 400
-      measurePods: 400
+  # - name: 5Nodes
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     taintNodes: 1
+  #     normalNodes: 4
+  #     measurePods: 4
+  # - name: 500Nodes
+  #   labels: [performance, short]
+  #   params:
+  #     taintNodes: 100
+  #     normalNodes: 400
+  #     measurePods: 400
   - name: 5000Nodes
+    labels: [performance, short]
+    threshold: 68
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000
+  - name: 5000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 68
     params:
@@ -1095,16 +1313,16 @@
     podTemplatePath: config/dra/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    labels: [integration-test, performance, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initPods: 0
-      measurePods: 10
-      maxClaimsPerNode: 10
+  # - name: fast
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     # This testcase runs through all code paths without
+  #     # taking too long overall.
+  #     nodesWithDRA: 1
+  #     nodesWithoutDRA: 1
+  #     initPods: 0
+  #     measurePods: 10
+  #     maxClaimsPerNode: 10
   - name: 2000pods_100nodes
     params:
       nodesWithDRA: 100
@@ -1167,16 +1385,16 @@
     podTemplatePath: config/dra/pod-with-claim-template.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    labels: [integration-test, fast, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initClaims: 0
-      maxClaimsPerNode: 10
-      duration: 2s
+  # - name: fast
+  #   labels: [integration-test, fast, short]
+  #   params:
+  #     # This testcase runs through all code paths without
+  #     # taking too long overall.
+  #     nodesWithDRA: 1
+  #     nodesWithoutDRA: 1
+  #     initClaims: 0
+  #     maxClaimsPerNode: 10
+  #     duration: 2s
   - name: empty_100nodes
     params:
       nodesWithDRA: 100
@@ -1280,18 +1498,18 @@
     podTemplatePath: config/dra/pod-with-claim-ref.yaml
     collectMetrics: true
   workloads:
-  - name: fast
-    labels: [integration-test, performance, short]
-    params:
-      # This testcase runs through all code paths without
-      # taking too long overall.
-      nodesWithDRA: 1
-      nodesWithoutDRA: 1
-      initPods: 0
-      initClaims: 0
-      measurePods: 10
-      measureClaims: 2 # must be measurePods / 5
-      maxClaimsPerNode: 2
+  # - name: fast
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     # This testcase runs through all code paths without
+  #     # taking too long overall.
+  #     nodesWithDRA: 1
+  #     nodesWithoutDRA: 1
+  #     initPods: 0
+  #     initClaims: 0
+  #     measurePods: 10
+  #     measureClaims: 2 # must be measurePods / 5
+  #     maxClaimsPerNode: 2
   - name: 2000pods_100nodes
     params:
       nodesWithDRA: 100
@@ -1350,13 +1568,22 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 1Node_10GatedPods
-    labels: [integration-test, performance, short]
-    params:
-      gatedPods: 10
-      deletingPods: 10
-      measurePods: 10
+  # - name: 1Node_10GatedPods
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     gatedPods: 10
+  #     deletingPods: 10
+  #     measurePods: 10
   - name: 1Node_10000GatedPods
+    labels: [performance, short]
+    threshold: 130
+    params:
+      gatedPods: 10000
+      deletingPods: 20000
+      measurePods: 20000
+  - name: 1Node_10000GatedPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 130
     params:
@@ -1383,12 +1610,20 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 1Node_10GatedPods
-    labels: [performance, short]
-    params:
-      gatedPods: 10
-      measurePods: 10
+  # - name: 1Node_10GatedPods
+  #   labels: [performance, short]
+  #   params:
+  #     gatedPods: 10
+  #     measurePods: 10
   - name: 1Node_10000GatedPods
+    labels: [performance, short]
+    threshold: 110
+    params:
+      gatedPods: 10000
+      measurePods: 20000
+  - name: 1Node_10000GatedPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [performance, short]
     threshold: 110
     params:
@@ -1421,12 +1656,12 @@
     countParam: $measurePods
     collectMetrics: true
   workloads:
-  - name: 10Node_100DeletingPods
-    labels: [integration-test, performance, short]
-    params:
-      initNodes: 10
-      deletingPods: 10
-      measurePods: 10
+  # - name: 10Node_100DeletingPods
+  #   labels: [integration-test, performance, short]
+  #   params:
+  #     initNodes: 10
+  #     deletingPods: 10
+  #     measurePods: 10
   - name: 1000Node_1000DeletingPods
     labels: [performance, short]
     params:
