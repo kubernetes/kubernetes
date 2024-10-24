@@ -115,6 +115,9 @@ const (
 	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
 
+	// metrics to track kubelet admission rejections number
+	AdmissionRejectionsTotalKey = "admission_rejections_total"
+
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
@@ -802,6 +805,17 @@ var (
 		},
 	)
 
+	// AdmissionRejectionsTotal tracks the number of failed admission times, currently, just record it for pod additions
+	AdmissionRejectionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           AdmissionRejectionsTotalKey,
+			Help:           "Cumulative number pod admission rejections by the Kubelet.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
+
 	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
 	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -1011,6 +1025,7 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 			legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
 		}
+		legacyregistry.MustRegister(AdmissionRejectionsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
