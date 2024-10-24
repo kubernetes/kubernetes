@@ -2806,9 +2806,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
 			return nil, err
 		}
-	} else {
-		// If resize isn't immediately feasible, proceed with the allocated pod.
-		pod = allocatedPod
+		allocatedPod = pod
 	}
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
@@ -2817,7 +2815,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(pod))
 		}
 	}
-	return pod, nil
+	return allocatedPod, nil
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
