@@ -64,6 +64,7 @@ func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 			scheme.ParameterCodec,
 			namespace,
 			func() *samplecontrollerv1alpha1.Foo { return &samplecontrollerv1alpha1.Foo{} },
-			func() *samplecontrollerv1alpha1.FooList { return &samplecontrollerv1alpha1.FooList{} }),
+			func() *samplecontrollerv1alpha1.FooList { return &samplecontrollerv1alpha1.FooList{} },
+		),
 	}
 }

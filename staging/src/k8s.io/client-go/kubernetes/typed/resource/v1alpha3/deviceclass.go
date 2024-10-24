@@ -64,6 +64,8 @@ func newDeviceClasses(c *ResourceV1alpha3Client) *deviceClasses {
 			scheme.ParameterCodec,
 			"",
 			func() *resourcev1alpha3.DeviceClass { return &resourcev1alpha3.DeviceClass{} },
-			func() *resourcev1alpha3.DeviceClassList { return &resourcev1alpha3.DeviceClassList{} }),
+			func() *resourcev1alpha3.DeviceClassList { return &resourcev1alpha3.DeviceClassList{} },
+			gentype.PrefersProtobuf[*resourcev1alpha3.DeviceClass](),
+		),
 	}
 }

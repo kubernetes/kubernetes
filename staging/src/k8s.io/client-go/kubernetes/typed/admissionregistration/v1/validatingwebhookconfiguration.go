@@ -68,6 +68,8 @@ func newValidatingWebhookConfigurations(c *AdmissionregistrationV1Client) *valid
 			},
 			func() *admissionregistrationv1.ValidatingWebhookConfigurationList {
 				return &admissionregistrationv1.ValidatingWebhookConfigurationList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*admissionregistrationv1.ValidatingWebhookConfiguration](),
+		),
 	}
 }

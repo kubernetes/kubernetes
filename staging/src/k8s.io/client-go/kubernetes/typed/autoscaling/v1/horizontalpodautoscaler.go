@@ -68,6 +68,8 @@ func newHorizontalPodAutoscalers(c *AutoscalingV1Client, namespace string) *hori
 			scheme.ParameterCodec,
 			namespace,
 			func() *autoscalingv1.HorizontalPodAutoscaler { return &autoscalingv1.HorizontalPodAutoscaler{} },
-			func() *autoscalingv1.HorizontalPodAutoscalerList { return &autoscalingv1.HorizontalPodAutoscalerList{} }),
+			func() *autoscalingv1.HorizontalPodAutoscalerList { return &autoscalingv1.HorizontalPodAutoscalerList{} },
+			gentype.PrefersProtobuf[*autoscalingv1.HorizontalPodAutoscaler](),
+		),
 	}
 }

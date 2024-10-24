@@ -72,7 +72,8 @@ func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 			scheme.ParameterCodec,
 			"",
 			func() *apiv1.ClusterTestType { return &apiv1.ClusterTestType{} },
-			func() *apiv1.ClusterTestTypeList { return &apiv1.ClusterTestTypeList{} }),
+			func() *apiv1.ClusterTestTypeList { return &apiv1.ClusterTestTypeList{} },
+		),
 	}
 }
 

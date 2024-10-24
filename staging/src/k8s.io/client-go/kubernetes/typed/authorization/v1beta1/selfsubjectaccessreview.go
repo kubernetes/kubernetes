@@ -54,6 +54,8 @@ func newSelfSubjectAccessReviews(c *AuthorizationV1beta1Client) *selfSubjectAcce
 			"",
 			func() *authorizationv1beta1.SelfSubjectAccessReview {
 				return &authorizationv1beta1.SelfSubjectAccessReview{}
-			}),
+			},
+			gentype.PrefersProtobuf[*authorizationv1beta1.SelfSubjectAccessReview](),
+		),
 	}
 }

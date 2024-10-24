@@ -68,6 +68,8 @@ func newIngresses(c *NetworkingV1beta1Client, namespace string) *ingresses {
 			scheme.ParameterCodec,
 			namespace,
 			func() *networkingv1beta1.Ingress { return &networkingv1beta1.Ingress{} },
-			func() *networkingv1beta1.IngressList { return &networkingv1beta1.IngressList{} }),
+			func() *networkingv1beta1.IngressList { return &networkingv1beta1.IngressList{} },
+			gentype.PrefersProtobuf[*networkingv1beta1.Ingress](),
+		),
 	}
 }

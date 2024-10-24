@@ -85,7 +85,8 @@ func newTestTypes(c *ExtensionsExampleV1Client, namespace string) *testTypes {
 			scheme.ParameterCodec,
 			namespace,
 			func() *extensionsv1.TestType { return &extensionsv1.TestType{} },
-			func() *extensionsv1.TestTypeList { return &extensionsv1.TestTypeList{} }),
+			func() *extensionsv1.TestTypeList { return &extensionsv1.TestTypeList{} },
+		),
 	}
 }
 

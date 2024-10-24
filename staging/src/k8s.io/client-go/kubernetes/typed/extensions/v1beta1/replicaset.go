@@ -74,7 +74,9 @@ func newReplicaSets(c *ExtensionsV1beta1Client, namespace string) *replicaSets {
 			scheme.ParameterCodec,
 			namespace,
 			func() *extensionsv1beta1.ReplicaSet { return &extensionsv1beta1.ReplicaSet{} },
-			func() *extensionsv1beta1.ReplicaSetList { return &extensionsv1beta1.ReplicaSetList{} }),
+			func() *extensionsv1beta1.ReplicaSetList { return &extensionsv1beta1.ReplicaSetList{} },
+			gentype.PrefersProtobuf[*extensionsv1beta1.ReplicaSet](),
+		),
 	}
 }
 
@@ -82,6 +84,7 @@ func newReplicaSets(c *ExtensionsV1beta1Client, namespace string) *replicaSets {
 func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *extensionsv1beta1.Scale, err error) {
 	result = &extensionsv1beta1.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("replicasets").
 		Name(replicaSetName).
@@ -96,6 +99,7 @@ func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, optio
 func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *extensionsv1beta1.Scale, opts v1.UpdateOptions) (result *extensionsv1beta1.Scale, err error) {
 	result = &extensionsv1beta1.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("replicasets").
 		Name(replicaSetName).
@@ -121,6 +125,7 @@ func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, sca
 
 	result = &extensionsv1beta1.Scale{}
 	err = c.GetClient().Patch(types.ApplyPatchType).
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("replicasets").
 		Name(replicaSetName).

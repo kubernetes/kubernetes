@@ -68,6 +68,8 @@ func newResourceQuotas(c *CoreV1Client, namespace string) *resourceQuotas {
 			scheme.ParameterCodec,
 			namespace,
 			func() *corev1.ResourceQuota { return &corev1.ResourceQuota{} },
-			func() *corev1.ResourceQuotaList { return &corev1.ResourceQuotaList{} }),
+			func() *corev1.ResourceQuotaList { return &corev1.ResourceQuotaList{} },
+			gentype.PrefersProtobuf[*corev1.ResourceQuota](),
+		),
 	}
 }

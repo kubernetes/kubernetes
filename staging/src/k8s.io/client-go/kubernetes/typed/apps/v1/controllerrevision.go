@@ -64,6 +64,8 @@ func newControllerRevisions(c *AppsV1Client, namespace string) *controllerRevisi
 			scheme.ParameterCodec,
 			namespace,
 			func() *appsv1.ControllerRevision { return &appsv1.ControllerRevision{} },
-			func() *appsv1.ControllerRevisionList { return &appsv1.ControllerRevisionList{} }),
+			func() *appsv1.ControllerRevisionList { return &appsv1.ControllerRevisionList{} },
+			gentype.PrefersProtobuf[*appsv1.ControllerRevision](),
+		),
 	}
 }

@@ -68,6 +68,7 @@ func newTestTypes(c *ConflictingExampleV1Client, namespace string) *testTypes {
 			scheme.ParameterCodec,
 			namespace,
 			func() *conflictingv1.TestType { return &conflictingv1.TestType{} },
-			func() *conflictingv1.TestTypeList { return &conflictingv1.TestTypeList{} }),
+			func() *conflictingv1.TestTypeList { return &conflictingv1.TestTypeList{} },
+		),
 	}
 }
