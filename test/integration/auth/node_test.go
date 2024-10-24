@@ -24,9 +24,11 @@ import (
 	"testing"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	coordination "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -629,8 +631,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// clean up node2
 	expectAllowed(t, deleteNode2(superuserClient))
 
-	//TODO(mikedanese): integration test node restriction of TokenRequest
-
 	// node1 allowed to operate on its own lease
 	expectAllowed(t, createNode1Lease(node1Client))
 	expectAllowed(t, getNode1Lease(node1Client))
@@ -720,4 +720,159 @@ func expectAllowed(t *testing.T, f func() error) {
 	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
+}
+
+func checkNilError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNodeAuthorizerServiceAccount(t *testing.T) {
+	const (
+		// Define credentials
+		// Fake values for testing.
+		tokenMaster = "master-token"
+		tokenNode1  = "node1-token"
+	)
+
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	checkNilError(t, err)
+
+	_, err = tokenFile.WriteString(strings.Join([]string{
+		fmt.Sprintf(`%s,admin,uid1,"system:masters"`, tokenMaster),
+		fmt.Sprintf(`%s,system:node:node1,uid3,"system:nodes"`, tokenNode1),
+	}, "\n"))
+	checkNilError(t, err)
+	checkNilError(t, tokenFile.Close())
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--runtime-config=api/all=true",
+		"--authorization-mode", "Node,RBAC",
+		"--token-auth-file", tokenFile.Name(),
+		"--enable-admission-plugins", "NodeRestriction",
+		// The "default" SA is not installed, causing the ServiceAccount plugin to retry for ~1s per
+		// API request.
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// Build client config and superuser clientset
+	clientConfig := server.ClientConfig
+	superuserClient, _ := clientsetForToken(tokenMaster, clientConfig)
+
+	// Wait for a healthy server
+	for {
+		result := superuserClient.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+		_, err := result.Raw()
+		if err == nil {
+			break
+		}
+		t.Log(err)
+		time.Sleep(time.Second)
+	}
+
+	if _, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = superuserClient.RbacV1().ClusterRoles().Update(context.TODO(), &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:node:node1"},
+		Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{""},
+			Resources: []string{"serviceaccounts/token"},
+			Verbs:     []string{"create"},
+		}},
+	}, metav1.UpdateOptions{})
+	checkNilError(t, err)
+
+	_, err = superuserClient.RbacV1().ClusterRoleBindings().Update(context.TODO(), &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:node"},
+		Subjects: []rbacv1.Subject{{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Group",
+			Name:     "system:nodes",
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     "system:node",
+		},
+	}, metav1.UpdateOptions{})
+	checkNilError(t, err)
+
+	createNode1 := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}, metav1.CreateOptions{})
+			return err
+		}
+	}
+
+	createDefaultServiceAccount := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().ServiceAccounts("ns").Create(context.TODO(), &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{Name: "default"},
+			}, metav1.CreateOptions{})
+			return err
+		}
+	}
+
+	createTokenRequestNodeNotBoundToPod := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().ServiceAccounts("ns").CreateToken(context.TODO(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
+			return err
+		}
+	}
+
+	createTokenRequestPod1 := func(client clientset.Interface, uid types.UID) func() error {
+		return func() error {
+			_, err := client.CoreV1().ServiceAccounts("ns").CreateToken(context.TODO(), "default", &authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
+					BoundObjectRef: &authenticationv1.BoundObjectReference{
+						Kind:       "Pod",
+						Name:       "pod1",
+						APIVersion: "v1",
+						UID:        uid,
+					},
+				},
+			}, metav1.CreateOptions{})
+			return err
+		}
+	}
+
+	createPod1 := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().Pods("ns").Create(context.TODO(), &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "uid1",
+				},
+				Spec: corev1.PodSpec{
+					NodeName:           "node1",
+					Containers:         []corev1.Container{{Name: "image", Image: "busybox"}},
+					ServiceAccountName: "default",
+				},
+			}, metav1.CreateOptions{})
+			return err
+		}
+	}
+
+	getPod := func(client clientset.Interface, podName string) (*corev1.Pod, error) {
+		return client.CoreV1().Pods("ns").Get(context.TODO(), podName, metav1.GetOptions{})
+	}
+
+	node1Client, _ := clientsetForToken(tokenNode1, clientConfig)
+	expectAllowed(t, createNode1(node1Client))
+	expectForbidden(t, createTokenRequestNodeNotBoundToPod(node1Client))
+	expectNotFound(t, createTokenRequestPod1(node1Client, "uid1"))
+
+	// create a pod as an admin to add object references
+	expectAllowed(t, createPod1(superuserClient))
+	expectAllowed(t, createDefaultServiceAccount(superuserClient))
+	pod, _ := getPod(superuserClient, "pod1")
+	expectAllowed(t, createTokenRequestPod1(node1Client, pod.UID))
 }
