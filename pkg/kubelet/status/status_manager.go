@@ -143,17 +143,27 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetContainerResourceAllocation returns checkpointed AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
-
 	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
 	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
 
-	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
-	SetPodAllocation(pod *v1.Pod) error
-
 	// SetPodResizeStatus checkpoints the last resizing decision for the pod.
 	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus) error
+
+	allocationManager
+}
+
+// TODO(tallclair): Refactor allocation state handling out of the status manager.
+type allocationManager interface {
+	// GetContainerResourceAllocation returns the checkpointed AllocatedResources value for the container
+	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
+
+	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
+	// This function does a deep copy only if updates are needed.
+	// Returns the updated (or original) pod, and whether there was an allocation stored.
+	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
+
+	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
+	SetPodAllocation(pod *v1.Pod) error
 }
 
 const syncPeriod = 10 * time.Second
@@ -240,6 +250,39 @@ func (m *manager) GetContainerResourceAllocation(podUID string, containerName st
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
+}
+
+// UpdatePodFromAllocation overwrites the pod spec with the allocation.
+// This function does a deep copy only if updates are needed.
+func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	// TODO(tallclair): This clones the whole cache, but we only need 1 pod.
+	allocs := m.state.GetPodResourceAllocation()
+	return updatePodFromAllocation(pod, allocs)
+}
+
+func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
+	allocated, found := allocs[string(pod.UID)]
+	if !found {
+		return pod, false
+	}
+
+	updated := false
+	for i, c := range pod.Spec.Containers {
+		if cAlloc, ok := allocated[c.Name]; ok {
+			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
+				// Allocation differs from pod spec, update
+				if !updated {
+					// If this is the first update, copy the pod
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				pod.Spec.Containers[i].Resources = cAlloc
+			}
+		}
+	}
+	return pod, updated
 }
 
 // GetPodResizeStatus returns the last checkpointed ResizeStaus value

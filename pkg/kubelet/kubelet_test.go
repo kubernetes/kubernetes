@@ -2391,6 +2391,13 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubelet.statusManager = status.NewFakeManager()
 
+	// fakePodWorkers trigger syncPodFn synchronously on update, but entering
+	// kubelet.SyncPod while holding the podResizeMutex can lead to deadlock.
+	kubelet.podWorkers.(*fakePodWorkers).syncPodFn =
+		func(_ context.Context, _ kubetypes.SyncPodType, _, _ *v1.Pod, _ *kubecontainer.PodStatus) (bool, error) {
+			return false, nil
+		}
+
 	nodes := []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -2575,7 +2582,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2717,14 +2723,24 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt.pod.Spec.Containers[0].Resources.Requests = tt.newRequests
-		tt.pod.Status.ContainerStatuses[0].AllocatedResources = v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}
-		kubelet.handlePodResourcesResize(tt.pod)
-		updatedPod, found := kubelet.podManager.GetPodByName(tt.pod.Namespace, tt.pod.Name)
-		assert.True(t, found, "expected to find pod %s", tt.pod.Name)
-		assert.Equal(t, tt.expectedAllocations, updatedPod.Status.ContainerStatuses[0].AllocatedResources, tt.name)
-		assert.Equal(t, tt.expectedResize, updatedPod.Status.Resize, tt.name)
-		testKubelet.fakeKubeClient.ClearActions()
+		t.Run(tt.name, func(t *testing.T) {
+			kubelet.statusManager = status.NewFakeManager()
+			require.NoError(t, kubelet.statusManager.SetPodAllocation(tt.pod))
+
+			pod := tt.pod.DeepCopy()
+			pod.Spec.Containers[0].Resources.Requests = tt.newRequests
+			updatedPod, err := kubelet.handlePodResourcesResize(pod)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedAllocations, updatedPod.Spec.Containers[0].Resources.Requests, "updated pod spec resources")
+
+			alloc, found := kubelet.statusManager.GetContainerResourceAllocation(string(pod.UID), pod.Spec.Containers[0].Name)
+			require.True(t, found, "container allocation")
+			assert.Equal(t, tt.expectedAllocations, alloc.Requests, "stored container allocation")
+
+			resizeStatus, found := kubelet.statusManager.GetPodResizeStatus(string(pod.UID))
+			require.True(t, found, "pod resize status")
+			assert.Equal(t, tt.expectedResize, resizeStatus)
+		})
 	}
 }
 
@@ -3274,5 +3290,134 @@ func TestSyncPodSpans(t *testing.T) {
 
 	for _, span := range runtimeServiceSpans {
 		assert.Equalf(t, span.Parent.SpanID(), rootSpan.SpanContext.SpanID(), "runtime service span %s %s should be child of root span", span.Name, span.Parent.SpanID())
+	}
+}
+
+func TestIsPodResizeInProgress(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345",
+			Name:      "test",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+					},
+				},
+			}, {
+				Name: "c2",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}
+	steadyStateC1Status := &kubecontainer.Status{
+		Name:  "c1",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(300, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(400, resource.DecimalSI),
+		},
+	}
+	resizeMemC1Status := &kubecontainer.Status{
+		Name:  "c1",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(300, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(800, resource.DecimalSI),
+		},
+	}
+	resizeCPUReqC1Status := &kubecontainer.Status{
+		Name:  "c1",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(200, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(300, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(400, resource.DecimalSI),
+		},
+	}
+	resizeCPULimitC1Status := &kubecontainer.Status{
+		Name:  "c1",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(600, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(400, resource.DecimalSI),
+		},
+	}
+	steadyStateC2Status := &kubecontainer.Status{
+		Name:  "c2",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(500, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(700, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(800, resource.DecimalSI),
+		},
+	}
+	mkPodStatus := func(containerStatuses ...*kubecontainer.Status) *kubecontainer.PodStatus {
+		return &kubecontainer.PodStatus{
+			ID:                pod.UID,
+			Name:              pod.Name,
+			Namespace:         pod.Namespace,
+			ContainerStatuses: containerStatuses,
+		}
+	}
+	tests := []struct {
+		name         string
+		status       *kubecontainer.PodStatus
+		expectResize bool
+	}{{
+		name:         "steady state",
+		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status),
+		expectResize: false,
+	}, {
+		name: "terminated container",
+		status: mkPodStatus(&kubecontainer.Status{
+			Name:      "c1",
+			State:     kubecontainer.ContainerStateExited,
+			Resources: resizeMemC1Status.Resources,
+		}, steadyStateC2Status),
+		expectResize: false,
+	}, {
+		name:         "missing container",
+		status:       mkPodStatus(steadyStateC2Status),
+		expectResize: false,
+	}, {
+		name:         "resizing memory limit",
+		status:       mkPodStatus(resizeMemC1Status, steadyStateC2Status),
+		expectResize: true,
+	}, {
+		name:         "resizing cpu request",
+		status:       mkPodStatus(resizeCPUReqC1Status, steadyStateC2Status),
+		expectResize: true,
+	}, {
+		name:         "resizing cpu limit",
+		status:       mkPodStatus(resizeCPULimitC1Status, steadyStateC2Status),
+		expectResize: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectResize, isPodResizeInProgress(pod, test.status))
+		})
 	}
 }
