@@ -97,6 +97,7 @@ func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, po
 func (c *pods) Resize(ctx context.Context, podName string, pod *corev1.Pod, opts metav1.UpdateOptions) (result *corev1.Pod, err error) {
 	result = &corev1.Pod{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("pods").
 		Name(podName).
