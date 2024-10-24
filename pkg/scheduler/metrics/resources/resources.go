@@ -110,7 +110,7 @@ func (c *podResourceCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	if err != nil {
 		return
 	}
-	reuseReqs, reuseLimits := make(v1.ResourceList, 5), make(v1.ResourceList, 5)
+	reuseReqs, reuseLimits := make(v1.ResourceList, 4), make(v1.ResourceList, 5)
 	for _, p := range pods {
 		reqs, limits, terminal := podRequestsAndLimitsByLifecycle(p, reuseReqs, reuseLimits)
 		if terminal {
