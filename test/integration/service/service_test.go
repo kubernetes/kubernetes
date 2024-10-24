@@ -314,6 +314,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	defer ctx.Cancel("test has completed")
 	epsController := endpointslice.NewController(
 		ctx,
+		"endpointslice-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),

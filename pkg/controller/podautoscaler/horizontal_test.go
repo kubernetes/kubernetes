@@ -770,6 +770,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
 		tCtx,
+		"horizontal-pod-autoscaler-controller",
 		eventClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
@@ -5262,6 +5263,7 @@ func TestMultipleHPAs(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
 		tCtx,
+		"horizontal-pod-autoscaler-controller",
 		testClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),

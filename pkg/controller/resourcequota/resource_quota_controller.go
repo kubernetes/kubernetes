@@ -54,6 +54,8 @@ type ReplenishmentFunc func(ctx context.Context, groupResource schema.GroupResou
 
 // ControllerOptions holds options for creating a quota controller
 type ControllerOptions struct {
+	// Controller name
+	ControllerName string
 	// Must have authority to list all quotas, and update quota status
 	QuotaClient corev1client.ResourceQuotasGetter
 	// Shared informer for resource quotas
@@ -78,6 +80,8 @@ type ControllerOptions struct {
 
 // Controller is responsible for tracking quota usage status in the system
 type Controller struct {
+	// Controller name
+	controllerName string
 	// Must have authority to list all resources in the system, and update quota status
 	rqClient corev1client.ResourceQuotasGetter
 	// A lister/getter of resource quota objects
@@ -106,6 +110,7 @@ type Controller struct {
 func NewController(ctx context.Context, options *ControllerOptions) (*Controller, error) {
 	// build the resource quota controller
 	rq := &Controller{
+		controllerName:      options.ControllerName,
 		rqClient:            options.QuotaClient,
 		rqLister:            options.ResourceQuotaInformer.Lister(),
 		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
@@ -297,14 +302,14 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 
 	logger := klog.FromContext(ctx)
 
-	logger.Info("Starting resource quota controller")
-	defer logger.Info("Shutting down resource quota controller")
+	logger.Info("Starting controller", "controller", rq.controllerName)
+	defer logger.Info("Shutting down controller", rq.controllerName)
 
 	if rq.quotaMonitor != nil {
 		go rq.quotaMonitor.Run(ctx)
 	}
 
-	if !cache.WaitForNamedCacheSync("resource quota", ctx.Done(), rq.informerSyncedFuncs...) {
+	if !cache.WaitForNamedCacheSync(rq.controllerName, ctx.Done(), rq.informerSyncedFuncs...) {
 		return
 	}
 

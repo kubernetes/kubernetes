@@ -82,8 +82,9 @@ var (
 // Controller ensures that all Job objects have corresponding pods to
 // run their configured workload.
 type Controller struct {
-	kubeClient clientset.Interface
-	podControl controller.PodControlInterface
+	controllerName string
+	kubeClient     clientset.Interface
+	podControl     controller.PodControlInterface
 
 	// To allow injection of the following for testing.
 	updateStatusHandler func(ctx context.Context, job *batch.Job) (*batch.Job, error)
@@ -162,16 +163,17 @@ type orphanPodKey struct {
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*Controller, error) {
-	return newControllerWithClock(ctx, podInformer, jobInformer, kubeClient, &clock.RealClock{})
+func NewController(ctx context.Context, controllerName string, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) (*Controller, error) {
+	return newControllerWithClock(ctx, controllerName, podInformer, jobInformer, kubeClient, &clock.RealClock{})
 }
 
-func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
+func newControllerWithClock(ctx context.Context, controllerName string, podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface, clock clock.WithTicker) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 
 	jm := &Controller{
-		kubeClient: kubeClient,
+		controllerName: controllerName,
+		kubeClient:     kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
@@ -240,10 +242,10 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	defer jm.queue.ShutDown()
 	defer jm.orphanQueue.ShutDown()
 
-	logger.Info("Starting job controller")
-	defer logger.Info("Shutting down job controller")
+	logger.Info("Starting controller", "controller", jm.controllerName)
+	defer logger.Info("Shutting down controller", "controller", jm.controllerName)
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSync(jm.controllerName, ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 

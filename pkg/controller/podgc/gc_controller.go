@@ -52,7 +52,8 @@ const (
 )
 
 type PodGCController struct {
-	kubeClient clientset.Interface
+	controllerName string
+	kubeClient     clientset.Interface
 
 	podLister        corelisters.PodLister
 	podListerSynced  cache.InformerSynced
@@ -66,15 +67,16 @@ type PodGCController struct {
 	quarantineTime         time.Duration
 }
 
-func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
+func NewPodGC(ctx context.Context, controllerName string, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
-	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
+	return NewPodGCInternal(ctx, controllerName, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
 }
 
 // This function is only intended for integration tests
-func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
+func NewPodGCInternal(ctx context.Context, controllerName string, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
 	gcc := &PodGCController{
+		controllerName:         controllerName,
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		podLister:              podInformer.Lister(),
@@ -96,11 +98,11 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 
 	defer utilruntime.HandleCrash()
 
-	logger.Info("Starting GC controller")
+	logger.Info("Starting controller", "controller", gcc.controllerName)
 	defer gcc.nodeQueue.ShutDown()
-	defer logger.Info("Shutting down GC controller")
+	defer logger.Info("Shutting down controller", gcc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("GC", ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync(gcc.controllerName, ctx.Done(), gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 

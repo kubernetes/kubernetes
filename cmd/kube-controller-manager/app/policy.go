@@ -48,6 +48,7 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 
 	go disruption.NewDisruptionController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Policy().V1().PodDisruptionBudgets(),
 		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),

@@ -167,6 +167,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 
 	dc := NewDisruptionControllerInternal(
 		ctx,
+		"disruption-controller",
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Policy().V1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),

@@ -122,7 +122,7 @@ func (rv *ResourceVersionController) Run(ctx context.Context) {
 	defer rv.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting", "controller", ResourceVersionControllerName)
+	logger.Info("Starting controller", "controller", ResourceVersionControllerName)
 	defer logger.Info("Shutting down", "controller", ResourceVersionControllerName)
 
 	if !cache.WaitForNamedCacheSync(ResourceVersionControllerName, ctx.Done(), rv.svmSynced) {

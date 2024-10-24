@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,8 +82,9 @@ type ReplicaSetController struct {
 	// For example, this struct can be used (with adapters) to handle ReplicationController.
 	schema.GroupVersionKind
 
-	kubeClient clientset.Interface
-	podControl controller.PodControlInterface
+	controllerName string
+	kubeClient     clientset.Interface
+	podControl     controller.PodControlInterface
 
 	eventBroadcaster record.EventBroadcaster
 
@@ -115,13 +115,13 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(ctx context.Context, controllerName string, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
 	logger := klog.FromContext(ctx)
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
-	return NewBaseController(logger, rsInformer, podInformer, kubeClient, burstReplicas,
+	return NewBaseController(logger, controllerName, rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
@@ -135,11 +135,12 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
-func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+func NewBaseController(logger klog.Logger, controllerName string, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
+		controllerName:   controllerName,
 		kubeClient:       kubeClient,
 		podControl:       podControl,
 		eventBroadcaster: eventBroadcaster,
@@ -212,12 +213,11 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 
 	defer rsc.queue.ShutDown()
 
-	controllerName := strings.ToLower(rsc.Kind)
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "name", controllerName)
-	defer logger.Info("Shutting down controller", "name", controllerName)
+	logger.Info("Starting controller", "controller", rsc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", rsc.controllerName)
 
-	if !cache.WaitForNamedCacheSync(rsc.Kind, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSync(rsc.controllerName, ctx.Done(), rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 

@@ -43,6 +43,7 @@ import (
 
 // ClusterRoleAggregationController is a controller to combine cluster roles
 type ClusterRoleAggregationController struct {
+	controllerName     string
 	clusterRoleClient  rbacclient.ClusterRolesGetter
 	clusterRoleLister  rbaclisters.ClusterRoleLister
 	clusterRolesSynced cache.InformerSynced
@@ -52,8 +53,9 @@ type ClusterRoleAggregationController struct {
 }
 
 // NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+func NewClusterRoleAggregation(controllerName string, clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
 	c := &ClusterRoleAggregationController{
+		controllerName:     controllerName,
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),
 		clusterRolesSynced: clusterRoleInformer.Informer().HasSynced,
@@ -191,10 +193,10 @@ func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting ClusterRoleAggregator controller")
-	defer logger.Info("Shutting down ClusterRoleAggregator controller")
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", "controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", ctx.Done(), c.clusterRolesSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.clusterRolesSynced) {
 		return
 	}
 

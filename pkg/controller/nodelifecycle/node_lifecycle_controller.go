@@ -219,6 +219,7 @@ type podUpdateItem struct {
 type Controller struct {
 	taintManager *tainteviction.Controller
 
+	controllerName    string
 	podLister         corelisters.PodLister
 	podInformerSynced cache.InformerSynced
 	kubeClient        clientset.Interface
@@ -306,6 +307,7 @@ type Controller struct {
 // NewNodeLifecycleController returns a new taint controller.
 func NewNodeLifecycleController(
 	ctx context.Context,
+	controllerName string,
 	leaseInformer coordinformers.LeaseInformer,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -329,6 +331,7 @@ func NewNodeLifecycleController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
+		controllerName:              controllerName,
 		kubeClient:                  kubeClient,
 		now:                         metav1.Now,
 		knownNodeSet:                make(map[string]*v1.Node),
@@ -422,7 +425,7 @@ func NewNodeLifecycleController(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
 		logger.Info("Running TaintEvictionController as part of NodeLifecyleController")
-		tm, err := tainteviction.New(ctx, kubeClient, podInformer, nodeInformer, taintEvictionController)
+		tm, err := tainteviction.New(ctx, taintEvictionController, kubeClient, podInformer, nodeInformer)
 		if err != nil {
 			return nil, err
 		}
@@ -474,15 +477,15 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer nc.nodeUpdateQueue.ShutDown()
 	defer nc.podUpdateQueue.ShutDown()
 
-	logger.Info("Starting node controller")
-	defer logger.Info("Shutting down node controller")
+	logger.Info("Starting controller", "controller", nc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", nc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSync(nc.controllerName, ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SeparateTaintEvictionController) {
-		logger.Info("Starting", "controller", taintEvictionController)
+		logger.Info("Starting controller", "controller", taintEvictionController)
 		go nc.taintManager.Run(ctx)
 	}
 

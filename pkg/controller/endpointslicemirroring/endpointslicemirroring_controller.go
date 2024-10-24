@@ -68,7 +68,10 @@ const (
 )
 
 // NewController creates and initializes a new Controller
-func NewController(ctx context.Context, endpointsInformer coreinformers.EndpointsInformer,
+func NewController(
+	ctx context.Context,
+	controllerName string,
+	endpointsInformer coreinformers.EndpointsInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	maxEndpointsPerSubset int32,
@@ -82,7 +85,8 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 	metrics.RegisterMetrics()
 
 	c := &Controller{
-		client: client,
+		controllerName: controllerName,
+		client:         client,
 		// This is similar to the DefaultControllerRateLimiter, just with a
 		// significantly higher default backoff (1s vs 5ms). This controller
 		// processes events that can require significant EndpointSlice changes.
@@ -155,6 +159,7 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 
 // Controller manages selector-based service endpoint slices
 type Controller struct {
+	controllerName   string
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -224,10 +229,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting EndpointSliceMirroring controller")
-	defer logger.Info("Shutting down EndpointSliceMirroring controller")
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", "controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", ctx.Done(), c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 

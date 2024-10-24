@@ -278,6 +278,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 
 	gc, err := garbagecollector.NewGarbageCollector(
 		tCtx,
+		"garbage-collector-controller",
 		clientSet,
 		metadataClient,
 		restMapper,

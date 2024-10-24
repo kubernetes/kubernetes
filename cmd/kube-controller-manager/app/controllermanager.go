@@ -728,7 +728,7 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 
 	time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	logger.V(1).Info("Starting controller", "controller", controllerName)
+	logger.V(1).Info("Initializing controller", "controller", controllerName)
 
 	initFunc := controllerDescriptor.GetInitFunc()
 	ctrl, started, err := initFunc(klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName)), controllerCtx, controllerName)

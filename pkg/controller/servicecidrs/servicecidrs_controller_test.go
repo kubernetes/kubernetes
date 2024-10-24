@@ -67,6 +67,7 @@ func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1be
 	}
 	controller := NewController(
 		ctx,
+		"service-cidr-controller",
 		serviceCIDRInformer,
 		ipAddressInformer,
 		client)

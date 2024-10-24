@@ -64,6 +64,7 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
+	controllerName string
 	// rsControl is used for adopting/releasing replica sets.
 	rsControl controller.RSControlInterface
 	client    clientset.Interface
@@ -98,10 +99,11 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+func NewDeploymentController(ctx context.Context, controllerName string, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
+		controllerName:   controllerName,
 		client:           client,
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
@@ -170,10 +172,10 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer dc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "controller", "deployment")
-	defer logger.Info("Shutting down controller", "controller", "deployment")
+	logger.Info("Starting controller", "controller", dc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", dc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSync(dc.controllerName, ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 

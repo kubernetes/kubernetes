@@ -56,6 +56,7 @@ type LegacySATokenCleanerOptions struct {
 
 // LegacySATokenCleaner is a controller that deletes legacy serviceaccount tokens that are not in use for a specified period of time.
 type LegacySATokenCleaner struct {
+	controllerName   string
 	client           clientset.Interface
 	clock            clock.Clock
 	saLister         listersv1.ServiceAccountLister
@@ -72,7 +73,7 @@ type LegacySATokenCleaner struct {
 }
 
 // NewLegacySATokenCleaner returns a new *NewLegacySATokenCleaner.
-func NewLegacySATokenCleaner(saInformer coreinformers.ServiceAccountInformer, secretInformer coreinformers.SecretInformer, podInformer coreinformers.PodInformer, client clientset.Interface, cl clock.Clock, options LegacySATokenCleanerOptions) (*LegacySATokenCleaner, error) {
+func NewLegacySATokenCleaner(controllerName string, saInformer coreinformers.ServiceAccountInformer, secretInformer coreinformers.SecretInformer, podInformer coreinformers.PodInformer, client clientset.Interface, cl clock.Clock, options LegacySATokenCleanerOptions) (*LegacySATokenCleaner, error) {
 	if !(options.CleanUpPeriod > 0) {
 		return nil, fmt.Errorf("invalid CleanUpPeriod: %v", options.CleanUpPeriod)
 	}
@@ -81,6 +82,7 @@ func NewLegacySATokenCleaner(saInformer coreinformers.ServiceAccountInformer, se
 	}
 
 	tc := &LegacySATokenCleaner{
+		controllerName:       controllerName,
 		client:               client,
 		clock:                cl,
 		saLister:             saInformer.Lister(),
@@ -100,10 +102,10 @@ func (tc *LegacySATokenCleaner) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting legacy service account token cleaner controller")
-	defer logger.Info("Shutting down legacy service account token cleaner controller")
+	logger.Info("Starting controller", "controller", tc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", tc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("legacy-service-account-token-cleaner", ctx.Done(), tc.saInformerSynced, tc.secretInformerSynced, tc.podInformerSynced) {
+	if !cache.WaitForNamedCacheSync(tc.controllerName, ctx.Done(), tc.saInformerSynced, tc.secretInformerSynced, tc.podInformerSynced) {
 		return
 	}
 

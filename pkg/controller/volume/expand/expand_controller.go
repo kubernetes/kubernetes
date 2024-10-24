@@ -72,6 +72,7 @@ type CSINameTranslator interface {
 // Deprecated: This controller is deprecated and for now exists for the sole purpose of adding
 // necessary annotations if necessary, so as volume can be expanded externally in the control-plane
 type expandController struct {
+	controllerName string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -100,6 +101,7 @@ type expandController struct {
 // NewExpandController expands the pvs
 func NewExpandController(
 	ctx context.Context,
+	controllerName string,
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	plugins []volume.VolumePlugin,
@@ -107,9 +109,10 @@ func NewExpandController(
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
-		kubeClient: kubeClient,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
+		controllerName: controllerName,
+		kubeClient:     kubeClient,
+		pvcLister:      pvcInformer.Lister(),
+		pvcsSynced:     pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
@@ -326,10 +329,10 @@ func (expc *expandController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting expand controller")
-	defer logger.Info("Shutting down expand controller")
+	logger.Info("Starting controller", "controller", expc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", expc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("expand", ctx.Done(), expc.pvcsSynced) {
+	if !cache.WaitForNamedCacheSync(expc.controllerName, ctx.Done(), expc.pvcsSynced) {
 		return
 	}
 

@@ -82,6 +82,7 @@ type timestampedScaleEvent struct {
 // in the system with the actual deployments/replication controllers they
 // control.
 type HorizontalController struct {
+	controllerName  string
 	scaleNamespacer scaleclient.ScalesGetter
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
 	mapper          apimeta.RESTMapper
@@ -124,6 +125,7 @@ type HorizontalController struct {
 // NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
 	ctx context.Context,
+	controllerName string,
 	evtNamespacer v1core.EventsGetter,
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
@@ -143,6 +145,7 @@ func NewHorizontalController(
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
+		controllerName:               controllerName,
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
@@ -198,10 +201,10 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer a.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting HPA controller")
-	defer logger.Info("Shutting down HPA controller")
+	logger.Info("Starting controller", "controller", a.controllerName)
+	defer logger.Info("Shutting down controller", "controller", a.controllerName)
 
-	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
+	if !cache.WaitForNamedCacheSync(a.controllerName, ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 

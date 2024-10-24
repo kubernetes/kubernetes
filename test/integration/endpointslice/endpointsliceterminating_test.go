@@ -119,6 +119,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			epsController := endpointslice.NewController(
 				tCtx,
+				"endpointslice-controller",
 				informers.Core().V1().Pods(),
 				informers.Core().V1().Services(),
 				informers.Core().V1().Nodes(),

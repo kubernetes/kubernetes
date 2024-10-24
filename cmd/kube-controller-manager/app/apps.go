@@ -43,6 +43,7 @@ func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -67,6 +68,7 @@ func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go statefulset.NewStatefulSetController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
@@ -87,6 +89,7 @@ func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 func startReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go replicaset.NewReplicaSetController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
@@ -106,6 +109,7 @@ func newDeploymentControllerDescriptor() *ControllerDescriptor {
 func startDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	dc, err := deployment.NewDeploymentController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),

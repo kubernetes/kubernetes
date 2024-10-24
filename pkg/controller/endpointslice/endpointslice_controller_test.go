@@ -99,6 +99,7 @@ func newController(t *testing.T, nodeNames []string, batchPeriod time.Duration) 
 	_, ctx := ktesting.NewTestContext(t)
 	esController := NewController(
 		ctx,
+		"endpointslice-controller",
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		nodeInformer,
@@ -397,7 +398,7 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   controllerQualifiedName,
 			},
 			DeletionTimestamp: &deletedTs,
 		},
@@ -442,7 +443,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   controllerQualifiedName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -453,7 +454,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   controllerQualifiedName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -472,7 +473,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 			Namespace: ns,
 			Labels: map[string]string{
 				discovery.LabelServiceName: "something-else",
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   controllerQualifiedName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -529,7 +530,7 @@ func TestOnEndpointSliceUpdate(t *testing.T) {
 			Namespace: ns,
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelManagedBy:   controllerQualifiedName,
 			},
 		},
 		AddressType: discovery.AddressTypeIPv4,
@@ -1750,7 +1751,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 					Generation: testcase.informerGenerationNumber,
 					Labels: map[string]string{
 						discovery.LabelServiceName: serviceName,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   controllerQualifiedName,
 					},
 				},
 				AddressType: discovery.AddressTypeIPv4,
@@ -1977,7 +1978,7 @@ func TestUpdateNode(t *testing.T) {
 					Namespace: "ns",
 					Labels: map[string]string{
 						discovery.LabelServiceName: "svc",
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   controllerQualifiedName,
 					},
 				},
 				Endpoints: []discovery.Endpoint{

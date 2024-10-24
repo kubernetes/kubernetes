@@ -48,6 +48,7 @@ type Controller interface {
 }
 
 type ephemeralController struct {
+	controllerName string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -77,17 +78,19 @@ type ephemeralController struct {
 // NewController creates an ephemeral volume controller.
 func NewController(
 	ctx context.Context,
+	controllerName string,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
 
 	ec := &ephemeralController{
-		kubeClient: kubeClient,
-		podLister:  podInformer.Lister(),
-		podIndexer: podInformer.Informer().GetIndexer(),
-		podSynced:  podInformer.Informer().HasSynced,
-		pvcLister:  pvcInformer.Lister(),
-		pvcsSynced: pvcInformer.Informer().HasSynced,
+		controllerName: controllerName,
+		kubeClient:     kubeClient,
+		podLister:      podInformer.Lister(),
+		podIndexer:     podInformer.Informer().GetIndexer(),
+		podSynced:      podInformer.Informer().HasSynced,
+		pvcLister:      pvcInformer.Lister(),
+		pvcsSynced:     pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ephemeral_volume"},
@@ -170,10 +173,10 @@ func (ec *ephemeralController) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+	logger.Info("Starting controller", "controller", ec.controllerName)
+	defer logger.Info("Shutting down controller", "controller", ec.controllerName)
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
+	if !cache.WaitForNamedCacheSync(ec.controllerName, ctx.Done(), ec.podSynced, ec.pvcsSynced) {
 		return
 	}
 

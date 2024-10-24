@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -162,6 +162,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		saInformer := informers.Core().V1().ServiceAccounts()
 		nsInformer := informers.Core().V1().Namespaces()
 		controller, err := NewServiceAccountsController(
+			"serviceaccount-controller",
 			saInformer,
 			nsInformer,
 			client,

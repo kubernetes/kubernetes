@@ -129,7 +129,7 @@ func (svmc *SVMController) Run(ctx context.Context) {
 	defer svmc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting", "controller", svmc.controllerName)
+	logger.Info("Starting controller", "controller", svmc.controllerName)
 	defer logger.Info("Shutting down", "controller", svmc.controllerName)
 
 	if !cache.WaitForNamedCacheSync(svmc.controllerName, ctx.Done(), svmc.svmSynced) {

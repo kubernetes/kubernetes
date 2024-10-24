@@ -39,6 +39,7 @@ func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 func startEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go endpointslicecontroller.NewController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
@@ -61,6 +62,7 @@ func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
 func startEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go endpointslicemirroringcontroller.NewController(
 		ctx,
+		controllerName,
 		controllerContext.InformerFactory.Core().V1().Endpoints(),
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.InformerFactory.Core().V1().Services(),

@@ -40,7 +40,7 @@ func newSigner() (*Signer, *fake.Clientset, coreinformers.SecretInformer, corein
 	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 	secrets := informers.Core().V1().Secrets()
 	configMaps := informers.Core().V1().ConfigMaps()
-	bsc, err := NewSigner(cl, secrets, configMaps, options)
+	bsc, err := NewSigner("bootstrap-signer-controller", cl, secrets, configMaps, options)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

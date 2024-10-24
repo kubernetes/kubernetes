@@ -61,8 +61,9 @@ func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions 
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
+func NewServiceAccountsController(controllerName string, saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
 	e := &ServiceAccountsController{
+		controllerName:          controllerName,
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -91,6 +92,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 
 // ServiceAccountsController manages ServiceAccount objects inside Namespaces
 type ServiceAccountsController struct {
+	controllerName          string
 	client                  clientset.Interface
 	serviceAccountsToEnsure []v1.ServiceAccount
 
@@ -111,10 +113,11 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.FromContext(ctx).Info("Starting service account controller")
-	defer klog.FromContext(ctx).Info("Shutting down service account controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync("service account", ctx.Done(), c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 

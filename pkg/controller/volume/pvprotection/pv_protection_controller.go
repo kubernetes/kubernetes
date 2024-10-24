@@ -40,7 +40,8 @@ import (
 // Controller is controller that removes PVProtectionFinalizer
 // from PVs that are not bound to PVCs.
 type Controller struct {
-	client clientset.Interface
+	controllerName string
+	client         clientset.Interface
 
 	pvLister       corelisters.PersistentVolumeLister
 	pvListerSynced cache.InformerSynced
@@ -49,9 +50,10 @@ type Controller struct {
 }
 
 // NewPVProtectionController returns a new *Controller.
-func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
+func NewPVProtectionController(logger klog.Logger, controllerName string, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
-		client: cl,
+		controllerName: controllerName,
+		client:         cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvprotection"},
@@ -78,10 +80,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting PV protection controller")
-	defer logger.Info("Shutting down PV protection controller")
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", "controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync("PV protection", ctx.Done(), c.pvListerSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.pvListerSynced) {
 		return
 	}
 

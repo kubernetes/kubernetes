@@ -228,7 +228,7 @@ type endpointController struct {
 func newController(ctx context.Context, url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}, ContentType: runtime.ContentTypeJSON}})
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
-	endpoints := NewEndpointController(ctx, informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
+	endpoints := NewEndpointController(ctx, "endpoint-controller", informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
@@ -247,6 +247,7 @@ func newFakeController(ctx context.Context, batchPeriod time.Duration) (*fake.Cl
 
 	eController := NewEndpointController(
 		ctx,
+		"endpoint-controller",
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(),

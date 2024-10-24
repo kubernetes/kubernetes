@@ -132,7 +132,7 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 	podInformer := informerFactory.Core().V1().Pods()
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), true /* admin access */, clientSet, podInformer, claimInformer, claimTemplateInformer)
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), "resourceclaim-controller", true /* admin access */, clientSet, podInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
@@ -203,6 +203,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
 		ctx,
+		"garbage-collector-controller",
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -237,6 +238,7 @@ func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig r
 	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
 	controller := namespace.NewNamespaceController(
 		ctx,
+		"namespace-controller",
 		clientSet,
 		metadataClient,
 		discoverResourcesFn,
@@ -673,6 +675,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 
 	dc := disruption.NewDisruptionController(
 		testCtx.Ctx,
+		"disruption-controller",
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

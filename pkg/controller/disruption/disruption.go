@@ -78,8 +78,9 @@ const (
 type updater func(context.Context, *policy.PodDisruptionBudget) error
 
 type DisruptionController struct {
-	kubeClient clientset.Interface
-	mapper     apimeta.RESTMapper
+	controllerName string
+	kubeClient     clientset.Interface
+	mapper         apimeta.RESTMapper
 
 	scaleNamespacer scaleclient.ScalesGetter
 	discoveryClient discovery.DiscoveryInterface
@@ -131,6 +132,7 @@ type podControllerFinder func(ctx context.Context, controllerRef *metav1.OwnerRe
 
 func NewDisruptionController(
 	ctx context.Context,
+	controllerName string,
 	podInformer coreinformers.PodInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	rcInformer coreinformers.ReplicationControllerInformer,
@@ -144,6 +146,7 @@ func NewDisruptionController(
 ) *DisruptionController {
 	return NewDisruptionControllerInternal(
 		ctx,
+		controllerName,
 		podInformer,
 		pdbInformer,
 		rcInformer,
@@ -162,6 +165,7 @@ func NewDisruptionController(
 // stalePodDisruptionTimeout
 // It is only supposed to be used by tests.
 func NewDisruptionControllerInternal(ctx context.Context,
+	controllerName string,
 	podInformer coreinformers.PodInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	rcInformer coreinformers.ReplicationControllerInformer,
@@ -252,6 +256,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 	dc.discoveryClient = discoveryClient
 
 	dc.clock = clock
+	dc.controllerName = controllerName
 
 	return dc
 }
@@ -460,10 +465,10 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	defer dc.recheckQueue.ShutDown()
 	defer dc.stalePodDisruptionQueue.ShutDown()
 
-	logger.Info("Starting disruption controller")
-	defer logger.Info("Shutting down disruption controller")
+	logger.Info("Starting controller", "controller", dc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", dc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("disruption", ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSync(dc.controllerName, ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 

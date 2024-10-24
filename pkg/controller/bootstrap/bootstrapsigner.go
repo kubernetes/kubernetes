@@ -72,6 +72,7 @@ func DefaultSignerOptions() SignerOptions {
 
 // Signer is a controller that signs a ConfigMap with a set of tokens.
 type Signer struct {
+	controllerName     string
 	client             clientset.Interface
 	configMapKey       string
 	configMapName      string
@@ -92,8 +93,9 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(controllerName string, cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
 	e := &Signer{
+		controllerName:     controllerName,
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
 		configMapName:      options.ConfigMapName,
@@ -159,15 +161,17 @@ func (e *Signer) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer e.syncQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "controller", e.controllerName)
+	defer logger.Info("Shutting down controller", "controller", e.controllerName)
+
+	if !cache.WaitForNamedCacheSync(e.controllerName, ctx.Done(), e.configMapSynced, e.secretSynced) {
 		return
 	}
 
-	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Starting workers")
 	go wait.UntilWithContext(ctx, e.serviceConfigMapQueue, 0)
 	<-ctx.Done()
-	logger.V(1).Info("Shutting down")
 }
 
 func (e *Signer) pokeConfigMapSync() {

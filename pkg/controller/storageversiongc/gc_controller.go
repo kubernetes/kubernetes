@@ -43,7 +43,8 @@ import (
 // Controller watches kube-apiserver leases and storageversions, and delete stale
 // storage version entries and objects.
 type Controller struct {
-	kubeclientset kubernetes.Interface
+	controllerName string
+	kubeclientset  kubernetes.Interface
 
 	leaseLister  coordlisters.LeaseLister
 	leasesSynced cache.InformerSynced
@@ -55,8 +56,9 @@ type Controller struct {
 }
 
 // NewStorageVersionGC creates a new Controller.
-func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, leaseInformer coordinformers.LeaseInformer, storageVersionInformer apiserverinternalinformers.StorageVersionInformer) *Controller {
+func NewStorageVersionGC(ctx context.Context, controllerName string, clientset kubernetes.Interface, leaseInformer coordinformers.LeaseInformer, storageVersionInformer apiserverinternalinformers.StorageVersionInformer) *Controller {
 	c := &Controller{
+		controllerName:       controllerName,
 		kubeclientset:        clientset,
 		leaseLister:          leaseInformer.Lister(),
 		leasesSynced:         leaseInformer.Informer().HasSynced,
@@ -95,11 +97,11 @@ func (c *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.leaseQueue.ShutDown()
 	defer c.storageVersionQueue.ShutDown()
-	defer logger.Info("Shutting down storage version garbage collector")
 
-	logger.Info("Starting storage version garbage collector")
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", "controller", c.controllerName)
 
-	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}

@@ -33,10 +33,10 @@ package names
 // The following places should use the controller name constants, when:
 //  1. defining a new app.ControllerDescriptor so it can be used in app.NewControllerDescriptors or app.KnownControllers:
 //  2. used anywhere inside the controller itself:
-//     2.1. [TODO] logging should use a canonical controller name when referencing a controller (Eg. Starting X, Shutting down X)
+//     2.1. logging should use a canonical controller name when referencing a controller (Eg. Starting X, Shutting down X)
 //     2.2. [TODO] emitted events should have an EventSource.Component set to the controller name (usually when initializing an EventRecorder)
 //     2.3. [TODO] registering ControllerManagerMetrics with ControllerStarted and ControllerStopped
-//     2.4. [TODO] calling WaitForNamedCacheSync
+//     2.4. calling WaitForNamedCacheSync
 //  3. defining controller options for "--help" command or generated documentation
 //     3.1. controller name should be used to create a pflag.FlagSet when registering controller options (the name is rendered in a controller flag group header) in options.KubeControllerManagerOptions
 //     3.2. when defined flag's help mentions a controller name

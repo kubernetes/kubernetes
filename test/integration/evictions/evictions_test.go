@@ -682,6 +682,7 @@ func rmSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFu
 
 	rm := disruption.NewDisruptionController(
 		ctx,
+		"disruption-controller",
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

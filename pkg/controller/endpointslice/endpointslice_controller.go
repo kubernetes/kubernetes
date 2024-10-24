@@ -72,16 +72,19 @@ const (
 	// maxSyncBackOff is the max backoff period for syncService calls.
 	maxSyncBackOff = 1000 * time.Second
 
-	// controllerName is a unique value used with LabelManagedBy to indicated
+	// controllerQualifiedName is a unique value used with LabelManagedBy to indicate
 	// the component managing an EndpointSlice.
-	controllerName = "endpointslice-controller.k8s.io"
+	controllerQualifiedName = "endpointslice-controller.k8s.io"
 
 	// topologyQueueItemKey is the key for all items in the topologyQueue.
 	topologyQueueItemKey = "topologyQueueItemKey"
 )
 
 // NewController creates and initializes a new Controller
-func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
+func NewController(
+	ctx context.Context,
+	controllerName string,
+	podInformer coreinformers.PodInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
@@ -95,7 +98,8 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 	endpointslicemetrics.RegisterMetrics()
 
 	c := &Controller{
-		client: client,
+		controllerName: controllerName,
+		client:         client,
 		// This is similar to the DefaultControllerRateLimiter, just with a
 		// significantly higher default backoff (1s vs 5ms). This controller
 		// processes events that can require significant EndpointSlice changes,
@@ -185,7 +189,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.endpointSliceTracker,
 		c.topologyCache,
 		c.eventRecorder,
-		controllerName,
+		controllerQualifiedName,
 		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
 	)
 
@@ -194,6 +198,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 // Controller manages selector-based service endpoint slices
 type Controller struct {
+	controllerName   string
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -278,10 +283,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer c.topologyQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting endpoint slice controller")
-	defer logger.Info("Shutting down endpoint slice controller")
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down controller", "controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 

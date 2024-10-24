@@ -379,6 +379,7 @@ func setup(t *testing.T, name string) *testutils.TestContext {
 	externalInformers := informers.NewSharedInformerFactory(testCtx.ClientSet, time.Second)
 
 	podgc := podgc.NewPodGCInternal(testCtx.Ctx,
+		"pod-garbage-collector-controller",
 		testCtx.ClientSet,
 		externalInformers.Core().V1().Pods(),
 		externalInformers.Core().V1().Nodes(),

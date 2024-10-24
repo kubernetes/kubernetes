@@ -390,7 +390,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 
-			ec, err := NewController(tCtx.Logger(), tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(tCtx.Logger(), "resourceclaim-controller", tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -465,7 +465,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 	claimClient := fakeKubeClient.ResourceV1alpha3().ResourceClaims(testNamespace)
 
-	_, err := NewController(tCtx.Logger(), false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	_, err := NewController(tCtx.Logger(), "resourceclaim-controller", false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())

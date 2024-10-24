@@ -81,8 +81,7 @@ type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 // Controller listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
 type Controller struct {
-	name string
-
+	controllerName        string
 	client                clientset.Interface
 	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
@@ -181,7 +180,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 }
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
-func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer, controllerName string) (*Controller, error) {
+func New(ctx context.Context, controllerName string, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	metrics.Register()
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -190,8 +189,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 	podIndexer := podInformer.Informer().GetIndexer()
 
 	tm := &Controller{
-		name: controllerName,
-
+		controllerName:   controllerName,
 		client:           c,
 		broadcaster:      eventBroadcaster,
 		recorder:         recorder,
@@ -219,7 +217,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 		nodeUpdateQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[nodeUpdateItem]{Name: "noexec_taint_node"}),
 		podUpdateQueue:  workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[podUpdateItem]{Name: "noexec_taint_pod"}),
 	}
-	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
+	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.controllerName))
 
 	_, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -278,8 +276,8 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 func (tc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting", "controller", tc.name)
-	defer logger.Info("Shutting down controller", "controller", tc.name)
+	logger.Info("Starting controller", "controller", tc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", tc.controllerName)
 
 	// Start events processing pipeline.
 	tc.broadcaster.StartStructuredLogging(3)
@@ -287,7 +285,7 @@ func (tc *Controller) Run(ctx context.Context) {
 		logger.Info("Sending events to api server")
 		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
 	} else {
-		logger.Error(nil, "kubeClient is nil", "controller", tc.name)
+		logger.Error(nil, "kubeClient is nil", "controller", tc.controllerName)
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	defer tc.broadcaster.Shutdown()
@@ -295,7 +293,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	defer tc.podUpdateQueue.ShutDown()
 
 	// wait for the cache to be synced
-	if !cache.WaitForNamedCacheSync(tc.name, ctx.Done(), tc.podListerSynced, tc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync(tc.controllerName, ctx.Done(), tc.podListerSynced, tc.nodeListerSynced) {
 		return
 	}
 

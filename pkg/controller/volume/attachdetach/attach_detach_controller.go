@@ -105,6 +105,7 @@ type AttachDetachController interface {
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
 	ctx context.Context,
+	controllerName string,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -123,16 +124,17 @@ func NewAttachDetachController(
 	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
+		controllerName: controllerName,
+		kubeClient:     kubeClient,
+		pvcLister:      pvcInformer.Lister(),
+		pvcsSynced:     pvcInformer.Informer().HasSynced,
+		pvLister:       pvInformer.Lister(),
+		pvsSynced:      pvInformer.Informer().HasSynced,
+		podLister:      podInformer.Lister(),
+		podsSynced:     podInformer.Informer().HasSynced,
+		podIndexer:     podInformer.Informer().GetIndexer(),
+		nodeLister:     nodeInformer.Lister(),
+		nodesSynced:    nodeInformer.Informer().HasSynced,
 		pvcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcs"},
@@ -239,6 +241,7 @@ func NewAttachDetachController(
 }
 
 type attachDetachController struct {
+	controllerName string
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
@@ -335,12 +338,12 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	defer adc.broadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting attach detach controller")
-	defer logger.Info("Shutting down attach detach controller")
+	logger.Info("Starting controller", "controller", adc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", adc.controllerName)
 
 	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced,
 		adc.csiNodeSynced, adc.csiDriversSynced, adc.volumeAttachmentSynced}
-	if !kcache.WaitForNamedCacheSync("attach detach", ctx.Done(), synced...) {
+	if !kcache.WaitForNamedCacheSync(adc.controllerName, ctx.Done(), synced...) {
 		return
 	}
 

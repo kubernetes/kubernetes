@@ -58,6 +58,7 @@ func DefaultTokenCleanerOptions() TokenCleanerOptions {
 
 // TokenCleaner is a controller that deletes expired tokens
 type TokenCleaner struct {
+	controllerName       string
 	tokenSecretNamespace string
 
 	client clientset.Interface
@@ -72,8 +73,9 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(controllerName string, cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
 	e := &TokenCleaner{
+		controllerName:       controllerName,
 		client:               cl,
 		secretLister:         secrets.Lister(),
 		secretSynced:         secrets.Informer().HasSynced,
@@ -114,10 +116,10 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting token cleaner controller")
-	defer logger.Info("Shutting down token cleaner controller")
+	logger.Info("Starting controller", "controller", tc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", tc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("token_cleaner", ctx.Done(), tc.secretSynced) {
+	if !cache.WaitForNamedCacheSync(tc.controllerName, ctx.Done(), tc.secretSynced) {
 		return
 	}
 

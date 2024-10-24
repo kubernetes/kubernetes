@@ -83,7 +83,8 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
-	kubeClient clientset.Interface
+	controllerName string
+	kubeClient     clientset.Interface
 
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -131,6 +132,7 @@ type DaemonSetsController struct {
 // NewDaemonSetsController creates a new DaemonSetsController
 func NewDaemonSetsController(
 	ctx context.Context,
+	controllerName string,
 	daemonSetInformer appsinformers.DaemonSetInformer,
 	historyInformer appsinformers.ControllerRevisionInformer,
 	podInformer coreinformers.PodInformer,
@@ -141,6 +143,7 @@ func NewDaemonSetsController(
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dsc := &DaemonSetsController{
+		controllerName:   controllerName,
 		kubeClient:       kubeClient,
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
@@ -291,10 +294,10 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer dsc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting daemon sets controller")
-	defer logger.Info("Shutting down daemon sets controller")
+	logger.Info("Starting controller", "controller", dsc.controllerName)
+	defer logger.Info("Shutting down controller", "controller", dsc.controllerName)
 
-	if !cache.WaitForNamedCacheSync("daemon sets", ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSync(dsc.controllerName, ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 

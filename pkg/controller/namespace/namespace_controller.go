@@ -52,6 +52,7 @@ const (
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
+	controllerName string
 	// lister that can list namespaces from a shared cache
 	lister corelisters.NamespaceLister
 	// returns true when the namespace cache is ready
@@ -65,6 +66,7 @@ type NamespaceController struct {
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
 	ctx context.Context,
+	controllerName string,
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
@@ -74,6 +76,7 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
+		controllerName: controllerName,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			nsControllerRateLimiter(),
 			workqueue.TypedRateLimitingQueueConfig[string]{
@@ -199,10 +202,10 @@ func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting namespace controller")
-	defer logger.Info("Shutting down namespace controller")
+	logger.Info("Starting controller", "controller", nm.controllerName)
+	defer logger.Info("Shutting down controller", nm.controllerName)
 
-	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync(nm.controllerName, ctx.Done(), nm.listerSynced) {
 		return
 	}
 

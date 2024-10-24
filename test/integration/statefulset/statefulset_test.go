@@ -393,6 +393,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 	ssc := statefulset.NewStatefulSetController(
 		tCtx,
+		"statefulset-controller",
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),

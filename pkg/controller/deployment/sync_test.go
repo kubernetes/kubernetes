@@ -414,7 +414,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, "deployment-controller", informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -550,7 +550,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(ctx, "deployment-controller", informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}

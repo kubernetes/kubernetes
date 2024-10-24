@@ -224,6 +224,7 @@ func newTestController(ctx context.Context, kubeClient clientset.Interface, info
 		informerFactory = informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	}
 	params := ControllerParameters{
+		ControllerName:            "persistentvolume-binder-controller",
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
 		VolumePlugins:             []volume.VolumePlugin{},

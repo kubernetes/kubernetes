@@ -53,8 +53,7 @@ const (
 	// sequence of delays between successive queuings of a service.
 	//
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
-	maxRetries     = 15
-	controllerName = "service-cidr-controller"
+	maxRetries = 15
 
 	ServiceCIDRProtectionFinalizer = "networking.k8s.io/service-cidr-finalizer"
 
@@ -67,6 +66,7 @@ const (
 // NewController returns a new *Controller.
 func NewController(
 	ctx context.Context,
+	controllerName string,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer,
 	client clientset.Interface,
@@ -74,7 +74,8 @@ func NewController(
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c := &Controller{
-		client: client,
+		controllerName: controllerName,
+		client:         client,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
@@ -106,6 +107,7 @@ func NewController(
 
 // Controller manages selector-based service ipAddress.
 type Controller struct {
+	controllerName   string
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -133,10 +135,10 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	logger := klog.FromContext(ctx)
 
-	logger.Info("Starting", "controller", controllerName)
-	defer logger.Info("Shutting down", "controller", controllerName)
+	logger.Info("Starting controller", "controller", c.controllerName)
+	defer logger.Info("Shutting down", "controller", c.controllerName)
 
-	if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), c.serviceCIDRsSynced, c.ipAddressSynced) {
+	if !cache.WaitForNamedCacheSync(c.controllerName, ctx.Done(), c.serviceCIDRsSynced, c.ipAddressSynced) {
 		return
 	}
 
@@ -310,7 +312,7 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 					WithMessage("There are still IPAddresses referencing the ServiceCIDR, please remove them or create a new ServiceCIDR").
 					WithLastTransitionTime(metav1.Now()))
 			svcApply := networkingapiv1beta1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-			_, err = c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true})
+			_, err = c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: c.controllerName, Force: true})
 			return err
 		}
 		// If there are no IPAddress depending on this ServiceCIDR is safe to remove it,
@@ -340,7 +342,7 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 			WithMessage("Kubernetes Service CIDR is ready").
 			WithLastTransitionTime(metav1.Now()))
 	svcApply := networkingapiv1beta1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-	if _, err := c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true}); err != nil {
+	if _, err := c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: c.controllerName, Force: true}); err != nil {
 		logger.Info("error updating default ServiceCIDR status", "error", err)
 		c.eventRecorder.Eventf(cidr, v1.EventTypeWarning, "KubernetesServiceCIDRError", "The ServiceCIDR Status can not be set to Ready=True")
 		return err

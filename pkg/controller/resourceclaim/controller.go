@@ -71,6 +71,7 @@ const (
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
+	controllerName string
 	// adminAccessEnabled matches the DRAAdminAccess feature gate state.
 	adminAccessEnabled bool
 
@@ -121,6 +122,7 @@ const (
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
+	controllerName string,
 	adminAccessEnabled bool,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
@@ -128,6 +130,7 @@ func NewController(
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
+		controllerName:     controllerName,
 		adminAccessEnabled: adminAccessEnabled,
 		kubeClient:         kubeClient,
 		podLister:          podInformer.Lister(),
@@ -405,8 +408,8 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting resource claim controller")
-	defer logger.Info("Shutting down resource claim controller")
+	logger.Info("Starting controller", "controller", ec.controllerName)
+	defer logger.Info("Shutting down controller", ec.controllerName)
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -414,7 +417,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
+	if !cache.WaitForNamedCacheSync(ec.controllerName, ctx.Done(), ec.podSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 

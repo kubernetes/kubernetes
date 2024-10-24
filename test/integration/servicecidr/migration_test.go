@@ -77,6 +77,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	// ServiceCIDR controller
 	go servicecidrs.NewController(
 		tCtx,
+		"service-cidr-controller",
 		informers1.Networking().V1beta1().ServiceCIDRs(),
 		informers1.Networking().V1beta1().IPAddresses(),
 		client1,
@@ -216,6 +217,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,
+		"service-cidr-controller",
 		informers2.Networking().V1beta1().ServiceCIDRs(),
 		informers2.Networking().V1beta1().IPAddresses(),
 		client2,

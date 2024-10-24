@@ -54,6 +54,7 @@ func TestEndpointUpdates(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -178,6 +179,7 @@ func TestEndpointWithMultiplePodUpdates(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -321,6 +323,7 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -430,6 +433,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -623,6 +627,7 @@ func TestEndpointTruncate(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
 		tCtx,
+		"endpoint-controller",
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
