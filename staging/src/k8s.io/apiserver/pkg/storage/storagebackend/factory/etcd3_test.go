@@ -17,10 +17,21 @@ limitations under the License.
 package factory
 
 import (
+	"context"
 	"errors"
 	"fmt"
+
+	"go.etcd.io/etcd/client/v3/mock/mockserver"
+
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
+
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func Test_atomicLastError(t *testing.T) {
@@ -45,4 +56,52 @@ func Test_atomicLastError(t *testing.T) {
 	if err.Error() != "now error" {
 		t.Fatalf("Expected: \"now error\" got: %s", err.Error())
 	}
+}
+
+func TestClientWithGrpcHealthcheck(t *testing.T) {
+	etcdMock, err := mockserver.StartMockServers(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mockHealthServer := NewMockHealthServer()
+	healthpb.RegisterHealthServer(etcdMock.Servers[0].GrpcServer, mockHealthServer)
+
+	cfg := storagebackend.Config{
+		Type: storagebackend.StorageTypeETCD3,
+		Transport: storagebackend.TransportConfig{
+			ServerList:            []string{etcdMock.Servers[0].Address},
+			EnableGrpcHealthcheck: true,
+		},
+		Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
+	}
+
+	_, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "")
+	defer destroyFunc()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if mockHealthServer.watchCounter == 0 {
+		t.Fatal("watch counter should not be 0")
+	}
+}
+
+// MockHealthServer is our custom implementation of the health server
+type MockHealthServer struct {
+	watchCounter int
+	checkCounter int
+}
+
+func NewMockHealthServer() *MockHealthServer {
+	return &MockHealthServer{}
+}
+
+func (s *MockHealthServer) Check(_ context.Context, _ *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
+	s.checkCounter += 1
+	return &healthpb.HealthCheckResponse{Status: healthpb.HealthCheckResponse_SERVING}, nil
+}
+
+func (s *MockHealthServer) Watch(_ *healthpb.HealthCheckRequest, server healthpb.Health_WatchServer) error {
+	s.watchCounter += 1
+	return server.Send(&healthpb.HealthCheckResponse{Status: healthpb.HealthCheckResponse_SERVING})
 }
