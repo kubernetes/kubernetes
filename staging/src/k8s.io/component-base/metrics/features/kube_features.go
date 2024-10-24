@@ -27,7 +27,6 @@ const (
 	ComponentSLIs featuregate.Feature = "ComponentSLIs"
 )
 
-
 func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 	return map[featuregate.Feature]featuregate.VersionedSpecs{
 		ComponentSLIs: {
