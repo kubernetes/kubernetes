@@ -539,7 +539,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0
 }
 
-func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
+func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false
 	}
@@ -927,7 +927,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	if isInPlacePodVerticalScalingAllowed(pod) {
+	if IsInPlacePodVerticalScalingAllowed(pod) {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
@@ -985,7 +985,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
+		} else if IsInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue
 		} else {
@@ -1302,7 +1302,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
-	if isInPlacePodVerticalScalingAllowed(pod) {
+	if IsInPlacePodVerticalScalingAllowed(pod) {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
 			m.doPodResizeAction(pod, podStatus, podContainerChanges, result)
 		}

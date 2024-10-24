@@ -1788,7 +1788,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !kubetypes.IsStaticPod(pod) {
+	// handlePodResourcesResize updates the pod to use the allocated resources. This should come
+	// before the main business logic of SyncPod, so that a consistent view of the pod is used
+	// across the sync loop.
+	if kuberuntime.IsInPlacePodVerticalScalingAllowed(pod) {
 		// Handle pod resize here instead of doing it in HandlePodUpdates because
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
@@ -1976,7 +1979,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, podStatus) {
-		// While resize is in progress, periodically call PLEG to update pod cache
+		// While resize is in progress, periodically request the latest status from the runtime via
+		// the PLEG. This is necessary since ordinarily pod status is only fetched when a container
+		// undergoes a state transition.
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
 			klog.ErrorS(err, "Failed to update pod cache", "pod", klog.KObj(pod))

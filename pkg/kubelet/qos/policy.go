@@ -37,6 +37,8 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
+// OOMScoreAdjust should be calculated based on the allocated resources, so the pod argument should
+// contain the allocated resources in the spec.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
 	if types.IsNodeCriticalPod(pod) {
 		// Only node critical pod should be the last to get killed.
