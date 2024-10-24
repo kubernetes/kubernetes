@@ -1966,7 +1966,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
 		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
-			pod = kl.handlePodResourcesResize(pod)
+			pod = kl.handlePodResourcesResize(pod, &apiPodStatus)
 		}
 	}
 
@@ -2786,7 +2786,7 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
 	return false
 }
 
-func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus) {
+func (kl *Kubelet) canResizePod(pod *v1.Pod, podStatus *v1.PodStatus) (bool, *v1.Pod, v1.PodResizeStatus) {
 	var otherActivePods []*v1.Pod
 
 	node, err := kl.getNodeAnyWay()
@@ -2795,6 +2795,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 		return false, nil, ""
 	}
 	podCopy := pod.DeepCopy()
+	podCopy.Status = *podStatus.DeepCopy()
 	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
 	memAvailable := node.Status.Allocatable.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(podCopy, v1.ResourceCPU)
@@ -2830,16 +2831,17 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	return true, podCopy, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
-	if pod.Status.Phase != v1.PodRunning {
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *v1.PodStatus) *v1.Pod {
+	if podStatus.Phase != v1.PodRunning {
 		return pod
 	}
-	podResized := false
+	requestsResized := false
+	limitsResized := false
 	for _, container := range pod.Spec.Containers {
 		if len(container.Resources.Requests) == 0 {
 			continue
 		}
-		containerStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
+		containerStatus, found := podutil.GetContainerStatus(podStatus.ContainerStatuses, container.Name)
 		if !found {
 			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
 			break
@@ -2849,17 +2851,25 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 			break
 		}
 		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
-			podResized = true
+			requestsResized = true
 			break
 		}
+		if !cmp.Equal(container.Resources.Limits, containerStatus.Resources.Limits) {
+			limitsResized = true
+		}
 	}
-	if !podResized {
+	if !requestsResized {
+		if limitsResized {
+			updatePod := pod.DeepCopy()
+			updatePod.Status = *podStatus.DeepCopy()
+			return updatePod
+		}
 		return pod
 	}
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
-	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
+	fit, updatedPod, resizeStatus := kl.canResizePod(pod, podStatus)
 	if updatedPod == nil {
 		return pod
 	}
