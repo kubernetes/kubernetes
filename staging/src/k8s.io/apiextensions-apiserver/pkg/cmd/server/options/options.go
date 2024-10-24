@@ -30,12 +30,18 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
@@ -130,8 +136,23 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 // Avoid messing with anything outside of changes to StorageConfig as that
 // may lead to unexpected behavior when the options are applied.
 func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, resourceTransformers storagevalue.ResourceTransformers, tracker flowcontrolrequest.StorageObjectCountTracker) genericregistry.RESTOptionsGetter {
+	ucbor := cbor.NewSerializer(unstructuredscheme.NewUnstructuredCreator(), unstructuredscheme.NewUnstructuredObjectTyper())
+
+	encoder := unstructured.UnstructuredJSONScheme
+	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		encoder = ucbor
+	}
+
 	etcdOptionsCopy := etcdOptions
-	etcdOptionsCopy.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+	etcdOptionsCopy.StorageConfig.Codec = runtime.NewCodec(
+		encoder,
+		// Whether the feature gate is enabled or disabled, the decoder must be able to
+		// recognize any resources stored using the CBOR encoder.
+		recognizer.NewDecoder(
+			ucbor,
+			unstructured.UnstructuredJSONScheme,
+		),
+	)
 	etcdOptionsCopy.StorageConfig.StorageObjectCountTracker = tracker
 	etcdOptionsCopy.WatchCacheSizes = nil // this control is not provided for custom resources
 
