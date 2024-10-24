@@ -2408,7 +2408,8 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		statusInfo := test.pod.Status.InitContainerStatuses
+		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
 		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
@@ -2620,8 +2621,101 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
-		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		statusInfo := test.pod.Status.InitContainerStatuses
+		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
 		status := getPhase(test.pod, statusInfo, test.podIsTerminal)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "containerX"},
+			{Name: "containerY", RestartPolicy: &containerRestartPolicyAlways},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+						runningState("containerY"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			v1.PodPending,
+			"regular init containers, restartable init container and regular container are all running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerX"),
+						runningState("containerY"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						stoppedState("containerA"),
+					},
+				},
+			},
+			v1.PodPending,
+			"regular containers is stopped, restartable init container and regular int container are both running",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+						runningState("containerY"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						stoppedState("containerA"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"regular init container is succeeded, restartable init container is running, regular containers is stopped",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerX"),
+						runningState("containerY"),
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"regular init container is succeeded, restartable init container and regular containers are both running",
+		},
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+	for _, test := range tests {
+		statusInfo := test.pod.Status.InitContainerStatuses
+		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
+		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2823,7 +2917,8 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		statusInfo := test.pod.Status.InitContainerStatuses
+		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
 		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
@@ -3022,7 +3117,8 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
-		statusInfo := append(test.pod.Status.InitContainerStatuses[:], test.pod.Status.ContainerStatuses[:]...)
+		statusInfo := test.pod.Status.InitContainerStatuses
+		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
 		status := getPhase(test.pod, statusInfo, false)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
