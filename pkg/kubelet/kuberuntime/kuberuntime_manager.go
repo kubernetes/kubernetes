@@ -553,8 +553,12 @@ func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 
 func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
 	container := pod.Spec.Containers[containerIdx]
-	if container.Resources.Limits == nil || len(pod.Status.ContainerStatuses) == 0 {
+	if len(pod.Status.ContainerStatuses) == 0 {
 		return true
+	}
+	containerSpecLimits := pod.Spec.Containers[containerIdx].Resources.Limits
+	if containerSpecLimits == nil {
+		containerSpecLimits = v1.ResourceList{}
 	}
 
 	// Determine if the *running* container needs resource update by comparing v1.Spec.Resources (desired)
@@ -569,8 +573,8 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		return true
 	}
 
-	desiredMemoryLimit := container.Resources.Limits.Memory().Value()
-	desiredCPULimit := container.Resources.Limits.Cpu().MilliValue()
+	desiredMemoryLimit := containerSpecLimits.Memory().Value()
+	desiredCPULimit := containerSpecLimits.Cpu().MilliValue()
 	desiredCPURequest := container.Resources.Requests.Cpu().MilliValue()
 	currentMemoryLimit := apiContainerStatus.Resources.Limits.Memory().Value()
 	currentCPULimit := apiContainerStatus.Resources.Limits.Cpu().MilliValue()
@@ -724,11 +728,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		return err
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
-		if podResources.Memory == nil {
-			klog.ErrorS(nil, "podResources.Memory is nil", "pod", pod.Name)
-			result.Fail(fmt.Errorf("podResources.Memory is nil for pod %s", pod.Name))
-			return
-		}
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
 			klog.ErrorS(err, "GetPodCgroupConfig for memory failed", "pod", pod.Name)
@@ -741,20 +740,25 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			result.Fail(err)
 			return
 		}
-		if currentPodMemoryUsage >= uint64(*podResources.Memory) {
+		if podResources.Memory != nil && currentPodMemoryUsage >= uint64(*podResources.Memory) {
 			klog.ErrorS(nil, "Aborting attempt to set pod memory limit less than current memory usage", "pod", pod.Name)
 			result.Fail(fmt.Errorf("Aborting attempt to set pod memory limit less than current memory usage for pod %s", pod.Name))
 			return
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
+		var currentMemory, desiredMemory int64
+		if podResources.Memory != nil {
+			currentMemory = *currentPodMemoryConfig.Memory
+			desiredMemory = *podResources.Memory
+		}
+		if errResize := resizeContainers(v1.ResourceMemory, currentMemory, desiredMemory, 0, 0); errResize != nil {
 			result.Fail(errResize)
 			return
 		}
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
-		if podResources.CPUQuota == nil || podResources.CPUShares == nil {
-			klog.ErrorS(nil, "podResources.CPUQuota or podResources.CPUShares is nil", "pod", pod.Name)
-			result.Fail(fmt.Errorf("podResources.CPUQuota or podResources.CPUShares is nil for pod %s", pod.Name))
+		if podResources.CPUShares == nil {
+			klog.ErrorS(nil, "podResources.CPUShares is nil", "pod", pod.Name)
+			result.Fail(fmt.Errorf("podResources.CPUShares is nil for pod %s", pod.Name))
 			return
 		}
 		currentPodCpuConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
@@ -763,7 +767,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			result.Fail(err)
 			return
 		}
-		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCpuConfig.CPUQuota, *podResources.CPUQuota,
+		var currentCPUQuota, desiredCPUQuota int64
+		if podResources.CPUQuota != nil {
+			currentCPUQuota = *currentPodCpuConfig.CPUQuota
+			desiredCPUQuota = *podResources.CPUQuota
+		}
+		if errResize := resizeContainers(v1.ResourceCPU, currentCPUQuota, desiredCPUQuota,
 			int64(*currentPodCpuConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
 			result.Fail(errResize)
 			return
