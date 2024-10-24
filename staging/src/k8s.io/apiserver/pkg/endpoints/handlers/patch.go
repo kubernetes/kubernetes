@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
@@ -129,10 +130,18 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		audit.LogRequestPatch(req.Context(), patchBytes)
 		span.AddEvent("Recorded the audit event")
 
-		baseContentType := runtime.ContentTypeJSON
-		if patchType == types.ApplyPatchType {
+		var baseContentType string
+		switch patchType {
+		case types.ApplyPatchType:
 			baseContentType = runtime.ContentTypeYAML
+		case "application/apply-patch+cbor":
+			// The allowlist check (above) should prevent CBOR requests from reaching
+			// this point without enabling the right feature gate.
+			baseContentType = runtime.ContentTypeCBOR
+		default:
+			baseContentType = runtime.ContentTypeJSON
 		}
+
 		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), baseContentType)
 		if !ok {
 			scope.err(fmt.Errorf("no serializer defined for %v", baseContentType), w, req)
@@ -460,6 +469,8 @@ type applyPatcher struct {
 	fieldManager        *managedfields.FieldManager
 	userAgent           string
 	validationDirective string
+	unmarshalFn         func(data []byte, v interface{}) error
+	unmarshalStrictFn   func(data []byte, v interface{}) error
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context, obj runtime.Object) (runtime.Object, error) {
@@ -472,7 +483,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 	}
 
 	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal(p.patch, &patchObj.Object); err != nil {
+	if err := p.unmarshalFn(p.patch, &patchObj.Object); err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
@@ -484,7 +495,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(requestContext context.Context,
 	// TODO: spawn something to track deciding whether a fieldValidation=Strict
 	// fatal error should return before an error from the apply operation
 	if p.validationDirective == metav1.FieldValidationStrict || p.validationDirective == metav1.FieldValidationWarn {
-		if err := yaml.UnmarshalStrict(p.patch, &map[string]interface{}{}); err != nil {
+		if err := p.unmarshalStrictFn(p.patch, &map[string]interface{}{}); err != nil {
 			if p.validationDirective == metav1.FieldValidationStrict {
 				return nil, errors.NewBadRequest(fmt.Sprintf("error strict decoding YAML: %v", err))
 			}
@@ -634,7 +645,15 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 			fieldManager:       scope.FieldManager,
 		}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
-	case types.ApplyPatchType:
+	case types.ApplyPatchType, "application/apply-patch+cbor":
+		unmarshalFn, unmarshalStrictFn := yaml.Unmarshal, yaml.UnmarshalStrict
+		if p.patchType == "application/apply-patch+cbor" {
+			// Any CBOR map with duplicate keys is invalid and always rejected outright
+			// regardless of strictness. Unknown field errors can't currently occur in
+			// practice because the type of the destination value for unmarshaling an
+			// apply configuration is always "unstructured".
+			unmarshalFn, unmarshalStrictFn = cbor.Unmarshal, cbor.Unmarshal
+		}
 		p.mechanism = &applyPatcher{
 			fieldManager:        scope.FieldManager,
 			patch:               p.patchBytes,
@@ -643,6 +662,8 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 			kind:                p.kind,
 			userAgent:           p.userAgent,
 			validationDirective: p.validationDirective,
+			unmarshalFn:         unmarshalFn,
+			unmarshalStrictFn:   unmarshalStrictFn,
 		}
 		p.forceAllowCreate = true
 	default:

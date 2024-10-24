@@ -281,6 +281,13 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
+var SupportedPatchTypes = []string{
+	string(types.JSONPatchType),
+	string(types.MergePatchType),
+	string(types.StrategicMergePatchType),
+	string(types.ApplyPatchType),
+}
+
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
 	admit := a.group.Admit
 
@@ -871,18 +878,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "partially update " + subresource + " of the specified " + kind
 			}
-			supportedTypes := []string{
-				string(types.JSONPatchType),
-				string(types.MergePatchType),
-				string(types.StrategicMergePatchType),
-				string(types.ApplyPatchType),
-			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
+			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, SupportedPatchTypes))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
-				Consumes(supportedTypes...).
+				Consumes(SupportedPatchTypes...).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).

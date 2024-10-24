@@ -220,6 +220,12 @@ var longRunningFilter = genericfilters.BasicLongRunningRequestCheck(sets.NewStri
 // namespaces for namespaces resources. I.e. for these an empty namespace in the requestInfo is fine.
 var possiblyAcrossAllNamespacesVerbs = sets.NewString("list", "watch")
 
+var SupportedPatchTypes = []string{
+	string(types.JSONPatchType),
+	string(types.MergePatchType),
+	string(types.ApplyPatchType),
+}
+
 func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -319,11 +325,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	resource := requestInfo.Resource
 	subresource := requestInfo.Subresource
 	scope := metrics.CleanScope(requestInfo)
-	supportedTypes := []string{
-		string(types.JSONPatchType),
-		string(types.MergePatchType),
-		string(types.ApplyPatchType),
-	}
 
 	var handlerFunc http.HandlerFunc
 	subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
@@ -337,11 +338,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	switch {
 	case subresource == "status" && subresources != nil && subresources.Status != nil:
-		handlerFunc = r.serveStatus(w, req, requestInfo, crdInfo, terminating, supportedTypes)
+		handlerFunc = r.serveStatus(w, req, requestInfo, crdInfo, terminating, SupportedPatchTypes)
 	case subresource == "scale" && subresources != nil && subresources.Scale != nil:
-		handlerFunc = r.serveScale(w, req, requestInfo, crdInfo, terminating, supportedTypes)
+		handlerFunc = r.serveScale(w, req, requestInfo, crdInfo, terminating, SupportedPatchTypes)
 	case len(subresource) == 0:
-		handlerFunc = r.serveResource(w, req, requestInfo, crdInfo, crd, terminating, supportedTypes)
+		handlerFunc = r.serveResource(w, req, requestInfo, crdInfo, crd, terminating, SupportedPatchTypes)
 	default:
 		responsewriters.ErrorNegotiated(
 			apierrors.NewNotFound(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Name),
@@ -599,6 +600,8 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
+
+var ExtraSerializers []func(runtime.ObjectCreater, runtime.ObjectTyper) runtime.SerializerInfo
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
 // Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
@@ -892,6 +895,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				},
 			},
 		}
+
+		for _, f := range ExtraSerializers {
+			negotiatedSerializer.supportedMediaTypes = append(negotiatedSerializer.supportedMediaTypes, f(creator, typer))
+		}
+
 		var standardSerializers []runtime.SerializerInfo
 		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
 			if s.MediaType == runtime.ContentTypeProtobuf {
@@ -955,7 +963,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
-		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
+		var opts []serializer.CodecFactoryOptionsMutator
+		for _, f := range ExtraSerializers {
+			opts = append(opts, serializer.WithSerializer(f))
+		}
+		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme(), opts...)
 		scaleScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 		scaleScope.Namer = handlers.ContextBasedNaming{
 			Namer:         meta.NewAccessor(),

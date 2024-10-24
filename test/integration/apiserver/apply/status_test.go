@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -28,8 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -92,6 +93,18 @@ func createMapping(groupVersion string, resource metav1.APIResource) (*meta.REST
 
 // TestApplyStatus makes sure that applying the status works for all known types.
 func TestApplyStatus(t *testing.T) {
+	testApplyStatus(t, func(testing.TB, *rest.Config) {})
+}
+
+// TestApplyStatus makes sure that applying the status works for all known types.
+func TestApplyStatusWithCBOR(t *testing.T) {
+	framework.EnableCBORForTest(t)
+	testApplyStatus(t, func(t testing.TB, config *rest.Config) {
+		config.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	})
+}
+
+func testApplyStatus(t *testing.T, reconfigureClient func(testing.TB, *rest.Config)) {
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +115,9 @@ func TestApplyStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
+	dynamicClientConfig := rest.CopyConfig(server.ClientConfig)
+	reconfigureClient(t, dynamicClientConfig)
+	dynamicClient, err := dynamic.NewForConfig(dynamicClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

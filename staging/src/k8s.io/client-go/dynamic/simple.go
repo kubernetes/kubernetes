@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,13 +40,18 @@ type DynamicClient struct {
 
 var _ Interface = &DynamicClient{}
 
+var (
+	AcceptContentTypes = "application/json"
+	ContentType        = "application/json"
+)
+
 // ConfigFor returns a copy of the provided config with the
 // appropriate dynamic client defaults set.
 func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
-	config.AcceptContentTypes = "application/json"
-	config.ContentType = "application/json"
-	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	config.AcceptContentTypes = AcceptContentTypes
+	config.ContentType = ContentType
+	config.NegotiatedSerializer = newBasicNegotiatedSerializer()
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
@@ -331,10 +335,6 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	if err := validateNamespaceWithOptionalName(c.namespace, name); err != nil {
 		return nil, err
 	}
-	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
-	if err != nil {
-		return nil, err
-	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -346,21 +346,23 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	}
 	patchOpts := opts.ToPatchOptions()
 
-	result := c.client.client.
-		Patch(types.ApplyPatchType).
-		AbsPath(append(c.makeURLSegments(name), subresources...)...).
-		Body(outBytes).
-		SpecificallyVersionedParams(&patchOpts, dynamicParameterCodec, versionV1).
-		Do(ctx)
-	if err := result.Error(); err != nil {
-		return nil, err
+	// this is tightly coupled with the restclient content negotiation behavior and won't be able to share a "fallback to json on 415" circuit breaker with other methods
+	var patchContentType string
+	switch ContentType {
+	case "application/cbor":
+		patchContentType = "application/apply-patch+cbor"
+	default:
+		patchContentType = string(types.ApplyPatchType)
 	}
-	retBytes, err := result.Raw()
-	if err != nil {
-		return nil, err
-	}
+
 	var out unstructured.Unstructured
-	if err := runtime.DecodeInto(unstructured.UnstructuredJSONScheme, retBytes, &out); err != nil {
+	if err := c.client.client.
+		Verb(http.MethodPatch).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(obj).
+		SpecificallyVersionedParams(&patchOpts, dynamicParameterCodec, versionV1).
+		SetHeader("Content-Type", patchContentType).
+		Do(ctx).Into(&out); err != nil {
 		return nil, err
 	}
 	return &out, nil
