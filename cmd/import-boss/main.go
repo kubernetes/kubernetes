@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -41,21 +42,23 @@ const (
 )
 
 func main() {
+	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	pkgs, err := loadPkgs(pflag.Args()...)
+	pkgs, err := loadPkgs(ctx, pflag.Args()...)
 	if err != nil {
-		klog.Errorf("failed to load packages: %v", err)
+		logger.Error(err, "Failed to load packages")
 	}
 
-	pkgs = massage(pkgs)
+	pkgs = massage(ctx, pkgs)
 	boss := newBoss(pkgs)
 
 	var allErrs []error
 	for _, pkg := range pkgs {
-		if pkgErrs := boss.Verify(pkg); pkgErrs != nil {
+		if pkgErrs := boss.Verify(ctx, pkg); pkgErrs != nil {
 			allErrs = append(allErrs, pkgErrs...)
 		}
 	}
@@ -64,10 +67,10 @@ func main() {
 	for _, err := range allErrs {
 		if lister, ok := err.(interface{ Unwrap() []error }); ok {
 			for _, err := range lister.Unwrap() {
-				fmt.Printf("ERROR: %v\n", err)
+				logger.Error(err, "Unwrapped error")
 			}
 		} else {
-			fmt.Printf("ERROR: %v\n", err)
+			logger.Error(err, "Error encountered")
 		}
 		fail = true
 	}
@@ -76,23 +79,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	klog.V(2).Info("Completed successfully.")
+	logger.V(2).Info("Completed successfully.")
 }
 
-func loadPkgs(patterns ...string) ([]*packages.Package, error) {
+func loadPkgs(ctx context.Context, patterns ...string) ([]*packages.Package, error) {
+	logger := klog.FromContext(ctx)
 	cfg := packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports |
 			packages.NeedDeps | packages.NeedModule,
 		Tests: true,
 	}
 
-	klog.V(1).Infof("loading: %v", patterns)
+	logger.V(1).Info("Loading", "patterns", patterns)
 	tBefore := time.Now()
 	pkgs, err := packages.Load(&cfg, patterns...)
 	if err != nil {
 		return nil, err
 	}
-	klog.V(2).Infof("loaded %d pkg(s) in %v", len(pkgs), time.Since(tBefore))
+	logger.V(2).Info("Loaded packages", "count", len(pkgs), "duration", time.Since(tBefore))
 
 	var allErrs []error
 	for _, pkg := range pkgs {
@@ -113,16 +117,17 @@ func loadPkgs(patterns ...string) ([]*packages.Package, error) {
 	return pkgs, nil
 }
 
-func massage(in []*packages.Package) []*packages.Package {
+func massage(ctx context.Context, in []*packages.Package) []*packages.Package {
+	logger := klog.FromContext(ctx)
 	out := []*packages.Package{}
 
 	for _, pkg := range in {
-		klog.V(2).Infof("considering pkg: %q", pkg.PkgPath)
+		logger.V(2).Info("Considering package", "packagePath", pkg.PkgPath)
 
 		// Discard packages which represent the <pkg>.test result.  They don't seem
 		// to hold any interesting source info.
 		if strings.HasSuffix(pkg.PkgPath, ".test") {
-			klog.V(3).Infof("ignoring testbin pkg: %q", pkg.PkgPath)
+			logger.V(3).Info("Ignoring testbin package", "packagePath", pkg.PkgPath)
 			continue
 		}
 
@@ -132,7 +137,7 @@ func massage(in []*packages.Package) []*packages.Package {
 		if strings.HasSuffix(pkg.PkgPath, "_test") || hasTestFiles(pkg.GoFiles) {
 			// NOTE: This syntax can be undone with unmassage().
 			pkg.PkgPath = strings.TrimSuffix(pkg.PkgPath, "_test") + " ((tests:" + pkg.Name + "))"
-			klog.V(3).Infof("renamed to: %q", pkg.PkgPath)
+			logger.V(3).Info("Renamed package", "newPackagePath", pkg.PkgPath)
 		}
 		out = append(out, pkg)
 	}
@@ -184,7 +189,8 @@ func hasTestFiles(files []string) bool {
 	return false
 }
 
-func (boss *ImportBoss) Verify(pkg *packages.Package) []error {
+func (boss *ImportBoss) Verify(ctx context.Context, pkg *packages.Package) []error {
+	logger := klog.FromContext(ctx)
 	pkgDir := packageDir(pkg)
 	if pkgDir == "" {
 		// This Package has no usable files, e.g. only tests, which are modelled in
@@ -200,10 +206,10 @@ func (boss *ImportBoss) Verify(pkg *packages.Package) []error {
 		return nil
 	}
 
-	klog.V(2).Infof("verifying pkg %q (%s)", pkg.PkgPath, pkgDir)
+	logger.V(2).Info("Verifying package", "packagePath", pkg.PkgPath, "packageDir", pkgDir)
 	var errs []error
-	errs = append(errs, boss.verifyRules(pkg, restrictionFiles)...)
-	errs = append(errs, boss.verifyInverseRules(pkg, restrictionFiles)...)
+	errs = append(errs, boss.verifyRules(ctx, pkg, restrictionFiles)...)
+	errs = append(errs, boss.verifyInverseRules(ctx, pkg, restrictionFiles)...)
 	return errs
 }
 
@@ -250,20 +256,21 @@ const (
 )
 
 // Evaluate considers this rule and decides if this dependency is allowed.
-func (r Rule) Evaluate(imp string) Disposition {
+func (r Rule) Evaluate(ctx context.Context, imp string) Disposition {
 	// To pass, an import muct be allowed and not forbidden.
 	// Check forbidden first.
+	logger := klog.FromContext(ctx)
 	for _, forbidden := range r.ForbiddenPrefixes {
-		klog.V(5).Infof("checking %q against forbidden prefix %q", imp, forbidden)
+		logger.V(5).Info("Checking import against forbidden prefix", "import", imp, "forbiddenPrefix", forbidden)
 		if hasPathPrefix(imp, forbidden) {
-			klog.V(5).Infof("this import of %q is forbidden", imp)
+			logger.V(5).Info("Forbidden import detected,", "import", imp)
 			return DepForbidden
 		}
 	}
 	for _, allowed := range r.AllowedPrefixes {
-		klog.V(5).Infof("checking %q against allowed prefix %q", imp, allowed)
+		logger.V(5).Info("Checking import against allowed prefix", "import", imp, "allowedPrefix", allowed)
 		if hasPathPrefix(imp, allowed) {
-			klog.V(5).Infof("this import of %q is allowed", imp)
+			logger.V(5).Info("Allowed import detected", "import", imp)
 			return DepAllowed
 		}
 	}
@@ -327,8 +334,9 @@ func removeLastDir(path string) (newPath, removedDir string) {
 	return filepath.Join(filepath.Dir(dir), file), filepath.Base(dir)
 }
 
-func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*FileFormat) []error {
-	klog.V(3).Infof("verifying pkg %q rules", pkg.PkgPath)
+func (boss *ImportBoss) verifyRules(ctx context.Context, pkg *packages.Package, restrictionFiles []*FileFormat) []error {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Verifying package rules", "packagePath", pkg.PkgPath)
 
 	// compile all Selector regex in all restriction files
 	selectors := make([][]*regexp.Regexp, len(restrictionFiles))
@@ -366,11 +374,11 @@ func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*F
 			// "foo" (if both exist in a giver directory).
 			continue
 		}
-		klog.V(4).Infof("considering import %q %s %q", pkg.PkgPath, relate(imp), imp)
+		logger.V(4).Info("Considering import", "packagePath", pkg.PkgPath, "relation", relate(imp), "import", imp)
 		matched := false
 		decided := false
 		for i, file := range restrictionFiles {
-			klog.V(4).Infof("rules file %s", file.path)
+			logger.V(4).Info("Loading rules file", "filePath", file.path)
 			for j, rule := range file.Rules {
 				if !rule.Transitive && !isDirect[imp] {
 					continue
@@ -380,9 +388,9 @@ func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*F
 					continue
 				}
 				matched = true
-				klog.V(6).Infof("selector %v matches %q", rule.SelectorRegexp, imp)
+				logger.V(6).Info("Selector matches import", "selectorRegexp", rule.SelectorRegexp, "import", imp)
 
-				disp := rule.Evaluate(imp)
+				disp := rule.Evaluate(ctx, imp)
 				if disp == DepAllowed {
 					decided = true
 					break // no further rules, next file
@@ -397,7 +405,7 @@ func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*F
 			}
 		}
 		if matched && !decided {
-			klog.V(5).Infof("%q %s %q did not match any rule", pkg, relate(imp), imp)
+			logger.V(5).Info("No matching rule for import", "package", pkg, "relation", relate(imp), "import", imp)
 			errs = append(errs, fmt.Errorf("%q %s %q did not match any rule", pkg.PkgPath, relate(imp), imp))
 		}
 	}
@@ -459,8 +467,9 @@ func dfsImports(dest *[]string, seen map[string]bool, p *packages.Package) {
 }
 
 // verifyInverseRules checks that all packages that import a package are allowed to import it.
-func (boss *ImportBoss) verifyInverseRules(pkg *packages.Package, restrictionFiles []*FileFormat) []error {
-	klog.V(3).Infof("verifying pkg %q inverse-rules", pkg.PkgPath)
+func (boss *ImportBoss) verifyInverseRules(ctx context.Context, pkg *packages.Package, restrictionFiles []*FileFormat) []error {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Verifying package inverse-rules", "packagePath", pkg.PkgPath)
 
 	// compile all Selector regex in all restriction files
 	selectors := make([][]*regexp.Regexp, len(restrictionFiles))
@@ -497,11 +506,11 @@ func (boss *ImportBoss) verifyInverseRules(pkg *packages.Package, restrictionFil
 			// "foo" (if both exist in a giver directory).
 			continue
 		}
-		klog.V(4).Infof("considering import %q %s %q", pkg.PkgPath, relate(imp), imp)
+		logger.V(4).Info("Considering import", "packagePath", pkg.PkgPath, "relation", relate(imp), "import", imp)
 		matched := false
 		decided := false
 		for i, file := range restrictionFiles {
-			klog.V(4).Infof("rules file %s", file.path)
+			logger.V(4).Info("Loading rules file", "filePath", file.path)
 			for j, rule := range file.InverseRules {
 				if !rule.Transitive && !isDirect[imp] {
 					continue
@@ -511,9 +520,9 @@ func (boss *ImportBoss) verifyInverseRules(pkg *packages.Package, restrictionFil
 					continue
 				}
 				matched = true
-				klog.V(6).Infof("selector %v matches %q", rule.SelectorRegexp, imp)
+				logger.V(6).Info("Selector matches import", "selectorRegexp", rule.SelectorRegexp, "import", imp)
 
-				disp := rule.Evaluate(imp)
+				disp := rule.Evaluate(ctx, imp)
 				if disp == DepAllowed {
 					decided = true
 					break // no further rules, next file
@@ -528,7 +537,7 @@ func (boss *ImportBoss) verifyInverseRules(pkg *packages.Package, restrictionFil
 			}
 		}
 		if matched && !decided {
-			klog.V(5).Infof("%q %s %q did not match any rule", pkg.PkgPath, relate(imp), imp)
+			logger.V(5).Info("No matching rule for import", "packagePath", pkg.PkgPath, "relation", relate(imp), "import", imp)
 			errs = append(errs, fmt.Errorf("%q %s %q did not match any rule", pkg.PkgPath, relate(imp), imp))
 		}
 	}
