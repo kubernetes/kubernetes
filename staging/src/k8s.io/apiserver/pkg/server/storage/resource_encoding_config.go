@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
-	version "k8s.io/component-base/registry"
+	version "k8s.io/component-base/version"
 )
 
 type ResourceEncodingConfig interface {

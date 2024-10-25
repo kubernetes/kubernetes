@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	utilversion "k8s.io/component-base/registry"
+	utilversion "k8s.io/component-base/version"
 
 	"github.com/stretchr/testify/assert"
 )

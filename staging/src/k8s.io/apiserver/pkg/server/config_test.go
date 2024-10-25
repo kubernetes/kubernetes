@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
-	utilversion "k8s.io/component-base/registry"
 	"k8s.io/component-base/tracing"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )

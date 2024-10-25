@@ -62,9 +62,8 @@ import (
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
-	utilversion "k8s.io/component-base/registry"
 	"k8s.io/component-base/term"
-	"k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
@@ -107,8 +106,8 @@ const (
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
-	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	_, _ = featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
@@ -150,7 +149,7 @@ controller, and serviceaccounts controller.`,
 			}
 
 			// add feature enablement metrics
-			fg := s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
+			fg := s.ComponentGlobalsRegistry.FeatureGateFor(featuregate.DefaultKubeComponent)
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
 			return Run(context.Background(), c.Complete())
 		},
@@ -194,7 +193,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	stopCh := ctx.Done()
 
 	// To help debugging, immediately log version
-	logger.Info("Starting", "version", version.Get())
+	logger.Info("Starting", "version", utilversion.Get())
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
@@ -293,11 +292,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		binaryVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).BinaryVersion().String())
 		if err != nil {
 			return err
 		}
-		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
+		emulationVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).EmulationVersion().String())
 		if err != nil {
 			return err
 		}

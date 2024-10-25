@@ -38,7 +38,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/registry"
+	utilversion "k8s.io/component-base/version"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -48,7 +48,7 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 	t.Cleanup(func() {
 		componentGlobalsRegistry.Reset()
 	})
@@ -149,7 +149,7 @@ func TestAddFlags(t *testing.T) {
 				JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
 				MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 				ComponentGlobalsRegistry:     componentGlobalsRegistry,
-				ComponentName:                utilversion.DefaultKubeComponent,
+				ComponentName:                featuregate.DefaultKubeComponent,
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{

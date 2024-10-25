@@ -60,8 +60,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	utilversion "k8s.io/component-base/registry"
-	kubeversion "k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
 
@@ -241,7 +240,7 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedInfo := kubeversion.Get()
+	expectedInfo := utilversion.Get()
 	kubeVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
 	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
 	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())

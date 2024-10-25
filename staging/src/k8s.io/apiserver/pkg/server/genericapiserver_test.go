@@ -52,7 +52,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
-	utilversion "k8s.io/component-base/registry"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
