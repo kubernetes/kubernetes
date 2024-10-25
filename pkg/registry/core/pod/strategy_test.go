@@ -2449,3 +2449,513 @@ var _ warning.Recorder = &warningRecorder{}
 func (w *warningRecorder) AddWarning(_, text string) {
 	w.warnings = append(w.warnings, text)
 }
+
+func TestPodResizePrepareForUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		oldPod   *api.Pod
+		newPod   *api.Pod
+		expected *api.Pod
+	}{
+		{
+			name: "no resize",
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "update resizepolicy",
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+							ResizePolicy: []api.ContainerResizePolicy{
+								{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+								{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+							ResizePolicy: []api.ContainerResizePolicy{
+								{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+								{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "add new container",
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "add new container and update resources of existing container",
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Resize: api.PodResizeStatusProposed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "change container order and update resources",
+			oldPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("100m"),
+									api.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("200m"),
+									api.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("200m"),
+									api.ResourceMemory: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: "container1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("200m"),
+									api.ResourceMemory: resource.MustParse("4Gi"),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("200m"),
+									api.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Resize: api.PodResizeStatusProposed,
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "container1",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+						{
+							Name: "container2",
+							AllocatedResources: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			tc.newPod.Name = "test-pod"
+			tc.newPod.Namespace = "test-ns"
+			tc.newPod.ResourceVersion = "123"
+			tc.newPod.UID = "abc"
+			tc.expected.Name = "test-pod"
+			tc.expected.Namespace = "test-ns"
+			tc.expected.ResourceVersion = "123"
+			tc.expected.UID = "abc"
+			ctx := context.Background()
+			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
+			if !cmp.Equal(tc.expected, tc.newPod) {
+				t.Errorf("ResizeStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}
