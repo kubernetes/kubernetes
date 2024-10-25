@@ -19,7 +19,7 @@ package state
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -40,12 +40,12 @@ func NewStateMemory() State {
 	}
 }
 
-func (s *stateMemory) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+func (s *stateMemory) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
 	alloc, ok := s.podAllocation[podUID][containerName]
-	return alloc.DeepCopy(), ok
+	return *alloc.DeepCopy(), ok
 }
 
 func (s *stateMemory) GetPodResourceAllocation() PodResourceAllocation {
@@ -72,12 +72,12 @@ func (s *stateMemory) GetResizeStatus() PodResizeStatus {
 	return prs
 }
 
-func (s *stateMemory) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceList) error {
+func (s *stateMemory) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
 	if _, ok := s.podAllocation[podUID]; !ok {
-		s.podAllocation[podUID] = make(map[string]v1.ResourceList)
+		s.podAllocation[podUID] = make(map[string]v1.ResourceRequirements)
 	}
 
 	s.podAllocation[podUID][containerName] = alloc

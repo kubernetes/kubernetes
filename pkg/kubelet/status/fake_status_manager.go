@@ -63,22 +63,26 @@ func (m *fakeManager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	return
 }
 
-func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
 	klog.InfoS("GetContainerResourceAllocation()")
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
 func (m *fakeManager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
-	klog.InfoS("GetPodResizeStatus()")
-	return "", false
+	return m.state.GetPodResizeStatus(podUID)
+}
+
+func (m *fakeManager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
+	allocs := m.state.GetPodResourceAllocation()
+	return updatePodFromAllocation(pod, allocs)
 }
 
 func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 	klog.InfoS("SetPodAllocation()")
 	for _, container := range pod.Spec.Containers {
-		var alloc v1.ResourceList
+		var alloc v1.ResourceRequirements
 		if container.Resources.Requests != nil {
-			alloc = container.Resources.Requests.DeepCopy()
+			alloc = *container.Resources.DeepCopy()
 		}
 		m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc)
 	}
@@ -86,8 +90,7 @@ func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 }
 
 func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
-	klog.InfoS("SetPodResizeStatus()")
-	return nil
+	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
 }
 
 // NewFakeManager creates empty/fake memory manager
