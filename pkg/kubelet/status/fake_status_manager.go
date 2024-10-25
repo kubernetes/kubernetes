@@ -80,10 +80,7 @@ func (m *fakeManager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 	klog.InfoS("SetPodAllocation()")
 	for _, container := range pod.Spec.Containers {
-		var alloc v1.ResourceRequirements
-		if container.Resources.Requests != nil {
-			alloc = *container.Resources.DeepCopy()
-		}
+		alloc := *container.Resources.DeepCopy()
 		m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc)
 	}
 	return nil
