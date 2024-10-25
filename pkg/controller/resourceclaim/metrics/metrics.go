@@ -45,6 +45,22 @@ var (
 			Help:           "Number of ResourceClaims creation request failures",
 			StabilityLevel: metrics.ALPHA,
 		})
+	// NumResourceClaims tracks the current number of ResourceClaims.
+	NumResourceClaims = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      ResourceClaimSubsystem,
+			Name:           "resource_claims",
+			Help:           "Number of ResourceClaims",
+			StabilityLevel: metrics.ALPHA,
+		})
+	// NumAllocatedResourceClaims tracks the current number of allocated ResourceClaims.
+	NumAllocatedResourceClaims = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      ResourceClaimSubsystem,
+			Name:           "allocated_resource_claims",
+			Help:           "Number of allocated ResourceClaims",
+			StabilityLevel: metrics.ALPHA,
+		})
 )
 
 var registerMetrics sync.Once
@@ -54,5 +70,7 @@ func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(ResourceClaimCreateAttempts)
 		legacyregistry.MustRegister(ResourceClaimCreateFailures)
+		legacyregistry.MustRegister(NumResourceClaims)
+		legacyregistry.MustRegister(NumAllocatedResourceClaims)
 	})
 }
