@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -72,12 +73,13 @@ type ContainerAllocations struct {
 }
 
 type ResizableContainerInfo struct {
-	Name         string
-	Resources    *ContainerResources
-	Allocations  *ContainerAllocations
-	CPUPolicy    *v1.ResourceResizeRestartPolicy
-	MemPolicy    *v1.ResourceResizeRestartPolicy
-	RestartCount int32
+	Name                 string
+	Resources            *ContainerResources
+	Allocations          *ContainerAllocations
+	CPUPolicy            *v1.ResourceResizeRestartPolicy
+	MemPolicy            *v1.ResourceResizeRestartPolicy
+	RestartCount         int32
+	CpusAllowedListValue string
 }
 
 type containerPatch struct {
@@ -287,7 +289,7 @@ func isPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
 	return len(out) != 0
 }
 
-func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
+func VerifyPodContainersCgroupValues(f *framework.Framework, pod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 	if podOnCgroupv2Node == nil {
 		value := isPodOnCgroupv2Node(f, pod)
@@ -315,7 +317,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 		}
 		return nil
 	}
-	for _, ci := range tcInfo {
+	for _, ci := range wantCtrs {
 		if ci.Resources == nil {
 			continue
 		}
@@ -455,4 +457,59 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 	}
 
 	return string(patchBytes), nil
+}
+
+// TODO TO replace with cpuset method
+// Credits github.com/prometheus/procfs/proc_status.go
+func calcCpusAllowedList(cpuString string) []uint64 {
+	s := strings.Split(cpuString, ",")
+
+	var g []uint64
+
+	for _, cpu := range s {
+		// parse cpu ranges, example: 1-3=[1,2,3]
+		if l := strings.Split(strings.TrimSpace(cpu), "-"); len(l) > 1 {
+			startCPU, _ := strconv.ParseUint(l[0], 10, 64)
+			endCPU, _ := strconv.ParseUint(l[1], 10, 64)
+
+			for i := startCPU; i <= endCPU; i++ {
+				g = append(g, i)
+			}
+		} else if len(l) == 1 {
+			cpu, _ := strconv.ParseUint(l[0], 10, 64)
+			g = append(g, cpu)
+		}
+
+	}
+
+	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
+	return g
+}
+
+func VerifyPodContainersCpusAllowedListValue(f *framework.Framework, pod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
+	ginkgo.GinkgoHelper()
+	verifyCpusAllowedListValue := func(cName, expectedCpusAllowedListValue string) error {
+		mycmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
+		calValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", mycmd)
+		framework.Logf("Namespace %s Pod %s Container %s - looking for Cpus allowed list value %s in /proc/self/status",
+			pod.Namespace, pod.Name, cName, expectedCpusAllowedListValue)
+		if err != nil {
+			return fmt.Errorf("failed to find expected value '%s' in container '%s' Cpus allowred list '/proc/self/status'", cName, expectedCpusAllowedListValue)
+		}
+		cpuTotalValue := strconv.Itoa(len(calcCpusAllowedList(calValue)))
+		if cpuTotalValue != expectedCpusAllowedListValue {
+			return fmt.Errorf("container '%s' cgroup value '%s' results to total CPUs '%s' not equal to expected '%s'", cName, calValue, cpuTotalValue, expectedCpusAllowedListValue)
+		}
+		return nil
+	}
+	for _, ci := range wantCtrs {
+		if ci.CpusAllowedListValue == "" {
+			continue
+		}
+		err := verifyCpusAllowedListValue(ci.Name, ci.CpusAllowedListValue)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
