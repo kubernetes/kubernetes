@@ -19,11 +19,7 @@ package cpumanager
 import (
 	"context"
 	"fmt"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"math"
-	"runtime"
 	"sync"
 	"time"
 
@@ -530,37 +526,6 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 		}
 	}
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
-}
-
-func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
-	// TODO: Consider adding a `ResourceConfigForContainer` helper in
-	// helpers_linux.go similar to what exists for pods.
-	// It would be better to pass the full container resources here instead of
-	// this patch-like partial resources.
-
-	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		affinities := winstats.CpusToGroupAffinity(cpus.List())
-		var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
-		for _, affinity := range affinities {
-			cpuGroupAffinities = append(cpuGroupAffinities, &runtimeapi.WindowsCpuGroupAffinity{
-				CpuGroup: uint32(affinity.Group),
-				CpuMask:  uint64(affinity.Mask),
-			})
-		}
-		return m.containerRuntime.UpdateContainerResources(ctx, containerID, &runtimeapi.ContainerResources{
-			Windows: &runtimeapi.WindowsContainerResources{
-				AffinityCpus: cpuGroupAffinities,
-			},
-		})
-	}
-	return m.containerRuntime.UpdateContainerResources(
-		ctx,
-		containerID,
-		&runtimeapi.ContainerResources{
-			Linux: &runtimeapi.LinuxContainerResources{
-				CpusetCpus: cpus.String(),
-			},
-		})
 }
 
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {

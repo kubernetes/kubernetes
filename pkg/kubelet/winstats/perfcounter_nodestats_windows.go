@@ -188,7 +188,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		numOfPysicalCores, numOfSockets, topology, err := processorInfo(RelationAll)
+		numOfPysicalCores, numOfSockets, topology, err := processorInfo(relationAll)
 		if err != nil {
 			return nil, err
 		}
@@ -201,6 +201,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 	return mi, nil
 }
 
+// ProcessorCount returns the number of logical processors on the system.
 // runtime.NumCPU() will only return the information for a single Processor Group.
 // Since a single group can only hold 64 logical processors, this
 // means when there are more they will be divided into multiple groups.

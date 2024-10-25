@@ -1,3 +1,22 @@
+//go:build windows
+// +build windows
+
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package winstats
 
 import (
@@ -13,41 +32,51 @@ var (
 	getNumaAvailableMemoryNodeEx         = modkernel32.NewProc("GetNumaAvailableMemoryNodeEx")
 )
 
-type RelationType int
+type relationType int
 
 const (
-	RelationProcessorCore RelationType = iota
-	RelationNumaNode
-	RelationCache
-	RelationProcessorPackage
-	RelationGroup
-	RelationProcessorDie
-	RelationNumaNodeEx
-	RelationProcessorModule
-	RelationAll = 0xffff
+	relationProcessorCore relationType = iota
+	relationNumaNode
+	relationCache
+	relationProcessorPackage
+	relationGroup
+	relationProcessorDie
+	relationNumaNodeEx
+	relationProcessorModule
+	relationAll = 0xffff
 )
 
-type SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct {
+type systemLogicalProcessorInformationEx struct {
 	Relationship uint32
 	Size         uint32
 	data         interface{}
 }
 
-type PROCESSOR_RELATIONSHIP struct {
+type processorRelationship struct {
 	Flags           byte
 	EfficiencyClass byte
 	Reserved        [20]byte
 	GroupCount      uint16
-	GroupMasks      interface{} //[]GROUP_AFFINITY // in c++ this is a union of either one or many GROUP_AFFINITY based on GroupCount
+	// groupMasks is an []GroupAffinity. In c++ this is a union of either one or many GroupAffinity based on GroupCount
+	GroupMasks interface{}
 }
 
-type GROUP_AFFINITY struct {
-	Mask     uintptr
+// GroupAffinity represents the processor group affinity of cpus
+// https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-group_affinity
+type GroupAffinity struct {
+	Mask     uint64
 	Group    uint16
 	Reserved [3]uint16
 }
 
-func (a GROUP_AFFINITY) Processors() []int {
+// MaskString returns the affinity mask as a string of 0s and 1s
+func (a GroupAffinity) MaskString() string {
+	return fmt.Sprintf("%064b", a.Mask)
+}
+
+// Processors returns a list of processors ids that are part of the affinity mask
+// Windows doesn't track processors by ID but kubelet converts them to a number
+func (a GroupAffinity) Processors() []int {
 	processors := []int{}
 	for i := 0; i < 64; i++ {
 		if a.Mask&(1<<i) != 0 {
@@ -57,64 +86,31 @@ func (a GROUP_AFFINITY) Processors() []int {
 	return processors
 }
 
-func CpusToGroupAffinity(cpus []int) map[int]*GROUP_AFFINITY {
-	groupAffinities := make(map[int]*GROUP_AFFINITY)
+// CpusToGroupAffinity converts a list of CPUs to a map of GroupAffinity split by windows CPU group.
+// Windows doesn't track processors by ID but kubelet converts them to a number and this function goes in reverse.
+func CpusToGroupAffinity(cpus []int) map[int]*GroupAffinity {
+	groupAffinities := make(map[int]*GroupAffinity)
 	for _, cpu := range cpus {
 		group := uint16(cpu / 64)
 
-		groupaffinity, ok := groupAffinities[int(group)]
+		groupAffinity, ok := groupAffinities[int(group)]
 		if !ok {
-			groupaffinity = &GROUP_AFFINITY{
+			groupAffinity = &GroupAffinity{
 				Group: group,
 			}
-			groupAffinities[int(group)] = groupaffinity
+			groupAffinities[int(group)] = groupAffinity
 		}
-		mask := uintptr(1 << (cpu % 64))
-		groupaffinity.Mask |= mask
+		mask := uint64(1 << (cpu % 64))
+		groupAffinity.Mask |= mask
 	}
 	return groupAffinities
 }
 
-type NUMA_NODE_RELATIONSHIP struct {
+type numaNodeRelationship struct {
 	NodeNumber uint32
 	Reserved   [18]byte
 	GroupCount uint16
-	GroupMasks interface{} //[]GROUP_AFFINITY // in c++ this is a union of either one or many GROUP_AFFINITY based on GroupCount
-}
-
-type CACHE_RELATIONSHIP struct {
-	Level         byte
-	Associativity byte
-	LineSize      uint16
-	CacheSize     uint32
-	Type          PROCESSOR_CACHE_TYPE
-	Reserved      [18]byte
-	GroupCount    uint16
-	GroupMasks    interface{} //interface{}[]GROUP_AFFINITY // in c++ this is a union of either one or many GROUP_AFFINITY based on GroupCount
-}
-
-type PROCESSOR_CACHE_TYPE int
-
-const (
-	CacheUnified PROCESSOR_CACHE_TYPE = iota
-	CacheInstruction
-	CacheData
-	CacheTrace
-	CacheUnknown
-)
-
-type GROUP_RELATIONSHIP struct {
-	MaximumGroupCount uint16
-	ActiveGroupCount  uint16
-	Reserved          [20]byte
-	GroupInfo         interface{} //[]PROCESSOR_GROUP_INFO
-}
-
-type PROCESSOR_GROUP_INFO struct {
-	MaximumProcessorCount byte
-	ActiveProcessorCount  byte
-	Reserved              [38]byte
-	ActiveProcessorMask   uintptr
+	GroupMasks interface{} //[]GroupAffinity in c++ this is a union of either one or many GroupAffinity based on GroupCount
 }
 
 type processor struct {
@@ -123,7 +119,7 @@ type processor struct {
 	NodeID   int
 }
 
-func processorInfo(relationShip RelationType) (int, int, []cadvisorapi.Node, error) {
+func processorInfo(relationShip relationType) (int, int, []cadvisorapi.Node, error) {
 	// Call once to get the length of data to return
 	var returnLength uint32 = 0
 	r1, _, err := procGetLogicalProcessorInformationEx.Call(
@@ -132,7 +128,7 @@ func processorInfo(relationShip RelationType) (int, int, []cadvisorapi.Node, err
 		uintptr(unsafe.Pointer(&returnLength)),
 	)
 	if r1 != 0 && err.(syscall.Errno) != syscall.ERROR_INSUFFICIENT_BUFFER {
-		return 0, 0, nil, fmt.Errorf("Call to GetLogicalProcessorInformationEx failed: %v", err)
+		return 0, 0, nil, fmt.Errorf("call to GetLogicalProcessorInformationEx failed: %v", err)
 	}
 
 	// Allocate the buffer with the length it should be
@@ -145,7 +141,7 @@ func processorInfo(relationShip RelationType) (int, int, []cadvisorapi.Node, err
 		uintptr(unsafe.Pointer(&returnLength)),
 	)
 	if r1 == 0 {
-		return 0, 0, nil, fmt.Errorf("Call to GetLogicalProcessorInformationEx failed: %v", err)
+		return 0, 0, nil, fmt.Errorf("call to GetLogicalProcessorInformationEx failed: %v", err)
 	}
 
 	return convertWinApiToCadvisorApi(buffer)
@@ -156,23 +152,29 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 	numofSockets := 0
 	numOfcores := 0
 	nodes := []cadvisorapi.Node{}
-	//iterate over the buffer casting it to the correct type
 	for offset := 0; offset < len(buffer); {
-		//todo check if there is enough left in buffer to read system_logical_processor_information_ex?
-		info := (*SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)(unsafe.Pointer(&buffer[offset]))
-		switch (RelationType)(info.Relationship) {
-		case RelationProcessorCore, RelationProcessorPackage:
-			processorRelationship := (*PROCESSOR_RELATIONSHIP)(unsafe.Pointer(&info.data))
-			groupMasks := make([]GROUP_AFFINITY, processorRelationship.GroupCount)
-			for i := 0; i < int(processorRelationship.GroupCount); i++ {
-				groupMasks[i] = *(*GROUP_AFFINITY)(unsafe.Pointer(uintptr(unsafe.Pointer(&processorRelationship.GroupMasks)) + uintptr(i)*unsafe.Sizeof(GROUP_AFFINITY{})))
+		// check size in buffer to avoid out of bounds access, we don't know the type or size yet
+		if offset+int(unsafe.Sizeof(systemLogicalProcessorInformationEx{})) > len(buffer) {
+			return 0, 0, nil, fmt.Errorf("remaining buffer too small while reading windows processor relationship")
+		}
+		info := (*systemLogicalProcessorInformationEx)(unsafe.Pointer(&buffer[offset]))
+		// check one more time now that we know the size of the struct
+		if offset+int(info.Size) > len(buffer) {
+			return 0, 0, nil, fmt.Errorf("remaining buffer too small while reading windows processor relationship")
+		}
+		switch (relationType)(info.Relationship) {
+		case relationProcessorCore, relationProcessorPackage:
+			relationship := (*processorRelationship)(unsafe.Pointer(&info.data))
+			groupMasks := make([]GroupAffinity, relationship.GroupCount)
+			for i := 0; i < int(relationship.GroupCount); i++ {
+				groupMasks[i] = *(*GroupAffinity)(unsafe.Pointer(uintptr(unsafe.Pointer(&relationship.GroupMasks)) + uintptr(i)*unsafe.Sizeof(GroupAffinity{})))
 			}
 
-			if RelationProcessorCore == (RelationType)(info.Relationship) {
+			if relationProcessorCore == (relationType)(info.Relationship) {
 				numOfcores++
 			}
 
-			if RelationProcessorPackage == (RelationType)(info.Relationship) {
+			if relationProcessorPackage == (relationType)(info.Relationship) {
 				numofSockets++
 			}
 
@@ -184,20 +186,20 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 						p = &processor{}
 						logicalProcessors[processorId] = p
 					}
-					if RelationProcessorCore == (RelationType)(info.Relationship) {
+					if relationProcessorCore == (relationType)(info.Relationship) {
 						p.CoreID = numOfcores
 					}
-					if RelationProcessorPackage == (RelationType)(info.Relationship) {
+					if relationProcessorPackage == (relationType)(info.Relationship) {
 						p.SocketID = numofSockets
 					}
 				}
 			}
 
-		case RelationNumaNode, RelationNumaNodeEx:
-			numaNodeRelationship := (*NUMA_NODE_RELATIONSHIP)(unsafe.Pointer(&info.data))
-			groupMasks := make([]GROUP_AFFINITY, numaNodeRelationship.GroupCount)
+		case relationNumaNode, relationNumaNodeEx:
+			numaNodeRelationship := (*numaNodeRelationship)(unsafe.Pointer(&info.data))
+			groupMasks := make([]GroupAffinity, numaNodeRelationship.GroupCount)
 			for i := 0; i < int(numaNodeRelationship.GroupCount); i++ {
-				groupMasks[i] = *(*GROUP_AFFINITY)(unsafe.Pointer(uintptr(unsafe.Pointer(&numaNodeRelationship.GroupMasks)) + uintptr(i)*unsafe.Sizeof(GROUP_AFFINITY{})))
+				groupMasks[i] = *(*GroupAffinity)(unsafe.Pointer(uintptr(unsafe.Pointer(&numaNodeRelationship.GroupMasks)) + uintptr(i)*unsafe.Sizeof(GroupAffinity{})))
 			}
 
 			nodes = append(nodes, cadvisorapi.Node{Id: int(numaNodeRelationship.NodeNumber)})
@@ -213,12 +215,8 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 				}
 			}
 
-		case RelationCache:
-			//cacheRelationship := (*CACHE_RELATIONSHIP)(unsafe.Pointer(&info.data))
-			// TODO Process cache relationship data
-
 		default:
-			klog.V(4).Infof("Not using relationship type: %d", info.Relationship)
+			klog.V(4).Infof("Not using Windows CPU relationship type: %d", info.Relationship)
 		}
 
 		// Move the offset to the next SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct
@@ -226,21 +224,20 @@ func convertWinApiToCadvisorApi(buffer []byte) (int, int, []cadvisorapi.Node, er
 	}
 
 	for processId, p := range logicalProcessors {
-		klog.V(4).Infof("Processor (%d): %v", processId, p)
 		node := nodes[p.NodeID]
 		if node.Id != p.NodeID {
-			return 0, 0, nil, fmt.Errorf("Node ID mismatch: %d != %d", node.Id, p.NodeID)
+			return 0, 0, nil, fmt.Errorf("node ID mismatch: %d != %d", node.Id, p.NodeID)
 		}
 		availableBytes := uint64(0)
 		r1, _, err := getNumaAvailableMemoryNodeEx.Call(uintptr(p.NodeID), uintptr(unsafe.Pointer(&availableBytes)))
 		if r1 == 0 {
-			return 0, 0, nil, fmt.Errorf("Call to GetNumaAvailableMemoryNodeEx failed: %v", err)
+			return 0, 0, nil, fmt.Errorf("call to GetNumaAvailableMemoryNodeEx failed: %v", err)
 		}
 		node.Memory = availableBytes
 		node.AddThread(processId, p.CoreID)
 		ok, coreIdx := node.FindCore(p.CoreID)
 		if !ok {
-			return 0, 0, nil, fmt.Errorf("Core not found: %d", p.CoreID)
+			return 0, 0, nil, fmt.Errorf("core not found: %d", p.CoreID)
 		}
 		node.Cores[coreIdx].SocketID = p.SocketID
 		nodes[p.NodeID] = node

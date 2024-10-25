@@ -1,7 +1,25 @@
+//go:build windows
+// +build windows
+
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package winstats
 
 import (
-	"fmt"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -11,7 +29,7 @@ import (
 func TestGROUP_AFFINITY_Processors(t *testing.T) {
 	tests := []struct {
 		name  string
-		Mask  uintptr
+		Mask  uint64
 		Group uint16
 		want  []int
 	}{
@@ -78,7 +96,7 @@ func TestGROUP_AFFINITY_Processors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := GROUP_AFFINITY{
+			a := GroupAffinity{
 				Mask:  tt.Mask,
 				Group: tt.Group,
 			}
@@ -100,16 +118,16 @@ func TestCpusToGroupAffinity(t *testing.T) {
 	tests := []struct {
 		name string
 		cpus []int
-		want map[int]*GROUP_AFFINITY
+		want map[int]*GroupAffinity
 	}{
 		{
 			name: "empty",
-			want: map[int]*GROUP_AFFINITY{},
+			want: map[int]*GroupAffinity{},
 		},
 		{
 			name: "single cpu group 0",
 			cpus: []int{0},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  1,
 					Group: 0,
@@ -119,7 +137,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "single cpu group 0",
 			cpus: []int{63},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  1 << 63,
 					Group: 0,
@@ -129,7 +147,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "single cpu group 1",
 			cpus: []int{64},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				1: {
 					Mask:  1,
 					Group: 1,
@@ -139,7 +157,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "multiple cpus same group",
 			cpus: []int{0, 1, 2},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  1 | 2 | 4, // Binary OR to combine the masks
 					Group: 0,
@@ -149,7 +167,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "multiple cpus different groups",
 			cpus: []int{0, 64},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  1,
 					Group: 0,
@@ -163,7 +181,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "multiple cpus different groups",
 			cpus: []int{0, 1, 2, 64, 65, 66},
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  1 | 2 | 4,
 					Group: 0,
@@ -177,7 +195,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "64 cpus group 0",
 			cpus: makeRange(0, 63),
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				0: {
 					Mask:  0xffffffffffffffff, // All 64 bits set
 					Group: 0,
@@ -187,7 +205,7 @@ func TestCpusToGroupAffinity(t *testing.T) {
 		{
 			name: "64 cpus group 1",
 			cpus: makeRange(64, 127),
-			want: map[int]*GROUP_AFFINITY{
+			want: map[int]*GroupAffinity{
 				1: {
 					Mask:  0xffffffffffffffff, // All 64 bits set
 					Group: 1,
@@ -209,7 +227,7 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 		expectedNumOfCores   int
 		expectedNumOfSockets int
 		expectedNodes        []cadvisorapi.Node
-		wantErr              assert.ErrorAssertionFunc
+		wantErr              bool
 	}{
 		{
 			name:                 "empty",
@@ -217,7 +235,7 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 			expectedNumOfCores:   0,
 			expectedNumOfSockets: 0,
 			expectedNodes:        []cadvisorapi.Node{},
-			wantErr:              assert.NoError,
+			wantErr:              false,
 		},
 		{
 			name:                 "single core",
@@ -235,7 +253,7 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name:                 "single core, multiple cpus",
@@ -253,7 +271,7 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name:                 "single core, multiple groups",
@@ -271,13 +289,32 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
+			wantErr: false,
+		},
+		{
+			name:                 "buffer to small",
+			buffer:               createProcessorRelationships([]int{0, 64})[:48],
+			expectedNumOfCores:   1,
+			expectedNumOfSockets: 1,
+			expectedNodes: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Cores: []cadvisorapi.Core{
+						{
+							Id:      1,
+							Threads: []int{0, 64},
+						},
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			numOfCores, numOfSockets, nodes, err := convertWinApiToCadvisorApi(tt.buffer)
-			if !tt.wantErr(t, err, fmt.Sprintf("convertWinApiToCadvisorApi(%v)", tt.name)) {
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
 			assert.Equalf(t, tt.expectedNumOfCores, numOfCores, "num of cores")
@@ -286,14 +323,26 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 				assert.Equalf(t, tt.expectedNodes[node].Id, nodes[node].Id, "node id")
 				for core := range nodes[node].Cores {
 					assert.Equalf(t, tt.expectedNodes[node].Cores[core].Id, nodes[node].Cores[core].Id, "core id")
-					assert.Equalf(t, tt.expectedNodes[node].Cores[core].Threads, nodes[node].Cores[core].Threads, "threads")
+					assert.Equalf(t, len(tt.expectedNodes[node].Cores[core].Threads), len(nodes[node].Cores[core].Threads), "num of threads")
+					for _, thread := range nodes[node].Cores[core].Threads {
+						assert.Truef(t, containsThread(tt.expectedNodes[node].Cores[core].Threads, thread), "thread %d", thread)
+					}
 				}
 			}
 		})
 	}
 }
 
-func genbuffer(infos ...SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) []byte {
+func containsThread(threads []int, thread int) bool {
+	for _, t := range threads {
+		if t == thread {
+			return true
+		}
+	}
+	return false
+}
+
+func genBuffer(infos ...systemLogicalProcessorInformationEx) []byte {
 	var buffer []byte
 	for _, info := range infos {
 		buffer = append(buffer, structToBytes(info)...)
@@ -304,32 +353,32 @@ func genbuffer(infos ...SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) []byte {
 func createProcessorRelationships(cpus []int) []byte {
 	groups := CpusToGroupAffinity(cpus)
 	grouplen := len(groups)
-	groupAffinities := make([]GROUP_AFFINITY, 0, grouplen)
+	groupAffinities := make([]GroupAffinity, 0, grouplen)
 	for _, group := range groups {
 		groupAffinities = append(groupAffinities, *group)
 	}
-	return genbuffer(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX{
-		Relationship: uint32(RelationProcessorCore),
+	return genBuffer(systemLogicalProcessorInformationEx{
+		Relationship: uint32(relationProcessorCore),
 		Size:         uint32(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE + PROCESSOR_RELATIONSHIP_SIZE + (GROUP_AFFINITY_SIZE * grouplen)),
-		data: PROCESSOR_RELATIONSHIP{
+		data: processorRelationship{
 			Flags:           0,
 			EfficiencyClass: 0,
 			Reserved:        [20]byte{},
 			GroupCount:      uint16(grouplen),
 			GroupMasks:      groupAffinities,
 		},
-	}, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX{
-		Relationship: uint32(RelationNumaNode),
+	}, systemLogicalProcessorInformationEx{
+		Relationship: uint32(relationNumaNode),
 		Size:         uint32(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE + NUMA_NODE_RELATIONSHIP_SIZE + (GROUP_AFFINITY_SIZE * grouplen)),
-		data: NUMA_NODE_RELATIONSHIP{
+		data: numaNodeRelationship{
 			NodeNumber: 0,
 			Reserved:   [18]byte{},
 			GroupCount: uint16(grouplen),
 			GroupMasks: groupAffinities,
-		}}, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX{
-		Relationship: uint32(RelationProcessorPackage),
+		}}, systemLogicalProcessorInformationEx{
+		Relationship: uint32(relationProcessorPackage),
 		Size:         uint32(SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE + PROCESSOR_RELATIONSHIP_SIZE + (GROUP_AFFINITY_SIZE * grouplen)),
-		data: PROCESSOR_RELATIONSHIP{
+		data: processorRelationship{
 			Flags:           0,
 			EfficiencyClass: 0,
 			Reserved:        [20]byte{},
@@ -342,29 +391,29 @@ func createProcessorRelationships(cpus []int) []byte {
 const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE = 8
 const PROCESSOR_RELATIONSHIP_SIZE = 24
 const NUMA_NODE_RELATIONSHIP_SIZE = 24
-const GROUP_AFFINITY_SIZE = int(unsafe.Sizeof(GROUP_AFFINITY{})) // this one is known at compile time
+const GROUP_AFFINITY_SIZE = int(unsafe.Sizeof(GroupAffinity{})) // this one is known at compile time
 
-func structToBytes(info SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX) []byte {
+func structToBytes(info systemLogicalProcessorInformationEx) []byte {
 	var pri []byte = (*(*[SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE]byte)(unsafe.Pointer(&info)))[:SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX_SIZE]
 
 	switch info.data.(type) {
-	case PROCESSOR_RELATIONSHIP:
-		rel := info.data.(PROCESSOR_RELATIONSHIP)
+	case processorRelationship:
+		rel := info.data.(processorRelationship)
 		var prBytes []byte = (*(*[PROCESSOR_RELATIONSHIP_SIZE]byte)(unsafe.Pointer(&rel)))[:PROCESSOR_RELATIONSHIP_SIZE]
 		pri = append(pri, prBytes...)
 
-		groupAffinities := rel.GroupMasks.([]GROUP_AFFINITY)
+		groupAffinities := rel.GroupMasks.([]GroupAffinity)
 
 		for _, groupAffinity := range groupAffinities {
 			var groupByte []byte = (*(*[GROUP_AFFINITY_SIZE]byte)(unsafe.Pointer(&groupAffinity)))[:]
 			pri = append(pri, groupByte...)
 		}
-	case NUMA_NODE_RELATIONSHIP:
-		numa := info.data.(NUMA_NODE_RELATIONSHIP)
+	case numaNodeRelationship:
+		numa := info.data.(numaNodeRelationship)
 		var nameBytes []byte = (*(*[NUMA_NODE_RELATIONSHIP_SIZE]byte)(unsafe.Pointer(&numa)))[:NUMA_NODE_RELATIONSHIP_SIZE]
 		pri = append(pri, nameBytes...)
 
-		groupAffinities := numa.GroupMasks.([]GROUP_AFFINITY)
+		groupAffinities := numa.GroupMasks.([]GroupAffinity)
 
 		for _, groupAffinity := range groupAffinities {
 			var groupByte []byte = (*(*[GROUP_AFFINITY_SIZE]byte)(unsafe.Pointer(&groupAffinity)))[:]

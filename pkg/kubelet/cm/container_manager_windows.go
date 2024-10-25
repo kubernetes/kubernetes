@@ -130,6 +130,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)
+		if err != nil {
+			klog.ErrorS(err, "Failed to initialize topology manager")
+			return nil, err
+		}
 
 		klog.InfoS("Creating cpu manager")
 		cm.cpuManager, err = cpumanager.NewManager(
@@ -150,10 +154,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	} else {
 		cm.topologyManager = topologymanager.NewFakeManager()
 		cm.cpuManager = cpumanager.NewFakeManager()
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	klog.InfoS("Creating device plugin manager")
