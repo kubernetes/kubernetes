@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -184,6 +183,8 @@ type PriorityQueue struct {
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
 	// queueingHintMap is keyed with profile name, valued with registered queueing hint functions.
 	queueingHintMap QueueingHintMapPerProfile
+	// pluginToEventsMap shows which plugin is interested in which events.
+	pluginToEventsMap map[string][]framework.ClusterEvent
 
 	nsLister listersv1.NamespaceLister
 
@@ -340,6 +341,7 @@ func NewPriorityQueue(
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
+		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 		moveRequestCycle:                  -1,
@@ -350,6 +352,20 @@ func NewPriorityQueue(
 	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
+}
+
+func buildEventMap(qHintMap QueueingHintMapPerProfile) map[string][]framework.ClusterEvent {
+	eventMap := make(map[string][]framework.ClusterEvent)
+
+	for _, hintMap := range qHintMap {
+		for event, qHints := range hintMap {
+			for _, qHint := range qHints {
+				eventMap[qHint.PluginName] = append(eventMap[qHint.PluginName], event)
+			}
+		}
+	}
+
+	return eventMap
 }
 
 // Run starts the goroutine to pump from podBackoffQ to activeQ
@@ -496,12 +512,11 @@ func queueingHintToLabel(hint framework.QueueingHint, err error) string {
 	return ""
 }
 
-// runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin.
-// It returns true if all PreEnqueue function run successfully; otherwise returns false
-// upon the first failure.
+// runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin,
+// and updates pInfo.Gated, pInfo.GatingPlugin, and pInfo.UnschedulablePlugins.
 // Note: we need to associate the failed plugin to `pInfo`, so that the pod can be moved back
 // to activeQ by related cluster event.
-func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framework.QueuedPodInfo) bool {
+func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framework.QueuedPodInfo) {
 	logger := klog.FromContext(ctx)
 	var s *framework.Status
 	pod := pInfo.Pod
@@ -517,15 +532,18 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 			continue
 		}
 		pInfo.UnschedulablePlugins.Insert(pl.Name())
+		pInfo.GatingPlugin = pl.Name()
+		pInfo.Gated = true
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 		if s.Code() == framework.Error {
 			logger.Error(s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
 		} else {
 			logger.V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)
 		}
-		return false
+		return
 	}
-	return true
+	// All PreEnqueue plugins are OK; ungate the Pod.
+	pInfo.Gated = false
 }
 
 func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl framework.PreEnqueuePlugin, pod *v1.Pod, shouldRecordMetric bool) *framework.Status {
@@ -544,7 +562,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl framework.Pr
 // 2. an error for the caller to act on.
 func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) bool {
 	gatedBefore := pInfo.Gated
-	pInfo.Gated = !p.runPreEnqueuePlugins(context.Background(), pInfo)
+	p.runPreEnqueuePlugins(context.Background(), pInfo)
 
 	added := false
 	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
@@ -1072,22 +1090,9 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	activated := false
 	for _, pInfo := range podInfoList {
-		// When handling events takes time, a scheduling throughput gets impacted negatively
-		// because of a shared lock within PriorityQueue, which Pop() also requires.
-		//
-		// Scheduling-gated Pods never get schedulable with any events,
-		// except the Pods themselves got updated, which isn't handled by movePodsToActiveOrBackoffQueue.
-		// So, we can skip them early here so that they don't go through isPodWorthRequeuing,
-		// which isn't fast enough to keep a sufficient scheduling throughput
-		// when the number of scheduling-gated Pods in unschedulablePods is large.
-		// https://github.com/kubernetes/kubernetes/issues/124384
-		// This is a hotfix for this issue, which might be changed
-		// once we have a better general solution for the shared lock issue.
-		//
-		// Note that we cannot skip all pInfo.Gated Pods here
-		// because PreEnqueue plugins apart from the scheduling gate plugin may change the gating status
-		// with these events.
-		if pInfo.Gated && pInfo.UnschedulablePlugins.Has(names.SchedulingGates) {
+		if pInfo.Gated && !event.MatchAny(p.pluginToEventsMap[pInfo.GatingPlugin]) {
+			// This event doesn't interest the gating plugin of this Pod,
+			// which means this event never moves this Pod to activeQ.
 			continue
 		}
 
