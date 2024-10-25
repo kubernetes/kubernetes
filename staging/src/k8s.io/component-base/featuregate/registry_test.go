@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package featuregate
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-base/featuregate"
+	baseversion "k8s.io/component-base/version"
 )
 
 const (
@@ -33,8 +33,8 @@ const (
 
 func TestEffectiveVersionRegistry(t *testing.T) {
 	r := NewComponentGlobalsRegistry()
-	ver1 := NewEffectiveVersion("1.31")
-	ver2 := NewEffectiveVersion("1.28")
+	ver1 := baseversion.NewEffectiveVersion("1.31")
+	ver2 := baseversion.NewEffectiveVersion("1.28")
 
 	if r.EffectiveVersionFor(testComponent) != nil {
 		t.Fatalf("expected nil EffectiveVersion initially")
@@ -56,40 +56,40 @@ func TestEffectiveVersionRegistry(t *testing.T) {
 
 func testRegistry(t *testing.T) *componentGlobalsRegistry {
 	r := NewComponentGlobalsRegistry()
-	verKube := NewEffectiveVersion("1.31")
-	fgKube := featuregate.NewVersionedFeatureGate(version.MustParse("0.0"))
-	err := fgKube.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+	verKube := baseversion.NewEffectiveVersion("1.31")
+	fgKube := NewVersionedFeatureGate(version.MustParse("0.0"))
+	err := fgKube.AddVersioned(map[Feature]VersionedSpecs{
 		"kubeA": {
-			{Version: version.MustParse("1.31"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
-			{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
-			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: true, LockToDefault: true, PreRelease: GA},
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
 		},
 		"kubeB": {
-			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
 		},
 		"commonC": {
-			{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	verTest := NewEffectiveVersion("2.8")
-	fgTest := featuregate.NewVersionedFeatureGate(version.MustParse("0.0"))
-	err = fgTest.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+	verTest := baseversion.NewEffectiveVersion("2.8")
+	fgTest := NewVersionedFeatureGate(version.MustParse("0.0"))
+	err = fgTest.AddVersioned(map[Feature]VersionedSpecs{
 		"testA": {
-			{Version: version.MustParse("2.10"), Default: true, PreRelease: featuregate.GA},
-			{Version: version.MustParse("2.8"), Default: false, PreRelease: featuregate.Beta},
-			{Version: version.MustParse("2.7"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("2.10"), Default: true, PreRelease: GA},
+			{Version: version.MustParse("2.8"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("2.7"), Default: false, PreRelease: Alpha},
 		},
 		"testB": {
-			{Version: version.MustParse("2.9"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("2.9"), Default: false, PreRelease: Alpha},
 		},
 		"commonC": {
-			{Version: version.MustParse("2.9"), Default: true, PreRelease: featuregate.Beta},
-			{Version: version.MustParse("2.7"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("2.9"), Default: true, PreRelease: Beta},
+			{Version: version.MustParse("2.7"), Default: false, PreRelease: Alpha},
 		},
 	})
 	if err != nil {
@@ -130,7 +130,7 @@ func TestVersionFlagOptionsWithMapping(t *testing.T) {
 	}
 }
 
-func TestVersionedFeatureGateFlag(t *testing.T) {
+func TestVersionedFeatureGateFlags(t *testing.T) {
 	r := testRegistry(t)
 	known := strings.Join(r.unsafeKnownFeatures(), "\n")
 	expectedKnown := "kube:AllAlpha=true|false (ALPHA - default=false)\n" +
@@ -153,8 +153,8 @@ func TestFlags(t *testing.T) {
 		parseError                   string
 		expectedKubeEmulationVersion string
 		expectedTestEmulationVersion string
-		expectedKubeFeatureValues    map[featuregate.Feature]bool
-		expectedTestFeatureValues    map[featuregate.Feature]bool
+		expectedKubeFeatureValues    map[Feature]bool
+		expectedTestFeatureValues    map[Feature]bool
 	}{
 		{
 			name:                         "setting kube emulation version",
@@ -213,8 +213,8 @@ func TestFlags(t *testing.T) {
 			},
 			expectedKubeEmulationVersion: "1.31",
 			expectedTestEmulationVersion: "2.7",
-			expectedKubeFeatureValues:    map[featuregate.Feature]bool{"kubeA": true, "kubeB": false, "commonC": true},
-			expectedTestFeatureValues:    map[featuregate.Feature]bool{"testA": true, "testB": false, "commonC": false},
+			expectedKubeFeatureValues:    map[Feature]bool{"kubeA": true, "kubeB": false, "commonC": true},
+			expectedTestFeatureValues:    map[Feature]bool{"testA": true, "testB": false, "commonC": false},
 		},
 		{
 			name: "setting future test feature flag",
@@ -234,8 +234,8 @@ func TestFlags(t *testing.T) {
 			},
 			expectedKubeEmulationVersion: "1.30",
 			expectedTestEmulationVersion: "2.7",
-			expectedKubeFeatureValues:    map[featuregate.Feature]bool{"kubeA": false, "kubeB": true, "commonC": false},
-			expectedTestFeatureValues:    map[featuregate.Feature]bool{"testA": false, "testB": false, "commonC": true},
+			expectedKubeFeatureValues:    map[Feature]bool{"kubeA": false, "kubeB": true, "commonC": false},
+			expectedTestFeatureValues:    map[Feature]bool{"testA": false, "testB": false, "commonC": true},
 		},
 		{
 			name: "setting kube feature flag with different prefix",
@@ -312,9 +312,9 @@ func TestFlags(t *testing.T) {
 
 func TestVersionMapping(t *testing.T) {
 	r := NewComponentGlobalsRegistry()
-	ver1 := NewEffectiveVersion("0.58")
-	ver2 := NewEffectiveVersion("1.28")
-	ver3 := NewEffectiveVersion("2.10")
+	ver1 := baseversion.NewEffectiveVersion("0.58")
+	ver2 := baseversion.NewEffectiveVersion("1.28")
+	ver3 := baseversion.NewEffectiveVersion("2.10")
 
 	utilruntime.Must(r.Register("test1", ver1, nil))
 	utilruntime.Must(r.Register("test2", ver2, nil))
@@ -354,9 +354,9 @@ func TestVersionMapping(t *testing.T) {
 
 func TestVersionMappingWithMultipleDependency(t *testing.T) {
 	r := NewComponentGlobalsRegistry()
-	ver1 := NewEffectiveVersion("0.58")
-	ver2 := NewEffectiveVersion("1.28")
-	ver3 := NewEffectiveVersion("2.10")
+	ver1 := baseversion.NewEffectiveVersion("0.58")
+	ver2 := baseversion.NewEffectiveVersion("1.28")
+	ver3 := baseversion.NewEffectiveVersion("2.10")
 
 	utilruntime.Must(r.Register("test1", ver1, nil))
 	utilruntime.Must(r.Register("test2", ver2, nil))
@@ -381,9 +381,9 @@ func TestVersionMappingWithMultipleDependency(t *testing.T) {
 
 func TestVersionMappingWithCyclicDependency(t *testing.T) {
 	r := NewComponentGlobalsRegistry()
-	ver1 := NewEffectiveVersion("0.58")
-	ver2 := NewEffectiveVersion("1.28")
-	ver3 := NewEffectiveVersion("2.10")
+	ver1 := baseversion.NewEffectiveVersion("0.58")
+	ver2 := baseversion.NewEffectiveVersion("1.28")
+	ver3 := baseversion.NewEffectiveVersion("2.10")
 
 	utilruntime.Must(r.Register("test1", ver1, nil))
 	utilruntime.Must(r.Register("test2", ver2, nil))

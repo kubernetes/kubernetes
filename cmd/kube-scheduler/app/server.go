@@ -40,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
@@ -55,7 +54,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
-	"k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -81,8 +80,8 @@ type Option func(runtime.Registry) error
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	// explicitly register (if not already registered) the kube effective version and feature gate in DefaultComponentGlobalsRegistry,
 	// which will be used in NewOptions.
-	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	_, _ = featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
@@ -133,7 +132,7 @@ for more information about scheduling and the kube-scheduler component.`,
 // runCommand runs the scheduler.
 func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
-	fg := opts.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
+	fg := opts.ComponentGlobalsRegistry.FeatureGateFor(featuregate.DefaultKubeComponent)
 	// Activate logging as soon as possible, after that
 	// show flags with the final logging configuration.
 	if err := logsapi.ValidateAndApply(opts.Logs, fg); err != nil {
@@ -164,7 +163,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	logger := klog.FromContext(ctx)
 
 	// To help debugging, immediately log version
-	logger.Info("Starting Kubernetes Scheduler", "version", version.Get())
+	logger.Info("Starting Kubernetes Scheduler", "version", utilversion.Get())
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
@@ -211,11 +210,11 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
 	if cc.LeaderElection != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		binaryVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).BinaryVersion().String())
 		if err != nil {
 			return err
 		}
-		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
+		emulationVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).EmulationVersion().String())
 		if err != nil {
 			return err
 		}

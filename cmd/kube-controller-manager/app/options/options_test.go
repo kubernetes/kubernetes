@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/component-base/version"
 
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
@@ -449,7 +449,7 @@ func TestAddFlags(t *testing.T) {
 		Master:                   "192.168.4.20",
 		Metrics:                  &metrics.Options{},
 		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
+		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -729,7 +729,7 @@ func TestApplyTo(t *testing.T) {
 
 func TestEmulatedVersion(t *testing.T) {
 	var cleanupAndSetupFunc = func() featuregate.FeatureGate {
-		componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+		componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 		componentGlobalsRegistry.Reset() // make sure this test have a clean state
 		t.Cleanup(func() {
 			componentGlobalsRegistry.Reset() // make sure this test doesn't leak a dirty state
@@ -746,7 +746,7 @@ func TestEmulatedVersion(t *testing.T) {
 				{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 			},
 		}))
-		utilruntime.Must(componentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, verKube, fg))
+		utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, verKube, fg))
 		return fg
 	}
 

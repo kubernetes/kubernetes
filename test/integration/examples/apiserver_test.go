@@ -47,7 +47,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/component-base/featuregate"
+	utilversion "k8s.io/component-base/version"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -702,7 +702,7 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 		framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
-	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+	_, _ = featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
 		apiserver.WardleComponentName, utilversion.NewEffectiveVersion(wardleBinaryVersion),
 		featuregate.NewVersionedFeatureGate(version.MustParse(wardleBinaryVersion)))
 

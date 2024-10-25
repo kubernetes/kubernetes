@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example2"
 	example2install "k8s.io/apiserver/pkg/apis/example2/install"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/util/version"
+	version "k8s.io/component-base/version"
 )
 
 var (
