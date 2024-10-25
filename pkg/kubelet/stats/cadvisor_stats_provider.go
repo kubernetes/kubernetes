@@ -276,11 +276,11 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 	if imageStats == nil || len(imageStats.ImageFilesystems) == 0 || len(imageStats.ContainerFilesystems) == 0 {
 		return nil, nil, fmt.Errorf("missing image stats: %+v", imageStats)
 	}
+
 	splitFileSystem := false
 	imageFs := imageStats.ImageFilesystems[0]
 	containerFs := imageStats.ContainerFilesystems[0]
 	if imageFs.FsId != nil && containerFs.FsId != nil && imageFs.FsId.Mountpoint != containerFs.FsId.Mountpoint {
-		klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageFs, "ContainerFilesystems", containerFs)
 		splitFileSystem = true
 	}
 	var imageFsInodesUsed *uint64
@@ -312,6 +312,12 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get container fs info: %w", err)
 	}
+	// ImageFs and ContainerFs could be on different paths on the same device.
+	if containerFsInfo.Device == imageFsInfo.Device {
+		return fsStats, fsStats, nil
+	}
+
+	klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageStats.ImageFilesystems[0], "ContainerFilesystems", imageStats.ContainerFilesystems[0])
 
 	var containerFsInodesUsed *uint64
 	if containerFsInfo.Inodes != nil && containerFsInfo.InodesFree != nil {
