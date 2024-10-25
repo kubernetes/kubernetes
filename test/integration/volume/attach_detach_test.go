@@ -73,6 +73,9 @@ func fakePodWithVol(namespace string) *v1.Pod {
 			},
 			NodeName: "node-sandbox",
 		},
+		Status: v1.PodStatus{
+			QOSClass: v1.PodQOSBestEffort,
+		},
 	}
 	return fakePod
 }

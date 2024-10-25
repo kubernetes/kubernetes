@@ -14454,6 +14454,19 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		"",
 		"restartable init container can restart if RestartPolicyAlways",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSBurstable,
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSGuaranteed,
+			}),
+		),
+		"status.qosClass: Invalid value: \"Burstable\": field is immutable",
+		"qosClass can not be changed",
 	},
 	}
 

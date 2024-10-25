@@ -1424,6 +1424,7 @@ func TestPDBInPreemption(t *testing.T) {
 				}
 				// Add pod condition ready so that PDB is updated.
 				addPodConditionReady(p)
+				p.Status.QOSClass = pods[i].Status.QOSClass
 				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{}); err != nil {
 					t.Fatal(err)
 				}
