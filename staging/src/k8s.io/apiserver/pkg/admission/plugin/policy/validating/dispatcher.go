@@ -64,7 +64,7 @@ type policyDecisionWithMetadata struct {
 	Binding    *admissionregistrationv1.ValidatingAdmissionPolicyBinding
 }
 
-func (c *dispatcher) Run(ctx context.Context) error {
+func (c *dispatcher) Start(ctx context.Context) error {
 	return nil
 }
 

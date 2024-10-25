@@ -63,9 +63,9 @@ type dispatcher struct {
 	generic.Dispatcher[PolicyHook]
 }
 
-func (d *dispatcher) Run(ctx context.Context) error {
+func (d *dispatcher) Start(ctx context.Context) error {
 	go d.typeConverterManager.Run(ctx)
-	return d.Dispatcher.Run(ctx)
+	return d.Dispatcher.Start(ctx)
 }
 
 func (d *dispatcher) dispatchInvocations(

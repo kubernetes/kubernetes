@@ -95,12 +95,12 @@ func NewPolicyDispatcher[P runtime.Object, B runtime.Object, E Evaluator](
 	}
 }
 
-// Dispatch implements generic.Dispatcher. It loops through all active hooks
+// Start implements generic.Dispatcher Start. It loops through all active hooks
 // (policy x binding pairs) and selects those which are active for the current
 // request. It then resolves all params and creates an Invocation for each
 // matching policy-binding-param tuple. The delegate is then called with the
 // list of tuples.
-func (d *policyDispatcher[P, B, E]) Run(ctx context.Context) error {
+func (d *policyDispatcher[P, B, E]) Start(ctx context.Context) error {
 	return nil
 }
 

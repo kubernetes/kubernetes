@@ -186,7 +186,7 @@ func (c *Plugin[H]) ValidateInitialization() error {
 		}
 	}()
 
-	err := c.dispatcher.Run(pluginContext)
+	err := c.dispatcher.Start(pluginContext)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		utilruntime.HandleError(fmt.Errorf("policy dispatcher context unexpectedly closed: %w", err))
 	}
