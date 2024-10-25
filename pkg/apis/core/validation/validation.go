@@ -1775,6 +1775,8 @@ var allowedTemplateObjectMetaFields = map[string]bool{
 type PersistentVolumeSpecValidationOptions struct {
 	// Allow users to modify the class of volume attributes
 	EnableVolumeAttributesClass bool
+	// Allow invalid label-value in NodeSelector
+	AllowInvalidLabelValueInNodeSelector bool
 }
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
@@ -1796,10 +1798,16 @@ var supportedVolumeModes = sets.New(core.PersistentVolumeBlock, core.PersistentV
 
 func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) PersistentVolumeSpecValidationOptions {
 	opts := PersistentVolumeSpecValidationOptions{
-		EnableVolumeAttributesClass: utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		EnableVolumeAttributesClass:          utilfeature.DefaultMutableFeatureGate.Enabled(features.VolumeAttributesClass),
+		AllowInvalidLabelValueInNodeSelector: false,
 	}
 	if oldPv != nil && oldPv.Spec.VolumeAttributesClassName != nil {
 		opts.EnableVolumeAttributesClass = true
+	}
+	if oldPv != nil && oldPv.Spec.NodeAffinity != nil &&
+		oldPv.Spec.NodeAffinity.Required != nil {
+		terms := oldPv.Spec.NodeAffinity.Required.NodeSelectorTerms
+		opts.AllowInvalidLabelValueInNodeSelector = helper.HasInvalidLabelValueInNodeSelectorTerms(terms)
 	}
 	return opts
 }
@@ -1872,7 +1880,7 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 		if validateInlinePersistentVolumeSpec {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeAffinity"), "may not be specified in the context of inline volumes"))
 		} else {
-			nodeAffinitySpecified, errs = validateVolumeNodeAffinity(pvSpec.NodeAffinity, fldPath.Child("nodeAffinity"))
+			nodeAffinitySpecified, errs = validateVolumeNodeAffinity(pvSpec.NodeAffinity, opts.AllowInvalidLabelValueInNodeSelector, fldPath.Child("nodeAffinity"))
 			allErrs = append(allErrs, errs...)
 		}
 	}
@@ -3867,7 +3875,7 @@ func validateAffinity(affinity *core.Affinity, opts PodValidationOptions, fldPat
 
 	if affinity != nil {
 		if affinity.NodeAffinity != nil {
-			allErrs = append(allErrs, validateNodeAffinity(affinity.NodeAffinity, fldPath.Child("nodeAffinity"))...)
+			allErrs = append(allErrs, validateNodeAffinity(affinity.NodeAffinity, opts.AllowInvalidLabelValueInNodeSelector, fldPath.Child("nodeAffinity"))...)
 		}
 		if affinity.PodAffinity != nil {
 			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, opts.AllowInvalidLabelValueInSelector, fldPath.Child("podAffinity"))...)
@@ -4049,6 +4057,8 @@ type PodValidationOptions struct {
 	AllowRelaxedEnvironmentVariableValidation bool
 	// Allow the use of a relaxed DNS search
 	AllowRelaxedDNSSearchValidation bool
+	// Allow invalid label-value in NodeSelector
+	AllowInvalidLabelValueInNodeSelector bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4394,7 +4404,7 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateNodeSelectorRequirement tests that the specified NodeSelectorRequirement fields has valid data
-func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *field.Path) field.ErrorList {
+func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch rq.Operator {
 	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
@@ -4413,9 +4423,10 @@ func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, fldPath *f
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
 	}
-
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
-
+	if !allowInvalidLabelValueInNodeSelector {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelValues(rq.Values, fldPath.Child("values"))...)
+	}
 	return allErrs
 }
 
@@ -4451,11 +4462,11 @@ func ValidateNodeFieldSelectorRequirement(req core.NodeSelectorRequirement, fldP
 }
 
 // ValidateNodeSelectorTerm tests that the specified node selector term has valid data
-func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, fldPath *field.Path) field.ErrorList {
+func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for j, req := range term.MatchExpressions {
-		allErrs = append(allErrs, ValidateNodeSelectorRequirement(req, fldPath.Child("matchExpressions").Index(j))...)
+		allErrs = append(allErrs, ValidateNodeSelectorRequirement(req, allowInvalidLabelValueInNodeSelector, fldPath.Child("matchExpressions").Index(j))...)
 	}
 
 	for j, req := range term.MatchFields {
@@ -4466,7 +4477,7 @@ func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, fldPath *field.Path) f
 }
 
 // ValidateNodeSelector tests that the specified nodeSelector fields has valid data
-func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) field.ErrorList {
+func ValidateNodeSelector(nodeSelector *core.NodeSelector, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	termFldPath := fldPath.Child("nodeSelectorTerms")
@@ -4475,7 +4486,7 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) 
 	}
 
 	for i, term := range nodeSelector.NodeSelectorTerms {
-		allErrs = append(allErrs, ValidateNodeSelectorTerm(term, termFldPath.Index(i))...)
+		allErrs = append(allErrs, ValidateNodeSelectorTerm(term, allowInvalidLabelValueInNodeSelector, termFldPath.Index(i))...)
 	}
 
 	return allErrs
@@ -4568,7 +4579,7 @@ func validatePreferAvoidPodsEntry(avoidPodEntry core.PreferAvoidPodsEntry, fldPa
 }
 
 // ValidatePreferredSchedulingTerms tests that the specified SoftNodeAffinity fields has valid data
-func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldPath *field.Path) field.ErrorList {
+func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for i, term := range terms {
@@ -4576,7 +4587,7 @@ func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldP
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("weight"), term.Weight, "must be in the range 1-100"))
 		}
 
-		allErrs = append(allErrs, ValidateNodeSelectorTerm(term.Preference, fldPath.Index(i).Child("preference"))...)
+		allErrs = append(allErrs, ValidateNodeSelectorTerm(term.Preference, allowInvalidLabelValueInNodeSelector, fldPath.Index(i).Child("preference"))...)
 	}
 	return allErrs
 }
@@ -4639,17 +4650,17 @@ func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, allowInvalid
 }
 
 // validateNodeAffinity tests that the specified nodeAffinity fields have valid data
-func validateNodeAffinity(na *core.NodeAffinity, fldPath *field.Path) field.ErrorList {
+func validateNodeAffinity(na *core.NodeAffinity, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// TODO: Uncomment the next three lines once RequiredDuringSchedulingRequiredDuringExecution is implemented.
 	// if na.RequiredDuringSchedulingRequiredDuringExecution != nil {
 	//	allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingRequiredDuringExecution, fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 	// }
 	if na.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, ValidateNodeSelector(na.RequiredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInNodeSelector, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	if len(na.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
-		allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, ValidatePreferredSchedulingTerms(na.PreferredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInNodeSelector, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	return allErrs
 }
@@ -7527,7 +7538,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 // returns:
 // - true if volumeNodeAffinity is set
 // - errorList if there are validation errors
-func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) (bool, field.ErrorList) {
+func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) (bool, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
 	if nodeAffinity == nil {
@@ -7535,7 +7546,7 @@ func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *
 	}
 
 	if nodeAffinity.Required != nil {
-		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, fldPath.Child("required"))...)
+		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, allowInvalidLabelValueInNodeSelector, fldPath.Child("required"))...)
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath.Child("required"), "must specify required node constraints"))
 	}

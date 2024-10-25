@@ -385,6 +385,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
+		AllowInvalidLabelValueInNodeSelector:              false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -400,6 +401,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
+		opts.AllowInvalidLabelValueInNodeSelector = hasInvalidLabelValueInNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
 		// if old spec has an invalid projected token volume path, we must allow it
@@ -1249,6 +1251,26 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+func hasInvalidLabelValueInNodeAffinity(spec *api.PodSpec) bool {
+	if spec.Affinity == nil || spec.Affinity.NodeAffinity == nil {
+		return false
+	}
+	affinity := spec.Affinity.NodeAffinity
+	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		terms := affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+		if helper.HasInvalidLabelValueInNodeSelectorTerms(terms) {
+			return true
+		}
+	}
+	for _, schedulingTerm := range affinity.PreferredDuringSchedulingIgnoredDuringExecution {
+		terms := []api.NodeSelectorTerm{schedulingTerm.Preference}
+		if helper.HasInvalidLabelValueInNodeSelectorTerms(terms) {
+			return true
 		}
 	}
 	return false

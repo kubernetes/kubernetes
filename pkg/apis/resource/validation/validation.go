@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
@@ -80,11 +81,28 @@ func ValidateResourceClaimUpdate(resourceClaim, oldClaim *resource.ResourceClaim
 	return allErrs
 }
 
+type ResourceClaimValidationOptions struct {
+	// Allow invalid label-value in NodeSelector
+	AllowInvalidLabelValueInNodeSelector bool
+}
+
+func ValidationOptionsForResourceClaimStatus(resourceClaim, oldClaim *resource.ResourceClaim) ResourceClaimValidationOptions {
+	opts := ResourceClaimValidationOptions{
+		AllowInvalidLabelValueInNodeSelector: false,
+	}
+	if oldClaim != nil && oldClaim.Status.Allocation != nil &&
+		oldClaim.Status.Allocation.NodeSelector != nil {
+		terms := oldClaim.Status.Allocation.NodeSelector.NodeSelectorTerms
+		opts.AllowInvalidLabelValueInNodeSelector = helper.HasInvalidLabelValueInNodeSelectorTerms(terms)
+	}
+	return opts
+}
+
 // ValidateResourceClaimStatusUpdate tests if an update to the status of a ResourceClaim is valid.
-func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) field.ErrorList {
+func ValidateResourceClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim, opts ResourceClaimValidationOptions) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldClaim.ObjectMeta, field.NewPath("metadata"))
 	requestNames := gatherRequestNames(&resourceClaim.Spec.Devices)
-	allErrs = append(allErrs, validateResourceClaimStatusUpdate(&resourceClaim.Status, &oldClaim.Status, resourceClaim.DeletionTimestamp != nil, requestNames, field.NewPath("status"))...)
+	allErrs = append(allErrs, validateResourceClaimStatusUpdate(&resourceClaim.Status, &oldClaim.Status, resourceClaim.DeletionTimestamp != nil, requestNames, opts.AllowInvalidLabelValueInNodeSelector, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -250,9 +268,9 @@ func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldP
 	return allErrs
 }
 
-func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaimStatus, claimDeleted bool, requestNames sets.Set[string], fldPath *field.Path) field.ErrorList {
+func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaimStatus, claimDeleted bool, requestNames sets.Set[string], allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames)...)
+	allErrs = append(allErrs, validateAllocationResult(status.Allocation, allowInvalidLabelValueInNodeSelector, fldPath.Child("allocation"), requestNames)...)
 	allErrs = append(allErrs, validateSet(status.ReservedFor, resource.ResourceClaimReservedForMaxSize,
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
@@ -298,7 +316,7 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	return allErrs
 }
 
-func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+func validateAllocationResult(allocation *resource.AllocationResult, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
 	if allocation == nil {
 		return nil
 	}
@@ -306,7 +324,7 @@ func validateAllocationResult(allocation *resource.AllocationResult, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames)...)
 	if allocation.NodeSelector != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, fldPath.Child("nodeSelector"))...)
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, allowInvalidLabelValueInNodeSelector, fldPath.Child("nodeSelector"))...)
 	}
 	return allErrs
 }
@@ -425,21 +443,37 @@ func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+type ResourceSliceValidationOptions struct {
+	// Allow invalid label-value in NodeSelector
+	AllowInvalidLabelValueInNodeSelector bool
+}
+
+func ValidationOptionsForResourceSlice(slice, oldSlice *resource.ResourceSlice) ResourceSliceValidationOptions {
+	opts := ResourceSliceValidationOptions{
+		AllowInvalidLabelValueInNodeSelector: false,
+	}
+	if oldSlice != nil && oldSlice.Spec.NodeSelector != nil {
+		terms := oldSlice.Spec.NodeSelector.NodeSelectorTerms
+		opts.AllowInvalidLabelValueInNodeSelector = helper.HasInvalidLabelValueInNodeSelectorTerms(terms)
+	}
+	return opts
+}
+
 // ValidateResourceSlice tests if a ResourceSlice object is valid.
-func ValidateResourceSlice(slice *resource.ResourceSlice) field.ErrorList {
+func ValidateResourceSlice(slice *resource.ResourceSlice, opts ResourceSliceValidationOptions) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&slice.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceSliceSpec(&slice.Spec, nil, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceSliceSpec(&slice.Spec, nil, opts.AllowInvalidLabelValueInNodeSelector, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateResourceSlice tests if a ResourceSlice update is valid.
-func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.ResourceSlice) field.ErrorList {
+func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.ResourceSlice, opts ResourceSliceValidationOptions) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlice.ObjectMeta, &oldResourceSlice.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateResourceSliceSpec(&resourceSlice.Spec, &oldResourceSlice.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceSliceSpec(&resourceSlice.Spec, &oldResourceSlice.Spec, opts.AllowInvalidLabelValueInNodeSelector, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, allowInvalidLabelValueInNodeSelector bool, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(spec.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validateResourcePool(spec.Pool, fldPath.Child("pool"))...)
@@ -456,7 +490,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 	if spec.NodeSelector != nil {
 		numNodeSelectionFields++
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, allowInvalidLabelValueInNodeSelector, fldPath.Child("nodeSelector"))...)
 		if len(spec.NodeSelector.NodeSelectorTerms) != 1 {
 			// This additional constraint simplifies merging of different selectors
 			// when devices are allocated from different slices.

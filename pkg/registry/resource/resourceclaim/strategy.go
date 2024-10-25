@@ -138,7 +138,8 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 func (resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	return validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)
+	opts := validation.ValidationOptionsForResourceClaimStatus(newClaim, oldClaim)
+	return validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

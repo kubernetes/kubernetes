@@ -53,7 +53,8 @@ func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	return validation.ValidateResourceSlice(slice)
+	opts := validation.ValidationOptionsForResourceSlice(slice, nil)
+	return validation.ValidateResourceSlice(slice, opts)
 }
 
 func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -78,7 +79,10 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
+	slice := obj.(*resource.ResourceSlice)
+	oldSlice := old.(*resource.ResourceSlice)
+	opts := validation.ValidationOptionsForResourceSlice(slice, oldSlice)
+	return validation.ValidateResourceSliceUpdate(slice, oldSlice, opts)
 }
 
 func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

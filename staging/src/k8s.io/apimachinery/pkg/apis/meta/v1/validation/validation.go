@@ -107,6 +107,17 @@ func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateLabelValues validates that the label value is correctly defined.
+func ValidateLabelValues(labelValues []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for valueIndex, value := range labelValues {
+		for _, msg := range validation.IsValidLabelValue(value) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(valueIndex), value, msg))
+		}
+	}
+	return allErrs
+}
+
 // ValidateLabels validates that a set of labels are correctly defined.
 func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
