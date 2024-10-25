@@ -85,6 +85,11 @@ func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
+	klog.InfoS("GetAllCPUs")
+	return cpuset.CPUSet{}
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{
