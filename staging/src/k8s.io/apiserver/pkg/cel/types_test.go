@@ -18,6 +18,9 @@ package cel
 
 import (
 	"testing"
+
+	"github.com/google/cel-go/common/types"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTypes_ListType(t *testing.T) {
@@ -76,4 +79,17 @@ func testValue(t *testing.T, id int64, val interface{}) *DynValue {
 		t.Fatalf("NewDynValue(%d, %v) failed: %v", id, val, err)
 	}
 	return dv
+}
+
+func TestDeclTypeProvider_FindStructType(t *testing.T) {
+	obj := NewObjectType("foo", map[string]*DeclField{
+		"bar": NewDeclField("bar", StringType, true, nil, nil),
+	})
+	base := types.NewEmptyRegistry()
+	provider := NewDeclTypeProvider(obj)
+	provider, err := provider.WithTypeProvider(base)
+	require.NoError(t, err)
+	wrappedType, found := provider.FindStructType("foo")
+	require.True(t, found)
+	require.Equal(t, types.TypeKind, wrappedType.Kind())
 }
