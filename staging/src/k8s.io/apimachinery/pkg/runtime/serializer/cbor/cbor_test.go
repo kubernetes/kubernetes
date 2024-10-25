@@ -346,6 +346,33 @@ func TestDecode(t *testing.T) {
 			},
 		},
 		{
+			name:        "raw types not transcoded",
+			options:     []Option{Transcode(false)},
+			data:        []byte{0xa4, 0x41, 'f', 0xa1, 0x41, 'a', 0x01, 0x42, 'f', 'p', 0xa1, 0x41, 'z', 0x02, 0x41, 'r', 0xa1, 0x41, 'b', 0x03, 0x42, 'r', 'p', 0xa1, 0x41, 'y', 0x04},
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
+			into:        &structWithRawFields{},
+			expectedObj: &structWithRawFields{
+				FieldsV1:        metav1.FieldsV1{Raw: []byte{0xa1, 0x41, 'a', 0x01}},
+				FieldsV1Pointer: &metav1.FieldsV1{Raw: []byte{0xa1, 0x41, 'z', 0x02}},
+				// RawExtension's UnmarshalCBOR ensures the self-described CBOR tag
+				// is present in the result so that there is never any ambiguity in
+				// distinguishing CBOR from JSON or Protobuf. It is unnecessary for
+				// FieldsV1 to do the same because the initial byte is always
+				// sufficient to distinguish a valid JSON-encoded FieldsV1 from a
+				// valid CBOR-encoded FieldsV1.
+				RawExtension:        runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0xa1, 0x41, 'b', 0x03}},
+				RawExtensionPointer: &runtime.RawExtension{Raw: []byte{0xd9, 0xd9, 0xf7, 0xa1, 0x41, 'y', 0x04}},
+			},
+			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
 			name:        "object with embedded typemeta and objectmeta",
 			data:        []byte("\xa2\x48metadata\xa1\x44name\x43foo\x44spec\xa0"), // {"metadata": {"name": "foo"}}
 			gvk:         &schema.GroupVersionKind{},

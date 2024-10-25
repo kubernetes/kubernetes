@@ -41,6 +41,27 @@ const (
 	// owner: @nilekhc
 	// alpha: v1.30
 	InformerResourceVersion Feature = "InformerResourceVersion"
+
+	// owner: @benluddy
+	// kep: https://kep.k8s.io/4222
+	//
+	// If disabled, clients configured to accept "application/cbor" will instead accept
+	// "application/json" with the same relative preference, and clients configured to write
+	// "application/cbor" or "application/apply-patch+cbor" will instead write
+	// "application/json" or "application/apply-patch+yaml", respectively.
+	//
+	// This feature is currently PRE-ALPHA and MUST NOT be enabled outside of integration tests.
+	TestOnlyClientAllowsCBOR Feature = "TestOnlyClientAllowsCBOR"
+
+	// owner: @benluddy
+	// kep: https://kep.k8s.io/4222
+	//
+	// If enabled AND TestOnlyClientAllowsCBOR is also enabled, the default request content type
+	// (if not explicitly configured) and the dynamic client's request content type both become
+	// "application/cbor".
+	//
+	// This feature is currently PRE-ALPHA and MUST NOT be enabled outside of integration tests.
+	TestOnlyClientPrefersCBOR Feature = "TestOnlyClientPrefersCBOR"
 )
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

@@ -20,11 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -55,12 +58,12 @@ func TestDynamicClient(t *testing.T) {
 	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
 	// Create a Pod with the normal client
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:  "test",
 					Image: "test-image",
@@ -134,16 +137,16 @@ func TestDynamicClientWatch(t *testing.T) {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
 
-	resource := v1.SchemeGroupVersion.WithResource("events")
+	resource := corev1.SchemeGroupVersion.WithResource("events")
 
-	mkEvent := func(i int) *v1.Event {
+	mkEvent := func(i int) *corev1.Event {
 		name := fmt.Sprintf("event-%v", i)
-		return &v1.Event{
+		return &corev1.Event{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      name,
 			},
-			InvolvedObject: v1.ObjectReference{
+			InvolvedObject: corev1.ObjectReference{
 				Namespace: "default",
 				Name:      name,
 			},
@@ -276,24 +279,171 @@ func TestUnstructuredExtract(t *testing.T) {
 
 }
 
-func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
+func unstructuredToPod(obj *unstructured.Unstructured) (*corev1.Pod, error) {
 	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	pod := new(v1.Pod)
-	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pod)
+	pod := new(corev1.Pod)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), json, pod)
 	pod.Kind = ""
 	pod.APIVersion = ""
 	return pod, err
 }
 
-func unstructuredToEvent(obj *unstructured.Unstructured) (*v1.Event, error) {
+func unstructuredToEvent(obj *unstructured.Unstructured) (*corev1.Event, error) {
 	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	event := new(v1.Event)
-	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, event)
+	event := new(corev1.Event)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), json, event)
 	return event, err
+}
+
+func TestDynamicClientCBOREnablement(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		serving                 bool
+		allowed                 bool
+		preferred               bool
+		wantRequestContentType  string
+		wantRequestAccept       string
+		wantResponseContentType string
+		wantResponseStatus      int
+		wantStatusError         bool
+	}{
+		{
+			name:                    "sends cbor accepts both gets cbor",
+			serving:                 true,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+		{
+			name:                    "sends cbor accepts both gets 415",
+			serving:                 false,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusUnsupportedMediaType,
+			wantStatusError:         true,
+		},
+		{
+			name:                    "sends json accepts both gets cbor",
+			serving:                 true,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+		{
+			name:                    "sends json accepts both gets json",
+			serving:                 false,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+		{
+			name:                    "sends json accepts json gets json with serving enabled",
+			serving:                 true,
+			allowed:                 false,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+		{
+			name:                    "sends json accepts json gets json with serving disabled",
+			serving:                 false,
+			allowed:                 false,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+		{
+			name:                    "sends json without both gates enabled",
+			serving:                 true,
+			allowed:                 false,
+			preferred:               true,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.serving {
+				framework.EnableCBORServingAndStorageForTest(t)
+			}
+
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			framework.SetTestOnlyCBORClientFeatureGatesForTest(t, tc.allowed, tc.preferred)
+
+			config := rest.CopyConfig(server.ClientConfig)
+			config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+				return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+					response, err := rt.RoundTrip(request)
+					if got := response.Request.Header.Get("Content-Type"); got != tc.wantRequestContentType {
+						t.Errorf("want request content type %q, got %q", tc.wantRequestContentType, got)
+					}
+					if got := response.Request.Header.Get("Accept"); got != tc.wantRequestAccept {
+						t.Errorf("want request accept %q, got %q", tc.wantRequestAccept, got)
+					}
+					if got := response.Header.Get("Content-Type"); got != tc.wantResponseContentType {
+						t.Errorf("want response content type %q, got %q", tc.wantResponseContentType, got)
+					}
+					if got := response.StatusCode; got != tc.wantResponseStatus {
+						t.Errorf("want response status %d, got %d", tc.wantResponseStatus, got)
+					}
+					return response, err
+				})
+			})
+			client, err := dynamic.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+				context.TODO(),
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name": "test-dynamic-client-cbor-enablement",
+						},
+					},
+				},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			)
+			switch {
+			case tc.wantStatusError && errors.IsUnsupportedMediaType(err):
+				// ok
+			case !tc.wantStatusError && err == nil:
+				// ok
+			default:
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
 }
