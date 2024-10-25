@@ -98,6 +98,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		fieldSelector = "spec.unschedulable=false"
 		ns            = metav1.NamespaceSystem
 		timeout       = 15 * time.Second
+		timeoutMargin = 5 * time.Second
 	)
 	var (
 		err, lastError error
@@ -132,6 +133,9 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		return nil
 	}
 
+	// Adding a margin of error to the polling timeout.
+	timeoutWithMargin := timeout.Seconds() + timeoutMargin.Seconds()
+
 	// Prepare Job
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +144,8 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit:            ptr.To[int32](0),
-			TTLSecondsAfterFinished: ptr.To[int32](int32(timeout.Seconds()) + 5), // Make sure it's more than 'timeout'.
+			TTLSecondsAfterFinished: ptr.To[int32](int32(timeoutWithMargin)),
+			ActiveDeadlineSeconds:   ptr.To[int64](int64(timeoutWithMargin)),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
