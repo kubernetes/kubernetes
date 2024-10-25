@@ -402,7 +402,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		if ok {
 			zone, err := zones.GetZone(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
+				return nil, fmt.Errorf("failed to get zone from cloud provider: %w", err)
 			}
 			if zone.FailureDomain != "" {
 				klog.InfoS("Adding node label from cloud provider", "labelKey", v1.LabelFailureDomainBetaZone, "labelValue", zone.FailureDomain)
@@ -559,7 +559,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	}
 	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+		return fmt.Errorf("error getting node %q: %w", kl.nodeName, err)
 	}
 	if originalNode == nil {
 		return fmt.Errorf("nil %q node object", kl.nodeName)

@@ -118,16 +118,16 @@ func generateImageTags() []string {
 func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error) {
 	original, err := json.Marshal(originalNode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal original node %#v: %v", originalNode, err)
+		return nil, fmt.Errorf("failed to marshal original node %#v: %w", originalNode, err)
 	}
 	updated, err := strategicpatch.StrategicMergePatch(original, patch, v1.Node{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply strategic merge patch %q on node %#v: %v",
+		return nil, fmt.Errorf("failed to apply strategic merge patch %q on node %#v: %w",
 			patch, originalNode, err)
 	}
 	updatedNode := &v1.Node{}
 	if err := json.Unmarshal(updated, updatedNode); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal updated node %q: %v", updated, err)
+		return nil, fmt.Errorf("failed to unmarshal updated node %q: %w", updated, err)
 	}
 	return updatedNode, nil
 }

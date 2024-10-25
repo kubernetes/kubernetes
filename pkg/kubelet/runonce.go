@@ -119,7 +119,7 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 	for !isTerminal {
 		status, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			return fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
+			return fmt.Errorf("unable to get status for pod %q: %w", format.Pod(pod), err)
 		}
 
 		if kl.isPodRunning(pod, status) {
@@ -134,7 +134,7 @@ func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Dura
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		if isTerminal, err = kl.SyncPod(ctx, kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
-			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
+			return fmt.Errorf("error syncing pod %q: %w", format.Pod(pod), err)
 		}
 		if retry >= runOnceMaxRetries {
 			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", format.Pod(pod), runOnceMaxRetries)
@@ -164,7 +164,7 @@ func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bo
 func (kl *Kubelet) getFailedContainers(ctx context.Context, pod *v1.Pod) ([]string, error) {
 	status, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
+		return nil, fmt.Errorf("unable to get status for pod %q: %w", format.Pod(pod), err)
 	}
 	var containerNames []string
 	for _, cs := range status.ContainerStatuses {
