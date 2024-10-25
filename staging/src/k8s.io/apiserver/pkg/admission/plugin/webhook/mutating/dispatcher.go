@@ -190,7 +190,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "admit", 200)
 		}
 		if changed {
-			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
+			// Patch had changed the object. Prepare to reinvoke all previous mutations that are eligible for re-invocation.
 			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
