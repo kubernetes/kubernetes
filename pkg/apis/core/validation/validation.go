@@ -8260,17 +8260,39 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 			// ignore missing container, see https://github.com/kubernetes/kubernetes/issues/124915
 			if containerFound {
 				found := false
+				var errorStr string
 
-				// get container resources from the spec
-				containerResources := container.Resources
-				for resourceName := range containerResources.Requests {
-					if resourceName == allocatedResource.Name {
-						found = true
-						break
+				if strings.HasPrefix(string(allocatedResource.Name), "claim:") {
+					// assume it is a claim name
+
+					errorStr = "must match one of the container's resource claims in a format 'claim:<claimName>/<request>' or 'claim:<claimName>' if request is empty"
+
+					for _, c := range container.Resources.Claims {
+						name := "claim:" + c.Name
+						if c.Request != "" {
+							name += "/" + c.Request
+						}
+
+						if name == string(allocatedResource.Name) {
+							found = true
+							break
+						}
+					}
+
+				} else {
+					// assume it is a resource name
+
+					errorStr = "must match one of the container's resource requests"
+
+					for resourceName := range container.Resources.Requests {
+						if resourceName == allocatedResource.Name {
+							found = true
+							break
+						}
 					}
 				}
 				if !found {
-					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("name"), allocatedResource.Name, "must match one of the container's resource requirements"))
+					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("name"), allocatedResource.Name, errorStr))
 				}
 			}
 
