@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -212,6 +213,13 @@ func (v *SummaryVec) Reset() {
 	}
 
 	v.SummaryVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the SummaryVec.
+// NOTE: This should only be used in test.
+func (v *SummaryVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped SummaryVec with context

@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -237,6 +238,13 @@ func (v *GaugeVec) Reset() {
 	}
 
 	v.GaugeVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the GaugeVec.
+// NOTE: This should only be used in test.
+func (v *GaugeVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 func newGaugeFunc(opts *GaugeOpts, function func() float64, v semver.Version) GaugeFunc {
