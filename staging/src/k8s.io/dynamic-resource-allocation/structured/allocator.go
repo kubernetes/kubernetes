@@ -68,7 +68,7 @@ func NewAllocator(ctx context.Context,
 	}, nil
 }
 
-// ClaimsToAllocate returns the claims that the allocated was created for.
+// ClaimsToAllocate returns the claims that the allocator was created for.
 func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 	return a.claimsToAllocate
 }
@@ -169,9 +169,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				return nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, request.DeviceClassName, err)
 			}
 
+			// Start collecting information about the request.
+			// The class must be set and stored before calling isSelectable.
 			requestData := requestData{
 				class: class,
 			}
+			requestKey := requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}
+			alloc.requestData[requestKey] = requestData
 
 			switch request.AllocationMode {
 			case resourceapi.DeviceAllocationModeExactCount:
@@ -190,7 +194,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 					for _, slice := range pool.Slices {
 						for deviceIndex := range slice.Spec.Devices {
-							selectable, err := alloc.isSelectable(requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}, slice, deviceIndex)
+							selectable, err := alloc.isSelectable(requestKey, slice, deviceIndex)
 							if err != nil {
 								return nil, err
 							}
@@ -205,7 +209,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			default:
 				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.AllocationMode)
 			}
-			alloc.requestData[requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}] = requestData
+			alloc.requestData[requestKey] = requestData
 			numDevices += requestData.numDevices
 		}
 		alloc.logger.V(6).Info("Checked claim", "claim", klog.KObj(claim), "numDevices", numDevices)
@@ -290,10 +294,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// All errors get created such that they can be returned by Allocate
 	// without further wrapping.
 	done, err := alloc.allocateOne(deviceIndices{})
+	if errors.Is(err, errStop) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	if errors.Is(err, errStop) || !done {
+	if !done {
 		return nil, nil
 	}
 
@@ -347,7 +354,6 @@ type allocator struct {
 	constraints          [][]constraint                 // one list of constraints per claim
 	requestData          map[requestIndices]requestData // one entry per request
 	allocated            map[DeviceID]bool
-	skippedUnknownDevice bool
 	result               []*resourceapi.AllocationResult
 }
 
@@ -534,20 +540,23 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 		// For "all" devices we already know which ones we need. We
 		// just need to check whether we can use them.
 		deviceWithID := requestData.allDevices[r.deviceIndex]
-		_, _, err := alloc.allocateDevice(r, deviceWithID.device, deviceWithID.DeviceID, true)
+		success, _, err := alloc.allocateDevice(r, deviceWithID.device, deviceWithID.DeviceID, true)
 		if err != nil {
 			return false, err
+		}
+		if !success {
+			// The order in which we allocate "all" devices doesn't matter,
+			// so we only try with the one which was up next. If we couldn't
+			// get all of them, then there is no solution and we have to stop.
+			return false, errStop
 		}
 		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1})
 		if err != nil {
 			return false, err
 		}
-
-		// The order in which we allocate "all" devices doesn't matter,
-		// so we only try with the one which was up next. If we couldn't
-		// get all of them, then there is no solution and we have to stop.
 		if !done {
-			return false, errStop
+			// Backtrack.
+			return false, nil
 		}
 		return done, nil
 	}
@@ -610,9 +619,6 @@ func (alloc *allocator) isSelectable(r requestIndices, slice *resourceapi.Resour
 	device := slice.Spec.Devices[deviceIndex].Basic
 	if device == nil {
 		// Must be some future, unknown device type. We cannot select it.
-		// If we don't find anything else, then this will get reported
-		// in the final result, so remember that we skipped some device.
-		alloc.skippedUnknownDevice = true
 		return false, nil
 	}
 
