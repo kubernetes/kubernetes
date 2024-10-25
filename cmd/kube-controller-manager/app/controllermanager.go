@@ -63,7 +63,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
-	"k8s.io/component-base/version"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
@@ -194,7 +193,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	stopCh := ctx.Done()
 
 	// To help debugging, immediately log version
-	logger.Info("Starting", "version", version.Get())
+	logger.Info("Starting", "version", utilversion.Get())
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
