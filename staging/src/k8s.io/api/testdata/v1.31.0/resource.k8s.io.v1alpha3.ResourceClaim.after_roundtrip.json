@@ -99,7 +99,8 @@
             "request": "requestValue",
             "driver": "driverValue",
             "pool": "poolValue",
-            "device": "deviceValue"
+            "device": "deviceValue",
+            "adminAccess": null
           }
         ],
         "config": [
