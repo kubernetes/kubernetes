@@ -136,6 +136,21 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 				exit 1
 			fi
 		`}
+	case "failOncePerIndex":
+		// Use marker files per index. If the given marker file already exists
+		// then terminate successfully. Otherwise create the marker file and
+		// fail with exit code 42.
+		setupHostPathDirectory(job)
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [[ -r /data/foo-$JOB_COMPLETION_INDEX ]]
+			then
+				exit 0
+			else
+				touch /data/foo-$JOB_COMPLETION_INDEX
+				exit 42
+			fi
+		`}
 	case "notTerminateOncePerIndex":
 		// Use marker files per index. If the given marker file already exists
 		// then terminate successfully. Otherwise create the marker file and
