@@ -73,16 +73,17 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client              *kubernetes.Client
-	codec               runtime.Codec
-	versioner           storage.Versioner
-	transformer         value.Transformer
-	pathPrefix          string
-	groupResource       schema.GroupResource
-	groupResourceString string
-	watcher             *watcher
-	leaseManager        *leaseManager
-	decoder             Decoder
+	client                   *kubernetes.Client
+	codec                    runtime.Codec
+	versioner                storage.Versioner
+	transformer              value.Transformer
+	pathPrefix               string
+	groupResource            schema.GroupResource
+	groupResourceString      string
+	watcher                  *watcher
+	leaseManager             *leaseManager
+	decoder                  Decoder
+	listErrAggregatorFactory func() ListErrorAggregator
 }
 
 func (s *store) RequestWatchProgress(ctx context.Context) error {
@@ -99,12 +100,43 @@ type objState struct {
 	stale bool
 }
 
-// New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) storage.Interface {
-	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner)
+// ListErrorAggregator aggregates the error(s) that the LIST operation
+// encounters while retrieving object(s) from the storage
+type ListErrorAggregator interface {
+	// Aggregate aggregates the given error from list operation
+	// key: it identifies the given object in the storage.
+	// err: it represents the error the list operation encountered while
+	// retrieving the given object from the storage.
+	// done: true if the aggregation is done and the list operation should
+	// abort, otherwise the list operation will continue
+	Aggregate(key string, err error) bool
+
+	// Err returns the aggregated error
+	Err() error
 }
 
-func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+// DefaultListErrorAggregatorFactory returns the default list error
+// aggregator that maintains backward compatibility, which is abort
+// the list operation as soon as it encounters the first error
+func DefaultListErrorAggregatorFactory() ListErrorAggregator { return &abortOnFirstError{} }
+
+// LIST aborts on the first error it encounters (backward compatible)
+type abortOnFirstError struct {
+	err error
+}
+
+func (a *abortOnFirstError) Aggregate(key string, err error) bool {
+	a.err = err
+	return true
+}
+func (a *abortOnFirstError) Err() error { return a.err }
+
+// New returns an etcd3 implementation of storage.Interface.
+func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner, listErrAggregatorFactory func() ListErrorAggregator) storage.Interface {
+	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner, listErrAggregatorFactory)
+}
+
+func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner, listErrAggregatorFactory func() ListErrorAggregator) *store {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -128,16 +160,17 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 		w.objectType = reflect.TypeOf(newFunc()).String()
 	}
 	s := &store{
-		client:              c,
-		codec:               codec,
-		versioner:           versioner,
-		transformer:         transformer,
-		pathPrefix:          pathPrefix,
-		groupResource:       groupResource,
-		groupResourceString: groupResource.String(),
-		watcher:             w,
-		leaseManager:        newDefaultLeaseManager(c.Client, leaseManagerConfig),
-		decoder:             decoder,
+		client:                   c,
+		codec:                    codec,
+		versioner:                versioner,
+		transformer:              transformer,
+		pathPrefix:               pathPrefix,
+		groupResource:            groupResource,
+		groupResourceString:      groupResource.String(),
+		watcher:                  w,
+		leaseManager:             newDefaultLeaseManager(c.Client, leaseManagerConfig),
+		decoder:                  decoder,
+		listErrAggregatorFactory: listErrAggregatorFactory,
 	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
@@ -179,7 +212,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return storage.NewInternalError(err)
+		return storage.NewInternalErrorWithRevision(getResp.KV.ModRevision, err)
 	}
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
@@ -270,7 +303,7 @@ func (s *store) Delete(
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 
-	skipTransformDecode := false
+	skipTransformDecode := opts.IgnoreStoreReadError
 	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, skipTransformDecode)
 }
 
@@ -693,6 +726,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metricsOp = "list"
 	}
 
+	aggregator := s.listErrAggregatorFactory()
 	for {
 		startTime := time.Now()
 		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
@@ -736,7 +770,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
+				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+					return aggregator.Err()
+				}
+				continue
 			}
 
 			// Check if the request has already timed out before decode object
@@ -750,7 +787,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 			if err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				if done := aggregator.Aggregate(string(kv.Key), err); done {
+					return aggregator.Err()
+				}
+				continue
 			}
 
 			// being unable to set the version does not prevent the object from being extracted
@@ -782,6 +822,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 				limit = maxLimit
 			}
 		}
+	}
+
+	if err := aggregator.Err(); err != nil {
+		return err
 	}
 
 	if v.IsNil() {
@@ -912,8 +956,10 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v
 		state.meta.ResourceVersion = uint64(state.rev)
 
 		if skipTransformDecode {
-			// be explicit that we don't have the object
-			state.obj = nil
+			state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
+			if err := s.versioner.UpdateObject(state.obj, uint64(state.rev)); err != nil {
+				return nil, err
+			}
 			state.stale = true // this seems a more sane value here
 			return state, nil
 		}

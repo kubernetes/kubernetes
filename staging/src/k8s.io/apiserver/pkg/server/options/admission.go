@@ -37,7 +37,9 @@ import (
 	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverapiv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -217,6 +219,24 @@ func (a *AdmissionOptions) Validate() []error {
 		// Developer error, this should never run in.
 		errs = append(errs, fmt.Errorf("plugins %v registered are not in RecommendedPluginOrder",
 			registeredPlugins.Difference(intersections).List()))
+	}
+
+	// TODO: is there a better location? we need to ensure that the
+	// admission plugin is not disabled by the admin when the feature
+	// gate is enabled, otherwise we skip the check whether the user
+	// has permission to do unsafe deletion of corrupt object
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		// the plugin and the feature have the same name
+		// the plugin is enabled by default, and is active only
+		// when the feature is enabled
+		name := string(genericfeatures.AllowUnsafeMalformedObjectDeletion)
+		// developer error, the plugin should be registered
+		if !registeredPlugins.Has(name) {
+			errs = append(errs, fmt.Errorf("the plugin %q must be registered, and enabled by default", name))
+		}
+		if disablePlugins.Has(name) {
+			errs = append(errs, fmt.Errorf("the plugin %q must not be disabled when feature %q is enabled", name, name))
+		}
 	}
 
 	return errs
