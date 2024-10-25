@@ -147,6 +147,8 @@ const (
 	ContainerCheckpoint featuregate.Feature = "ContainerCheckpoint"
 
 	// owner: @helayoty
+	// kep: https://kep.k8s.io/4026
+	//
 	// Set the scheduled time as an annotation in the job.
 	CronJobsScheduledAnnotation featuregate.Feature = "CronJobsScheduledAnnotation"
 
