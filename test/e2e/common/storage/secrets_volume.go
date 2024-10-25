@@ -30,6 +30,7 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -195,6 +196,148 @@ var _ = SIGDescribe("Secrets", func() {
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			fileModeRegexp,
 		})
+	})
+
+	/*
+				Release: v1.9
+				Testname: Immutable secret, creation, deletion, recreation
+				Description:
+		To test the behavior of immutable secrets, first create an immutable secret, then deploy a pod that consumes this secret. Afterward, delete the original secret and recreate it with the same name but with new data values. Next, create a second pod that consumes this newly recreated immutable secret. Ideally, the second pod should reflect the updated data from the new immutable secret. This process helps confirm whether the newly created pod accurately consumes the latest secret data.
+	*/
+
+	// this test case is a little flaky as it relays on time and depending on this pod2 output differs sometimes.
+	framework.ConformanceIt("our custom test", f.WithNodeConformance(), func(ctx context.Context) {
+		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
+		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
+		trueVal := true
+		volumeMountPath := "/etc/secret-volumes"
+		podClient := e2epod.NewPodClient(f)
+
+		secretName := "s-test-opt-create-" + string(uuid.NewUUID())
+		immutableContainerName := "creates-volume-test"
+		immutableVolumeName := "creates-volume"
+		immutableSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-1"),
+			},
+			Immutable: ptr.To(true),
+		}
+
+		newImmutableSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				"data-1": []byte("value-7"),
+			},
+			Immutable: ptr.To(true),
+		}
+
+		ginkgo.By(fmt.Sprintf("Creating secret with name %s", immutableSecret.Name))
+		var err error
+		if immutableSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, immutableSecret, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test secret %s: %v", immutableSecret.Name, err)
+		}
+
+		pod1 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: immutableVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: secretName,
+								Optional:   &trueVal,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  immutableContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/immutable/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      immutableVolumeName,
+								MountPath: path.Join(volumeMountPath, "immutable"),
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		pod2 := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-secrets-2-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: immutableVolumeName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: secretName,
+								Optional:   &trueVal,
+							},
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  immutableContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/immutable/data-1"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      immutableVolumeName,
+								MountPath: path.Join(volumeMountPath, "immutable"),
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		ginkgo.By("Creating the pod")
+		podClient.Create(ctx, pod1)
+
+		pod1Logs := func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod1.Name, immutableContainerName)
+		}
+		gomega.Eventually(ctx, pod1Logs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+
+		ginkgo.By(fmt.Sprintf("Deleting secret %v", immutableSecret.Name))
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(ctx, immutableSecret.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", immutableSecret.Name, f.Namespace.Name)
+
+		ginkgo.By(fmt.Sprintf("Creating the immutable secret with same name %s but differnet value", newImmutableSecret.Name))
+		if newImmutableSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newImmutableSecret, metav1.CreateOptions{}); err != nil {
+			framework.Failf("unable to create test secret %s: %v", newImmutableSecret.Name, err)
+		}
+
+		ginkgo.By("Creating the second pod with newimmutable secret")
+		podClient.Create(ctx, pod2)
+
+		pod2Logs := func() (string, error) {
+			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod2.Name, immutableContainerName)
+		}
+
+		gomega.Eventually(ctx, pod2Logs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-7"))
+
 	})
 
 	/*
