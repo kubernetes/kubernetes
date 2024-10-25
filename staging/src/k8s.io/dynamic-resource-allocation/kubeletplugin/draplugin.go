@@ -393,7 +393,9 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 	driverResources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
 			d.nodeName: {
-				Devices: resources.Devices,
+				Slices: []resourceslice.Slice{{
+					Devices: resources.Devices,
+				}},
 			},
 		},
 	}
