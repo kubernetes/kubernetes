@@ -3066,19 +3066,21 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 		"nil pv": {
 			oldPvc: nil,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"invaild apiGroup in dataSource allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
 		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
@@ -3086,7 +3088,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       true,
 			},
 		},
@@ -3094,7 +3096,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       true,
 			},
 		},

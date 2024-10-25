@@ -455,6 +455,11 @@ func getTestPVC(volumeName string, specSize, statusSize, allocatedSize string, r
 	return pvc
 }
 
+func addAccessMode(pvc *v1.PersistentVolumeClaim, mode v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
+	pvc.Spec.AccessModes = append(pvc.Spec.AccessModes, mode)
+	return pvc
+}
+
 func getTestPV(volumeName string, specSize string) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

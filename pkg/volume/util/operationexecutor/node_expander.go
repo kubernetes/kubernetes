@@ -97,7 +97,9 @@ func (ne *NodeExpander) runPreCheck() bool {
 
 	// PVC is already expanded but we are still trying to expand the volume because
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && ne.resizeStatus == "" {
+	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 &&
+		ne.resizeStatus == "" &&
+		ne.hasReadWriteMany() {
 		ne.pvcAlreadyUpdated = true
 		return true
 	}
@@ -114,6 +116,20 @@ func (ne *NodeExpander) runPreCheck() bool {
 	if resizeStatusVal == v1.PersistentVolumeClaimNodeResizePending ||
 		resizeStatusVal == v1.PersistentVolumeClaimNodeResizeInProgress {
 		return true
+	}
+	return false
+}
+
+func (ne *NodeExpander) hasReadWriteMany() bool {
+	accessModes := ne.pvc.Spec.AccessModes
+	if accessModes == nil {
+		return false
+	}
+
+	for _, mode := range accessModes {
+		if mode == v1.ReadWriteMany {
+			return true
+		}
 	}
 	return false
 }
