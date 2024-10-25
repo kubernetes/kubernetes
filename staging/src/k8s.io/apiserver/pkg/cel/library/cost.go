@@ -97,7 +97,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost += traversalCost(args[0]) // these O(n) operations all cost roughly the cost of a single traversal
 		}
 		return &cost
-	case "url", "lowerAscii", "upperAscii", "substring", "trim":
+	case "url", "lowerAscii", "upperAscii", "substring", "trim", "jsonpatch.escapeKey":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
@@ -294,7 +294,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
 		}
-	case "url":
+	case "url", "jsonpatch.escapeKey":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}

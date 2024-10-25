@@ -54,6 +54,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "cidr", "containsIP", "containsCIDR", "masked", "prefixLength", "isCIDR", "string",
 		// Kubernetes <1.31>:
 		"fieldSelector", "labelSelector", "validate", "format.named", "isSemver", "major", "minor", "patch", "semver",
+		// Kubernetes <1.32>:
+		"jsonpatch.escapeKey",
 		// Kubernetes <1.??>:
 	)
 

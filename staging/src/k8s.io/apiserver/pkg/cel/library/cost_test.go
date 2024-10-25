@@ -629,6 +629,12 @@ func TestStringLibrary(t *testing.T) {
 			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
 			expectRuntimeCost:  2,
 		},
+		{
+			name:               "jsonpatch.escapeKey",
+			expr:               "jsonpatch.escapeKey('abc/def~ abc/def~')",
+			expectEsimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:  2,
+		},
 	}
 
 	for _, tc := range cases {
@@ -1122,6 +1128,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		IP(),
 		CIDR(),
 		Format(),
+		JSONPatch(),
 		cel.OptionalTypes(),
 		// cel-go v0.17.7 introduced CostEstimatorOptions.
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
