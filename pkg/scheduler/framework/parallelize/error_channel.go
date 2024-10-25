@@ -18,31 +18,31 @@ package parallelize
 
 import "context"
 
-// ErrorChannel supports non-blocking send and receive operation to capture error.
+// errorChannel supports non-blocking send and receive operation to capture error.
 // A maximum of one error is kept in the channel and the rest of the errors sent
 // are ignored, unless the existing error is received and the channel becomes empty
 // again.
-type ErrorChannel struct {
+type errorChannel struct {
 	errCh chan error
 }
 
-// SendError sends an error without blocking the sender.
-func (e *ErrorChannel) SendError(err error) {
+// sendError sends an error without blocking the sender.
+func (e *errorChannel) sendError(err error) {
 	select {
 	case e.errCh <- err:
 	default:
 	}
 }
 
-// SendErrorWithCancel sends an error without blocking the sender and calls
+// sendErrorWithCancel sends an error without blocking the sender and calls
 // cancel function.
-func (e *ErrorChannel) SendErrorWithCancel(err error, cancel context.CancelFunc) {
-	e.SendError(err)
+func (e *errorChannel) sendErrorWithCancel(err error, cancel context.CancelFunc) {
+	e.sendError(err)
 	cancel()
 }
 
-// ReceiveError receives an error from channel without blocking on the receiver.
-func (e *ErrorChannel) ReceiveError() error {
+// receiveError receives an error from channel without blocking on the receiver.
+func (e *errorChannel) receiveError() error {
 	select {
 	case err := <-e.errCh:
 		return err
@@ -51,9 +51,9 @@ func (e *ErrorChannel) ReceiveError() error {
 	}
 }
 
-// NewErrorChannel returns a new ErrorChannel.
-func NewErrorChannel() *ErrorChannel {
-	return &ErrorChannel{
+// newErrorChannel returns a new errorChannel.
+func newErrorChannel() *errorChannel {
+	return &errorChannel{
 		errCh: make(chan error, 1),
 	}
 }

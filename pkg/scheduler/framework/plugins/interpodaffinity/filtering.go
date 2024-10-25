@@ -153,9 +153,10 @@ func podMatchesAllAffinityTerms(terms []framework.AffinityTerm, pod *v1.Pod) boo
 //  1. Whether it has PodAntiAffinity
 //  2. Whether any AntiAffinityTerm matches the incoming pod
 func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, pod *v1.Pod, nsLabels labels.Set, nodes []*framework.NodeInfo) topologyToMatchedTermCount {
+	logger := klog.FromContext(ctx)
 	topoMaps := make([]topologyToMatchedTermCount, len(nodes))
 	index := int32(-1)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := nodes[i]
 		node := nodeInfo.Node()
 
@@ -166,8 +167,11 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 		if len(topoMap) != 0 {
 			topoMaps[atomic.AddInt32(&index, 1)] = topoMap
 		}
+		return nil
 	}
-	pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name())
+	if err := pl.parallelizer.Until(ctx, len(nodes), processNode, pl.Name()); err != nil {
+		logger.Error(err, "Failed to processing nodes in getExistingAntiAffinityCounts")
+	}
 
 	result := make(topologyToMatchedTermCount)
 	for i := 0; i <= int(index); i++ {
@@ -182,6 +186,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 // predicate. With this topologyToMatchedTermCount available, the affinity predicate does not
 // need to check all the pods in the cluster.
 func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Context, podInfo *framework.PodInfo, allNodes []*framework.NodeInfo) (topologyToMatchedTermCount, topologyToMatchedTermCount) {
+	logger := klog.FromContext(ctx)
 	affinityCounts := make(topologyToMatchedTermCount)
 	antiAffinityCounts := make(topologyToMatchedTermCount)
 	if len(podInfo.RequiredAffinityTerms) == 0 && len(podInfo.RequiredAntiAffinityTerms) == 0 {
@@ -191,7 +196,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	affinityCountsList := make([]topologyToMatchedTermCount, len(allNodes))
 	antiAffinityCountsList := make([]topologyToMatchedTermCount, len(allNodes))
 	index := int32(-1)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 
@@ -209,8 +214,11 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 			affinityCountsList[k] = affinity
 			antiAffinityCountsList[k] = antiAffinity
 		}
+		return nil
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
+	if err := pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name()); err != nil {
+		logger.Error(err, "Failed to processing nodes in getIncomingAffinityAntiAffinityCounts")
+	}
 
 	for i := 0; i <= int(index); i++ {
 		affinityCounts.append(affinityCountsList[i])

@@ -255,7 +255,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 
 	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	processNode := func(i int) {
+	processNode := func(i int) error {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 
@@ -263,13 +263,13 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			// spreading is applied to nodes that pass those filters.
 			// Ignore parsing errors for backwards compatibility.
 			if match, _ := requiredNodeAffinity.Match(node); !match {
-				return
+				return nil
 			}
 		}
 
 		// Ensure current node's labels contains all topologyKeys in 'Constraints'.
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
-			return
+			return nil
 		}
 
 		tpCounts := make(map[topologyPair]int, len(constraints))
@@ -284,8 +284,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			tpCounts[pair] = count
 		}
 		tpCountsByNode[i] = tpCounts
+		return nil
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
+	if err := pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name()); err != nil {
+		return nil, err
+	}
 
 	for _, tpCounts := range tpCountsByNode {
 		for tp, count := range tpCounts {
