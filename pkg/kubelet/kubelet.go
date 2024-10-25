@@ -2795,7 +2795,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Pod is not resizing, nothing more to do here.
-		return pod, nil
+		return allocatedPod, nil
 	}
 
 	kl.podResizeMutex.Lock()
@@ -2810,9 +2810,9 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 	}
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus); err != nil {
+		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(pod))
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(allocatedPod))
 		}
 	}
 	return allocatedPod, nil
