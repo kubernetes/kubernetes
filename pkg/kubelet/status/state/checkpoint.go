@@ -19,7 +19,7 @@ package state
 import (
 	"encoding/json"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
@@ -28,16 +28,16 @@ var _ checkpointmanager.Checkpoint = &PodResourceAllocationCheckpoint{}
 
 // PodResourceAllocationCheckpoint is used to store resources allocated to a pod in checkpoint
 type PodResourceAllocationCheckpoint struct {
-	AllocationEntries   map[string]map[string]v1.ResourceList `json:"allocationEntries,omitempty"`
-	ResizeStatusEntries map[string]v1.PodResizeStatus         `json:"resizeStatusEntries,omitempty"`
-	Checksum            checksum.Checksum                     `json:"checksum"`
+	AllocationEntries   map[string]map[string]v1.ResourceRequirements `json:"allocationEntries,omitempty"`
+	ResizeStatusEntries map[string]v1.PodResizeStatus                 `json:"resizeStatusEntries,omitempty"`
+	Checksum            checksum.Checksum                             `json:"checksum"`
 }
 
 // NewPodResourceAllocationCheckpoint returns an instance of Checkpoint
 func NewPodResourceAllocationCheckpoint() *PodResourceAllocationCheckpoint {
 	//lint:ignore unexported-type-in-api user-facing error message
 	return &PodResourceAllocationCheckpoint{
-		AllocationEntries:   make(map[string]map[string]v1.ResourceList),
+		AllocationEntries:   make(map[string]map[string]v1.ResourceRequirements),
 		ResizeStatusEntries: make(map[string]v1.PodResizeStatus),
 	}
 }

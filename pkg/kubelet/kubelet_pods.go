@@ -207,6 +207,21 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
+// getAllocatedPods returns the active pods (see GetActivePods), but updates the pods to their
+// allocated state.
+func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
+	activePods := kl.GetActivePods()
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return activePods
+	}
+
+	allocatedPods := make([]*v1.Pod, len(activePods))
+	for i, pod := range activePods {
+		allocatedPods[i], _ = kl.statusManager.UpdatePodFromAllocation(pod)
+	}
+	return allocatedPods
+}
+
 // makeBlockVolumes maps the raw block devices specified in the path of the container
 // Experimental
 func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumepathhandler.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
@@ -2081,12 +2096,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		}
 		container := kubecontainer.GetContainerSpec(pod, cName)
-		// AllocatedResources values come from checkpoint. It is the source-of-truth.
-		found := false
-		status.AllocatedResources, found = kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
-		if !(container.Resources.Requests == nil && container.Resources.Limits == nil) && !found {
-			// Log error and fallback to AllocatedResources in oldStatus if it exists
-			klog.ErrorS(nil, "resource allocation not found in checkpoint store", "pod", pod.Name, "container", cName)
+
+		// Always set the status to the latest allocated resources, even if it differs from the
+		// allocation used by the current sync loop.
+		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
+		if found {
+			status.AllocatedResources = alloc.Requests
+		} else if !(container.Resources.Requests == nil && container.Resources.Limits == nil) {
+			// This case is expected for ephemeral containers.
 			if oldStatusFound {
 				status.AllocatedResources = oldStatus.AllocatedResources
 			}
@@ -2107,46 +2124,46 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 
 		// Convert Limits
-		if container.Resources.Limits != nil {
+		if alloc.Limits != nil {
 			limits = make(v1.ResourceList)
 			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
 				limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 			} else {
-				determineResource(v1.ResourceCPU, container.Resources.Limits, oldStatus.Resources.Limits, limits)
+				determineResource(v1.ResourceCPU, alloc.Limits, oldStatus.Resources.Limits, limits)
 			}
 			if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
 				limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
-				determineResource(v1.ResourceMemory, container.Resources.Limits, oldStatus.Resources.Limits, limits)
+				determineResource(v1.ResourceMemory, alloc.Limits, oldStatus.Resources.Limits, limits)
 			}
-			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
+			if ephemeralStorage, found := alloc.Limits[v1.ResourceEphemeralStorage]; found {
 				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
-			if storage, found := container.Resources.Limits[v1.ResourceStorage]; found {
+			if storage, found := alloc.Limits[v1.ResourceStorage]; found {
 				limits[v1.ResourceStorage] = storage.DeepCopy()
 			}
 
-			convertCustomResources(container.Resources.Limits, limits)
+			convertCustomResources(alloc.Limits, limits)
 		}
 		// Convert Requests
-		if status.AllocatedResources != nil {
+		if alloc.Requests != nil {
 			requests = make(v1.ResourceList)
 			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
 				requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
 			} else {
-				determineResource(v1.ResourceCPU, status.AllocatedResources, oldStatus.Resources.Requests, requests)
+				determineResource(v1.ResourceCPU, alloc.Requests, oldStatus.Resources.Requests, requests)
 			}
-			if memory, found := status.AllocatedResources[v1.ResourceMemory]; found {
+			if memory, found := alloc.Requests[v1.ResourceMemory]; found {
 				requests[v1.ResourceMemory] = memory.DeepCopy()
 			}
-			if ephemeralStorage, found := status.AllocatedResources[v1.ResourceEphemeralStorage]; found {
+			if ephemeralStorage, found := alloc.Requests[v1.ResourceEphemeralStorage]; found {
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
-			if storage, found := status.AllocatedResources[v1.ResourceStorage]; found {
+			if storage, found := alloc.Requests[v1.ResourceStorage]; found {
 				requests[v1.ResourceStorage] = storage.DeepCopy()
 			}
 
-			convertCustomResources(status.AllocatedResources, requests)
+			convertCustomResources(alloc.Requests, requests)
 		}
 
 		resources := &v1.ResourceRequirements{

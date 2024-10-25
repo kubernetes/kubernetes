@@ -21,7 +21,7 @@ import (
 	"path"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -82,7 +82,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	podAllocation := sc.cache.GetPodResourceAllocation()
 	for pod := range podAllocation {
-		checkpoint.AllocationEntries[pod] = make(map[string]v1.ResourceList)
+		checkpoint.AllocationEntries[pod] = make(map[string]v1.ResourceRequirements)
 		for container, alloc := range podAllocation[pod] {
 			checkpoint.AllocationEntries[pod][container] = alloc
 		}
@@ -103,7 +103,7 @@ func (sc *stateCheckpoint) storeState() error {
 }
 
 // GetContainerResourceAllocation returns current resources allocated to a pod's container
-func (sc *stateCheckpoint) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+func (sc *stateCheckpoint) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
 	return sc.cache.GetContainerResourceAllocation(podUID, containerName)
@@ -131,7 +131,7 @@ func (sc *stateCheckpoint) GetResizeStatus() PodResizeStatus {
 }
 
 // SetContainerResourceAllocation sets resources allocated to a pod's container
-func (sc *stateCheckpoint) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceList) error {
+func (sc *stateCheckpoint) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.SetContainerResourceAllocation(podUID, containerName, alloc)
@@ -185,8 +185,8 @@ func NewNoopStateCheckpoint() State {
 	return &noopStateCheckpoint{}
 }
 
-func (sc *noopStateCheckpoint) GetContainerResourceAllocation(_ string, _ string) (v1.ResourceList, bool) {
-	return nil, false
+func (sc *noopStateCheckpoint) GetContainerResourceAllocation(_ string, _ string) (v1.ResourceRequirements, bool) {
+	return v1.ResourceRequirements{}, false
 }
 
 func (sc *noopStateCheckpoint) GetPodResourceAllocation() PodResourceAllocation {
@@ -201,7 +201,7 @@ func (sc *noopStateCheckpoint) GetResizeStatus() PodResizeStatus {
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string, _ v1.ResourceList) error {
+func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string, _ v1.ResourceRequirements) error {
 	return nil
 }
 

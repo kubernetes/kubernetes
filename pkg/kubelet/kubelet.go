@@ -27,13 +27,13 @@ import (
 	"os"
 	"path/filepath"
 	sysruntime "runtime"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -1581,7 +1581,8 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		os.Exit(1)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.PodIsFinished, evictionMonitoringPeriod)
+	// Eviction decisions are based on the allocated (rather than desired) pod resources.
+	kl.evictionManager.Start(kl.StatsProvider, kl.getAllocatedPods, kl.PodIsFinished, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
@@ -1806,6 +1807,20 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
+	// handlePodResourcesResize updates the pod to use the allocated resources. This should come
+	// before the main business logic of SyncPod, so that a consistent view of the pod is used
+	// across the sync loop.
+	if kuberuntime.IsInPlacePodVerticalScalingAllowed(pod) {
+		// Handle pod resize here instead of doing it in HandlePodUpdates because
+		// this conveniently retries any Deferred resize requests
+		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
+		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
+		pod, err = kl.handlePodResourcesResize(pod)
+		if err != nil {
+			return false, err
+		}
+	}
+
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
@@ -1960,16 +1975,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Handle pod resize here instead of doing it in HandlePodUpdates because
-		// this conveniently retries any Deferred resize requests
-		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
-		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
-		if kl.podWorkers.CouldHaveRunningContainers(pod.UID) && !kubetypes.IsStaticPod(pod) {
-			pod = kl.handlePodResourcesResize(pod)
-		}
-	}
-
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
 	// any wait.Interrupted errors need to be filtered from result and bypass the reasonCache - cancelling
@@ -1992,8 +1997,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
-		// While resize is in progress, periodically call PLEG to update pod cache
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, podStatus) {
+		// While resize is in progress, periodically request the latest status from the runtime via
+		// the PLEG. This is necessary since ordinarily pod status is only fetched when a container
+		// undergoes a state transition.
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
 			klog.ErrorS(err, "Failed to update pod cache", "pod", klog.KObj(pod))
@@ -2304,23 +2311,14 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 // The function returns a boolean value indicating whether the pod
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
-func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+// allocatedPods should represent the pods that have already been admitted, along with their
+// admitted (allocated) resources.
+func (kl *Kubelet) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
 	// TODO: out of resource eviction should have a pod admitter call-out
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: pods}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Use allocated resources values from checkpoint store (source of truth) to determine fit
-		otherPods := make([]*v1.Pod, 0, len(pods))
-		for _, p := range pods {
-			op := p.DeepCopy()
-			kl.updateContainerResourceAllocation(op)
-
-			otherPods = append(otherPods, op)
-		}
-		attrs.OtherPods = otherPods
-	}
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range kl.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 
@@ -2560,7 +2558,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		defer kl.podResizeMutex.Unlock()
 	}
 	for _, pod := range pods {
-		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
 		// not exist in the pod manager, it means that it has been deleted in
@@ -2590,29 +2587,30 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// we simply avoid doing any work.
 		// We also do not try to admit the pod that is already in terminated state.
 		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
-			// We failed pods that we rejected, so activePods include all admitted
+			// We failed pods that we rejected, so allocatedPods include all admitted
 			// pods that are alive.
-			activePods := kl.filterOutInactivePods(existingPods)
+			allocatedPods := kl.getAllocatedPods()
+			// Filter out the pod being evaluated.
+			allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-				podCopy := pod.DeepCopy()
-				kl.updateContainerResourceAllocation(podCopy)
+				allocatedPod, _ := kl.statusManager.UpdatePodFromAllocation(pod)
 
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
+				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.statusManager.SetPodAllocation(podCopy); err != nil {
+				if err := kl.statusManager.SetPodAllocation(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
 			} else {
 				// Check if we can admit the pod; if not, reject it.
-				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
+				if ok, reason, message := kl.canAdmitPod(allocatedPods, pod); !ok {
 					kl.rejectPod(pod, reason, message)
 					continue
 				}
@@ -2624,22 +2622,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			UpdateType: kubetypes.SyncPodCreate,
 			StartTime:  start,
 		})
-	}
-}
-
-// updateContainerResourceAllocation updates AllocatedResources values
-// (for cpu & memory) from checkpoint store
-func (kl *Kubelet) updateContainerResourceAllocation(pod *v1.Pod) {
-	for _, c := range pod.Spec.Containers {
-		allocatedResources, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), c.Name)
-		if c.Resources.Requests != nil && found {
-			if _, ok := allocatedResources[v1.ResourceCPU]; ok {
-				c.Resources.Requests[v1.ResourceCPU] = allocatedResources[v1.ResourceCPU]
-			}
-			if _, ok := allocatedResources[v1.ResourceMemory]; ok {
-				c.Resources.Requests[v1.ResourceMemory] = allocatedResources[v1.ResourceMemory]
-			}
-		}
 	}
 }
 
@@ -2772,117 +2754,87 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	}
 }
 
-func isPodResizeInProgress(pod *v1.Pod, podStatus *v1.PodStatus) bool {
+func isPodResizeInProgress(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	for _, c := range pod.Spec.Containers {
-		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			if cs.Resources == nil {
+		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
+			if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
 				continue
 			}
-			if !cmp.Equal(c.Resources.Limits, cs.Resources.Limits) || !cmp.Equal(cs.AllocatedResources, cs.Resources.Requests) {
-				return true
+			if c.Resources.Requests != nil {
+				if cs.Resources.CPURequest != nil && !cs.Resources.CPURequest.Equal(*c.Resources.Requests.Cpu()) {
+					return true
+				}
+			}
+			if c.Resources.Limits != nil {
+				if cs.Resources.CPULimit != nil && !cs.Resources.CPULimit.Equal(*c.Resources.Limits.Cpu()) {
+					return true
+				}
+				if cs.Resources.MemoryLimit != nil && !cs.Resources.MemoryLimit.Equal(*c.Resources.Limits.Memory()) {
+					return true
+				}
 			}
 		}
 	}
 	return false
 }
 
-func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus) {
-	var otherActivePods []*v1.Pod
-
+// canResizePod determines if the requested resize is currently feasible.
+// pod should hold the desired (pre-allocated) spec.
+// Returns true if the resize can proceed.
+func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		klog.ErrorS(err, "getNodeAnyway function failed")
-		return false, nil, ""
+		return false, ""
 	}
-	podCopy := pod.DeepCopy()
 	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
 	memAvailable := node.Status.Allocatable.Memory().Value()
-	cpuRequests := resource.GetResourceRequest(podCopy, v1.ResourceCPU)
-	memRequests := resource.GetResourceRequest(podCopy, v1.ResourceMemory)
+	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
+	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", podCopy.Name)
-		return false, podCopy, v1.PodResizeStatusInfeasible
+		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", klog.KObj(pod))
+		return false, v1.PodResizeStatusInfeasible
 	}
 
 	// Treat the existing pod needing resize as a new pod with desired resources seeking admit.
 	// If desired resources don't fit, pod continues to run with currently allocated resources.
-	activePods := kl.GetActivePods()
-	for _, p := range activePods {
-		if p.UID != pod.UID {
-			otherActivePods = append(otherActivePods, p)
-		}
-	}
+	allocatedPods := kl.getAllocatedPods()
+	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
-	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, podCopy); !ok {
+	if ok, failReason, failMessage := kl.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
-		klog.V(3).InfoS("Resize cannot be accommodated", "pod", podCopy.Name, "reason", failReason, "message", failMessage)
-		return false, podCopy, v1.PodResizeStatusDeferred
+		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
+		return false, v1.PodResizeStatusDeferred
 	}
 
-	for _, container := range podCopy.Spec.Containers {
-		idx, found := podutil.GetIndexOfContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
-		if found {
-			for rName, rQuantity := range container.Resources.Requests {
-				podCopy.Status.ContainerStatuses[idx].AllocatedResources[rName] = rQuantity
-			}
-		}
-	}
-	return true, podCopy, v1.PodResizeStatusInProgress
+	return true, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
-	if pod.Status.Phase != v1.PodRunning {
-		return pod
-	}
-	podResized := false
-	for _, container := range pod.Spec.Containers {
-		if len(container.Resources.Requests) == 0 {
-			continue
-		}
-		containerStatus, found := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name)
-		if !found {
-			klog.V(5).InfoS("ContainerStatus not found", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if len(containerStatus.AllocatedResources) != len(container.Resources.Requests) {
-			klog.V(5).InfoS("ContainerStatus.AllocatedResources length mismatch", "pod", pod.Name, "container", container.Name)
-			break
-		}
-		if !cmp.Equal(container.Resources.Requests, containerStatus.AllocatedResources) {
-			podResized = true
-			break
-		}
-	}
-	if !podResized {
-		return pod
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
+	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
+	if !updated {
+		// Pod is not resizing, nothing more to do here.
+		return allocatedPod, nil
 	}
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
-	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
-	if updatedPod == nil {
-		return pod
-	}
+	fit, resizeStatus := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.statusManager.SetPodAllocation(updatedPod); err != nil {
-			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(updatedPod))
-			return pod
+		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
+			return nil, err
 		}
+		allocatedPod = pod
 	}
 	if resizeStatus != "" {
 		// Save resize decision to checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(updatedPod.UID, resizeStatus); err != nil {
+		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, resizeStatus); err != nil {
 			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(updatedPod))
-			return pod
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(allocatedPod))
 		}
-		updatedPod.Status.Resize = resizeStatus
 	}
-	kl.podManager.UpdatePod(updatedPod)
-	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
-	return updatedPod
+	return allocatedPod, nil
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
