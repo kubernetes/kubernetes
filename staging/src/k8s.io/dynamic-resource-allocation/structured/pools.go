@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
@@ -30,8 +31,9 @@ import (
 // GatherPools collects information about all resource pools which provide
 // devices that are accessible from the given node.
 //
-// Out-dated slices are silently ignored. Pools may be incomplete, which is
-// recorded in the result.
+// Out-dated slices are silently ignored. Pools may be incomplete (not all
+// required slices available) or invalid (for example, device names not unique).
+// Both is recorded in the result.
 func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceLister, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 
@@ -75,6 +77,7 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 	result := make([]*Pool, 0, len(pools))
 	for _, pool := range pools {
 		pool.IsIncomplete = int64(len(pool.Slices)) != pool.Slices[0].Spec.Pool.ResourceSliceCount
+		pool.IsInvalid, pool.InvalidReason = poolIsInvalid(pool)
 		result = append(result, pool)
 	}
 
@@ -101,17 +104,32 @@ func addSlice(pools map[PoolID]*Pool, slice *resourceapi.ResourceSlice) {
 
 	if slice.Spec.Pool.Generation > pool.Slices[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pool.Slices = []*resourceapi.ResourceSlice{slice}
+		pool.Slices = nil
 	}
 
 	// Add to pool.
 	pool.Slices = append(pool.Slices, slice)
 }
 
+func poolIsInvalid(pool *Pool) (bool, string) {
+	devices := sets.New[string]()
+	for _, slice := range pool.Slices {
+		for _, device := range slice.Spec.Devices {
+			if devices.Has(device.Name) {
+				return true, fmt.Sprintf("duplicate device name %s", device.Name)
+			}
+			devices.Insert(device.Name)
+		}
+	}
+	return false, ""
+}
+
 type Pool struct {
 	PoolID
-	IsIncomplete bool
-	Slices       []*resourceapi.ResourceSlice
+	IsIncomplete  bool
+	IsInvalid     bool
+	InvalidReason string
+	Slices        []*resourceapi.ResourceSlice
 }
 
 type PoolID struct {

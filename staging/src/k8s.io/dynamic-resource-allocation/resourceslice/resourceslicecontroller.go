@@ -578,6 +578,20 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 					Devices:      pool.Slices[i].Devices,
 				},
 			}
+
+			// It can happen that we create a missing slice, some
+			// other change than the create causes another sync of
+			// the pool, and then a second slice for the same set
+			// of devices gets created because the controller has
+			// no copy of the first slice instance in its informer
+			// cache yet.
+			//
+			// This is not a problem: a client will either see one
+			// of the two slices and use it or see both and do
+			// nothing because of the duplicated device IDs.
+			//
+			// To avoid creating a second slice, we would have to use a
+			// https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache.
 			logger.V(5).Info("Creating new resource slice")
 			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create resource slice: %w", err)
