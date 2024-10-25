@@ -18,8 +18,12 @@ package validatingadmissionpolicybinding
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -31,17 +35,16 @@ import (
 
 func TestAuthorization(t *testing.T) {
 	for _, tc := range []struct {
-		name             string
-		userInfo         user.Info
-		auth             AuthFunc
-		policyGetter     PolicyGetterFunc
-		resourceResolver resolver.ResourceResolverFunc
-		expectErr        bool
+		name              string
+		userInfo          user.Info
+		auth              AuthFunc
+		policyGetter      PolicyGetterFunc
+		resourceResolver  resolver.ResourceResolverFunc
+		expectErrContains string
 	}{
 		{
-			name:      "superuser",
-			userInfo:  &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
-			expectErr: false, // success despite always-denying authorizer
+			name:     "superuser", // success despite always-denying authorizer
+			userInfo: &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
 			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 				return authorizer.DecisionDeny, "", nil
 			},
@@ -70,7 +73,6 @@ func TestAuthorization(t *testing.T) {
 					Resource: "configmaps",
 				}, nil
 			},
-			expectErr: false,
 		},
 		{
 			name:     "denied",
@@ -96,7 +98,76 @@ func TestAuthorization(t *testing.T) {
 					Resource: "params",
 				}, nil
 			},
-			expectErr: true,
+			expectErrContains: "permission on the object referenced by paramRef",
+		},
+		{
+			name:     "unable to parse paramRef",
+			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+				if a.GetResource() == "configmaps" {
+					return authorizer.DecisionAllow, "", nil
+				}
+				return authorizer.DecisionDeny, "", nil
+			},
+			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
+				return &admissionregistration.ValidatingAdmissionPolicy{
+					ObjectMeta: metav1.ObjectMeta{Name: "replicalimit-policy.example.com"},
+					Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+						ParamKind: &admissionregistration.ParamKind{Kind: "ConfigMap", APIVersion: "invalid"},
+					},
+				}, nil
+			},
+			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+				return schema.GroupVersionResource{
+					Group:    "",
+					Version:  "v1",
+					Resource: "configmaps",
+				}, nil
+			},
+			expectErrContains: "unable to parse paramKind &{foo.example.com/v1 Params} to determine minimum required permissions",
+		},
+		{
+			name:     "unable to resolve param",
+			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+				if a.GetResource() == "configmaps" {
+					return authorizer.DecisionAllow, "", nil
+				}
+				return authorizer.DecisionDeny, "", nil
+			},
+			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
+				return &admissionregistration.ValidatingAdmissionPolicy{
+					ObjectMeta: metav1.ObjectMeta{Name: "replicalimit-policy.example.com"},
+					Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+						ParamKind: &admissionregistration.ParamKind{Kind: "Params", APIVersion: "foo.example.com/v1"},
+					},
+				}, nil
+			},
+			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+				return schema.GroupVersionResource{}, &meta.NoKindMatchError{GroupKind: gvk.GroupKind(), SearchedVersions: []string{gvk.Version}}
+			},
+			expectErrContains: "unable to resolve paramKind &{foo.example.com/v1 Params} to determine minimum required permissions",
+		},
+		{
+			name:     "unable to get policy",
+			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+				if a.GetResource() == "configmaps" {
+					return authorizer.DecisionAllow, "", nil
+				}
+				return authorizer.DecisionDeny, "", nil
+			},
+			policyGetter: func(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
+				return nil, fmt.Errorf("no such policy")
+			},
+			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+				return schema.GroupVersionResource{
+					Group:    "",
+					Version:  "v1",
+					Resource: "configmaps",
+				}, nil
+			},
+			expectErrContains: "unable to get policy replicalimit-policy.example.com to determine minimum required permissions",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -105,8 +176,8 @@ func TestAuthorization(t *testing.T) {
 				ctx := request.WithUser(context.Background(), tc.userInfo)
 				for _, obj := range validPolicyBindings() {
 					errs := strategy.Validate(ctx, obj)
-					if len(errs) > 0 != tc.expectErr {
-						t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+					if len(errs) > 0 && !strings.Contains(errors.Join(errs.ToAggregate().Errors()...).Error(), tc.expectErrContains) {
+						t.Errorf("expected error to contain: %v but got error: %v", tc.expectErrContains, errs)
 					}
 				}
 			})
@@ -140,8 +211,8 @@ func TestAuthorization(t *testing.T) {
 						}
 					}
 					errs := strategy.ValidateUpdate(ctx, obj, objWithChangedParamRef)
-					if len(errs) > 0 != tc.expectErr {
-						t.Errorf("expected error: %v but got error: %v", tc.expectErr, errs)
+					if len(errs) > 0 && !strings.Contains(errors.Join(errs.ToAggregate().Errors()...).Error(), tc.expectErrContains) {
+						t.Errorf("expected error to contain: %v but got error: %v", tc.expectErrContains, errs)
 					}
 				}
 			})
