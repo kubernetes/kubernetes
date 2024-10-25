@@ -831,17 +831,28 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
-		// Drop Resize, AllocatedResources, and Resources fields
-		dropResourcesFields := func(csl []api.ContainerStatus) {
+		// Drop Resize and Resources fields
+		dropResourcesField := func(csl []api.ContainerStatus) {
 			for i := range csl {
-				csl[i].AllocatedResources = nil
 				csl[i].Resources = nil
 			}
 		}
-		dropResourcesFields(podStatus.ContainerStatuses)
-		dropResourcesFields(podStatus.InitContainerStatuses)
-		dropResourcesFields(podStatus.EphemeralContainerStatuses)
+		dropResourcesField(podStatus.ContainerStatuses)
+		dropResourcesField(podStatus.InitContainerStatuses)
+		dropResourcesField(podStatus.EphemeralContainerStatuses)
 		podStatus.Resize = ""
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
+		// Drop AllocatedResources field
+		dropAllocatedResourcesField := func(csl []api.ContainerStatus) {
+			for i := range csl {
+				csl[i].AllocatedResources = nil
+			}
+		}
+		dropAllocatedResourcesField(podStatus.ContainerStatuses)
+		dropAllocatedResourcesField(podStatus.InitContainerStatuses)
+		dropAllocatedResourcesField(podStatus.EphemeralContainerStatuses)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {

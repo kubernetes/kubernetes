@@ -2638,56 +2638,69 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasInPlaceVerticalScaling, oldPod := oldPodInfo.hasInPlaceVerticalScaling, oldPodInfo.pod()
-				newPodHasInPlaceVerticalScaling, newPod := newPodInfo.hasInPlaceVerticalScaling, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
+	for _, ippvsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InPlacePodVerticalScaling=%t", ippvsEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, ippvsEnabled)
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, enabled)
+			for _, allocatedStatusEnabled := range []bool{true, false} {
+				t.Run(fmt.Sprintf("AllocatedStatus=%t", allocatedStatusEnabled), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, allocatedStatusEnabled)
 
-					var oldPodSpec *api.PodSpec
-					var oldPodStatus *api.PodStatus
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-						oldPodStatus = &oldPod.Status
+					for _, oldPodInfo := range podInfo {
+						for _, newPodInfo := range podInfo {
+							oldPodHasInPlaceVerticalScaling, oldPod := oldPodInfo.hasInPlaceVerticalScaling, oldPodInfo.pod()
+							newPodHasInPlaceVerticalScaling, newPod := newPodInfo.hasInPlaceVerticalScaling, newPodInfo.pod()
+							if newPod == nil {
+								continue
+							}
+
+							t.Run(fmt.Sprintf("old pod %v, new pod %v", oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+								var oldPodSpec *api.PodSpec
+								var oldPodStatus *api.PodStatus
+								if oldPod != nil {
+									oldPodSpec = &oldPod.Spec
+									oldPodStatus = &oldPod.Status
+								}
+								dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+								dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+
+								// old pod should never be changed
+								if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+									t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+								}
+
+								switch {
+								case ippvsEnabled || oldPodHasInPlaceVerticalScaling:
+									// new pod shouldn't change if feature enabled or if old pod has ResizePolicy set
+									expected := newPodInfo.pod()
+									if !ippvsEnabled || !allocatedStatusEnabled {
+										expected.Status.ContainerStatuses[0].AllocatedResources = nil
+									}
+									if !reflect.DeepEqual(newPod, expected) {
+										t.Errorf("new pod changed: %v", cmp.Diff(newPod, expected))
+									}
+								case newPodHasInPlaceVerticalScaling:
+									// new pod should be changed
+									if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+										t.Errorf("new pod was not changed")
+									}
+									// new pod should not have ResizePolicy
+									if !reflect.DeepEqual(newPod, podWithoutInPlaceVerticalScaling()) {
+										t.Errorf("new pod has ResizePolicy: %v", cmp.Diff(newPod, podWithoutInPlaceVerticalScaling()))
+									}
+								default:
+									// new pod should not need to be changed
+									if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+										t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+									}
+								}
+							})
+						}
 					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-					dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
 
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasInPlaceVerticalScaling:
-						// new pod shouldn't change if feature enabled or if old pod has ResizePolicy set
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasInPlaceVerticalScaling:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have ResizePolicy
-						if !reflect.DeepEqual(newPod, podWithoutInPlaceVerticalScaling()) {
-							t.Errorf("new pod has ResizePolicy: %v", cmp.Diff(newPod, podWithoutInPlaceVerticalScaling()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
 				})
 			}
-		}
+		})
 	}
 }
 

@@ -2095,18 +2095,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				}
 			}
 		}
-		container := kubecontainer.GetContainerSpec(pod, cName)
 
 		// Always set the status to the latest allocated resources, even if it differs from the
 		// allocation used by the current sync loop.
 		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
-		if found {
-			status.AllocatedResources = alloc.Requests
-		} else if !(container.Resources.Requests == nil && container.Resources.Limits == nil) {
-			// This case is expected for ephemeral containers.
-			if oldStatusFound {
-				status.AllocatedResources = oldStatus.AllocatedResources
-			}
+		if !found {
+			// This case is expected for non-resizeable containers.
+			// Don't set status.Resources in this case.
+			return nil
 		}
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
@@ -2341,6 +2337,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			if status.State.Running != nil {
 				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
+				if alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName); found {
+					status.AllocatedResources = alloc.Requests
+				}
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
