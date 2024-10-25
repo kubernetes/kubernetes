@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -466,6 +467,43 @@ done`}
 		gotIndexes := succeededIndexes.List()
 		wantIndexes := []int{0, 1, 2, 3}
 		gomega.Expect(gotIndexes).To(gomega.Equal(wantIndexes), "expected completed indexes %s, but got %s", wantIndexes, gotIndexes)
+	})
+
+	/*
+		  Release: v1.32
+			Testname: Ensure Pods of an Indexed Job get a unique index for PodIndexLabel key.
+			Description: Create an Indexed job. Job MUST complete successfully.
+			Ensure that created pods have completion index label.
+	*/
+	// TODO: once this test is stable, squash the functionality into pre-existing conformance test called "should create
+	//   pods for an Indexed job with completion indexes and specified hostname" earlier in this file.
+	framework.It("should create pods with completion indexes for an Indexed Job", feature.PodIndexLabel, func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
+		ginkgo.By("Creating Indexed job")
+		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring all pods have the required index labels")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		succeededIndexes := sets.NewInt()
+		for _, pod := range pods.Items {
+			ix, err := strconv.Atoi(pod.Labels[batchv1.JobCompletionIndexAnnotation])
+			framework.ExpectNoError(err, "failed obtaining completion index in namespace: %s for pod: %s", pod.Namespace, pod.Name)
+			succeededIndexes.Insert(ix)
+		}
+		gotIndexes := succeededIndexes.List()
+		wantIndexes := []int{0, 1, 2, 3}
+		gomega.Expect(gotIndexes).To(gomega.Equal(wantIndexes), "expected completed indexes in namespace: %s for job: %s", job.Namespace, job.Name)
 	})
 
 	/*

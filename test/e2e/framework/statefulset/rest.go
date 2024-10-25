@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -230,6 +232,26 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 			expectedServiceName, ss.Spec.ServiceName)
 	}
 
+	return nil
+}
+
+// CheckPodIndexLabel asserts that the pods for ss have expected index label and values.
+func CheckPodIndexLabel(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) error {
+	pods := GetPodList(ctx, c, ss)
+	labelIndices := sets.NewInt()
+	for _, pod := range pods.Items {
+		ix, err := strconv.Atoi(pod.Labels[appsv1.PodIndexLabel])
+		if err != nil {
+			return err
+		}
+		labelIndices.Insert(ix)
+	}
+	wantIndexes := []int{0, 1, 2}
+	gotIndexes := labelIndices.List()
+
+	if !reflect.DeepEqual(gotIndexes, wantIndexes) {
+		return fmt.Errorf("pod index labels are not as expected, got: %v, want: %v", gotIndexes, wantIndexes)
+	}
 	return nil
 }
 
