@@ -28,8 +28,6 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
-	pointer "k8s.io/utils/ptr"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,17 +46,18 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pointer "k8s.io/utils/ptr"
 )
 
-type condition struct {
+type testCondition struct {
 	Expression string
 }
 
-func (c *condition) GetExpression() string {
-	return c.Expression
+func (tc *testCondition) GetExpression() string {
+	return tc.Expression
 }
 
-func (v *condition) ReturnTypes() []*celgo.Type {
+func (tc *testCondition) ReturnTypes() []*celgo.Type {
 	return []*celgo.Type{celgo.BoolType}
 }
 
@@ -71,10 +70,10 @@ func TestCompile(t *testing.T) {
 		{
 			name: "invalid syntax",
 			validation: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "1 < 'asdf'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "1 < 2",
 				},
 			},
@@ -85,13 +84,13 @@ func TestCompile(t *testing.T) {
 		{
 			name: "valid syntax",
 			validation: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "1 < 2",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.spec.string.matches('[0-9]+')",
 				},
-				&condition{
+				&testCondition{
 					Expression: "request.kind.group == 'example.com' && request.kind.version == 'v1' && request.kind.kind == 'Fake'",
 				},
 			},
@@ -100,13 +99,13 @@ func TestCompile(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))}
-			e := c.Compile(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: true}, environment.NewExpressions)
+			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))}
+			e := c.CompileCondition(tc.validation, OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false, StrictCost: true}, environment.NewExpressions)
 			if e == nil {
 				t.Fatalf("unexpected nil validator")
 			}
 			validations := tc.validation
-			CompilationResults := e.(*filter).compilationResults
+			CompilationResults := e.(*condition).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
 			meets := make([]bool, len(validations))
@@ -131,7 +130,7 @@ func TestCompile(t *testing.T) {
 	}
 }
 
-func TestFilter(t *testing.T) {
+func TestCondition(t *testing.T) {
 	simpleLabelSelector, err := labels.NewRequirement("apple", selection.Equals, []string{"banana"})
 	if err != nil {
 		panic(err)
@@ -205,7 +204,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "valid syntax for object",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets) && object.subsets.size() < 2",
 				},
 			},
@@ -220,7 +219,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "valid syntax for metadata",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "object.metadata.name == 'endpoints1'",
 				},
 			},
@@ -235,10 +234,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "valid syntax for oldObject",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject == null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object != null",
 				},
 			},
@@ -256,7 +255,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "valid syntax for request",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "request.operation == 'CREATE'",
 				},
 			},
@@ -271,7 +270,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "valid syntax for configMap",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "request.namespace != params.data.fakeString",
 				},
 			},
@@ -287,7 +286,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test failure",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -310,10 +309,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test failure with multiple validations",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets)",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -332,10 +331,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test failure policy with multiple failed validations",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject != null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -354,10 +353,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test Object null in delete",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject != null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object == null",
 				},
 			},
@@ -376,7 +375,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test runtime error",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject.x == 100",
 				},
 			},
@@ -392,7 +391,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test against crd param",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() < params.spec.testSize",
 				},
 			},
@@ -408,10 +407,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test compile failure",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "fail to compile test",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > params.spec.testSize",
 				},
 			},
@@ -430,7 +429,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test pod",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "object.spec.nodeName == 'testnode'",
 				},
 			},
@@ -446,7 +445,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test deny paramKind without paramRef",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "params != null",
 				},
 			},
@@ -461,7 +460,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test allow paramKind without paramRef",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "params == null",
 				},
 			},
@@ -477,10 +476,10 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer allow resource check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
 				},
 			},
@@ -503,7 +502,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer error using fieldSelector with 1.30 compatibility",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
 			},
@@ -535,7 +534,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer allow resource check with all fields",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
 			},
@@ -567,7 +566,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer allow resource check with parse failures",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo badoperator bar').labelSelector('apple badoperator banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
 			},
@@ -595,7 +594,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer allow resource check with all fields, without gate",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
 			},
@@ -621,7 +620,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer not allowed resource check one incorrect field",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 
 					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
@@ -646,7 +645,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer reason",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').reason() == 'fake reason'",
 				},
 			},
@@ -661,13 +660,13 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer error",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').errored()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').error() == 'fake authz error'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -688,7 +687,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer allow path check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.path('/healthz').check('get').allowed()",
 				},
 			},
@@ -706,7 +705,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test authorizer decision is denied path check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.path('/healthz').check('get').allowed() == false",
 				},
 			},
@@ -721,7 +720,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test request resource authorizer allow check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.requestResource.check('custom-verb').allowed()",
 				},
 			},
@@ -745,7 +744,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test subresource request resource authorizer allow check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.requestResource.check('custom-verb').allowed()",
 				},
 			},
@@ -769,7 +768,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test serviceAccount authorizer allow check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "authorizer.serviceAccount('default', 'test-serviceaccount').group('').resource('endpoints').namespace('default').name('endpoints1').check('custom-verb').allowed()",
 				},
 			},
@@ -796,7 +795,7 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test perCallLimit exceed",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() < params.spec.testSize",
 				},
 			},
@@ -813,28 +812,28 @@ func TestFilter(t *testing.T) {
 		{
 			name: "test namespaceObject",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "namespaceObject.metadata.name == 'test'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "'env' in namespaceObject.metadata.labels && namespaceObject.metadata.labels.env == 'test'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "('fake' in namespaceObject.metadata.labels) && namespaceObject.metadata.labels.fake == 'test'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "namespaceObject.spec.finalizers[0] == 'kubernetes'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "namespaceObject.status.phase == 'Active'",
 				},
-				&condition{
+				&testCondition{
 					Expression: "size(namespaceObject.metadata.managedFields) == 1",
 				},
-				&condition{
+				&testCondition{
 					Expression: "size(namespaceObject.metadata.ownerReferences) == 1",
 				},
-				&condition{
+				&testCondition{
 					Expression: "'env' in namespaceObject.metadata.annotations",
 				},
 			},
@@ -891,14 +890,14 @@ func TestFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			c := NewFilterCompiler(env)
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil, StrictCost: tc.strictCost}, environment.NewExpressions)
+			c := NewConditionCompiler(env)
+			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil, StrictCost: tc.strictCost}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
 
 			validations := tc.validations
-			CompilationResults := f.(*filter).compilationResults
+			CompilationResults := f.(*condition).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
 			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
@@ -960,10 +959,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "expression exceed RuntimeCELCostBudget at fist expression",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets) && object.subsets.size() < 2",
 				},
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets)",
 				},
 			},
@@ -975,10 +974,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "expression exceed RuntimeCELCostBudget at last expression",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets) && object.subsets.size() < 2",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -991,10 +990,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "test RuntimeCELCostBudge is not exceed",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject != null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -1008,10 +1007,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "test RuntimeCELCostBudge exactly covers",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject != null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
 			},
@@ -1025,13 +1024,13 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "test RuntimeCELCostBudge exactly covers then constant",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "oldObject != null",
 				},
-				&condition{
+				&testCondition{
 					Expression: "object.subsets.size() > 2",
 				},
-				&condition{
+				&testCondition{
 					Expression: "true", // zero cost
 				},
 			},
@@ -1045,7 +1044,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: authz check",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -1059,7 +1058,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: isSorted()",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "[1,2,3,4].isSorted()",
 				},
 			},
@@ -1072,7 +1071,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: url",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "url('https:://kubernetes.io/').getHostname() == 'kubernetes.io'",
 				},
 			},
@@ -1085,7 +1084,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: split",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size('abc 123 def 123'.split(' ')) > 0",
 				},
 			},
@@ -1098,7 +1097,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: join",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
 				},
 			},
@@ -1111,7 +1110,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: find",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size('abc 123 def 123'.find('123')) > 0",
 				},
 			},
@@ -1124,7 +1123,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "Extended library cost: quantity",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "quantity(\"200M\") == quantity(\"0.2G\") && quantity(\"0.2G\") == quantity(\"200M\")",
 				},
 			},
@@ -1137,10 +1136,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: expression exceed RuntimeCELCostBudget at fist expression",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "has(object.subsets)",
 				},
 			},
@@ -1154,10 +1153,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: expression exceed RuntimeCELCostBudget at last expression",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -1171,10 +1170,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: test RuntimeCELCostBudge is not exceed",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -1190,10 +1189,10 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: test RuntimeCELCostBudge exactly covers",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -1209,7 +1208,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: per call limit exceeds",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "!authorizer.group('').resource('endpoints').check('create').allowed() && !authorizer.group('').resource('endpoints').check('create').allowed() && !authorizer.group('').resource('endpoints').check('create').allowed()",
 				},
 			},
@@ -1224,7 +1223,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: isSorted()",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "[1,2,3,4].isSorted()",
 				},
 			},
@@ -1238,7 +1237,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: url",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "url('https:://kubernetes.io/').getHostname() == 'kubernetes.io'",
 				},
 			},
@@ -1252,7 +1251,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: split",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size('abc 123 def 123'.split(' ')) > 0",
 				},
 			},
@@ -1266,7 +1265,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: join",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
 				},
 			},
@@ -1280,7 +1279,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: find",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "size('abc 123 def 123'.find('123')) > 0",
 				},
 			},
@@ -1294,7 +1293,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		{
 			name: "With StrictCostEnforcementForVAP enabled: Extended library cost: quantity",
 			validations: []ExpressionAccessor{
-				&condition{
+				&testCondition{
 					Expression: "quantity(\"200M\") == quantity(\"0.2G\") && quantity(\"0.2G\") == quantity(\"200M\")",
 				},
 			},
@@ -1309,13 +1308,13 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := filterCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), tc.enableStrictCostEnforcement))}
-			f := c.Compile(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: true, StrictCost: tc.enableStrictCostEnforcement}, environment.NewExpressions)
+			c := conditionCompiler{compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), tc.enableStrictCostEnforcement))}
+			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: true, StrictCost: tc.enableStrictCostEnforcement}, environment.NewExpressions)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}
 			validations := tc.validations
-			CompilationResults := f.(*filter).compilationResults
+			CompilationResults := f.(*condition).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
 			versionedAttr, err := admission.NewVersionedAttributes(tc.attributes, tc.attributes.GetKind(), newObjectInterfacesForTest())
@@ -1476,7 +1475,7 @@ func TestCompilationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			e := filter{
+			e := condition{
 				compilationResults: tc.results,
 			}
 			compilationErrors := e.CompilationErrors()
