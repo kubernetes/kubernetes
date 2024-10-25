@@ -260,8 +260,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		m.dedicatedImageFs = &hasImageFs
 		splitContainerImageFs, splitErr := diskInfoProvider.HasDedicatedContainerFs(ctx)
 		if splitErr != nil {
-			klog.ErrorS(splitErr, "Eviction manager: failed to get HasDedicatedContainerFs")
-			return nil, fmt.Errorf("eviction manager: failed to get HasDedicatedContainerFs: %w", splitErr)
+			klog.ErrorS(splitErr, "eviction manager: failed to check if we have separate container filesystem. Ignoring.")
 		}
 
 		// If we are a split filesystem but the feature is turned off
