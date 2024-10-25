@@ -160,6 +160,9 @@ func NewRequest(c *RESTClient) *Request {
 	contentTypeNotSet := len(contentConfig.ContentType) == 0
 	if contentTypeNotSet {
 		contentConfig.ContentType = "application/json"
+		if clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) && clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientPrefersCBOR) {
+			contentConfig.ContentType = "application/cbor"
+		}
 	}
 
 	r := &Request{
