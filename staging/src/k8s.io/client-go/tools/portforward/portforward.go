@@ -406,6 +406,11 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	case <-remoteDone:
 	case <-localError:
 	}
+	/*
+		reset dataStream to discard any unsent data, preventing port forwarding from being blocked.
+		we must reset dataStream before waiting on errorChan, otherwise, the blocking data will affect errorStream and cause <-errorChan to block indefinitely.
+	*/
+	_ = dataStream.Reset()
 
 	// always expect something on errorChan (it may be nil)
 	err = <-errorChan
