@@ -73,11 +73,15 @@ type Controller struct {
 	resources *DriverResources
 }
 
+// +k8s:deepcopy-gen=true
+
 // DriverResources is a complete description of all resources synchronized by the controller.
 type DriverResources struct {
 	// Each driver may manage different resource pools.
 	Pools map[string]Pool
 }
+
+// +k8s:deepcopy-gen=true
 
 // Pool is the collection of devices belonging to the same pool.
 type Pool struct {
@@ -93,6 +97,8 @@ type Pool struct {
 	// Device names must be unique inside the pool.
 	Devices []resourceapi.Device
 }
+
+// +k8s:deepcopy-gen=true
 
 // Owner is the resource which is meant to be listed as owner of the resource slices.
 // For a node the UID may be left blank. The controller will look it up automatically.
