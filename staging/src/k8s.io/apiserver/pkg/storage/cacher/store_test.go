@@ -28,7 +28,17 @@ import (
 )
 
 func TestStoreSingleKey(t *testing.T) {
-	store := newStoreIndexer(nil)
+	t.Run("cache.Indexer", func(t *testing.T) {
+		store := newStoreIndexer(testStoreIndexers())
+		testStoreSingleKey(t, store)
+	})
+	t.Run("btree", func(t *testing.T) {
+		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), 32)
+		testStoreSingleKey(t, store)
+	})
+}
+
+func testStoreSingleKey(t *testing.T, store storeIndexer) {
 	assertStoreEmpty(t, store, "foo")
 
 	require.NoError(t, store.Add(testStorageElement("foo", "bar", 1)))
@@ -50,7 +60,17 @@ func TestStoreSingleKey(t *testing.T) {
 }
 
 func TestStoreIndexerSingleKey(t *testing.T) {
-	store := newStoreIndexer(testStoreIndexers())
+	t.Run("cache.Indexer", func(t *testing.T) {
+		store := newStoreIndexer(testStoreIndexers())
+		testStoreIndexerSingleKey(t, store)
+	})
+	t.Run("btree", func(t *testing.T) {
+		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), 32)
+		testStoreIndexerSingleKey(t, store)
+	})
+}
+
+func testStoreIndexerSingleKey(t *testing.T, store storeIndexer) {
 	items, err := store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
 	assert.Empty(t, items)

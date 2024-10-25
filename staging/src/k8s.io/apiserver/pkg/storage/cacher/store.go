@@ -19,6 +19,8 @@ package cacher
 import (
 	"fmt"
 
+	"github.com/google/btree"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +54,12 @@ type storeElement struct {
 	Labels labels.Set
 	Fields fields.Set
 }
+
+func (t *storeElement) Less(than btree.Item) bool {
+	return t.Key < than.(*storeElement).Key
+}
+
+var _ btree.Item = (*storeElement)(nil)
 
 func storeElementKey(obj interface{}) (string, error) {
 	elem, ok := obj.(*storeElement)
