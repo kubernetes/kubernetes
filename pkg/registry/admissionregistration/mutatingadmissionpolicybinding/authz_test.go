@@ -101,6 +101,28 @@ func TestAuthorization(t *testing.T) {
 			expectErrContains: "permission on the object referenced by paramRef",
 		},
 		{
+			name:     "deny but relevant fields not updated",
+			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
+			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+				return authorizer.DecisionDeny, "", nil
+			},
+			policyGetter: func(ctx context.Context, name string) (*admissionregistration.MutatingAdmissionPolicy, error) {
+				return &admissionregistration.MutatingAdmissionPolicy{
+					ObjectMeta: metav1.ObjectMeta{Name: "replicalimit-policy.example.com"},
+					Spec: admissionregistration.MutatingAdmissionPolicySpec{
+						ParamKind: &admissionregistration.ParamKind{Kind: "Params", APIVersion: "foo.example.com/v1"},
+					},
+				}, nil
+			},
+			resourceResolver: func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+				return schema.GroupVersionResource{
+					Group:    "foo.example.com",
+					Version:  "v1",
+					Resource: "params",
+				}, nil
+			},
+		},
+		{
 			name:     "unable to parse paramRef",
 			userInfo: &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
 			auth: func(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
