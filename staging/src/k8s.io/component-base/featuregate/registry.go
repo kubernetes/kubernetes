@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package featuregate
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/featuregate"
+	baseversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 )
 
@@ -67,8 +67,8 @@ type VersionMapping func(from *version.Version) *version.Version
 
 // ComponentGlobals stores the global variables for a component for easy access.
 type ComponentGlobals struct {
-	effectiveVersion MutableEffectiveVersion
-	featureGate      featuregate.MutableVersionedFeatureGate
+	effectiveVersion baseversion.MutableEffectiveVersion
+	featureGate      MutableVersionedFeatureGate
 
 	// emulationVersionMapping contains the mapping from the emulation version of this component
 	// to the emulation version of another component.
@@ -87,16 +87,16 @@ type ComponentGlobals struct {
 type ComponentGlobalsRegistry interface {
 	// EffectiveVersionFor returns the EffectiveVersion registered under the component.
 	// Returns nil if the component is not registered.
-	EffectiveVersionFor(component string) EffectiveVersion
+	EffectiveVersionFor(component string) baseversion.EffectiveVersion
 	// FeatureGateFor returns the FeatureGate registered under the component.
 	// Returns nil if the component is not registered.
-	FeatureGateFor(component string) featuregate.FeatureGate
+	FeatureGateFor(component string) FeatureGate
 	// Register registers the EffectiveVersion and FeatureGate for a component.
 	// returns error if the component is already registered.
-	Register(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) error
+	Register(component string, effectiveVersion baseversion.MutableEffectiveVersion, featureGate MutableVersionedFeatureGate) error
 	// ComponentGlobalsOrRegister would return the registered global variables for the component if it already exists in the registry.
 	// Otherwise, the provided variables would be registered under the component, and the same variables would be returned.
-	ComponentGlobalsOrRegister(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) (MutableEffectiveVersion, featuregate.MutableVersionedFeatureGate)
+	ComponentGlobalsOrRegister(component string, effectiveVersion baseversion.MutableEffectiveVersion, featureGate MutableVersionedFeatureGate) (baseversion.MutableEffectiveVersion, MutableVersionedFeatureGate)
 	// AddFlags adds flags of "--emulated-version" and "--feature-gates"
 	AddFlags(fs *pflag.FlagSet)
 	// Set sets the flags for all global variables for all components registered.
@@ -143,7 +143,7 @@ func (r *componentGlobalsRegistry) Reset() {
 	r.set = false
 }
 
-func (r *componentGlobalsRegistry) EffectiveVersionFor(component string) EffectiveVersion {
+func (r *componentGlobalsRegistry) EffectiveVersionFor(component string) baseversion.EffectiveVersion {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	globals, ok := r.componentGlobals[component]
@@ -153,7 +153,7 @@ func (r *componentGlobalsRegistry) EffectiveVersionFor(component string) Effecti
 	return globals.effectiveVersion
 }
 
-func (r *componentGlobalsRegistry) FeatureGateFor(component string) featuregate.FeatureGate {
+func (r *componentGlobalsRegistry) FeatureGateFor(component string) FeatureGate {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	globals, ok := r.componentGlobals[component]
@@ -163,7 +163,7 @@ func (r *componentGlobalsRegistry) FeatureGateFor(component string) featuregate.
 	return globals.featureGate
 }
 
-func (r *componentGlobalsRegistry) unsafeRegister(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) error {
+func (r *componentGlobalsRegistry) unsafeRegister(component string, effectiveVersion baseversion.MutableEffectiveVersion, featureGate MutableVersionedFeatureGate) error {
 	if _, ok := r.componentGlobals[component]; ok {
 		return fmt.Errorf("component globals of %s already registered", component)
 	}
@@ -182,7 +182,7 @@ func (r *componentGlobalsRegistry) unsafeRegister(component string, effectiveVer
 	return nil
 }
 
-func (r *componentGlobalsRegistry) Register(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) error {
+func (r *componentGlobalsRegistry) Register(component string, effectiveVersion baseversion.MutableEffectiveVersion, featureGate MutableVersionedFeatureGate) error {
 	if effectiveVersion == nil {
 		return fmt.Errorf("cannot register nil effectiveVersion")
 	}
@@ -191,7 +191,7 @@ func (r *componentGlobalsRegistry) Register(component string, effectiveVersion M
 	return r.unsafeRegister(component, effectiveVersion, featureGate)
 }
 
-func (r *componentGlobalsRegistry) ComponentGlobalsOrRegister(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) (MutableEffectiveVersion, featuregate.MutableVersionedFeatureGate) {
+func (r *componentGlobalsRegistry) ComponentGlobalsOrRegister(component string, effectiveVersion baseversion.MutableEffectiveVersion, featureGate MutableVersionedFeatureGate) (baseversion.MutableEffectiveVersion, MutableVersionedFeatureGate) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	globals, ok := r.componentGlobals[component]

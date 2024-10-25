@@ -31,19 +31,19 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
+	utilversion "k8s.io/component-base/version"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 	t.Cleanup(func() {
 		componentGlobalsRegistry.Reset()
 	})
@@ -133,7 +133,7 @@ func TestAddFlags(t *testing.T) {
 			JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 			ComponentGlobalsRegistry:     componentGlobalsRegistry,
-			ComponentName:                utilversion.DefaultKubeComponent,
+			ComponentName:                featuregate.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{

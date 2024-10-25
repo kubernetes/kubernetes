@@ -33,7 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
+	utilversion "k8s.io/component-base/version"
 )
 
 // DefaultCompatibilityVersion returns a default compatibility version for use with EnvSet
@@ -49,7 +50,7 @@ import (
 // A default version number equal to the current Kubernetes major.minor version
 // indicates fast forward CEL features that can be used when rollback is no longer needed.
 func DefaultCompatibilityVersion() *version.Version {
-	effectiveVer := utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
+	effectiveVer := featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
 	if effectiveVer == nil {
 		effectiveVer = utilversion.DefaultKubeEffectiveVersion()
 	}

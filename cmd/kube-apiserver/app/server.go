@@ -36,17 +36,17 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/webhook"
 	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
-	"k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
@@ -64,8 +64,8 @@ func init() {
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	_, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	_, featureGate := featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	s := options.NewServerRunOptions()
 
 	cmd := &cobra.Command{
@@ -78,7 +78,7 @@ cluster's shared state through which all other components interact.`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+			if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
 				return err
 			}
 			// silence client-go warnings.
@@ -139,7 +139,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(ctx context.Context, opts options.CompletedOptions) error {
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
+	klog.Infof("Version: %+v", utilversion.Get())
 
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 

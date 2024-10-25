@@ -38,10 +38,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 )
 
@@ -129,8 +130,8 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
 
-	utilversion.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
+	featuregate.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	s.AddFlags(fs)
 
@@ -154,7 +155,7 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	fs.Parse(customFlags)
 
-	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+	if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
 		return result, err
 	}
 

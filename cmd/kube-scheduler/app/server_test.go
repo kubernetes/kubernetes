@@ -35,10 +35,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/features"
@@ -437,7 +437,7 @@ leaderElection:
 			for k, v := range tc.restoreFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
-			componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+			componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 			t.Cleanup(func() {
 				componentGlobalsRegistry.Reset()
 			})
@@ -453,7 +453,7 @@ leaderElection:
 					{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 				},
 			}))
-			utilruntime.Must(componentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, verKube, fg))
+			utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, verKube, fg))
 
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 			opts := options.NewOptions()
