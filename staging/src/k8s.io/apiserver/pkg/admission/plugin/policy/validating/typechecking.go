@@ -436,7 +436,7 @@ func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*envi
 	)
 }
 
-// createVariableOpts creates a slice of EnvOption
+// createVariableOpts creates a slice of ResolverEnvOption
 // that can be used for creating a CEL env containing variables of declType.
 // declType can be nil, in which case the variables will be of DynType.
 func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []cel.EnvOption {

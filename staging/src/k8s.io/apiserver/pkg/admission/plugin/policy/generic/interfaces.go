@@ -49,6 +49,9 @@ type Source[H Hook] interface {
 // Dispatcher dispatches evaluates an admission request against the currently
 // active hooks returned by the source.
 type Dispatcher[H Hook] interface {
+	// Run the dispatcher. This method should be called only once at startup.
+	Run(ctx context.Context) error
+
 	// Dispatch a request to the policies. Dispatcher may choose not to
 	// call a hook, either because the rules of the hook does not match, or
 	// the namespaceSelector or the objectSelector of the hook does not
