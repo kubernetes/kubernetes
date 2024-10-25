@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strings"
@@ -144,6 +145,12 @@ func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, p
 	return nil
 }
 
+const (
+	LabelKeyIsViolatingPDB    = "test.kubernetes.io/is-violating-pdb"
+	LabelValueViolatingPDB    = "violating"
+	LabelValueNonViolatingPDB = "non-violating"
+)
+
 func TestPostFilter(t *testing.T) {
 	metrics.Register()
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
@@ -152,6 +159,7 @@ func TestPostFilter(t *testing.T) {
 		name                  string
 		pod                   *v1.Pod
 		pods                  []*v1.Pod
+		pdbs                  []*policy.PodDisruptionBudget
 		nodes                 []*v1.Node
 		filteredNodesStatuses *framework.NodeToStatus
 		extender              framework.Extender
@@ -222,6 +230,29 @@ func TestPostFilter(t *testing.T) {
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Priority(highPriority).Node("node1").Obj(),
 				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NewNodeToStatus(map[string]*framework.Status{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			}, framework.NewStatus(framework.UnschedulableAndUnresolvable)),
+			wantResult: framework.NewPostFilterResultWithNominatedNode("node2"),
+			wantStatus: framework.NewStatus(framework.Success),
+		},
+		{
+			name: "pod can be made schedulable on minHighestPriority node",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(veryHighPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Label(LabelKeyIsViolatingPDB, LabelValueNonViolatingPDB).Namespace(v1.NamespaceDefault).Priority(highPriority).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Label(LabelKeyIsViolatingPDB, LabelValueViolatingPDB).Namespace(v1.NamespaceDefault).Priority(lowPriority).Node("node1").Obj(),
+				st.MakePod().Name("p3").UID("p3").Label(LabelKeyIsViolatingPDB, LabelValueViolatingPDB).Namespace(v1.NamespaceDefault).Priority(midPriority).Node("node2").Obj(),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				st.MakePDB().Name("violating-pdb").Namespace(v1.NamespaceDefault).MatchLabel(LabelKeyIsViolatingPDB, LabelValueViolatingPDB).MinAvailable("100%").Obj(),
+				st.MakePDB().Name("non-violating-pdb").Namespace(v1.NamespaceDefault).MatchLabel(LabelKeyIsViolatingPDB, LabelValueNonViolatingPDB).MinAvailable("0").DisruptionsAllowed(math.MaxInt32).Obj(),
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
@@ -365,6 +396,13 @@ func TestPostFilter(t *testing.T) {
 			for i := range tt.pods {
 				podInformer.GetStore().Add(tt.pods[i])
 			}
+			pdbInformer := informerFactory.Policy().V1().PodDisruptionBudgets().Informer()
+			for i := range tt.pdbs {
+				if err := pdbInformer.GetStore().Add(tt.pdbs[i]); err != nil {
+					t.Fatal(err)
+				}
+			}
+
 			// Register NodeResourceFit as the Filter & PreFilter plugin.
 			registeredPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
