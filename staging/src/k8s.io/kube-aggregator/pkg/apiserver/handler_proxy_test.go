@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2/ktesting"
 
 	"golang.org/x/net/websocket"
 
@@ -981,12 +982,11 @@ func TestProxyCertReload(t *testing.T) {
 			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
 		}
 	}()
-
-	certProvider, err := dynamiccertificates.NewDynamicServingContentFromFiles("test", certFile, keyFile)
+	_, ctx := ktesting.NewTestContext(t)
+	certProvider, err := dynamiccertificates.NewDynamicServingContentFromFiles(ctx, "test", certFile, keyFile)
 	if err != nil {
 		t.Fatalf("Unable to create dynamic certificates: %v", err)
 	}
-	ctx := context.TODO()
 	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Unable to load dynamic certificates: %v", err)

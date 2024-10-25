@@ -135,7 +135,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	if err != nil {
 		t.Fatal(err)
 	}
-	kubeAPIServer, err := app.CreateServerChain(completed)
+	kubeAPIServer, err := app.CreateServerChain(tCtx, completed)
 	if err != nil {
 		t.Fatal(err)
 	}
