@@ -4543,6 +4543,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
 	nowTime := time.Now()
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
@@ -4843,26 +4844,41 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			},
 		},
 	} {
-		tPod := testPod.DeepCopy()
-		tPod.Name = fmt.Sprintf("%s-%d", testPod.Name, idx)
-		for i := range tPod.Spec.Containers {
-			if tc.Resources != nil {
-				tPod.Spec.Containers[i].Resources = tc.Resources[i]
-			}
-			kubelet.statusManager.SetPodAllocation(tPod)
-			if tc.Resources != nil {
-				tPod.Status.ContainerStatuses[i].AllocatedResources = tc.Resources[i].Requests
-				testPodStatus.ContainerStatuses[i].Resources = &kubecontainer.ContainerResources{
-					MemoryLimit: tc.Resources[i].Limits.Memory(),
-					CPULimit:    tc.Resources[i].Limits.Cpu(),
-					CPURequest:  tc.Resources[i].Requests.Cpu(),
+		t.Run(tdesc, func(t *testing.T) {
+			tPod := testPod.DeepCopy()
+			tPod.Name = fmt.Sprintf("%s-%d", testPod.Name, idx)
+			for i := range tPod.Spec.Containers {
+				if tc.Resources != nil {
+					tPod.Spec.Containers[i].Resources = tc.Resources[i]
+				}
+				kubelet.statusManager.SetPodAllocation(tPod)
+				if tc.Resources != nil {
+					testPodStatus.ContainerStatuses[i].Resources = &kubecontainer.ContainerResources{
+						MemoryLimit: tc.Resources[i].Limits.Memory(),
+						CPULimit:    tc.Resources[i].Limits.Cpu(),
+						CPURequest:  tc.Resources[i].Requests.Cpu(),
+					}
 				}
 			}
-		}
 
-		t.Logf("TestCase: %q", tdesc)
-		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, testPodStatus, tc.OldStatus, tPod.Spec.Containers, false, false)
-		assert.Equal(t, tc.Expected, cStatuses)
+			for _, enableAllocatedStatus := range []bool{true, false} {
+				t.Run(fmt.Sprintf("AllocatedStatus=%t", enableAllocatedStatus), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, enableAllocatedStatus)
+
+					expected := tc.Expected
+					if !enableAllocatedStatus {
+						for i, status := range expected {
+							noAllocated := *status.DeepCopy()
+							noAllocated.AllocatedResources = nil
+							expected[i] = noAllocated
+						}
+					}
+
+					cStatuses := kubelet.convertToAPIContainerStatuses(tPod, testPodStatus, tc.OldStatus, tPod.Spec.Containers, false, false)
+					assert.Equal(t, expected, cStatuses)
+				})
+			}
+		})
 	}
 }
 
