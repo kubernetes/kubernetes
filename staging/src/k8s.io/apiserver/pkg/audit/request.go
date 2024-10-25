@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"regexp"
+    	"net/http"
+    	"errors"
 
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -40,12 +43,32 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
+// Define valid characters (alphanumeric, underscore, dash)
+var validAuditID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// Function to validate audit-id
+func validateAuditID(auditID string) error {
+    if !validAuditID.MatchString(auditID) {
+        return errors.New("Invalid audit-id: contains disallowed characters")
+    }
+    return nil
+}
+
 func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) {
 	ac := AuditContextFrom(ctx)
 	if !ac.Enabled() {
 		return
 	}
 	ev := &ac.Event
+
+	// Validate audit-id
+	auditID := req.Header.Get("Audit-ID")
+	if auditID != "" {
+		if err := validateAuditID(auditID); err != nil {
+			klog.ErrorS(err, "Invalid audit-id provided", "auditID", auditID)
+			return
+		}
+	}
 
 	ev.RequestReceivedTimestamp = metav1.NewMicroTime(requestReceivedTimestamp)
 	ev.Verb = attribs.GetVerb()
@@ -80,6 +103,23 @@ func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedT
 		}
 	}
 }
+
+// LogImpersonatedUser fills in the impersonated user attributes into an audit event.
+func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
+	ae.ImpersonatedUser = &authnv1.UserInfo{
+		Username: user.GetName(),
+	}
+	ae.ImpersonatedUser.Groups = user.GetGroups()
+	ae.ImpersonatedUser.UID = user.GetUID()
+	ae.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
+	for k, v := range user.GetExtra() {
+		ae.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
+	}
+}
+
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.
 func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
