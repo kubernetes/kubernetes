@@ -742,7 +742,7 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 	return c.Config.Complete(c.SharedInformerFactory)
 }
 
-var allowedMediaTypes = []string{
+var defaultAllowedMediaTypes = []string{
 	runtime.ContentTypeJSON,
 	runtime.ContentTypeYAML,
 	runtime.ContentTypeProtobuf,
@@ -754,6 +754,10 @@ var allowedMediaTypes = []string{
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+	}
+	allowedMediaTypes := defaultAllowedMediaTypes
+	if utilfeature.TestOnlyFeatureGate.Enabled(genericfeatures.TestOnlyCBORServingAndStorage) {
+		allowedMediaTypes = append(allowedMediaTypes, runtime.ContentTypeCBOR)
 	}
 	for _, info := range c.Serializer.SupportedMediaTypes() {
 		var ok bool

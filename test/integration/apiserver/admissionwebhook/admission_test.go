@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -446,16 +446,25 @@ func (w *warningHandler) HandleWarningHeader(code int, agent string, message str
 
 // TestWebhookAdmissionWithWatchCache tests communication between API server and webhook process.
 func TestWebhookAdmissionWithWatchCache(t *testing.T) {
-	testWebhookAdmission(t, true)
+	testWebhookAdmission(t, true, func(testing.TB, *rest.Config) {})
 }
 
 // TestWebhookAdmissionWithoutWatchCache tests communication between API server and webhook process.
 func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
-	testWebhookAdmission(t, false)
+	testWebhookAdmission(t, false, func(testing.TB, *rest.Config) {})
+}
+
+func TestWebhookAdmissionWithCBOR(t *testing.T) {
+	framework.EnableCBORServingAndStorageForTest(t)
+	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+	testWebhookAdmission(t, false, func(t testing.TB, config *rest.Config) {
+		config.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	})
 }
 
 // testWebhookAdmission tests communication between API server and webhook process.
-func testWebhookAdmission(t *testing.T, watchCache bool) {
+func testWebhookAdmission(t *testing.T, watchCache bool, reconfigureClient func(testing.TB, *rest.Config)) {
+
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
@@ -528,10 +537,6 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	}
 
 	// gather resources to test
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, resources, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
@@ -640,6 +645,13 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
 					t.Run(verb, func(t *testing.T) {
+						clientConfig := rest.CopyConfig(clientConfig)
+						reconfigureClient(t, clientConfig)
+						dynamicClient, err := dynamic.NewForConfig(clientConfig)
+						if err != nil {
+							t.Fatal(err)
+						}
+
 						count++
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
