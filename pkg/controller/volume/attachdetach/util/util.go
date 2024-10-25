@@ -55,7 +55,7 @@ func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Po
 	pvc, err := getPVCFromCache(pod.Namespace, claimName, pvcLister)
 	if err != nil {
 		return nil, claimName, fmt.Errorf(
-			"error processing PVC %q/%q: %v",
+			"error processing PVC %q/%q: %w",
 			pod.Namespace,
 			claimName,
 			err)
@@ -74,7 +74,7 @@ func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Po
 		pvName, readOnly, pvcUID, pvLister)
 	if err != nil {
 		return nil, claimName, fmt.Errorf(
-			"error processing PVC %q/%q: %v",
+			"error processing PVC %q/%q: %w",
 			pod.Namespace,
 			claimName,
 			err)
@@ -92,7 +92,7 @@ func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, vpm 
 	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error performing CSI migration checks and translation for PVC %q/%q: %v",
+			"error performing CSI migration checks and translation for PVC %q/%q: %w",
 			pod.Namespace,
 			claimName,
 			err)
@@ -113,7 +113,7 @@ func CreateVolumeSpecWithNodeMigration(logger klog.Logger, podVolume v1.Volume, 
 	volumeSpec, err = translateInTreeSpecToCSIOnNodeIfNeeded(logger, volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"error performing CSI migration checks and translation for PVC %q/%q: %v",
+			"error performing CSI migration checks and translation for PVC %q/%q: %w",
 			pod.Namespace,
 			claimName,
 			err)
