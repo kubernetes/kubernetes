@@ -1776,6 +1776,7 @@
     "fullyLabeledReplicas": 2,
     "readyReplicas": 4,
     "availableReplicas": 5,
+    "terminatingReplicas": 7,
     "observedGeneration": 3,
     "conditions": [
       {

@@ -413,6 +413,28 @@ type DeploymentSpec struct {
 	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
 	// +optional
 	ProgressDeadlineSeconds *int32
+
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminationStarted policy creates replacement Pods when the old Pods start
+	//   terminating (has a .metadata.deletionTimestamp). The total number of
+	//   Deployment Pods can be greater than specified by the Deployment's
+	//   .spec.replicas and the DeploymentStrategy.
+	// - TerminationComplete policy creates replacement Pods only when the old Pods
+	//   are fully terminated (reach Succeeded or Failed phase). The old Pods are
+	//   subsequently removed. The total number of the Deployment Pods is
+	//   limited by the Deployment's .spec.replicas and the DeploymentStrategy.
+	//
+	// The default behavior when the policy is not specified depends on the DeploymentStrategy:
+	// - Recreate strategy uses TerminationComplete behavior when recreating the deployment,
+	//   but uses TerminationStarted when scaling the deployment.
+	// - RollingUpdate strategy uses TerminationStarted behavior for both rolling out and
+	//   scaling the deployments.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to
+	// use this field.
+	// +optional
+	PodReplacementPolicy *DeploymentPodReplacementPolicy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -501,25 +523,43 @@ type RollingUpdateDeployment struct {
 	MaxSurge intstr.IntOrString
 }
 
+// DeploymentPodReplacementPolicy specifies the policy for creating Deployment Pod replacements.
+// Default is a mixed behavior depending on the DeploymentStrategy
+// +enum
+type DeploymentPodReplacementPolicy string
+
+const (
+	// TerminationStarted policy creates replacement Pods when the old Pods start
+	// terminating (has a .metadata.deletionTimestamp). The total number of
+	// Deployment Pods can be greater than specified by the Deployment's
+	// .spec.replicas and the DeploymentStrategy.
+	TerminationStarted DeploymentPodReplacementPolicy = "TerminationStarted"
+	// TerminationComplete policy creates replacement Pods only when the old Pods
+	// are fully terminated (reach Succeeded or Failed phase). The old Pods are
+	// subsequently removed. The total number of the Deployment Pods is
+	// limited by the Deployment's .spec.replicas and the DeploymentStrategy.
+	TerminationComplete DeploymentPodReplacementPolicy = "TerminationComplete"
+)
+
 // DeploymentStatus holds information about the observed status of a deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
 	// +optional
 	ObservedGeneration int64
 
-	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
+	// Total number of non-terminating pods targeted by this deployment (their labels match the selector).
 	// +optional
 	Replicas int32
 
-	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
+	// Total number of non-terminating pods targeted by this deployment that have the desired template spec.
 	// +optional
 	UpdatedReplicas int32
 
-	// Total number of ready pods targeted by this deployment.
+	// Total number of non-terminating pods targeted by this Deployment with a Ready Condition.
 	// +optional
 	ReadyReplicas int32
 
-	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+	// Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32
 
@@ -528,6 +568,12 @@ type DeploymentStatus struct {
 	// either be pods that are running but not yet available or pods that still have not been created.
 	// +optional
 	UnavailableReplicas int32
+
+	// Total number of terminating pods (have non-null .metadata.deletionTimestamp) targeted by this deployment.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+	// +optional
+	TerminatingReplicas int32
 
 	// Represents the latest available observations of a deployment's current state.
 	Conditions []DeploymentCondition
@@ -865,22 +911,29 @@ type ReplicaSetSpec struct {
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	// Replicas is the number of actual replicas.
+	// Replicas is the most recently observed number of non-terminating pods.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	Replicas int32
 
-	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+	// The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
 	// +optional
 	FullyLabeledReplicas int32
 
-	// The number of ready replicas for this replica set.
+	// The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
 	// +optional
 	ReadyReplicas int32
 
-	// The number of available replicas (ready for at least minReadySeconds) for this replica set.
+	// The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.
 	// +optional
 	AvailableReplicas int32
 
-	// ObservedGeneration is the most recent generation observed by the controller.
+	// The number of terminating replicas (have non-null .metadata.deletionTimestamp) for this replica set.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+	// +optional
+	TerminatingReplicas int32
+
+	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
 	// +optional
 	ObservedGeneration int64
 

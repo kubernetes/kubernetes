@@ -26,16 +26,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -52,6 +57,12 @@ func newDControllerRef(d *apps.Deployment) *metav1.OwnerReference {
 
 // generateRS creates a replica set, with the input deployment's template as its template
 func generateRS(deployment apps.Deployment) apps.ReplicaSet {
+	return generateRSWithReplicas(deployment, 0, apps.ReplicaSetStatus{})
+}
+
+// generateRSWithReplicas creates a replica set, with the input deployment's template as its template
+// and includes replicas and the status in the replica set
+func generateRSWithReplicas(deployment apps.Deployment, replicas int32, status apps.ReplicaSetStatus) apps.ReplicaSet {
 	template := deployment.Spec.Template.DeepCopy()
 	return apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,10 +72,11 @@ func generateRS(deployment apps.Deployment) apps.ReplicaSet {
 			OwnerReferences: []metav1.OwnerReference{*newDControllerRef(&deployment)},
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: new(int32),
+			Replicas: ptr.To(replicas),
 			Template: *template,
 			Selector: &metav1.LabelSelector{MatchLabels: template.Labels},
 		},
+		Status: status,
 	}
 }
 
@@ -72,8 +84,12 @@ func randomUID() types.UID {
 	return types.UID(strconv.FormatInt(rand.Int63(), 10))
 }
 
-// generateDeployment creates a deployment, with the input image as its template
 func generateDeployment(image string) apps.Deployment {
+	return generateDeploymentWithReplicas(image, 1)
+}
+
+// generateDeployment creates a deployment, with the input image as its template
+func generateDeploymentWithReplicas(image string, replicas int32) apps.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
@@ -83,7 +99,7 @@ func generateDeployment(image string) apps.Deployment {
 			Annotations: make(map[string]string),
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: func(i int32) *int32 { return &i }(1),
+			Replicas: ptr.To(replicas),
 			Selector: &metav1.LabelSelector{MatchLabels: podLabels},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -231,7 +247,6 @@ func TestFindNewReplicaSet(t *testing.T) {
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
-	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
 
 	tests := []struct {
 		Name       string
@@ -274,8 +289,7 @@ func TestFindOldReplicaSets(t *testing.T) {
 	before := metav1.Time{Time: now.Add(-time.Minute)}
 
 	deployment := generateDeployment("nginx")
-	newRS := generateRS(deployment)
-	*(newRS.Spec.Replicas) = 1
+	newRS := generateRSWithReplicas(deployment, 1, apps.ReplicaSetStatus{})
 	newRS.Labels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
 	newRS.CreationTimestamp = later
 
@@ -286,7 +300,6 @@ func TestFindOldReplicaSets(t *testing.T) {
 	oldDeployment := generateDeployment("nginx")
 	oldDeployment.Spec.Template.Spec.Containers[0].Name = "nginx-old-1"
 	oldRS := generateRS(oldDeployment)
-	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
 	oldRS.CreationTimestamp = before
 
 	tests := []struct {
@@ -343,42 +356,69 @@ func TestFindOldReplicaSets(t *testing.T) {
 }
 
 func TestGetReplicaCountForReplicaSets(t *testing.T) {
-	rs1 := generateRS(generateDeployment("foo"))
-	*(rs1.Spec.Replicas) = 1
-	rs1.Status.Replicas = 2
-	rs2 := generateRS(generateDeployment("bar"))
-	*(rs2.Spec.Replicas) = 2
-	rs2.Status.Replicas = 3
+	rs1 := generateRSWithReplicas(generateDeployment("foo"), 1, apps.ReplicaSetStatus{Replicas: 2, TerminatingReplicas: 3})
+	rs2 := generateRSWithReplicas(generateDeployment("bar"), 2, apps.ReplicaSetStatus{Replicas: 3, TerminatingReplicas: 1})
+	rs3 := generateRSWithReplicas(generateDeployment("unsynced"), 3, apps.ReplicaSetStatus{})
 
 	tests := []struct {
-		Name           string
-		sets           []*apps.ReplicaSet
-		expectedCount  int32
-		expectedActual int32
+		name                     string
+		sets                     []*apps.ReplicaSet
+		expectedCount            int32
+		expectedActual           int32
+		expectedTerminating      int32
+		expectSurgeCapacityCount int32
 	}{
 		{
-			"1:2 Replicas",
-			[]*apps.ReplicaSet{&rs1},
-			1,
-			2,
+			name:                     "scaling down rs1",
+			sets:                     []*apps.ReplicaSet{&rs1},
+			expectedCount:            1,
+			expectedActual:           2,
+			expectedTerminating:      3,
+			expectSurgeCapacityCount: 2,
 		},
 		{
-			"3:5 Replicas",
-			[]*apps.ReplicaSet{&rs1, &rs2},
-			3,
-			5,
+			name:                     "scaling down rs1 and rs2",
+			sets:                     []*apps.ReplicaSet{&rs1, &rs2},
+			expectedCount:            3,
+			expectedActual:           5,
+			expectedTerminating:      4,
+			expectSurgeCapacityCount: 5,
+		},
+		{
+			name:                     "scaling up rs3",
+			sets:                     []*apps.ReplicaSet{&rs3},
+			expectedCount:            3,
+			expectedActual:           0,
+			expectedTerminating:      0,
+			expectSurgeCapacityCount: 3,
+		},
+		{
+			name:                     "scaling down rs1 and rs2 and scaling up rs3",
+			sets:                     []*apps.ReplicaSet{&rs1, &rs2, &rs3},
+			expectedCount:            6,
+			expectedActual:           5,
+			expectedTerminating:      4,
+			expectSurgeCapacityCount: 8,
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			rs := GetReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedCount {
-				t.Errorf("In test case %s, expectedCount %+v, got %+v", test.Name, test.expectedCount, rs)
+		t.Run(test.name, func(t *testing.T) {
+			count := GetReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedCount {
+				t.Errorf("expectedCount %+v, got %+v", test.expectedCount, count)
 			}
-			rs = GetActualReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedActual {
-				t.Errorf("In test case %s, expectedActual %+v, got %+v", test.Name, test.expectedActual, rs)
+			count = GetActualReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedActual {
+				t.Errorf("expectedActual %+v, got %+v", test.expectedActual, count)
+			}
+			count = GetTerminatingReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedTerminating {
+				t.Errorf("expectedTerminating %+v, got %+v", test.expectedTerminating, count)
+			}
+			count = GetReplicaSurgeCapacityCountForReplicaSets(test.sets)
+			if count != test.expectSurgeCapacityCount {
+				t.Errorf("expectSurgeCapacityCount %+v, got %+v", test.expectSurgeCapacityCount, count)
 			}
 		})
 	}
@@ -476,49 +516,298 @@ func TestResolveFenceposts(t *testing.T) {
 
 func TestNewRSNewReplicas(t *testing.T) {
 	tests := []struct {
-		Name          string
-		strategyType  apps.DeploymentStrategyType
-		depReplicas   int32
-		newRSReplicas int32
-		maxSurge      int32
-		expected      int32
+		name        string
+		replicas    int32
+		strategy    apps.DeploymentStrategy
+		replicaSets []*apps.ReplicaSet
+		expected    int32
 	}{
 		{
-			"can not scale up - to newRSReplicas",
-			apps.RollingUpdateDeploymentStrategyType,
-			1, 5, 1, 5,
+			name:     "empty deployment does not scale",
+			replicas: 0,
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+			},
+			expected: 0,
 		},
 		{
-			"scale up - to depReplicas",
-			apps.RollingUpdateDeploymentStrategyType,
-			6, 2, 10, 6,
+			name:     "rolling update can not scale up as there are too many pods in the old replica set",
+			replicas: 9,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(1)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+			},
+			expected: 5,
 		},
 		{
-			"recreate - to depReplicas",
-			apps.RecreateDeploymentStrategyType,
-			3, 1, 1, 3,
+			name:     "rolling update can partially scale up as there is some additional capacity in the maxSurge",
+			replicas: 6,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(3)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 2, apps.ReplicaSetStatus{})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+			},
+			expected: 4,
+		},
+		{
+			name:     "rolling update can scale up as there is enough additional capacity in the maxSurge",
+			replicas: 6,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(10)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 2, apps.ReplicaSetStatus{})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+			},
+			expected: 6,
+		},
+		{
+			name:     "recreate should fully scale as it is always scaled after the pods from previous replicaset have terminated",
+			replicas: 3,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 5, apps.ReplicaSetStatus{})),
+			},
+			expected: 3,
 		},
 	}
-	newDeployment := generateDeployment("nginx")
-	newRC := generateRS(newDeployment)
-	rs5 := generateRS(newDeployment)
-	*(rs5.Spec.Replicas) = 5
+
+	testVariants := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		podReplacementPolicy                 *apps.DeploymentPodReplacementPolicy
+	}{
+		{
+			name:                                 " with DeploymentPodReplacementPolicy=false",
+			enableDeploymentPodReplacementPolicy: false,
+		},
+
+		{
+			name:                                 " with DeploymentPodReplacementPolicy=true",
+			enableDeploymentPodReplacementPolicy: true,
+		},
+
+		{
+			name:                                 " with DeploymentPodReplacementPolicy=true and podReplacementPolicy=TerminationStarted",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationStarted),
+		},
+	}
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			*(newDeployment.Spec.Replicas) = test.depReplicas
-			newDeployment.Spec.Strategy = apps.DeploymentStrategy{Type: test.strategyType}
-			newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
-				MaxUnavailable: ptr.To(intstr.FromInt32(1)),
-				MaxSurge:       ptr.To(intstr.FromInt32(test.maxSurge)),
-			}
-			*(newRC.Spec.Replicas) = test.newRSReplicas
-			rs, err := NewRSNewReplicas(&newDeployment, []*apps.ReplicaSet{&rs5}, &newRC)
+		for _, testVariant := range testVariants {
+			t.Run(test.name+testVariant.name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, testVariant.enableDeploymentPodReplacementPolicy)
+				newDeployment := generateDeploymentWithReplicas("nginx", test.replicas)
+				newDeployment.Spec.Strategy = test.strategy
+
+				if testVariant.enableDeploymentPodReplacementPolicy {
+					// TerminationStarted policy should not affect default behavior
+					newDeployment.Spec.PodReplacementPolicy = testVariant.podReplacementPolicy
+					for _, rs := range test.replicaSets {
+						// replicas and terminating replicas should not affect default behavior
+						rs.Status.Replicas = rand.Int31n(15)
+						rs.Status.TerminatingReplicas = rand.Int31n(15)
+					}
+				}
+
+				rs, err := NewRSNewReplicas(&newDeployment, test.replicaSets, test.replicaSets[0])
+				if err != nil {
+					t.Errorf("In test case %s, got unexpected error %v", test.name, err)
+				}
+				if rs != test.expected {
+					t.Errorf("In test case %s, expected %+v, got %+v", test.name, test.expected, rs)
+				}
+			})
+		}
+	}
+}
+
+func TestNewRSNewReplicasWithTerminationCompleteDeploymentPodReplacementPolicy(t *testing.T) {
+	tests := []struct {
+		name                           string
+		replicas                       int32
+		strategy                       apps.DeploymentStrategy
+		deploymentPodReplacementPolicy *apps.DeploymentPodReplacementPolicy
+		replicaSets                    []*apps.ReplicaSet
+		expected                       int32
+	}{
+		{
+			name:     "rolling update with TerminationComplete policy should not scale when old replicas are still present",
+			replicas: 5,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(2)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 3, apps.ReplicaSetStatus{Replicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{Replicas: 3})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "rolling update with TerminationComplete policy should not scale when old and terminating replicas are still present",
+			replicas: 5,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(2)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{Replicas: 1, TerminatingReplicas: 2})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "rolling update with TerminationComplete policy should not scale when terminating replicas are still present",
+			replicas: 5,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(2)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 3})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "rolling update with TerminationComplete policy should partially scale when terminating pods are present",
+			replicas: 6,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(3)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1, TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{Replicas: 1, TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+			},
+			expected: 5,
+		},
+
+		{
+			name:     "rolling update with TerminationComplete policy should fully scale when most of the pods are terminated",
+			replicas: 6,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge: ptr.To(intstr.FromInt32(3)),
+				},
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1, TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+			},
+			expected: 6,
+		},
+		{
+			name:     "recreate with TerminationComplete policy should not scale when old replicas are still present",
+			replicas: 7,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 3, apps.ReplicaSetStatus{Replicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{Replicas: 3})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "recreate with TerminationComplete policy should not scale when old and terminating replicas are still present",
+			replicas: 7,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{Replicas: 1, TerminatingReplicas: 2})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "recreate with TerminationComplete policy should not scale when terminating replicas are still present",
+			replicas: 7,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{TerminatingReplicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 2})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 3})),
+			},
+			expected: 1,
+		},
+		{
+			name:     "recreate with TerminationComplete policy should partially scale when terminating pods are present",
+			replicas: 3,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{TerminatingReplicas: 1})),
+			},
+			expected: 2,
+		},
+		{
+			name:     "recreate with TerminationComplete policy should fully scale when all pods terminated",
+			replicas: 3,
+			strategy: apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			},
+			replicaSets: []*apps.ReplicaSet{
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 1, apps.ReplicaSetStatus{Replicas: 1})),
+				ptr.To(generateRSWithReplicas(generateDeployment("nginx"), 0, apps.ReplicaSetStatus{})),
+			},
+			expected: 3,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)
+			newDeployment := generateDeploymentWithReplicas("nginx", test.replicas)
+			newDeployment.Spec.Strategy = test.strategy
+			newDeployment.Spec.PodReplacementPolicy = ptr.To(apps.TerminationComplete)
+
+			rs, err := NewRSNewReplicas(&newDeployment, test.replicaSets, test.replicaSets[0])
 			if err != nil {
-				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
+				t.Errorf("In test case %s, got unexpected error %v", test.name, err)
 			}
 			if rs != test.expected {
-				t.Errorf("In test case %s, expected %+v, got %+v", test.Name, test.expected, rs)
+				t.Errorf("In test case %s, expected %+v, got %+v", test.name, test.expected, rs)
 			}
 		})
 	}
@@ -1020,11 +1309,72 @@ func TestMaxUnavailable(t *testing.T) {
 	}
 }
 
+func TestGetNonNegativeIntFromAnnotation(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue int32
+		expectedValid bool
+		expectErr     bool
+	}{
+		{
+			name: "invalid empty",
+		},
+		{
+			name:        "invalid negative ",
+			annotations: map[string]string{"test": "-1", "foo": "2"},
+			expectErr:   true,
+		},
+		{
+			name:        "invalid",
+			annotations: map[string]string{"test": "invalid", "foo": "2"},
+			expectErr:   true,
+		},
+		{
+			name:          "valid",
+			annotations:   map[string]string{"test": "13", "foo": "2"},
+			expectedValue: 13,
+			expectedValid: true,
+		},
+		{
+			name:          "valid zero",
+			annotations:   map[string]string{"test": "0", "foo": "2"},
+			expectedValue: 0,
+			expectedValid: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tDeployment := generateDeployment("nginx")
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.annotations
+			value, valid, err := getNonNegativeIntFromAnnotation(&tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
+			}
+			if test.expectErr != (err != nil) {
+				t.Fatalf("expected err:%v, got:%v", test.expectErr, err)
+			}
+		})
+	}
+}
+
 // Set of simple tests for annotation related util functions
 func TestAnnotationUtils(t *testing.T) {
 
 	//Setup
-	tDeployment := generateDeployment("nginx")
+	tDeployment := generateDeploymentWithReplicas("nginx", 10)
+	tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+		RollingUpdate: &apps.RollingUpdateDeployment{
+			MaxSurge:       ptr.To(intstr.FromInt32(1)),
+			MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+		},
+		Type: apps.RollingUpdateDeploymentStrategyType,
+	}
 	tRS := generateRS(tDeployment)
 	tDeployment.Annotations[RevisionAnnotation] = "1"
 
@@ -1052,31 +1402,32 @@ func TestAnnotationUtils(t *testing.T) {
 	})
 
 	//Test Case 2:  Check if annotations are set properly
-	t.Run("SetReplicasAnnotations", func(t *testing.T) {
-		updated := SetReplicasAnnotations(&tRS, 10, 11)
-		if !updated {
-			t.Errorf("SetReplicasAnnotations() failed")
+	t.Run("SetReplicaSetScaleAnnotations", func(t *testing.T) {
+		annotationUpdate, needUpdate := ComputeReplicaSetScaleAnnotations(&tRS, &tDeployment, false)
+		if !needUpdate {
+			t.Errorf("ComputeReplicaSetScaleAnnotations() failed")
 		}
+		SetReplicaSetScaleAnnotations(&tRS, annotationUpdate)
 		value, ok := tRS.Annotations[DesiredReplicasAnnotation]
 		if !ok {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation")
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation")
 		}
 		if value != "10" {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation correctly value=%s", value)
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation correctly value=%s", value)
 		}
 		if value, ok = tRS.Annotations[MaxReplicasAnnotation]; !ok {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation")
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation")
 		}
 		if value != "11" {
-			t.Errorf("SetReplicasAnnotations did not set MaxReplicasAnnotation correctly value=%s", value)
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set MaxReplicasAnnotation correctly value=%s", value)
 		}
 	})
 
 	//Test Case 3:  Check if annotations reflect deployments state
-	tRS.Annotations[DesiredReplicasAnnotation] = "1"
-	tRS.Status.AvailableReplicas = 1
+	tRS.Annotations[DesiredReplicasAnnotation] = "10"
+	tRS.Status.AvailableReplicas = 10
 	tRS.Spec.Replicas = new(int32)
-	*tRS.Spec.Replicas = 1
+	*tRS.Spec.Replicas = 10
 
 	t.Run("IsSaturated", func(t *testing.T) {
 		saturated := IsSaturated(&tDeployment, &tRS)
@@ -1087,15 +1438,18 @@ func TestAnnotationUtils(t *testing.T) {
 	//Tear Down
 }
 
-func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
-
-	desiredReplicas := fmt.Sprintf("%d", int32(10))
-	maxReplicas := fmt.Sprintf("%d", int32(20))
+func TestComputeAndSetReplicaSetScaleAnnotations(t *testing.T) {
+	desiredReplicas := fmt.Sprintf("%d", int32(13))
+	maxReplicas := fmt.Sprintf("%d", int32(24))
 
 	tests := []struct {
-		name       string
-		replicaSet *apps.ReplicaSet
-		expected   bool
+		name                           string
+		replicaSet                     *apps.ReplicaSet
+		partialScaling                 bool
+		podReplacementPolicy           *apps.DeploymentPodReplacementPolicy
+		requiresPodReplacementPolicyFG bool
+		expectedNeedUpdate             bool
+		expectedAnnotations            map[string]string
 	}{
 		{
 			name: "test Annotations nil",
@@ -1105,7 +1459,8 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 		{
 			name: "test desiredReplicas update",
@@ -1113,13 +1468,14 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "hello",
 					Namespace:   "test",
-					Annotations: map[string]string{DesiredReplicasAnnotation: "8", MaxReplicasAnnotation: maxReplicas},
+					Annotations: map[string]string{DesiredReplicasAnnotation: "8", MaxReplicasAnnotation: maxReplicas, "foo": "bar"},
 				},
 				Spec: apps.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedNeedUpdate:  true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas, "foo": "bar"},
 		},
 		{
 			name: "test maxReplicas update",
@@ -1133,7 +1489,8 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 		{
 			name: "test needn't update",
@@ -1147,18 +1504,130 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  false,
+		},
+		{
+			name: "test removes replicasBeforeScale when not partial scaling",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas, ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			partialScaling:      false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
+		},
+		{
+			name: "test starts partial scaling and keeps old desiredReplicas and maxReplicas",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(5)),
+				},
+			},
+			partialScaling:                 true,
+			podReplacementPolicy:           ptr.To(apps.TerminationComplete),
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+			expectedNeedUpdate:             true,
+		},
+		{
+			name: "test starts partial scaling with invalid ReplicaSetReplicasBeforeScale value, keeps old desiredReplicas and maxReplicas",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "invalid"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(5)),
+				},
+			},
+			partialScaling:                 true,
+			podReplacementPolicy:           ptr.To(apps.TerminationComplete),
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+			expectedNeedUpdate:             true,
+		},
+		{
+			name: "test continues partial scaling and keeps old desiredReplicas and maxReplicas and replicasBeforeScale",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(6)),
+				},
+			},
+			partialScaling:                 true,
+			podReplacementPolicy:           ptr.To(apps.TerminationComplete),
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+			expectedNeedUpdate:             false,
+		},
+		{
+			name: "test removes updates desiredReplicas and maxReplicas and replicasBeforeScale when finishing partial scaling",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScaleAnnotation: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(10)),
+				},
+			},
+			partialScaling:      false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := ReplicasAnnotationsNeedUpdate(test.replicaSet, 10, 20)
-			if result != test.expected {
-				t.Errorf("case[%d]:%s Expected %v, Got: %v", i, test.name, test.expected, result)
+	for _, podReplacementPolicyFG := range []bool{true, false} {
+		for _, test := range tests {
+			if test.requiresPodReplacementPolicyFG && !podReplacementPolicyFG {
+				continue
 			}
-		})
+			t.Run(test.name+fmt.Sprintf("with podReplacementPolicyFG=%v", podReplacementPolicyFG), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, podReplacementPolicyFG)
+				tDeployment := generateDeploymentWithReplicas("hello", 13)
+				tDeployment.Spec.PodReplacementPolicy = test.podReplacementPolicy
+				tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+					Type: apps.RollingUpdateDeploymentStrategyType,
+					RollingUpdate: &apps.RollingUpdateDeployment{
+						MaxSurge:       ptr.To(intstr.FromInt32(11)),
+						MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+					},
+				}
+				annotationUpdate, needUpdate := ComputeReplicaSetScaleAnnotations(test.replicaSet, &tDeployment, test.partialScaling)
+				tReplicaSet := test.replicaSet.DeepCopy()
+				SetReplicaSetScaleAnnotations(tReplicaSet, annotationUpdate)
+				if needUpdate != test.expectedNeedUpdate {
+					t.Errorf("Expected needUpdate %v, Got: %v", test.expectedNeedUpdate, needUpdate)
+				}
+				if !reflect.DeepEqual(test.expectedAnnotations, tReplicaSet.Annotations) {
+					t.Errorf("invalid annotations: %v", cmp.Diff(test.expectedAnnotations, tReplicaSet.Annotations))
+				}
+			})
+		}
 	}
+
 }
 
 func TestGetDeploymentsForReplicaSet(t *testing.T) {
@@ -1315,6 +1784,518 @@ func TestMinAvailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MinAvailable(tt.deployment); got != tt.expected {
 				t.Errorf("MinAvailable() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetReplicaSetFraction(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		podReplacementPolicy                 *apps.DeploymentPodReplacementPolicy
+		deploymentReplicas                   int32
+		deploymentStatusReplicas             int32
+		deploymentMaxSurge                   int32
+		rsReplicas                           int32
+		rsAnnotations                        map[string]string
+		expectedFraction                     int32
+	}{
+		{
+			name:               "empty deployment always scales to 0",
+			deploymentReplicas: 0,
+			rsReplicas:         10,
+			expectedFraction:   -10,
+		},
+		{
+			name:               "unsynced deployment does not scale when max-replicas annotation is missing",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			expectedFraction:   0,
+		},
+		{
+			name:                     "scale up by 1/5 should increase RS replicas by 1/5 when max-replicas annotation is missing",
+			deploymentReplicas:       120,
+			deploymentStatusReplicas: 100,
+			rsReplicas:               50,
+			expectedFraction:         10,
+		},
+		{
+			name:               "scale up by 1/5 should increase RS replicas by 1/5",
+			deploymentReplicas: 120,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "100",
+			},
+			expectedFraction: 10,
+		},
+		{
+			name:               "scale up with maxSurge by 1/5 should increase RS replicas approximately by 1/5",
+			deploymentReplicas: 120,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "110",
+			},
+			expectedFraction: 9, // expectedFraction is not the whole 1/5 (10) since maxSurge pods have to be taken into account
+			// and replica sets with these surge pods should proportionally scale as well during a rollout
+		},
+		{
+			name:               "scale down by 1/6 should decrease RS replicas by 1/6",
+			deploymentReplicas: 10,
+			rsReplicas:         6,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "12",
+			},
+			expectedFraction: -1,
+		},
+		{
+			name:               "scale down with maxSurge by 1/6 should decrease RS replicas approximately by 1/6",
+			deploymentReplicas: 100,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "130",
+			},
+			expectedFraction: -8,
+		},
+		{
+			name:                                 "scale up by 1/5 should increase RS replicas by 1/5 even when replicaset-replicas-before-scale is present and DeploymentPodReplacementPolicy is disabled",
+			enableDeploymentPodReplacementPolicy: false,
+			deploymentReplicas:                   120,
+			rsReplicas:                           55,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation:                   "100",
+				ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			},
+			expectedFraction: 11,
+		},
+		{
+			name:                                 "partial scale up by 1/5 should increase RS replicas by 1/5 in the end when DeploymentPodReplacementPolicy is enabled",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   120,
+			rsReplicas:                           55,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation:                   "100",
+				ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			},
+			expectedFraction: 5,
+		},
+		{
+			name:                                 "partial scale up with maxSurge by 1/5 should increase RS replicas approximately by 1/5 in the end when DeploymentPodReplacementPolicy is enabled",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   120,
+			deploymentMaxSurge:                   10,
+			rsReplicas:                           54,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation:                   "110",
+				ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			},
+			expectedFraction: 5,
+		},
+		{
+			name:                                 "partial scale down with maxSurge by 1/6 should decrease RS replicas approximately by 1/6 in the end when DeploymentPodReplacementPolicy is enabled",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   100,
+			deploymentMaxSurge:                   10,
+			rsReplicas:                           47,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation:                   "130",
+				ReplicaSetReplicasBeforeScaleAnnotation: "50",
+			},
+			expectedFraction: -5,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, test.enableDeploymentPodReplacementPolicy)
+			logger, _ := ktesting.NewTestContext(t)
+
+			tDeployment := generateDeploymentWithReplicas("nginx", test.deploymentReplicas)
+			tDeployment.Status.Replicas = test.deploymentStatusReplicas
+			tDeployment.Spec.PodReplacementPolicy = test.podReplacementPolicy
+			tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       ptr.To(intstr.FromInt32(test.deploymentMaxSurge)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				},
+			}
+
+			tRS := generateRSWithReplicas(tDeployment, test.rsReplicas, apps.ReplicaSetStatus{})
+			tRS.Annotations = test.rsAnnotations
+
+			fraction := getReplicaSetFraction(logger, tRS, tDeployment)
+			if test.expectedFraction != fraction {
+				t.Fatalf("expected fraction: %v, got:%v", test.expectedFraction, fraction)
+			}
+		})
+	}
+}
+
+func TestGetReplicaSetProportion(t *testing.T) {
+	tests := []struct {
+		name               string
+		deploymentReplicas int32
+		rsReplicas         int32
+		rsAnnotations      map[string]string
+		replicasToAdd      int32
+		replicasAdded      int32
+		expectedProportion int32
+	}{
+		{
+			name:               "empty RS always scales to 0",
+			deploymentReplicas: 10,
+			rsReplicas:         0,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "5",
+			},
+			expectedProportion: 0,
+		},
+		{
+			name:               "replicasToAdd=0 always scales to 0",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "5",
+			},
+			expectedProportion: 0,
+		},
+		{
+			name:               "replicasToAdd=replicasAdded always scales to 0",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "5",
+			},
+			replicasToAdd:      5,
+			replicasAdded:      5,
+			expectedProportion: 0,
+		},
+		{
+			name:               "scale up by 1/5 should fully increase RS replicas when there is enough capacity in replicasAdded",
+			deploymentReplicas: 120,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "100",
+			},
+			replicasToAdd:      20,
+			replicasAdded:      5,
+			expectedProportion: 10,
+		},
+
+		{
+			name:               "scale up by 1/5 should partially increase RS replicas when there is not enough capacity in replicasAdded",
+			deploymentReplicas: 120,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "100",
+			},
+			replicasToAdd:      20,
+			replicasAdded:      13,
+			expectedProportion: 7,
+		},
+		{
+			name:               "scale down by 1/6 should fully decrease RS replicas when there is enough capacity in replicasAdded",
+			deploymentReplicas: 100,
+			rsReplicas:         60,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "120",
+			},
+			replicasToAdd:      -20,
+			replicasAdded:      -10,
+			expectedProportion: -10,
+		},
+		{
+			name:               "scale down by 1/6 should partially decrease RS replicas when there is not enough capacity in replicasAdded",
+			deploymentReplicas: 100,
+			rsReplicas:         60,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "120",
+			},
+			replicasToAdd:      -20,
+			replicasAdded:      -19,
+			expectedProportion: -1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			tDeployment := generateDeploymentWithReplicas("nginx", test.deploymentReplicas)
+			tRS := generateRSWithReplicas(tDeployment, test.rsReplicas, apps.ReplicaSetStatus{})
+			tRS.Annotations = test.rsAnnotations
+
+			proportion := getReplicaSetProportion(logger, &tRS, tDeployment, test.replicasToAdd, test.replicasAdded)
+			if test.expectedProportion != proportion {
+				t.Fatalf("expected proportion: %v, got:%v", test.expectedProportion, proportion)
+			}
+		})
+	}
+}
+
+func TestPrepareProportionalScalePlan(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		podReplacementPolicy                 *apps.DeploymentPodReplacementPolicy
+		deploymentReplicas                   int32
+		deploymentMaxSurge                   int32
+		deploymentScaleUpdateReplicas        int32
+		replicaSetsReplicas                  map[string]int32
+		replicasetReplicasBeforeScale        map[string]int32
+		terminatingReplica                   int32
+		expectedScalePlan                    map[string]int32
+	}{
+		{
+			name:                          "should scale up proportionally",
+			deploymentReplicas:            100,
+			deploymentScaleUpdateReplicas: 120,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 50,
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 60,
+				"rs-2": 36,
+				"rs-1": 24,
+			},
+		},
+		{
+			name:                          "should scale down proportionally",
+			deploymentReplicas:            120,
+			deploymentScaleUpdateReplicas: 100,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 60,
+				"rs-2": 36,
+				"rs-1": 24,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 50,
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+		},
+		{
+			name:                          "the largest replicaset rs-2 should be preferred with a leftover when scaling up proportionally",
+			deploymentReplicas:            100,
+			deploymentScaleUpdateReplicas: 111,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 30,
+				"rs-2": 40,
+				"rs-1": 30,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 33,
+				"rs-2": 45,
+				"rs-1": 33,
+			},
+		},
+		{
+			name:                          "the newest and largest replicaset rs-3 should be preferred with a leftover when scaling up proportionally",
+			deploymentReplicas:            100,
+			deploymentScaleUpdateReplicas: 111,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 40,
+				"rs-2": 40,
+				"rs-1": 20,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 45,
+				"rs-2": 44,
+				"rs-1": 22,
+			},
+		},
+		{
+			name:                          "the oldest and largest replicaset rs-3 should be preferred with a leftover when scaling down proportionally",
+			deploymentReplicas:            111,
+			deploymentScaleUpdateReplicas: 100,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 44,
+				"rs-2": 44,
+				"rs-1": 23,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 40,
+				"rs-2": 39,
+				"rs-1": 21,
+			},
+		},
+		{
+			name:                          "should scale up proportionally with maxSurge",
+			deploymentReplicas:            100,
+			deploymentMaxSurge:            10,
+			deploymentScaleUpdateReplicas: 120,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 60, // latest RS is surging
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 71, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+		},
+		{
+			name:                          "should scale up proportionally with maxSurge: second iteration",
+			deploymentReplicas:            120,
+			deploymentMaxSurge:            10,
+			deploymentScaleUpdateReplicas: 130,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 71, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 76, // latest RS is surging
+				"rs-2": 38,
+				"rs-1": 26,
+			},
+		},
+		{
+			name:                          "should scale down proportionally with maxSurge",
+			deploymentReplicas:            120,
+			deploymentMaxSurge:            10,
+			deploymentScaleUpdateReplicas: 100,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 71, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+			expectedScalePlan: map[string]int32{
+				"rs-3": 60, // latest RS is surging
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+		},
+		{
+			name:                                 "should scale up partially and proportionally with maxSurge: first iteration",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   100,
+			deploymentMaxSurge:                   10,
+			deploymentScaleUpdateReplicas:        120,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 50, // latest RS is surging
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+			terminatingReplica: 15,
+			expectedScalePlan: map[string]int32{
+				"rs-3": 59, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 21,
+			},
+		},
+		{
+			name:                                 "should scale up partially and proportionally with maxSurge: second iteration",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   100,
+			deploymentMaxSurge:                   10,
+			deploymentScaleUpdateReplicas:        120,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 59, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 21,
+			},
+			replicasetReplicasBeforeScale: map[string]int32{
+				"rs-3": 50, // latest RS is surging
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+			terminatingReplica: 5,
+			expectedScalePlan: map[string]int32{
+				"rs-3": 66, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+		},
+		{
+			name:                                 "should scale up partially and proportionally with maxSurge: third iteration",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			deploymentReplicas:                   100,
+			deploymentMaxSurge:                   10,
+			deploymentScaleUpdateReplicas:        120,
+			replicaSetsReplicas: map[string]int32{
+				"rs-3": 66, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+			replicasetReplicasBeforeScale: map[string]int32{
+				"rs-3": 50, // latest RS is surging
+				"rs-2": 30,
+				"rs-1": 20,
+			},
+			terminatingReplica: 0,
+			expectedScalePlan: map[string]int32{
+				"rs-3": 71, // latest RS is surging
+				"rs-2": 35,
+				"rs-1": 24,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, test.enableDeploymentPodReplacementPolicy)
+			logger, _ := ktesting.NewTestContext(t)
+
+			tDeployment := generateDeploymentWithReplicas("nginx", test.deploymentReplicas)
+			tDeployment.Spec.PodReplacementPolicy = test.podReplacementPolicy
+			tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       ptr.To(intstr.FromInt32(test.deploymentMaxSurge)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				},
+			}
+			maxReplicasAnnotationValue := fmt.Sprintf("%v", *tDeployment.Spec.Replicas+test.deploymentMaxSurge)
+
+			allActiveRSs := []*apps.ReplicaSet{}
+			allReplicas := int32(0)
+			for rsName, rsReplicas := range test.replicaSetsReplicas {
+				tRS := generateRSWithReplicas(tDeployment, rsReplicas, apps.ReplicaSetStatus{})
+				tRS.Name = rsName
+				tRS.Annotations = map[string]string{
+					MaxReplicasAnnotation: maxReplicasAnnotationValue,
+				}
+				if replicasBeforeScale := test.replicasetReplicasBeforeScale[rsName]; replicasBeforeScale > 0 {
+					tRS.Annotations[ReplicaSetReplicasBeforeScaleAnnotation] = fmt.Sprintf("%v", replicasBeforeScale)
+				}
+				minutesCreatedAfterDeployment, err := strconv.Atoi(rsName[3:])
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				}
+				tRS.CreationTimestamp = metav1.Time{Time: time.Now().Add(time.Duration(minutesCreatedAfterDeployment) * time.Minute)}
+				allActiveRSs = append(allActiveRSs, &tRS)
+				allReplicas += rsReplicas
+			}
+
+			// simulate scale
+			tDeployment.Spec.Replicas = &test.deploymentScaleUpdateReplicas
+
+			deploymentReplicasToAdd := *tDeployment.Spec.Replicas + test.deploymentMaxSurge - allReplicas
+			deploymentReplicasToAdd -= test.terminatingReplica
+
+			switch {
+			case deploymentReplicasToAdd >= 0:
+				sort.Sort(controller.ReplicaSetsBySizeNewer(allActiveRSs))
+			case deploymentReplicasToAdd < 0:
+				sort.Sort(controller.ReplicaSetsBySizeOlder(allActiveRSs))
+			}
+
+			scalePlan := PrepareProportionalScalePlan(logger, allActiveRSs, &tDeployment, deploymentReplicasToAdd)
+
+			if !reflect.DeepEqual(test.expectedScalePlan, scalePlan) {
+				t.Fatalf("unexpected scale plan: %s", cmp.Diff(test.expectedScalePlan, scalePlan))
 			}
 		})
 	}
