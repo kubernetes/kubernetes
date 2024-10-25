@@ -25,7 +25,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/registry"
 	"k8s.io/kubernetes/pkg/features"
 
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
@@ -201,7 +200,7 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate master count equal 0",
 			expectErrors: true,
 			options: &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry},
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
 				Audit:                   &genericoptions.AuditOptions{},
@@ -228,7 +227,7 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate token request enable not attempted",
 			expectErrors: true,
 			options: &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry},
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
 				Audit:                   &genericoptions.AuditOptions{},

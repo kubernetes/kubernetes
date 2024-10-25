@@ -53,7 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
-	utilversion "k8s.io/component-base/registry"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
 	openapicommon "k8s.io/kube-openapi/pkg/common"

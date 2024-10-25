@@ -48,8 +48,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
-	utilversion "k8s.io/component-base/registry"
 	"k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
