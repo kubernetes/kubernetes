@@ -1254,28 +1254,40 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// IsRestartableInitContainer returns true if the initContainer has
+// ContainerRestartPolicyAlways.
+func IsRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+}
+
 func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
-	for i, c := range newPod.Spec.Containers {
-		if c.Resources.Requests == nil {
-			continue
-		}
-		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
-			continue
-		}
-		findContainerStatus := func(css []api.ContainerStatus, cName string) (api.ContainerStatus, bool) {
-			for i := range css {
-				if css[i].Name == cName {
-					return css[i], true
-				}
-			}
-			return api.ContainerStatus{}, false
-		}
-		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
-			if !cmp.Equal(c.Resources.Requests, cs.AllocatedResources) {
-				newPod.Status.Resize = api.PodResizeStatusProposed
-				break
+	oldPodSpecContainers := oldPod.Spec.Containers
+	newPodSpecContainers := newPod.Spec.Containers
+
+	// Update is invalid: ignore changes and let validation handle it.
+	// See https://github.com/kubernetes/kubernetes/pull/127291 for more detail.
+	if len(newPodSpecContainers) != len(oldPodSpecContainers) {
+		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for i, c := range oldPod.Spec.InitContainers {
+			if IsRestartableInitContainer(&c) {
+				oldPodSpecContainers = append(oldPodSpecContainers, c)
+				newPodSpecContainers = append(newPodSpecContainers, newPod.Spec.InitContainers[i])
 			}
 		}
+	}
+
+	for i, c := range newPodSpecContainers {
+		if c.Resources.Requests == nil || cmp.Equal(oldPodSpecContainers[i].Resources, c.Resources) {
+			continue
+		}
+		newPod.Status.Resize = api.PodResizeStatusProposed
+		break
 	}
 }
 

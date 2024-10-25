@@ -120,9 +120,11 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
+	sidecarContainers := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SidecarContainers)
 	// sum requests and limits.
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
+		IsSidecarContainersEnabled:       sidecarContainers,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true

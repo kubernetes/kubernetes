@@ -2110,7 +2110,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 func TestSetDefaultResizePolicy(t *testing.T) {
 	// verify we default to NotRequired restart policy for resize when resources are specified
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-
+	restartAlways := v1.ContainerRestartPolicyAlways
 	for desc, tc := range map[string]struct {
 		testContainer        v1.Container
 		expectedResizePolicy []v1.ContainerResizePolicy
@@ -2307,15 +2307,29 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
-			testPod := v1.Pod{}
-			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
-			output := roundTrip(t, runtime.Object(&testPod))
-			pod2 := output.(*v1.Pod)
-			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
-				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
-			}
-		})
+		for _, isSidecarContainer := range []bool{true, false} {
+			t.Run(desc, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, isSidecarContainer)
+				if isSidecarContainer {
+					tc.testContainer.RestartPolicy = &restartAlways
+				}
+				testPod := v1.Pod{}
+				testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
+				if isSidecarContainer {
+					testPod.Spec.InitContainers = append(testPod.Spec.InitContainers, tc.testContainer)
+				}
+				output := roundTrip(t, runtime.Object(&testPod))
+				pod2 := output.(*v1.Pod)
+				if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
+					t.Errorf("expected resize policy %+v, but got %+v for normal containers", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
+				}
+				if isSidecarContainer {
+					if !cmp.Equal(pod2.Spec.InitContainers[0].ResizePolicy, tc.expectedResizePolicy) {
+						t.Errorf("expected resize policy %+v, but got %+v for restartable init containers", tc.expectedResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy)
+					}
+				}
+			})
+		}
 	}
 }
 

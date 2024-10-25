@@ -64,7 +64,11 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+		containerStatuses := pod.Status.ContainerStatuses
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && types.IsRestartableInitContainer(container) {
+			containerStatuses = pod.Status.InitContainerStatuses
+		}
+		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			memoryRequest = cs.AllocatedResources.Memory().Value()
 		}
 	}

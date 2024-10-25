@@ -47,6 +47,7 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -5181,28 +5182,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			// Resources are mutable for CPU & memory only
 			//   - user can now modify Resources to express new desired Resources
-			mungeCpuMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-				if oldResourceList == nil {
-					return nil
-				}
-				var mungedResourceList core.ResourceList
-				if resourceList == nil {
-					mungedResourceList = make(core.ResourceList)
-				} else {
-					mungedResourceList = resourceList.DeepCopy()
-				}
-				delete(mungedResourceList, core.ResourceCPU)
-				delete(mungedResourceList, core.ResourceMemory)
-				if cpu, found := oldResourceList[core.ResourceCPU]; found {
-					mungedResourceList[core.ResourceCPU] = cpu
-				}
-				if mem, found := oldResourceList[core.ResourceMemory]; found {
-					mungedResourceList[core.ResourceMemory] = mem
-				}
-				return mungedResourceList
-			}
-			lim := mungeCpuMemResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
-			req := mungeCpuMemResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
+			lim := mungeResizableResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
+			req := mungeResizableResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
 			container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 		}
 		newContainers = append(newContainers, container)
@@ -5212,6 +5193,13 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	var newInitContainers []core.Container
 	for ix, container := range mungedPodSpec.InitContainers {
 		container.Image = oldPod.Spec.InitContainers[ix].Image // +k8s:verify-mutation:reason=clone
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+			if podutil.IsRestartableInitContainer(&container) {
+				lim := mungeResizableResources(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
+				req := mungeResizableResources(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
+				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+			}
+		}
 		newInitContainers = append(newInitContainers, container)
 	}
 	mungedPodSpec.InitContainers = newInitContainers
@@ -5288,6 +5276,27 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
+}
+
+func mungeResizableResources(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+	if oldResourceList == nil {
+		return nil
+	}
+	var mungedResourceList core.ResourceList
+	if resourceList == nil {
+		mungedResourceList = make(core.ResourceList)
+	} else {
+		mungedResourceList = resourceList.DeepCopy()
+	}
+	delete(mungedResourceList, core.ResourceCPU)
+	delete(mungedResourceList, core.ResourceMemory)
+	if cpu, found := oldResourceList[core.ResourceCPU]; found {
+		mungedResourceList[core.ResourceCPU] = cpu
+	}
+	if mem, found := oldResourceList[core.ResourceMemory]; found {
+		mungedResourceList[core.ResourceMemory] = mem
+	}
+	return mungedResourceList
 }
 
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted

@@ -553,6 +553,13 @@ type podResourcesOptions struct {
 	InPlacePodVerticalScalingEnabled bool
 }
 
+func isRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+}
+
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
@@ -566,6 +573,9 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 		for i := range pod.Status.ContainerStatuses {
 			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
 		}
+		for i := range pod.Status.InitContainerStatuses {
+			containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
+		}
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -573,11 +583,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 		if opts.InPlacePodVerticalScalingEnabled {
 			cs, found := containerStatuses[container.Name]
 			if found {
-				if pod.Status.Resize == api.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources
-				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
-				}
+				containerReqs = setContainerReqs(pod, container, cs)
 			}
 		}
 
@@ -587,9 +593,14 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	restartableInitCotnainerReqs := api.ResourceList{}
 	initContainerReqs := api.ResourceList{}
 	// init containers define the minimum of any resource
-	// Note: In-place resize is not allowed for InitContainers, so no need to check for ResizeStatus value
 	for _, container := range pod.Spec.InitContainers {
 		containerReqs := container.Resources.Requests
+		if opts.InPlacePodVerticalScalingEnabled && feature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isRestartableInitContainer(&container) {
+			cs, found := containerStatuses[container.Name]
+			if found {
+				containerReqs = setContainerReqs(pod, container, cs)
+			}
+		}
 
 		if container.RestartPolicy != nil && *container.RestartPolicy == api.ContainerRestartPolicyAlways {
 			// and add them to the resulting cumulative container requests
@@ -610,6 +621,17 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 
 	maxResourceList(reqs, initContainerReqs)
 	return reqs
+}
+
+// setContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
+func setContainerReqs(pod *api.Pod, container api.Container, cs *api.ContainerStatus) api.ResourceList {
+	cp := api.ResourceList{}
+	if pod.Status.Resize == api.PodResizeStatusInfeasible {
+		cp = cs.AllocatedResources.DeepCopy()
+	} else {
+		cp = max(container.Resources.Requests, cs.AllocatedResources)
+	}
+	return cp
 }
 
 // podLimits is a simplified version of pkg/api/v1/resource/PodLimits that operates against the core version of
