@@ -365,7 +365,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)
