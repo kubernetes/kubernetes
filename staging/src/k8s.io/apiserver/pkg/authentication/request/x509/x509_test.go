@@ -744,7 +744,7 @@ func TestX509(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", "/", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/", nil)
 			if !testCase.Insecure {
 				req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
 			}
@@ -887,7 +887,7 @@ func TestX509Verifier(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		req, _ := http.NewRequest("GET", "/", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
 		if !testCase.Insecure {
 			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
 		}

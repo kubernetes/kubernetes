@@ -46,7 +46,7 @@ func TestAuthenticateRequestSecondPasses(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{returnUser: user1}
 	handler2 := &mockAuthRequestHandler{returnUser: user2, isAuthenticated: true}
 	authRequestHandler := New(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	resp, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
@@ -64,7 +64,7 @@ func TestAuthenticateRequestFirstPasses(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{returnUser: user1, isAuthenticated: true}
 	handler2 := &mockAuthRequestHandler{returnUser: user2}
 	authRequestHandler := New(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	resp, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestAuthenticateRequestSuppressUnnecessaryErrors(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
 	handler2 := &mockAuthRequestHandler{isAuthenticated: true}
 	authRequestHandler := New(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
@@ -95,7 +95,7 @@ func TestAuthenticateRequestSuppressUnnecessaryErrors(t *testing.T) {
 
 func TestAuthenticateRequestNoAuthenticators(t *testing.T) {
 	authRequestHandler := New()
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	resp, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestAuthenticateRequestNonePass(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{}
 	handler2 := &mockAuthRequestHandler{}
 	authRequestHandler := New(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
 	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
 	authRequestHandler := New(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err == nil {
@@ -149,7 +149,7 @@ func TestAuthenticateRequestFailEarly(t *testing.T) {
 	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
 	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
 	authRequestHandler := NewFailOnError(handler1, handler2)
-	req, _ := http.NewRequest("GET", "http://example.org", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://example.org", nil)
 
 	_, isAuthenticated, err := authRequestHandler.AuthenticateRequest(req)
 	if err == nil {

@@ -652,7 +652,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 	if err := wait.Poll(500*time.Millisecond, 60*time.Second, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
 		// download spec with etag support
 		spec := &spec.Swagger{}
-		req, err := http.NewRequest("GET", url.String(), nil)
+		req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 		if err != nil {
 			return false, err
 		}

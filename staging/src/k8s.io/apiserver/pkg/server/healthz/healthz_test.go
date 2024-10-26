@@ -37,7 +37,7 @@ import (
 func TestInstallHandler(t *testing.T) {
 	mux := http.NewServeMux()
 	InstallHandler(mux)
-	req, err := http.NewRequest("GET", "http://example.com/healthz", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestInstallPathHandler(t *testing.T) {
 	mux := http.NewServeMux()
 	InstallPathHandler(mux, "/healthz/test")
 	InstallPathHandler(mux, "/healthz/ready")
-	req, err := http.NewRequest("GET", "http://example.com/healthz/test", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/healthz/test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestInstallPathHandler(t *testing.T) {
 		t.Errorf("expected %v, got %v", "ok", w.Body.String())
 	}
 
-	req, err = http.NewRequest("GET", "http://example.com/healthz/ready", nil)
+	req, err = http.NewRequest(http.MethodGet, "http://example.com/healthz/ready", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -129,7 +129,7 @@ func testMultipleChecks(path, name string, t *testing.T) {
 		} else {
 			InstallPathHandler(mux, path, checks...)
 		}
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s%v", path, test.path), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com%s%v", path, test.path), nil)
 		if err != nil {
 			t.Fatalf("case[%d] Unexpected error: %v", i, err)
 		}
@@ -245,7 +245,7 @@ func TestMetrics(t *testing.T) {
 
 	paths := []string{"/healthz", "/livez", "/readyz"}
 	for _, path := range paths {
-		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", path), nil)
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com%s", path), nil)
 		if err != nil {
 			t.Errorf("%v", err)
 		}
@@ -324,7 +324,7 @@ func TestInstallPathHandlerWithHealthyFunc(t *testing.T) {
 	InstallPathHandlerWithHealthyFunc(mux, "/readyz", hasBeenReadyFn, readyOnChanClose{readyzCh})
 
 	// scenario 1: expect the check to fail since the channel hasn't been closed
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", "/readyz"), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com%s", "/readyz"), nil)
 	if err != nil {
 		t.Errorf("%v", err)
 	}

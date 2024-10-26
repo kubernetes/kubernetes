@@ -1627,7 +1627,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 				return tc.authorizer(a)
 			}
 
-			req, err := http.NewRequest("GET", fw.testHTTPServer.URL+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+tc.path, nil)
 			require.NoError(t, err)
 
 			resp, err := http.DefaultClient.Do(req)

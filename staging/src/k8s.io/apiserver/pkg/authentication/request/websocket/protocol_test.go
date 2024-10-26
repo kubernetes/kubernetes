@@ -217,7 +217,7 @@ func TestBearerToken(t *testing.T) {
 	}
 
 	for k, tc := range tests {
-		req, _ := http.NewRequest("GET", "/", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/", nil)
 		req.Header.Set("Connection", "upgrade")
 		req.Header.Set("Upgrade", "websocket")
 		for _, h := range tc.ProtocolHeaders {

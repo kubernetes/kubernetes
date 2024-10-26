@@ -966,7 +966,7 @@ func setupDoer(t *testing.T, info *SecureServingInfo) doer {
 		url := fmt.Sprintf("https://%s:%d%s", "127.0.0.1", port, path)
 		t.Logf("Sending request - timeout: %s, url: %s", timeout, url)
 
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
 			return result{response: nil, err: err}
 		}

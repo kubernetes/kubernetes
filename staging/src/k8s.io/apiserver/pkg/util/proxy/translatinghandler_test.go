@@ -92,7 +92,7 @@ func TestTranslatingHandler(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		req, err := http.NewRequest("GET", "http://www.example.com/", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
 		require.NoError(t, err)
 		if test.upgrade != "" {
 			req.Header.Add("Connection", "Upgrade")

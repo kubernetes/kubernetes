@@ -165,7 +165,7 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 // a websocket connection. Returns the TunnelingConnection injected with the
 // websocket connection or an error if one occurs.
 func dialForTunnelingConnection(url *url.URL) (*TunnelingConnection, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err
 	}

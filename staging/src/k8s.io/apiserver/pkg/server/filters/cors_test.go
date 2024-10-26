@@ -105,7 +105,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 					server := httptest.NewServer(handler)
 					defer server.Close()
 
-					request, err := http.NewRequest("GET", server.URL+"/version", nil)
+					request, err := http.NewRequest(http.MethodGet, server.URL+"/version", nil)
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}

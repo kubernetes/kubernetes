@@ -298,7 +298,7 @@ apiserver_request_total{code="200",component="",dry_run="",group="",resource="",
 }
 
 func sendReq(t *testing.T, handler http.Handler, path string) []byte {
-	req, err := http.NewRequest("GET", path, nil)
+	req, err := http.NewRequest(http.MethodGet, path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

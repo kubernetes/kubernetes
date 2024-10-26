@@ -94,7 +94,7 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 // Perform a health check. Anything other than a 200-response is treated as a failure.
 // Only returns non-recoverable errors.
 func healthCheck(client *http.Client, url string) bool {
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
 		return false
 	}

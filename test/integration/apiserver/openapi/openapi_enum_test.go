@@ -88,7 +88,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v2", nil)
+			req, err := http.NewRequest(http.MethodGet, kubeConfig.Host+"/openapi/v2", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

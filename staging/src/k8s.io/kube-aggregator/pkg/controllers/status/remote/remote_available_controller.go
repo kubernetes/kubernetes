@@ -298,7 +298,7 @@ func (c *AvailableConditionController) sync(key string) error {
 				errCh := make(chan error, 1)
 				go func() {
 					// be sure to check a URL that the aggregated API server is required to serve
-					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
+					newReq, err := http.NewRequest(http.MethodGet, discoveryURL.String(), nil)
 					if err != nil {
 						errCh <- err
 						return

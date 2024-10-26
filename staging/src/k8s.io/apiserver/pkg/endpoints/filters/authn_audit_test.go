@@ -36,7 +36,7 @@ func TestFailedAuthnAudit(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	req.SetBasicAuth("username", "password")
@@ -68,7 +68,7 @@ func TestFailedMultipleAuthnAudit(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	req.SetBasicAuth("username", "password")
@@ -101,7 +101,7 @@ func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -132,7 +132,7 @@ func TestFailedAuthnAuditOmitted(t *testing.T) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
 		sink, fakeRuleEvaluator)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
 	handler.ServeHTTP(httptest.NewRecorder(), req)

@@ -211,7 +211,7 @@ func TestProxierWithNoProxyCIDR(t *testing.T) {
 			return nil, nil
 		})
 
-		req, err := http.NewRequest("GET", test.url, nil)
+		req, err := http.NewRequest(http.MethodGet, test.url, nil)
 		if err != nil {
 			t.Errorf("%s: unexpected err: %v", test.name, err)
 			continue
@@ -444,7 +444,7 @@ func TestSourceIPs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", "https://cluster.k8s.io/apis/foobars/v1/foo/bar", nil)
+			req, _ := http.NewRequest(http.MethodGet, "https://cluster.k8s.io/apis/foobars/v1/foo/bar", nil)
 			req.RemoteAddr = test.remoteAddr
 			if test.forwardedFor != "" {
 				req.Header.Set("X-Forwarded-For", test.forwardedFor)

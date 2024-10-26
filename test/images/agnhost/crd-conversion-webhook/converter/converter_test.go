@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -76,7 +76,7 @@ request:
 			sampleObj := fmt.Sprintf(sampleObjTemplate, tc.apiVersion)
 			// First try json, it should fail as the data is taml
 			response := httptest.NewRecorder()
-			request, err := http.NewRequest("POST", "/convert", strings.NewReader(sampleObj))
+			request, err := http.NewRequest(http.MethodPost, "/convert", strings.NewReader(sampleObj))
 			if err != nil {
 				t.Fatal(err)
 			}

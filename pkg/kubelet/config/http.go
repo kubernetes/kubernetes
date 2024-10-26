@@ -83,7 +83,7 @@ func (s *sourceURL) applyDefaults(pod *api.Pod) error {
 }
 
 func (s *sourceURL) extractFromURL() error {
-	req, err := http.NewRequest("GET", s.url, nil)
+	req, err := http.NewRequest(http.MethodGet, s.url, nil)
 	if err != nil {
 		return err
 	}

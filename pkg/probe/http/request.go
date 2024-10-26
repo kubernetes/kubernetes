@@ -61,7 +61,7 @@ func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Contain
 }
 
 func newProbeRequest(url *url.URL, headers http.Header, userAgentFragment string) (*http.Request, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, err
 	}

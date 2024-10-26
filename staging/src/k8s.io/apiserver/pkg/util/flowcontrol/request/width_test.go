@@ -559,7 +559,7 @@ func TestWorkEstimator(t *testing.T) {
 
 			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg, maxSeatsFn)
 
-			req, err := http.NewRequest("GET", test.requestURI, nil)
+			req, err := http.NewRequest(http.MethodGet, test.requestURI, nil)
 			if err != nil {
 				t.Fatalf("Failed to create new HTTP request - %v", err)
 			}

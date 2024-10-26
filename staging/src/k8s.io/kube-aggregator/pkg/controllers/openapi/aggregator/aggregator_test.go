@@ -598,7 +598,7 @@ func fetchOpenAPI(mux *http.ServeMux) (*spec.Swagger, error) {
 	defer server.Close()
 	client := server.Client()
 
-	req, err := http.NewRequest("GET", server.URL+"/openapi/v2", nil)
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/openapi/v2", nil)
 	if err != nil {
 		return nil, err
 	}

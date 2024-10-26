@@ -62,7 +62,7 @@ func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 			}
 			// attempt to fetch and unmarshal
 			url := kubeConfig.Host + "/openapi/v3" + path
-			req, err := http.NewRequest("GET", url, nil)
+			req, err := http.NewRequest(http.MethodGet, url, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -195,7 +195,7 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	// attempt to fetch and unmarshal
-	req, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
+	req, err := http.NewRequest(http.MethodGet, kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	protoReq, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
+	protoReq, err := http.NewRequest(http.MethodGet, kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

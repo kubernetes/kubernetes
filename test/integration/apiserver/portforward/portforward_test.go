@@ -164,7 +164,7 @@ func TestPortforward(t *testing.T) {
 
 	timeoutContext, cleanupTimeoutContext := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
 	defer cleanupTimeoutContext()
-	testReq, _ := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%s/test", localPort), nil)
+	testReq, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%s/test", localPort), nil)
 	testReq = testReq.WithContext(timeoutContext)
 	testResp, err := http.DefaultClient.Do(testReq)
 	if err != nil {

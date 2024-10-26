@@ -468,7 +468,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	defer ts.Close()
 
 	newServerRequest := func(tr *panicOnNonReuseTransport) *http.Request {
-		req, _ := http.NewRequest("GET", fmt.Sprintf("https://127.0.0.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port), nil)
+		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("https://127.0.0.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port), nil)
 		trace := &httptrace.ClientTrace{
 			GotConn: tr.GotConn,
 		}

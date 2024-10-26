@@ -188,7 +188,7 @@ func (he *HTTPError) Error() string {
 
 // ReadURL read contents from given url
 func ReadURL(url string, client *http.Client, header *http.Header) (body []byte, err error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

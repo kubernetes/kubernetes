@@ -976,7 +976,7 @@ func getCredentialID(c claims) string {
 // TODO: Allow passing in JSON hints to the IDP.
 func getClaimJWT(ctx context.Context, client *http.Client, url, accessToken string) (string, error) {
 	// TODO: Allow passing request body with configurable information.
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", fmt.Errorf("while calling %v: %v", url, err)
 	}

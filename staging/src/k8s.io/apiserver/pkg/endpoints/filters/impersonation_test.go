@@ -532,7 +532,7 @@ func TestImpersonationFilter(t *testing.T) {
 				ctx = request.WithUser(request.NewContext(), tc.user)
 			}()
 
-			req, err := http.NewRequest("GET", server.URL, nil)
+			req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				return

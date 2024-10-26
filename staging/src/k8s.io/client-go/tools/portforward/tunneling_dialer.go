@@ -61,7 +61,7 @@ func NewSPDYOverWebsocketDialer(url *url.URL, config *restclient.Config) (httpst
 func (d *tunnelingDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	// There is no passed context, so skip the context when creating request for now.
 	// Websockets requires "GET" method: RFC 6455 Sec. 4.1 (page 17).
-	req, err := http.NewRequest("GET", d.url.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, d.url.String(), nil)
 	if err != nil {
 		return nil, "", err
 	}

@@ -396,7 +396,7 @@ func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, 
 	for _, h := range instance.httpServers {
 		handler := h.(*fakeHTTPServer).handler
 
-		req, err := http.NewRequest("GET", "/healthz", nil)
+		req, err := http.NewRequest(http.MethodGet, "/healthz", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -613,7 +613,7 @@ func testProxierHealthUpdater(hs *ProxierHealthServer, hsTest *serverTest, fakeC
 
 func testHTTPHandler(hsTest *serverTest, status int, t *testing.T) {
 	handler := hsTest.server.(*fakeHTTPServer).handler
-	req, err := http.NewRequest("GET", string(hsTest.url), nil)
+	req, err := http.NewRequest(http.MethodGet, string(hsTest.url), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -403,7 +403,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 
 	url := strings.TrimRight(h.extenderURL, "/") + "/" + action
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(out))
 	if err != nil {
 		return err
 	}

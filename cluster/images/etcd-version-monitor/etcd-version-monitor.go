@@ -202,7 +202,7 @@ type EtcdVersion struct {
 // Function for fetching etcd version info and feeding it to the prometheus metric.
 func getVersion(lastSeenBinaryVersion *string) error {
 	// Create the get request for the etcd version endpoint.
-	req, err := http.NewRequest("GET", etcdVersionScrapeURI, nil)
+	req, err := http.NewRequest(http.MethodGet, etcdVersionScrapeURI, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create GET request for etcd version: %v", err)
 	}
@@ -259,7 +259,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 
 // scrapeMetrics scrapes the prometheus metrics from the etcd metrics URI.
 func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
-	req, err := http.NewRequest("GET", etcdMetricsScrapeURI, nil)
+	req, err := http.NewRequest(http.MethodGet, etcdMetricsScrapeURI, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GET request for etcd metrics: %v", err)
 	}
