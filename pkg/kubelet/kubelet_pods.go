@@ -33,7 +33,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1754,33 +1753,51 @@ func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirement
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus) v1.PodResizeStatus {
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
-	specStatusDiffer := false
-	for _, c := range pod.Spec.Containers {
-		if cs, ok := podutil.GetContainerStatus(podStatus.ContainerStatuses, c.Name); ok {
-			cResourceCopy := c.Resources.DeepCopy()
-			// for both requests and limits, we only compare the cpu, memory and ephemeralstorage
-			// which are included in convertToAPIContainerStatuses
-			deleteCustomResourceFromResourceRequirements(cResourceCopy)
-			csResourceCopy := cs.Resources.DeepCopy()
-			if csResourceCopy != nil && !cmp.Equal(*cResourceCopy, *csResourceCopy) {
-				specStatusDiffer = true
-				break
-			}
-		}
-	}
-	if !specStatusDiffer {
+	if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
 		// Clear last resize state from checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", pod.Name)
+		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", allocatedPod.Name)
 		}
 	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(pod.UID)); found {
+		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(allocatedPod.UID)); found {
 			podResizeStatus = resizeStatus
 		}
 	}
 	return podResizeStatus
+}
+
+// allocatedResourcesMatchStatus tests whether the resizeable resources in the pod spec match the
+// resources reported in the status.
+func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	for _, c := range allocatedPod.Spec.Containers {
+		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
+			if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
+				// If the container isn't running, it isn't resizing.
+				continue
+			}
+
+			// Only compare resizeable resources, and only compare resources that are explicitly configured.
+			if cpuReq, present := c.Resources.Requests[v1.ResourceCPU]; present {
+				if !cpuReq.Equal(*cs.Resources.CPURequest) {
+					return false
+				}
+			}
+			if cpuLim, present := c.Resources.Limits[v1.ResourceCPU]; present {
+				if !cpuLim.Equal(*cs.Resources.CPULimit) {
+					return false
+				}
+			}
+			if memLim, present := c.Resources.Limits[v1.ResourceMemory]; present {
+				if !memLim.Equal(*cs.Resources.MemoryLimit) {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
@@ -1794,7 +1811,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		s.Resize = kl.determinePodResizeStatus(pod, s)
+		s.Resize = kl.determinePodResizeStatus(pod, podStatus)
 	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)

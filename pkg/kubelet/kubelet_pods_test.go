@@ -6492,3 +6492,155 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestAllocatedResourcesMatchStatus(t *testing.T) {
+	tests := []struct {
+		name               string
+		allocatedResources v1.ResourceRequirements
+		statusResources    *kubecontainer.ContainerResources
+		statusTerminated   bool
+		expectMatch        bool
+	}{{
+		name: "guaranteed pod: match",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
+			MemoryLimit: resource.NewScaledQuantity(100, 6),
+		},
+		expectMatch: true,
+	}, {
+		name: "guaranteed pod: cpu request mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(50, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
+			MemoryLimit: resource.NewScaledQuantity(100, 6),
+		},
+		expectMatch: false,
+	}, {
+		name: "guaranteed pod: cpu limit mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(50, resource.DecimalSI),
+			MemoryLimit: resource.NewScaledQuantity(100, 6),
+		},
+		expectMatch: false,
+	}, {
+		name: "guaranteed pod: memory limit mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
+			MemoryLimit: resource.NewScaledQuantity(50, 6),
+		},
+		expectMatch: false,
+	}, {
+		name: "guaranteed pod: terminated mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
+			MemoryLimit: resource.NewScaledQuantity(50, 6),
+		},
+		statusTerminated: true,
+		expectMatch:      true,
+	}, {
+		name: "burstable: no cpu request",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
+		},
+		expectMatch: true,
+	}, {
+		name:               "best effort",
+		allocatedResources: v1.ResourceRequirements{},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
+		},
+		expectMatch: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			allocatedPod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:      "c",
+						Resources: test.allocatedResources,
+					}},
+				},
+			}
+			state := kubecontainer.ContainerStateRunning
+			if test.statusTerminated {
+				state = kubecontainer.ContainerStateExited
+			}
+			podStatus := &kubecontainer.PodStatus{
+				Name: "test",
+				ContainerStatuses: []*kubecontainer.Status{
+					&kubecontainer.Status{
+						Name:      "c",
+						State:     state,
+						Resources: test.statusResources,
+					},
+				},
+			}
+
+			match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
+			assert.Equal(t, test.expectMatch, match)
+		})
+	}
+}
