@@ -560,3 +560,7 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 	}
 	return count
 }
+
+func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
+	return ex.kubeClient.ResourceV1alpha3().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+}
