@@ -5504,7 +5504,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// newPod.Spec.Containers[].Resources are allowed.
 	specPath := field.NewPath("spec")
 	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
-		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class must not change"))
+		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
 	// Ensure that only CPU and memory resources are mutable.
@@ -5539,7 +5539,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 	mungedPodSpec.Containers = newContainers
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
-		// This likely means that the user has made changes to CPU and Memory resources.
+		// This likely means that the user has made changes to resources other than CPU and Memory.
 		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
 		errs := field.Forbidden(specPath, fmt.Sprintf("pod resize may not change fields other than cpu and memory\n%v", specDiff))
 		allErrs = append(allErrs, errs)
