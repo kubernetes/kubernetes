@@ -35,8 +35,10 @@ type PodResourcesOptions struct {
 	// Reuse, if provided will be reused to accumulate resources and returned by the PodRequests or PodLimits
 	// functions. All existing values in Reuse will be lost.
 	Reuse v1.ResourceList
-	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
-	InPlacePodVerticalScalingEnabled bool
+	// UseStatusResources indicates whether resources reported by the PodStatus should be considered
+	// when evaluating the pod resources. This MUST be false if the InPlacePodVerticalScaling
+	// feature is not enabled.
+	UseStatusResources bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
 	// ContainerFn is called with the effective resources required for each container within the pod.
@@ -54,7 +56,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	reqs := reuseOrClearResourceList(opts.Reuse)
 
 	var containerStatuses map[string]*v1.ContainerStatus
-	if opts.InPlacePodVerticalScalingEnabled {
+	if opts.UseStatusResources {
 		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses))
 		for i := range pod.Status.ContainerStatuses {
 			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
@@ -63,13 +65,13 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
-		if opts.InPlacePodVerticalScalingEnabled {
+		if opts.UseStatusResources {
 			cs, found := containerStatuses[container.Name]
-			if found {
+			if found && cs.Resources != nil {
 				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources.DeepCopy()
+					containerReqs = cs.Resources.Requests.DeepCopy()
 				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
+					containerReqs = max(container.Resources.Requests, cs.Resources.Requests)
 				}
 			}
 		}
@@ -155,11 +157,31 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := reuseOrClearResourceList(opts.Reuse)
 
-	for _, container := range pod.Spec.Containers {
-		if opts.ContainerFn != nil {
-			opts.ContainerFn(container.Resources.Limits, Containers)
+	var containerStatuses map[string]*v1.ContainerStatus
+	if opts.UseStatusResources {
+		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses))
+		for i := range pod.Status.ContainerStatuses {
+			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
 		}
-		addResourceList(limits, container.Resources.Limits)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		containerLimits := container.Resources.Limits
+		if opts.UseStatusResources {
+			cs, found := containerStatuses[container.Name]
+			if found && cs.Resources != nil {
+				if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+					containerLimits = cs.Resources.Limits.DeepCopy()
+				} else {
+					containerLimits = max(container.Resources.Limits, cs.Resources.Limits)
+				}
+			}
+		}
+
+		if opts.ContainerFn != nil {
+			opts.ContainerFn(containerLimits, Containers)
+		}
+		addResourceList(limits, containerLimits)
 	}
 
 	restartableInitContainerLimits := v1.ResourceList{}

@@ -432,7 +432,7 @@ func TestPodResourceRequests(t *testing.T) {
 				v1.ResourceCPU: resource.MustParse("2"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			options:         PodResourcesOptions{UseStatusResources: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -446,8 +446,10 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
 					},
 				},
 			},
@@ -457,7 +459,7 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			options: PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			options: PodResourcesOptions{UseStatusResources: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -471,19 +473,21 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
 					},
 				},
 			},
 		},
 		{
-			description: "resized, infeasible, feature gate disabled",
+			description: "resized, infeasible, but don't use status",
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: false},
+			options:         PodResourcesOptions{UseStatusResources: false},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -497,8 +501,10 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
 					},
 				},
 			},
@@ -742,12 +748,13 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 func TestPodResourceLimits(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
-		description    string
-		options        PodResourcesOptions
-		overhead       v1.ResourceList
-		initContainers []v1.Container
-		containers     []v1.Container
-		expectedLimits v1.ResourceList
+		description       string
+		options           PodResourcesOptions
+		overhead          v1.ResourceList
+		initContainers    []v1.Container
+		containers        []v1.Container
+		containerStatuses []v1.ContainerStatus
+		expectedLimits    v1.ResourceList
 	}{
 		{
 			description: "nil options, larger init container",
@@ -1119,6 +1126,87 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "pod scaled up",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod scaled down",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod scaled down, don't use status",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: false},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1127,6 +1215,9 @@ func TestPodResourceLimits(t *testing.T) {
 					Containers:     tc.containers,
 					InitContainers: tc.initContainers,
 					Overhead:       tc.overhead,
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.containerStatuses,
 				},
 			}
 			limits := PodLimits(p, tc.options)
