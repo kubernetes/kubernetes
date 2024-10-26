@@ -882,7 +882,21 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder,
 		volumepathhandler.NewBlockVolumePathHandler())
 
-	klet.backOff = flowcontrol.NewBackOff(containerBackOffPeriod, MaxContainerBackOff)
+	bo := MaxContainerBackOff
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableKubeletCrashLoopBackoffMax) {
+		if kubeCfg.CrashLoopBackOff.MaxSeconds != nil {
+			bo = time.Duration(*kubeCfg.CrashLoopBackOff.MaxSeconds)
+		} else {
+			klog.InfoS("EnableKubeletCrashLoopBackOffMax feature gate enabled, but crashloopbackoff.maxSeconds KubeletConfig not set. Using default CrashLoopBackOff maximum backoff.")
+		}
+	} else {
+		if kubeCfg.CrashLoopBackOff != nil {
+			if kubeCfg.CrashLoopBackOff.MaxSeconds != nil {
+				klog.InfoS("EnableKubeletCrashLoopBackOffMax feature gate not enabled, but corresponding crashloopbackoff.maxSeconds KubeletConfig configured. Ignoring crashloopbackoff.maxSeconds.")
+			}
+		}
+	}
+	klet.backOff = flowcontrol.NewBackOff(containerBackOffPeriod, bo)
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
