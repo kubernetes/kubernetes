@@ -40,6 +40,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/lru"
 
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -525,6 +526,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
 				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				IsSidecarContainersEnabled:       feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
@@ -551,13 +553,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 type podResourcesOptions struct {
 	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
 	InPlacePodVerticalScalingEnabled bool
-}
-
-func isRestartableInitContainer(initContainer *api.Container) bool {
-	if initContainer.RestartPolicy == nil {
-		return false
-	}
-	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+	// IsSidecarContainers indicates that the sidecar containers feature gate is enabled.
+	IsSidecarContainersEnabled bool
 }
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
@@ -595,7 +592,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	// init containers define the minimum of any resource
 	for _, container := range pod.Spec.InitContainers {
 		containerReqs := container.Resources.Requests
-		if opts.InPlacePodVerticalScalingEnabled && feature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isRestartableInitContainer(&container) {
+		if opts.InPlacePodVerticalScalingEnabled && opts.IsSidecarContainersEnabled && podutil.IsRestartableInitContainer(&container) {
 			cs, found := containerStatuses[container.Name]
 			if found {
 				containerReqs = setContainerReqs(pod, container, cs)
