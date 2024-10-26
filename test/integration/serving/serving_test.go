@@ -255,7 +255,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 				}
 
 				client := &http.Client{Transport: tr}
-				req, err := http.NewRequest("GET", url, nil)
+				req, err := http.NewRequest(http.MethodGet, url, nil)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -43,7 +43,7 @@ func TestWithContentType(t *testing.T) {
 	for _, test := range tests {
 		path := "http://example.com" + test.path
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", path, nil)
+			req, err := http.NewRequest(http.MethodGet, path, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -137,7 +137,7 @@ func TestHealthEndpoints(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get client from test server: %v", err)
 			}
-			req, err := http.NewRequest("GET", base+tt.path, nil)
+			req, err := http.NewRequest(http.MethodGet, base+tt.path, nil)
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
 			}

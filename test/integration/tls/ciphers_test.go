@@ -70,7 +70,7 @@ func runTestAPICiphers(t *testing.T, testID int, kubePort int, clientCiphers []u
 		},
 	}
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://127.0.0.1:%d", kubePort), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://127.0.0.1:%d", kubePort), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -78,7 +78,7 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 		Transport:     transport,
 		CheckRedirect: s.RedirectChecker,
 	}
-	req, err := http.NewRequest("GET", s.Location.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, s.Location.String(), nil)
 	if err != nil {
 		return nil, false, "", fmt.Errorf("failed to construct request for %s, got %v", s.Location.String(), err)
 	}

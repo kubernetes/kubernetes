@@ -109,7 +109,7 @@ func TestFakeHandlerWrongMethod(t *testing.T) {
 	path := "/foo/bar"
 	fakeT := fakeError{}
 
-	req, err := http.NewRequest("PUT", server.URL+path, nil)
+	req, err := http.NewRequest(http.MethodPut, server.URL+path, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

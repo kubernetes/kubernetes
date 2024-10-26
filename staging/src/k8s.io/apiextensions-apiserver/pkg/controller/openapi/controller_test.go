@@ -394,7 +394,7 @@ func (t *testEnv) fetchOpenAPIOrDie() *spec.Swagger {
 	defer server.Close()
 	client := server.Client()
 
-	req, err := http.NewRequest("GET", server.URL+"/openapi/v2", nil)
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/openapi/v2", nil)
 	if err != nil {
 		t.t.Error(err)
 	}

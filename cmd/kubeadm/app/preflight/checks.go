@@ -431,7 +431,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 		u.Host = net.JoinHostPort(hst.Host, "1234")
 	}
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -485,7 +485,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 	}
 	url := fmt.Sprintf("%s://%s/", subnet.Proto, testIPstring)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, []error{err}
 	}

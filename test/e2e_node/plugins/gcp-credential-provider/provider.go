@@ -84,7 +84,7 @@ func (p *provider) Provide(image string) (map[string]credentialproviderv1.AuthCo
 }
 
 func readURL(url string, client *http.Client) (body []byte, err error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

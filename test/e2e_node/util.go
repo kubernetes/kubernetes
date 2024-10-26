@@ -468,7 +468,7 @@ func kubeletHealthCheck(url string) bool {
 		Transport: insecureTransport,
 	}
 
-	req, err := http.NewRequest("HEAD", url, nil)
+	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
 		return false
 	}

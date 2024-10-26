@@ -63,7 +63,7 @@ func testPrefix(t *testing.T, prefix string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, err := http.NewRequest("GET", server.ClientConfig.Host+prefix, nil)
+	req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+prefix, nil)
 	if err != nil {
 		t.Fatalf("couldn't create a request: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestEmptyList(t *testing.T) {
 	}
 
 	u := server.ClientConfig.Host + "/api/v1/namespaces/default/pods"
-	req, err := http.NewRequest("GET", u, nil)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {
 		t.Fatalf("couldn't create a request: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", kubeConfig.Host+tc.reqPath, nil)
+			req, err := http.NewRequest(http.MethodGet, kubeConfig.Host+tc.reqPath, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -388,7 +388,7 @@ func TestWatchSucceedsWithoutArgs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err := http.NewRequest("GET", server.ClientConfig.Host+"/api/v1/namespaces?watch=1", nil)
+	req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/api/v1/namespaces?watch=1", nil)
 	if err != nil {
 		t.Fatalf("couldn't create a request: %v", err)
 	}
@@ -580,7 +580,7 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err := http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
+	req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +600,7 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
+	req, err = http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,7 +619,7 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
+	req, err = http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +638,7 @@ func TestAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err = http.NewRequest("GET", server.ClientConfig.Host+"/api/", nil)
+	req, err = http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/api/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

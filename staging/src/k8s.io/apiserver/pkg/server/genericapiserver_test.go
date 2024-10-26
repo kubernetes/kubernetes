@@ -430,7 +430,7 @@ func TestCustomHandlerChain(t *testing.T) {
 		protected, called = false, false
 
 		var w io.Reader
-		req, err := http.NewRequest("GET", test.path, w)
+		req, err := http.NewRequest(http.MethodGet, test.path, w)
 		if err != nil {
 			t.Errorf("%d: Unexpected http error: %v", i, err)
 			continue
@@ -478,7 +478,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		{"/version"},
 	} {
 		resp := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", test.route, nil)
+		req, _ := http.NewRequest(http.MethodGet, test.route, nil)
 		s.Handler.ServeHTTP(resp, req)
 		if resp.Code != 200 {
 			t.Errorf("route %q expected to work: code %d", test.route, resp.Code)
@@ -739,7 +739,7 @@ func TestWarningWithRequestTimeout(t *testing.T) {
 	server.StartTLS()
 	defer server.Close()
 
-	request, err := http.NewRequest("GET", server.URL+"/test?timeout=100ms", nil)
+	request, err := http.NewRequest(http.MethodGet, server.URL+"/test?timeout=100ms", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -756,7 +756,7 @@ func resetProxyEnv(t *testing.T) {
 	// ProxyFromEnvironment caches the *_proxy environment variables and
 	// if ProxyFromEnvironment already executed before our test with empty
 	// HTTP_PROXY it will make these tests return false positive failures
-	req, err := http.NewRequest("GET", "http://host.fake.tld/", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://host.fake.tld/", nil)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

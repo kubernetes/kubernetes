@@ -59,7 +59,7 @@ func TestStatusIsNot(t *testing.T) {
 }
 
 func TestWithLogging(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestLogOf(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", "http://example.com", nil)
+			req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -121,7 +121,7 @@ func TestLogOf(t *testing.T) {
 func TestUnlogged(t *testing.T) {
 	unloggedTests := []bool{true, false}
 	for _, makeLogger := range unloggedTests {
-		req, err := http.NewRequest("GET", "http://example.com", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -143,7 +143,7 @@ func TestUnlogged(t *testing.T) {
 }
 
 func TestLoggedStatus(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", "http://example.com", nil)
+			req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

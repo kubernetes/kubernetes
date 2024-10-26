@@ -225,7 +225,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	// If we have a handler to contact the server for this APIService, and
 	// the cache entry is too old to use, refresh the cache entry now.
 	handler := http.TimeoutHandler(info.handler, 5*time.Second, "request timed out")
-	req, err := http.NewRequest("GET", "/apis", nil)
+	req, err := http.NewRequest(http.MethodGet, "/apis", nil)
 	if err != nil {
 		// NewRequest should not fail, but if it does for some reason,
 		// log it and continue
@@ -320,7 +320,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 			path = "/apis/" + gv.Group + "/" + gv.Version
 		}
 
-		req, err := http.NewRequest("GET", path, nil)
+		req, err := http.NewRequest(http.MethodGet, path, nil)
 		if err != nil {
 			// NewRequest should not fail, but if it does for some reason,
 			// log it and continue

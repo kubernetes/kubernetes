@@ -154,7 +154,7 @@ func pollConfigz(ctx context.Context, timeout time.Duration, pollInterval time.D
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest("GET", endpoint, nil)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	framework.ExpectNoError(err)
 	if !useProxy {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))

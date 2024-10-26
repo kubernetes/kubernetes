@@ -743,7 +743,7 @@ func TestAudit(t *testing.T) {
 func TestAuditNoPanicOnNilUser(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -758,7 +758,7 @@ func TestAuditLevelNone(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
 	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 
@@ -814,7 +814,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 			req.RemoteAddr = "127.0.0.1"
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.requestHeader != "" {

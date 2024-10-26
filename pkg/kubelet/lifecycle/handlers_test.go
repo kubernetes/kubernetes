@@ -810,7 +810,7 @@ kubelet_lifecycle_handler_http_fallbacks_total 1
 func TestIsHTTPResponseError(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 	defer s.Close()
-	req, err := http.NewRequest("GET", s.URL, nil)
+	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

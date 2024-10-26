@@ -136,7 +136,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		"missing api group":           "/apis/version/resource",
 	}
 	for k, v := range errorCases {
-		req, err := http.NewRequest("GET", v, nil)
+		req, err := http.NewRequest(http.MethodGet, v, nil)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
@@ -174,7 +174,7 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 	resolver := newTestRequestInfoResolver()
 
 	for testName, tc := range tests {
-		req, _ := http.NewRequest("GET", tc.url, nil)
+		req, _ := http.NewRequest(http.MethodGet, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {

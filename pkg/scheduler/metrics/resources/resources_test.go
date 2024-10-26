@@ -87,7 +87,7 @@ func Test_podResourceCollector_Handler(t *testing.T) {
 	}})
 
 	r := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/metrics/resources", nil)
+	req, err := http.NewRequest(http.MethodGet, "/metrics/resources", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

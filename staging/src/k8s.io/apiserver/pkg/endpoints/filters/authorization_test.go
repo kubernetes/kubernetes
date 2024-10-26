@@ -19,16 +19,17 @@ package filters
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	batch "k8s.io/api/batch/v1"
@@ -284,7 +285,7 @@ func TestAuditAnnotation(t *testing.T) {
 		handler := WithAuthorization(&fakeHTTPHandler{}, tc.authorizer, negotiatedSerializer)
 		// TODO: fake audit injector
 
-		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
 		ae := audit.AuditEventFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"

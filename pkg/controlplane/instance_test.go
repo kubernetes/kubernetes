@@ -228,7 +228,7 @@ func TestVersion(t *testing.T) {
 	s, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	req, _ := http.NewRequest("GET", "/version", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/version", nil)
 	resp := httptest.NewRecorder()
 	s.ControlPlane.GenericAPIServer.Handler.ServeHTTP(resp, req)
 	if resp.Code != 200 {

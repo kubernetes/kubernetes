@@ -590,7 +590,7 @@ func TestProxyUpgradeConnectionErrorResponse(t *testing.T) {
 	defer proxy.Close()
 
 	// Send request to proxy server.
-	req, err := http.NewRequest("POST", "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
+	req, err := http.NewRequest(http.MethodPost, "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
 	require.NoError(t, err)
 	req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 	resp, err := http.DefaultClient.Do(req)
@@ -633,7 +633,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			bufferedReader := bufio.NewReader(conn)
 
 			// Send upgrade request resulting in a non-101 response from the backend
-			req, _ := http.NewRequest("GET", "/", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and full message body content
@@ -653,7 +653,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			}
 
 			// Send another request to another endpoint to verify it is not received
-			req, _ = http.NewRequest("GET", "/there", nil)
+			req, _ = http.NewRequest(http.MethodGet, "/there", nil)
 			req.Write(conn)
 			// wait to ensure the handler does not receive the request
 			time.Sleep(time.Second)
@@ -688,7 +688,7 @@ func TestProxyUpgradeErrorResponse(t *testing.T) {
 			bufferedReader := bufio.NewReader(conn)
 
 			// Send upgrade request resulting in a non-101 response from the backend
-			req, _ := http.NewRequest("GET", "/", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and full message body content
@@ -783,7 +783,7 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 			require.NoError(t, err)
 			bufferedReader := bufio.NewReader(conn)
 
-			req, _ := http.NewRequest("GET", proxyURL.String(), nil)
+			req, _ := http.NewRequest(http.MethodGet, proxyURL.String(), nil)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and message body content
 			resp, err := http.ReadResponse(bufferedReader, nil)
@@ -1073,7 +1073,7 @@ func TestFlushIntervalHeaders(t *testing.T) {
 	frontend := httptest.NewServer(proxyHandler)
 	defer frontend.Close()
 
-	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, frontend.URL, nil)
 	req.Close = true
 
 	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
@@ -1118,7 +1118,7 @@ func TestErrorPropagation(t *testing.T) {
 	frontend := httptest.NewServer(proxyHandler)
 	defer frontend.Close()
 
-	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, frontend.URL, nil)
 	req.Close = true
 
 	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)

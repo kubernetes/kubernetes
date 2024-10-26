@@ -116,7 +116,7 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
-	req, err := http.NewRequest("GET", "/openapi/v2", nil)
+	req, err := http.NewRequest(http.MethodGet, "/openapi/v2", nil)
 	if err != nil {
 		return nil, "", 0, err
 	}

@@ -32,7 +32,7 @@ func TestProcessStartTimeHeader(t *testing.T) {
 	now := time.Now()
 	handler := Handler()
 
-	request, _ := http.NewRequest("GET", "/", nil)
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
 	writer := httptest.NewRecorder()
 	handler.ServeHTTP(writer, request)
 	got := writer.Header().Get(processStartTimeHeader)

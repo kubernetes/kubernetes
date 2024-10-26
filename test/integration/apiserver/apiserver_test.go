@@ -251,7 +251,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -297,7 +297,7 @@ func TestHSTS(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3127,7 +3127,7 @@ func TestAllowedEmulationVersions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+"/", nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3189,7 +3189,7 @@ func TestEnableEmulationVersion(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3250,7 +3250,7 @@ func TestDisableEmulationVersion(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -109,7 +109,7 @@ func TestMutableHealthzHandler(t *testing.T) {
 			for _, batch := range tc.checkBatches {
 				h.AddHealthChecker(batch...)
 			}
-			req, err := http.NewRequest("GET", fmt.Sprintf("https://example.com%v", tc.path), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://example.com%v", tc.path), nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

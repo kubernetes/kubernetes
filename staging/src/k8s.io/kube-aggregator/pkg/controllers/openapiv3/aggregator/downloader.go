@@ -55,7 +55,7 @@ func (s *Downloader) OpenAPIV3Root(handler http.Handler) (*handler3.OpenAPIV3Dis
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
-	req, err := http.NewRequest("GET", "/openapi/v3", nil)
+	req, err := http.NewRequest(http.MethodGet, "/openapi/v3", nil)
 	if err != nil {
 		return nil, 0, err
 	}
