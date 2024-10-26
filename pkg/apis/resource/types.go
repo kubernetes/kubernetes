@@ -517,9 +517,41 @@ type CELDeviceSelector struct {
 	//
 	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
 	//
+	// The length of the expression must be smaller or equal to 10 Ki. The
+	// cost of evaluating it is also limited based on the estimated number
+	// of logical steps.
+	//
 	// +required
 	Expression string
 }
+
+// CELSelectorExpressionMaxCost specifies the cost limit for a single CEL selector
+// evaluation.
+//
+// There is no overall budget for selecting a device, so the actual time
+// required for that is proportional to the number of CEL selectors and how
+// often they need to be evaluated, which can vary depending on several factors
+// (number of devices, cluster utilization, additional constraints).
+//
+// Validation against this limit and [CELSelectorExpressionMaxLength] happens
+// only when setting an expression for the first time or when changing it. If
+// the limits are changed in a future Kubernetes release, existing users are
+// guaranteed that existing expressions will continue to be valid.
+//
+// However, the kube-scheduler also applies this cost limit at runtime, so it
+// could happen that a valid expression fails at runtime after an up- or
+// downgrade. This can also happen without version skew when the cost estimate
+// underestimated the actual cost. That this might happen is the reason why
+// kube-scheduler enforces the runtime limit instead of relying on validation.
+//
+// According to
+// https://github.com/kubernetes/kubernetes/blob/4aeaf1e99e82da8334c0d6dddd848a194cd44b4f/staging/src/k8s.io/apiserver/pkg/apis/cel/config.go#L20-L22,
+// this gives roughly 0.1 second for each expression evaluation.
+// However, this depends on how fast the machine is.
+const CELSelectorExpressionMaxCost = 1000000
+
+// CELSelectorExpressionMaxLength is the maximum length of a CEL selector expression string.
+const CELSelectorExpressionMaxLength = 10 * 1024
 
 // DeviceConstraint must have exactly one field set besides Requests.
 type DeviceConstraint struct {

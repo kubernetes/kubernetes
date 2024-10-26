@@ -167,10 +167,19 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 	if stored {
 		envType = environment.StoredExpressions
 	}
-	result := dracel.GetCompiler().CompileCELExpression(celSelector.Expression, envType)
+	if len(celSelector.Expression) > resource.CELSelectorExpressionMaxLength {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("expression"), "<value omitted>", resource.CELSelectorExpressionMaxLength))
+		// Don't bother compiling too long expressions.
+		return allErrs
+	}
+
+	result := dracel.GetCompiler().CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
 	if result.Error != nil {
 		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
+	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("expression"), "too complex, exceeds cost limit"))
 	}
+
 	return allErrs
 }
 
