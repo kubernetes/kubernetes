@@ -704,7 +704,7 @@
   - opcode: churn
     mode: create
     templatePaths:
-    - config/templates/pod-high-priority-large-cpu.yaml
+    - config/templates/pod-high-priority.yaml
     intervalMilliseconds: 200
   - opcode: createPods
     countParam: $measurePods
