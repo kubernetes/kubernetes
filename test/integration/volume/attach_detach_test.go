@@ -31,6 +31,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/podgc"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -326,7 +327,7 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertesting.TestServer, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
+func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertesting.TestServer, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, *podgc.PodGCController, clientgoinformers.SharedInformerFactory) {
 	config := restclient.CopyConfig(server.ClientConfig)
 	config.QPS = 1000000
 	config.Burst = 1000000
@@ -383,11 +384,20 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: false,
 	}
+	podgcCtrl := podgc.NewPodGCInternal(
+		ctx,
+		testClient,
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Nodes(),
+		0,
+		500*time.Millisecond,
+		time.Second,
+	)
 	pvCtrl, err := persistentvolume.NewController(ctx, params)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	return testClient, ctrl, pvCtrl, informers
+	return testClient, ctrl, pvCtrl, podgcCtrl, informers
 }
 
 // Via integration test we can verify that if pod add
