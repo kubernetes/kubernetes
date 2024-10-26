@@ -18,6 +18,7 @@ package resource
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // ContainerType signifies container type
@@ -44,15 +45,52 @@ type PodResourcesOptions struct {
 	// NonMissingContainerRequests if provided will replace any missing container level requests for the specified resources
 	// with the given values.  If the requests for those resources are explicitly set, even if zero, they will not be modified.
 	NonMissingContainerRequests v1.ResourceList
+	// PodLevelResourcesEnabled indicates that the pod-level resources feature gate
+	// is enabled.
+	PodLevelResourcesEnabled bool
+	// UseContainerLevelResources controls whether pod resource calculation should use
+	// container-level resources to calculate PodRequests.
+	UseContainerLevelResources bool
 }
 
-// PodRequests computes the pod requests per the PodResourcesOptions supplied. If PodResourcesOptions is nil, then
-// the requests are returned including pod overhead. The computation is part of the API and must be reviewed
-// as an API change.
+var supportedPodLevelResources = sets.NewString(string(v1.ResourceCPU), string(v1.ResourceMemory))
+
+// IsSupportedPodLevelResources checks if a given resource is supported by pod-level
+// resource management through the PodLevelResources feature. Returns true if
+// the resource is supported.
+func IsSupportedPodLevelResource(name v1.ResourceName) bool {
+	return supportedPodLevelResources.Has(string(name))
+}
+
+// PodRequests computes the total pod requests per the PodResourcesOptions supplied.
+// If PodResourcesOptions is nil, then the requests are returned including pod overhead.
+// If the PodLevelResources feature is enabled AND the pod-level resources are set,
+// those pod-level values are used in calculating Pod Requests.
+// The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	reqs := reuseOrClearResourceList(opts.Reuse)
 
+	if !opts.UseContainerLevelResources && (opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil) {
+		addResourceList(reqs, pod.Spec.Resources.Requests)
+	} else {
+		addResourceList(reqs, effectiveContainersRequests(pod, opts))
+	}
+
+	// Add overhead for running a pod to the sum of requests if requested:
+	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+		addResourceList(reqs, pod.Spec.Overhead)
+	}
+
+	return reqs
+}
+
+// effectiveContainersRequests computes the effective resource requests of all the containers
+// in a pod. This computation folows the formula defined in the KEP for sidecar
+// containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+// for more details.
+func effectiveContainersRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	reqs := v1.ResourceList{}
 	var containerStatuses map[string]*v1.ContainerStatus
 	if opts.InPlacePodVerticalScalingEnabled {
 		containerStatuses = make(map[string]*v1.ContainerStatus, len(pod.Status.ContainerStatuses))
@@ -122,12 +160,6 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	maxResourceList(reqs, initContainerReqs)
-
-	// Add overhead for running a pod to the sum of requests if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		addResourceList(reqs, pod.Spec.Overhead)
-	}
-
 	return reqs
 }
 

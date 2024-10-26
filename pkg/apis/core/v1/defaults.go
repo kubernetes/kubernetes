@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -216,6 +217,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+
+	if obj.Spec.Resources != nil {
+		defaultPodResources(obj)
+	}
+
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
@@ -427,5 +433,37 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
+	}
+}
+func defaultPodResources(obj *v1.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		return
+	}
+
+	if obj.Spec.Resources.Limits == nil {
+		return
+	}
+
+	if obj.Spec.Resources.Requests == nil {
+		obj.Spec.Resources.Requests = make(v1.ResourceList)
+	}
+
+	podReqsFromContainers := resourcehelper.PodRequests(obj, resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseContainerLevelResources:       true,
+		ExcludeOverhead:                  true,
+	})
+
+	for key, value := range podReqsFromContainers {
+		if _, exists := obj.Spec.Resources.Requests[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			obj.Spec.Resources.Requests[key] = value.DeepCopy()
+		}
+	}
+
+	for key, value := range obj.Spec.Resources.Limits {
+		if _, exists := obj.Spec.Resources.Requests[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			obj.Spec.Resources.Requests[key] = value.DeepCopy()
+		}
 	}
 }
