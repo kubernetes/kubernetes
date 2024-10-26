@@ -605,8 +605,22 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 
 	// Remove stale slices.
 	for _, slice := range obsoleteSlices {
-		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice))
-		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		options := metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{
+				UID:             &slice.UID,
+				ResourceVersion: &slice.ResourceVersion,
+			},
+		}
+		// It can happen that we sync again shortly after deleting a
+		// slice and before the slice gets removed from the informer
+		// cache. The MutationCache can't help here because it does not
+		// track pending deletes.
+		//
+		// If this happens, we get a "not found error" and nothing
+		// changes on the server. The only downside is the extra API
+		// call. This isn't as bad as extra creates.
+		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
+		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, options); err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("delete resource slice: %w", err)
 		}
 	}
