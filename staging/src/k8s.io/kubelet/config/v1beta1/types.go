@@ -775,6 +775,11 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdownBasedOnPodPriority
 	// +optional
 	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority `json:"shutdownGracePeriodByPodPriority,omitempty"`
+	// crashLoopBackOff contains config to modify node-level parameters for
+	// container restart behavior
+	// +featureGate=EnableCrashLoopBackOffMax
+	// +optional
+	CrashLoopBackOff *CrashLoopBackOffConfig `json:"crashloopbackoff,omitempty"`
 	// reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature.
 	// The memory manager will not allocate reserved memory for container workloads.
@@ -973,6 +978,14 @@ type MemorySwapConfiguration struct {
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string `json:"swapBehavior,omitempty"`
+}
+
+type CrashLoopBackOffConfig struct {
+	// maxSeconds is the maximum number of seconds the backoff delay can accrue
+	// to for container restarts
+	// +featureGate=EnableKubeletCrashLoopBackoffMax
+	// +optional
+	MaxSeconds *int32 `json:"maxSeconds,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

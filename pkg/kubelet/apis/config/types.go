@@ -505,6 +505,12 @@ type KubeletConfiguration struct {
 	// option is explicitly enabled.
 	// +optional
 	FailCgroupV1 bool
+
+	// CrashLoopBackOff contains config to modify node-level parameters for
+	// container restart behavior
+	// +featureGate=EnableKubeletCrashLoopBackoffMax
+	// +optional
+	CrashLoopBackOff *CrashLoopBackOffConfig
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -682,4 +688,12 @@ type MemorySwapConfiguration struct {
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string
+}
+
+type CrashLoopBackOffConfig struct {
+	// maxSeconds is the maximum number of seconds the backoff delay can accrue
+	// to for container restarts
+	// +featureGate=EnableKubeletCrashLoopBackoffMax
+	// +optional
+	MaxSeconds *int32
 }
