@@ -555,6 +555,13 @@ func addAllEventHandlers(
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
+		case framework.VolumeAttachment:
+			if handlerRegistration, err = informerFactory.Storage().V1().VolumeAttachments().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.VolumeAttachment),
+			); err != nil {
+				return err
+			}
+			handlers = append(handlers, handlerRegistration)
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {

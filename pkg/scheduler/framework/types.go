@@ -189,6 +189,7 @@ const (
 	PersistentVolumeClaim EventResource = "PersistentVolumeClaim"
 	CSINode               EventResource = "storage.k8s.io/CSINode"
 	CSIDriver             EventResource = "storage.k8s.io/CSIDriver"
+	VolumeAttachment      EventResource = "storage.k8s.io/VolumeAttachment"
 	CSIStorageCapacity    EventResource = "storage.k8s.io/CSIStorageCapacity"
 	StorageClass          EventResource = "storage.k8s.io/StorageClass"
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
@@ -218,6 +219,7 @@ var (
 		CSIDriver,
 		CSIStorageCapacity,
 		StorageClass,
+		VolumeAttachment,
 		ResourceClaim,
 		DeviceClass,
 	}
