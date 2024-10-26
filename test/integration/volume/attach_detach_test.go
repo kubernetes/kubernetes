@@ -158,7 +158,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
-	testClient, ctrl, pvCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -185,6 +185,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	go ctrl.Run(tCtx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(tCtx)
+	go podgcCtrl.Run(tCtx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -232,7 +233,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
-	testClient, ctrl, pvCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -262,6 +263,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	go ctrl.Run(tCtx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(tCtx)
+	go podgcCtrl.Run(tCtx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -420,7 +422,7 @@ func TestPodAddedByDswp(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
-	testClient, ctrl, pvCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -449,6 +451,7 @@ func TestPodAddedByDswp(t *testing.T) {
 	go ctrl.Run(tCtx)
 	// Run pvCtrl to avoid leaking goroutines started during its creation.
 	go pvCtrl.Run(tCtx)
+	go podgcCtrl.Run(tCtx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -490,7 +493,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 
 	namespaceName := "test-pod-deletion"
 
-	testClient, ctrl, pvCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
+	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
 		ReconcilerLoopPeriod:                        100 * time.Millisecond,
 		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
 		DesiredStateOfWorldPopulatorLoopSleepPeriod: 24 * time.Hour,
@@ -538,6 +541,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	initCSIObjects(tCtx.Done(), informers)
 	go ctrl.Run(tCtx)
 	go pvCtrl.Run(tCtx)
+	go podgcCtrl.Run(tCtx)
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4)
 	// Give attachdetach controller enough time to populate pods into DSWP.
