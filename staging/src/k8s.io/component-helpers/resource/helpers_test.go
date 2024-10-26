@@ -1137,10 +1137,253 @@ func TestPodResourceLimits(t *testing.T) {
 	}
 }
 
+func TestPodLevelResourceRequests(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	testCases := []struct {
+		name             string
+		opts             PodResourcesOptions
+		podResources     v1.ResourceRequirements
+		overhead         v1.ResourceList
+		initContainers   []v1.Container
+		containers       []v1.Container
+		expectedRequests v1.ResourceList
+	}{
+		{
+			name:             "nil",
+			expectedRequests: v1.ResourceList{},
+		},
+		{
+			name:             "pod level memory resource with feature disabled",
+			podResources:     v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			expectedRequests: v1.ResourceList{},
+		},
+		{
+			name:             "pod level memory resource with feature enabled",
+			podResources:     v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")},
+		},
+		{
+			name:         "pod level memory and container level cpu resources with feature enabled",
+			podResources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2m")}},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Mi"), v1.ResourceCPU: resource.MustParse("2m")},
+		},
+		{
+			name:         "pod level unsupported resources set at both pod-level and container-level with feature enabled",
+			podResources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")}},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("3Mi")},
+		},
+		{
+			name:         "pod level unsupported resources set at pod-level with feature enabled",
+			podResources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("2Mi")}},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")}},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi")},
+		},
+		{
+			name: "only container level resources set with feature enabled",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Mi"), v1.ResourceCPU: resource.MustParse("2m")},
+		},
+		{
+			name: "both container-level and pod-level resources set with feature enabled",
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("6Mi"),
+					v1.ResourceCPU:    resource.MustParse("8m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Mi"), v1.ResourceCPU: resource.MustParse("8m")},
+		},
+		{
+			name: "container-level resources and init container set with feature enabled",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi"), v1.ResourceCPU: resource.MustParse("4m")},
+		},
+		{
+			name: "container-level resources and sidecar container set with feature enabled",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Mi"), v1.ResourceCPU: resource.MustParse("6m")},
+		},
+		{
+			name: "container-level resources, init and sidecar container set with feature enabled",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("6Mi"),
+							v1.ResourceCPU:    resource.MustParse("8m"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("11Mi"), v1.ResourceCPU: resource.MustParse("12m")},
+		},
+		{
+			name: "pod-level resources, container-level resources, init and sidecar container set with feature enabled",
+			podResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("15Mi"),
+					v1.ResourceCPU:    resource.MustParse("18m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("3Mi"),
+							v1.ResourceCPU:    resource.MustParse("2m"),
+						},
+					},
+				},
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("5Mi"),
+							v1.ResourceCPU:    resource.MustParse("4m"),
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("6Mi"),
+							v1.ResourceCPU:    resource.MustParse("8m"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{PodLevelResourcesEnabled: true},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("15Mi"), v1.ResourceCPU: resource.MustParse("18m")},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podReqs := PodRequests(getPodLevelResourcesPod(tc.podResources, tc.overhead, tc.containers, tc.initContainers), tc.opts)
+			if diff := cmp.Diff(podReqs, tc.expectedRequests); diff != "" {
+				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff)
+			}
+		})
+	}
+}
+
 type podResources struct {
 	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
 }
 
+func getPodLevelResourcesPod(podResources v1.ResourceRequirements, overhead v1.ResourceList, containers, initContainers []v1.Container) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources:      &podResources,
+			Containers:     containers,
+			InitContainers: initContainers,
+			Overhead:       overhead,
+		},
+	}
+}
+
+// TODO(ndixita): refactor to re-use getPodResourcesPod()
 func getPod(cname string, resources podResources) *v1.Pod {
 	r := v1.ResourceRequirements{
 		Limits:   make(v1.ResourceList),

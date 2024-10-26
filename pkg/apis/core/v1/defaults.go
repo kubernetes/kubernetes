@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -216,6 +217,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
+
+	if resourcehelper.IsPodLevelResourcesSet(obj, utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) {
+		defaultPodResources(obj)
+	}
+
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
@@ -427,5 +433,49 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 	typeVol := v1.HostPathUnset
 	if obj.Type == nil {
 		obj.Type = &typeVol
+	}
+}
+
+// defaultPodResources applies default values for pod-level requests, when pod-level
+// limits are set, in following scenarios:
+// 1. When at least one container has requests set: The pod-level requests become
+// equal to the effective requests of all containers in the pod.
+// 2. When no containers have requests set: The pod-level requests become equal to
+// pod-level limits.
+// This defaulting behavior ensures consistent resource accounting at the pod-level
+// while mainting compatability with the container-level specifications, as detailed
+// in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
+func defaultPodResources(obj *v1.Pod) {
+	if obj.Spec.Resources.Limits == nil {
+		return
+	}
+
+	if obj.Spec.Resources.Requests == nil {
+		obj.Spec.Resources.Requests = make(v1.ResourceList)
+	}
+
+	podReqsFromContainers := resourcehelper.PodRequests(obj, resourcehelper.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseContainerLevelResources:       true,
+		ExcludeOverhead:                  true,
+	})
+
+	// When containers specify requests for a resource (supported by
+	// PodLevelResources feature) and pod-level requests are not set, the pod-level requests
+	// default to the effective requests of all the containers for that resource.
+	for key, value := range podReqsFromContainers {
+		if _, exists := obj.Spec.Resources.Requests[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			obj.Spec.Resources.Requests[key] = value.DeepCopy()
+		}
+	}
+
+	// When no containers specify requests for a resource, the pod-level requests
+	// will default to match the pod-level limits, if pod-level
+	// limits exist for that resource.
+	for key, value := range obj.Spec.Resources.Limits {
+		if _, exists := obj.Spec.Resources.Requests[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+			obj.Spec.Resources.Requests[key] = value.DeepCopy()
+		}
 	}
 }
