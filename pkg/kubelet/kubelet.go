@@ -884,6 +884,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		volumepathhandler.NewBlockVolumePathHandler())
 
 	klet.backOff = flowcontrol.NewBackOff(containerBackOffPeriod, MaxContainerBackOff)
+	klet.backOff.HasExpiredFunc = func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+		return eventTime.Sub(lastUpdate) > 600*time.Second
+	}
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
