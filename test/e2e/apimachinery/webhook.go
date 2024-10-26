@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -194,6 +195,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		namespace based on the webhook namespace selector MUST be allowed.
 	*/
 	framework.ConformanceIt("should be able to deny pod and configmap creation", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
 		testWebhook(ctx, f)
 	})
@@ -205,6 +209,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Attempts to attach MUST be denied.
 	*/
 	framework.ConformanceIt("should be able to deny attaching pod", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerWebhookForAttachingPod(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
 		testAttachingPodWebhook(ctx, f)
 	})
@@ -216,6 +223,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		custom resources. Attempts to create, update and delete custom resources MUST be denied.
 	*/
 	framework.ConformanceIt("should be able to deny custom resource creation, update and deletion", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -233,6 +243,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Attempt operations that require the admission webhook; all MUST be denied.
 	*/
 	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerFailClosedWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
 		testFailClosedWebhook(ctx, f)
 	})
@@ -245,6 +258,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the first webhook is present. Attempt to create a config map; both keys MUST be added to the config map.
 	*/
 	framework.ConformanceIt("should mutate configmap", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerMutatingWebhookForConfigMap(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
 		testMutatingConfigMapWebhook(ctx, f)
 	})
@@ -256,6 +272,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
 	*/
 	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerMutatingWebhookForPod(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
 		testMutatingPodWebhook(ctx, f)
 	})
@@ -268,6 +287,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		MUST NOT be mutated the webhooks.
 	*/
 	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		registerValidatingWebhookForWebhookConfigurations(ctx, f, markersNamespaceName, f.UniqueName+"blocking", certCtx, servicePort)
 		registerMutatingWebhookForWebhookConfigurations(ctx, f, markersNamespaceName, f.UniqueName+"blocking", certCtx, servicePort)
 		testWebhooksForWebhookConfigurations(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
@@ -280,6 +302,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		the custom resource MUST be mutated.
 	*/
 	framework.ConformanceIt("should mutate custom resource", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -310,6 +335,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		successfully.
 	*/
 	framework.ConformanceIt("should mutate custom resource with different stored version", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f)
 		if err != nil {
 			return
@@ -567,6 +595,9 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		all webhook configurations MUST be deleted. Attempt to create an object; the create MUST NOT be denied.
 	*/
 	framework.ConformanceIt("listing validating webhooks should work", func(ctx context.Context) {
+		go func() {
+			printWebhookPodLogs(ctx, f)
+		}()
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
@@ -2760,4 +2791,43 @@ func newMutatingIsReadyWebhookFixture(f *framework.Framework, certCtx *certConte
 			MatchLabels: map[string]string{f.UniqueName: "true"},
 		},
 	}
+}
+
+func printWebhookPodLogs(ctx context.Context, f *framework.Framework) {
+	defer func() {
+		recover()
+	}()
+	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return
+	}
+	var pod v1.Pod
+	for _, pod = range pods.Items {
+		if strings.HasPrefix(pod.Name, deploymentName) {
+			break
+		}
+	}
+
+	readCloser, err := f.ClientSet.
+		CoreV1().
+		Pods(f.Namespace.Name).
+		GetLogs(pod.Name, &v1.PodLogOptions{Follow: true}).
+		Stream(ctx)
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = readCloser.Close()
+	}()
+
+	scanner := bufio.NewScanner(readCloser)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, "\t\t"+scanner.Text())
+	}
+
+	framework.Logf("================ start of pod log for %s ================", pod.Name)
+	framework.Logf("\n%s", strings.Join(lines, "\n"))
+	framework.Logf("================ end of pod log for %s ================", pod.Name)
+
 }
