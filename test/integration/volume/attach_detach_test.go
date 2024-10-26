@@ -216,7 +216,7 @@ func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedIn
 	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)
 }
 
-func TestPodUpdateWithWithADC(t *testing.T) {
+func TestPodUpdateWithADC(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
