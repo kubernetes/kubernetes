@@ -659,12 +659,12 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	}
 
 	if latency > longThrottleLatency {
-		klog.V(3).Info(message)
+		klog.FromContext(ctx).V(3).Info(message)
 	}
 	if latency > extraLongThrottleLatency {
 		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
 		// but we use a throttled logger to prevent spamming.
-		globalThrottledLogger.Infof("%s", message)
+		globalThrottledLogger.Info(ctx, message)
 	}
 	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
@@ -723,11 +723,11 @@ func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
 	return -1, false
 }
 
-// Infof will write a log message at each logLevel specified by the receiver's throttleSettings
+// Info will write a log message at each logLevel specified by the receiver's throttleSettings
 // as long as it hasn't written a log message more recently than minLogInterval.
-func (b *throttledLogger) Infof(message string, args ...interface{}) {
+func (b *throttledLogger) Info(ctx context.Context, message string) {
 	if logLevel, ok := b.attemptToLog(); ok {
-		klog.V(logLevel).Infof(message, args...)
+		klog.FromContext(ctx).V(int(logLevel)).Info(message)
 	}
 }
 
