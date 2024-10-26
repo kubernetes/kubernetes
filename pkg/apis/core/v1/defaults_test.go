@@ -380,6 +380,880 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	}
 }
 
+func TestPodResourcesDefaults(t *testing.T) {
+	cases := []struct {
+		name                     string
+		podLevelResourcesEnabled bool
+		containers               []v1.Container
+		podResources             *v1.ResourceRequirements
+		expectedPodSpec          v1.PodSpec
+	}{
+		{
+			name:       "pod resources=unset, container resources=unset",
+			containers: []v1.Container{{Resources: v1.ResourceRequirements{}}, {Resources: v1.ResourceRequirements{}}},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{{Resources: v1.ResourceRequirements{}}, {Resources: v1.ResourceRequirements{}}},
+			},
+		}, {
+			name: "pod resources=unset, container requests=unset limits=set",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name: "pod resources=unset, container requests=set limits=unset",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name: "pod resources=unset, container requests=set limits=set",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset limits=set, container resources=unset",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("2m"),
+					"memory": resource.MustParse("1Mi"),
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+				},
+			},
+		}, {
+			name:                     "pod limits=nil, container requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: nil,
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod limits=empty map, container requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=empty map limits=set, container requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{},
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("5m"),
+					"memory": resource.MustParse("7Mi"),
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("3m"),
+						"memory": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("5m"),
+						"memory": resource.MustParse("7Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=nil limits=set, container requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: nil,
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("5m"),
+					"memory": resource.MustParse("7Mi"),
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("3m"),
+						"memory": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("5m"),
+						"memory": resource.MustParse("7Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset limits=set, container requests=unset limits=set",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("5m"),
+					"memory": resource.MustParse("7Mi"),
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("3m"),
+						"memory": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("5m"),
+						"memory": resource.MustParse("7Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset limits=set, container requests=set limits=unset",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("4m"),
+					"memory": resource.MustParse("8Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("2Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("3Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("4m"),
+						"memory": resource.MustParse("8Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("2Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset cpu limits=set, container resources=unset",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu": resource.MustParse("4m"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				}, {
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu": resource.MustParse("4m"),
+					},
+					Limits: v1.ResourceList{
+						"cpu": resource.MustParse("4m"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{},
+					}, {
+						Resources: v1.ResourceRequirements{},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset limits=set, container requests=set limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("4m"),
+					"memory": resource.MustParse("8Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("2Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("1m"),
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("3Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("4m"),
+						"memory": resource.MustParse("8Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("2Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod requests=unset limits=set, container memory requests=set limits=unset",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("4m"),
+					"memory": resource.MustParse("8Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"memory": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("4m"),
+						"memory": resource.MustParse("6Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("4m"),
+						"memory": resource.MustParse("8Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("1m"),
+								"memory": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod limits=set, container unsupported requests=set limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":    resource.MustParse("2m"),
+					"memory": resource.MustParse("1Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"storage": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"ephemeral-storage": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod unsupported resources limits=set, container unsupported requests=set limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"storage": resource.MustParse("1Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"storage": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"ephemeral-storage": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{},
+					Limits: v1.ResourceList{
+						"storage": resource.MustParse("1Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}, {
+			name:                     "pod supported and unsupported resources limits=set, container unsupported requests=set limits=set",
+			podLevelResourcesEnabled: true,
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"cpu":     resource.MustParse("2m"),
+					"memory":  resource.MustParse("1Mi"),
+					"storage": resource.MustParse("1Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"storage": resource.MustParse("1Mi"),
+						},
+					},
+				}, {
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							"ephemeral-storage": resource.MustParse("5Mi"),
+						},
+					},
+				},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+					Limits: v1.ResourceList{
+						"cpu":    resource.MustParse("2m"),
+						"memory": resource.MustParse("1Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"storage": resource.MustParse("1Mi"),
+							},
+						},
+					}, {
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+							Limits: v1.ResourceList{
+								"ephemeral-storage": resource.MustParse("5Mi"),
+							},
+						},
+					},
+				},
+			},
+		}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			}
+			spec := v1.PodSpec{
+				Containers: tc.containers,
+				Resources:  tc.podResources,
+			}
+			p := v1.Pod{Spec: *spec.DeepCopy()}
+			corev1.SetDefaults_Pod(&p)
+			for i, container := range p.Spec.Containers {
+				for resource, quantity := range container.Resources.Requests {
+					if quantity.Cmp(tc.expectedPodSpec.Containers[i].Resources.Requests[resource]) != 0 {
+						t.Errorf("got: %v, expected: %v", quantity, tc.expectedPodSpec.Containers[i].Resources.Requests[resource])
+					}
+				}
+			}
+
+			if tc.podResources != nil {
+				for resource, quantity := range p.Spec.Resources.Requests {
+					if quantity.Cmp(tc.expectedPodSpec.Resources.Requests[resource]) != 0 {
+						t.Errorf("got: %v, expected: %v", quantity, tc.expectedPodSpec.Resources.Requests[resource])
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestPodHostNetworkDefaults(t *testing.T) {
 	cases := []struct {
 		name                 string

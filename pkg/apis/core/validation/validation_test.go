@@ -20656,6 +20656,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].Name",
 		"ResourceClaims[*].ResourceClaimName",
 		"ResourceClaims[*].ResourceClaimTemplateName",
+		"Resources",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
