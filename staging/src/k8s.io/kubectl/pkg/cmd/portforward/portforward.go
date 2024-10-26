@@ -223,7 +223,9 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 	var converted []string
 	for _, port := range ports {
 		localPort, remotePort := splitPort(port)
-
+		if remotePort == "" {
+			return nil, fmt.Errorf("remote port cannot be empty")
+		}
 		containerPortStr := remotePort
 		_, err := strconv.Atoi(remotePort)
 		if err != nil {
