@@ -875,6 +875,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolume:      framework.All - framework.Delete,
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
+				framework.VolumeAttachment:      framework.Delete,
 			},
 		},
 		{
@@ -889,6 +890,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolume:      framework.All - framework.Delete,
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
+				framework.VolumeAttachment:      framework.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 		},
@@ -904,6 +906,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolume:      framework.All - framework.Delete,
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
+				framework.VolumeAttachment:      framework.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 			enableSchedulerQueueingHints:    true,
