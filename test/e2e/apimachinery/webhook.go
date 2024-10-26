@@ -2647,6 +2647,19 @@ func createWebhookConfigurationReadyNamespace(ctx context.Context, f *framework.
 // the webhook configuration.
 func waitWebhookConfigurationReady(ctx context.Context, f *framework.Framework, markersNamespaceName string) error {
 	cmClient := f.ClientSet.CoreV1().ConfigMaps(markersNamespaceName)
+	go func() {
+		for i := 0; i < 10; i++ {
+			resp, err := f.ClientSet.CoreV1().
+				Services(f.Namespace.Name).
+				ProxyGet("https", serviceName, "8443", "readyz", nil).
+				DoRaw(ctx)
+			if err != nil {
+				continue
+			}
+			framework.Logf("\nwebhook readiness: namespace: %s, response: %s\n", f.Namespace.Name, string(resp))
+			time.Sleep(1*time.Second + 500*time.Millisecond)
+		}
+	}()
 	return wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		marker := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
