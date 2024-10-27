@@ -674,9 +674,14 @@ func TestControllerSyncPool(t *testing.T) {
 			assert.Equal(t, test.expectedStats, ctrl.GetStats())
 
 			// The informer might have added a work item after ctrl.run returned.
-			state := queue.State()
-			state.Ready = nil
-			assert.Equal(t, workqueue.MockState[string]{}, state)
+			actualState := queue.State()
+			actualState.Ready = nil
+			var expectState workqueue.MockState[string]
+			if test.expectedStats.NumCreates > 0 {
+				expectState.Later = []workqueue.MockDelayedItem[string]{{Item: poolName, Duration: defaultMutationCacheTTL}}
+			}
+			assert.Equal(t, expectState, actualState)
+
 		})
 	}
 }
