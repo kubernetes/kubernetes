@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -65,6 +66,11 @@ type Controller struct {
 	// The queue is keyed with the pool name that needs work.
 	queue      workqueue.TypedRateLimitingInterface[string]
 	sliceStore cache.Indexer
+
+	// Must use atomic access...
+	numCreates int64
+	numUpdates int64
+	numDeletes int64
 
 	mutex sync.RWMutex
 
@@ -207,6 +213,25 @@ func (c *Controller) Update(resources *DriverResources) {
 	for poolName := range c.resources.Pools {
 		c.queue.Add(poolName)
 	}
+}
+
+// GetStats provides some insights into operations of the controller.
+func (c *Controller) GetStats() Stats {
+	s := Stats{
+		NumCreates: atomic.LoadInt64(&c.numCreates),
+		NumUpdates: atomic.LoadInt64(&c.numUpdates),
+		NumDeletes: atomic.LoadInt64(&c.numDeletes),
+	}
+	return s
+}
+
+type Stats struct {
+	// NumCreates counts the number of ResourceSlices that got created.
+	NumCreates int64
+	// NumUpdates counts the number of ResourceSlices that got update.
+	NumUpdates int64
+	// NumDeletes counts the number of ResourceSlices that got deleted.
+	NumDeletes int64
 }
 
 // newController creates a new controller.
@@ -540,6 +565,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("update resource slice: %w", err)
 			}
+			atomic.AddInt64(&c.numUpdates, 1)
 		}
 
 		// Create new slices.
@@ -596,6 +622,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create resource slice: %w", err)
 			}
+			atomic.AddInt64(&c.numCreates, 1)
 		}
 	} else if len(slices) > 0 {
 		// All are obsolete, pool does not exist anymore.
@@ -620,7 +647,13 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// changes on the server. The only downside is the extra API
 		// call. This isn't as bad as extra creates.
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
-		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, options); err != nil && !apierrors.IsNotFound(err) {
+		err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, options)
+		switch {
+		case err == nil:
+			atomic.AddInt64(&c.numDeletes, 1)
+		case apierrors.IsNotFound(err):
+			// okay
+		default:
 			return fmt.Errorf("delete resource slice: %w", err)
 		}
 	}

@@ -96,6 +96,7 @@ func TestControllerSyncPool(t *testing.T) {
 		initialOtherObjects    []runtime.Object
 		inputDriverResources   *DriverResources
 		expectedResourceSlices []resourceapi.ResourceSlice
+		expectedStats          Stats
 	}{
 		"create-slice": {
 			nodeUID:        nodeUID,
@@ -106,6 +107,9 @@ func TestControllerSyncPool(t *testing.T) {
 						Slices: []Slice{{Devices: []resourceapi.Device{}}},
 					},
 				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
@@ -145,7 +149,10 @@ func TestControllerSyncPool(t *testing.T) {
 					Driver(driverName).Devices([]resourceapi.Device{}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
-			inputDriverResources:   &DriverResources{},
+			inputDriverResources: &DriverResources{},
+			expectedStats: Stats{
+				NumDeletes: 1,
+			},
 			expectedResourceSlices: nil,
 		},
 		"delete-and-add-slice": {
@@ -162,6 +169,10 @@ func TestControllerSyncPool(t *testing.T) {
 					poolName: {
 						Slices: []Slice{{Devices: []resourceapi.Device{{Name: deviceName}}}}},
 				},
+			},
+			expectedStats: Stats{
+				NumDeletes: 1,
+				NumCreates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
@@ -187,6 +198,9 @@ func TestControllerSyncPool(t *testing.T) {
 					poolName: {
 						Slices: []Slice{{Devices: []resourceapi.Device{{Name: deviceName}}}}},
 				},
+			},
+			expectedStats: Stats{
+				NumDeletes: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
@@ -214,6 +228,9 @@ func TestControllerSyncPool(t *testing.T) {
 						}},
 					},
 				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
@@ -247,6 +264,9 @@ func TestControllerSyncPool(t *testing.T) {
 						}},
 					},
 				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
@@ -334,6 +354,9 @@ func TestControllerSyncPool(t *testing.T) {
 					},
 				},
 			},
+			expectedStats: Stats{
+				NumDeletes: 2,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice2).UID(resourceSlice2).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
@@ -369,6 +392,9 @@ func TestControllerSyncPool(t *testing.T) {
 				},
 			},
 			// Generation not bumped, only one update.
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
@@ -412,6 +438,9 @@ func TestControllerSyncPool(t *testing.T) {
 				},
 			},
 			// Generation bumped, all updated.
+			expectedStats: Stats{
+				NumUpdates: 3,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).ResourceVersion("1").
@@ -454,6 +483,10 @@ func TestControllerSyncPool(t *testing.T) {
 				},
 			},
 			// Generation bumped, two updated, one removed.
+			expectedStats: Stats{
+				NumUpdates: 2,
+				NumDeletes: 1,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).ResourceVersion("1").
@@ -493,7 +526,10 @@ func TestControllerSyncPool(t *testing.T) {
 					},
 				},
 			},
-			// Three updated, one generated.
+			expectedStats: Stats{
+				NumUpdates: 3,
+				NumCreates: 1,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
@@ -523,6 +559,9 @@ func TestControllerSyncPool(t *testing.T) {
 					},
 				},
 			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(driverName + "-0").GenerateName(driverName + "-").
 					AllNodes(true).
@@ -539,6 +578,9 @@ func TestControllerSyncPool(t *testing.T) {
 						Slices:       []Slice{{Devices: []resourceapi.Device{{Name: deviceName}}}},
 					},
 				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
@@ -561,6 +603,9 @@ func TestControllerSyncPool(t *testing.T) {
 						Slices:       []Slice{{Devices: []resourceapi.Device{{Name: deviceName}}}},
 					},
 				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
@@ -625,6 +670,8 @@ func TestControllerSyncPool(t *testing.T) {
 			sortResourceSlices(test.expectedResourceSlices)
 			sortResourceSlices(resourceSlices.Items)
 			assert.Equal(t, test.expectedResourceSlices, resourceSlices.Items)
+
+			assert.Equal(t, test.expectedStats, ctrl.GetStats())
 
 			// The informer might have added a work item after ctrl.run returned.
 			state := queue.State()
