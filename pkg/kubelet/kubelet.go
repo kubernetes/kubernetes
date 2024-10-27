@@ -145,8 +145,11 @@ const (
 	// DefaultContainerLogsDir is the location of container logs.
 	DefaultContainerLogsDir = "/var/log/containers"
 
-	// MaxContainerBackOff is the max backoff period, exported for the e2e test
+	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
+
+	// MaxImageBackOff is the max backoff period for image pulls, exported for the e2e test
+	MaxImageBackOff = 300 * time.Second
 
 	// Period for performing global cleanup tasks.
 	housekeepingPeriod = time.Second * 2
@@ -190,9 +193,14 @@ const (
 	eventedPlegMaxStreamRetries = 5
 
 	// backOffPeriod is the period to back off when pod syncing results in an
-	// error. It is also used as the base period for the exponential backoff
-	// container restarts and image pulls.
+	// error.
 	backOffPeriod = time.Second * 10
+
+	// base period for the exponential backoff for container restarts.
+	containerBackOffPeriod = time.Second * 10
+
+	// base period for the exponential backoff for image pulls.
+	imageBackOffPeriod = time.Second * 10
 
 	// ContainerGCPeriod is the period for performing container garbage collection.
 	ContainerGCPeriod = time.Minute
@@ -616,7 +624,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	machineInfo.Timestamp = time.Time{}
 	klet.setCachedMachineInfo(machineInfo)
 
-	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	imageBackOff := flowcontrol.NewBackOff(imageBackOffPeriod, MaxImageBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
 	klet.readinessManager = proberesults.NewManager()
@@ -875,7 +883,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder,
 		volumepathhandler.NewBlockVolumePathHandler())
 
-	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
+	klet.backOff = flowcontrol.NewBackOff(containerBackOffPeriod, MaxContainerBackOff)
 
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
