@@ -186,7 +186,13 @@ func IsExtendedResourceName(name core.ResourceName) bool {
 // implicitly in the kubernetes.io/ namespace.
 func IsNativeResource(name core.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
-		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
+		IsPrefixedNativeResource(name)
+}
+
+// IsPrefixedNativeResource returns true if the resource name
+// has a kubernetes.io/ substring.
+func IsPrefixedNativeResource(name core.ResourceName) bool {
+	return strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
 // IsOvercommitAllowed returns true if the resource is in the default

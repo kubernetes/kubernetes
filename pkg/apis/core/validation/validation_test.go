@@ -5756,7 +5756,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), ResourceValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -10130,7 +10130,7 @@ func TestValidatePodSpec(t *testing.T) {
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
-			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) != 0 {
+			if errs := ValidatePodSpec(v, nil, field.NewPath("field"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -10249,7 +10249,7 @@ func TestValidatePodSpec(t *testing.T) {
 		opts := PodValidationOptions{
 			ResourceIsPod: true,
 		}
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -18619,6 +18619,54 @@ func TestValidateServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestValidatePodResourceNames(t *testing.T) {
+	table := []struct {
+		input   core.ResourceName
+		success bool
+		expect  string
+	}{
+		{"memory", true, ""},
+		{"cpu", true, ""},
+		{"storage", false, ""},
+		{"requests.cpu", false, ""},
+		{"requests.memory", false, ""},
+		{"requests.storage", false, ""},
+		{"limits.cpu", false, ""},
+		{"limits.memory", false, ""},
+		{"limits.storage", false, ""},
+		{"network", false, ""},
+		{"disk", false, ""},
+		{"", false, ""},
+		{".", false, ""},
+		{"..", false, ""},
+		{"my.favorite.app.co/12345", false, ""},
+		{"my.favorite.app.co/_12345", false, ""},
+		{"my.favorite.app.co/12345_", false, ""},
+		{"kubernetes.io/..", false, ""},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 64)), false, ""},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 64)), false, ""},
+		{core.ResourceName("kubernetes.io/" + core.ResourceCPU), true, ""},
+		{core.ResourceName("kubernetes.io/" + core.ResourceMemory), true, ""},
+		{"kubernetes.io//", false, ""},
+		{"kubernetes.io", false, ""},
+		{"kubernetes.io/will/not/work/", false, ""},
+	}
+	for k, item := range table {
+		err := validatePodResourceName(item.input, field.NewPath("field"))
+		if len(err) != 0 && item.success {
+			t.Errorf("expected no failure for input %q", item.input)
+		} else if len(err) == 0 && !item.success {
+			t.Errorf("expected failure for input %q", item.input)
+			for i := range err {
+				detail := err[i].Detail
+				if detail != "" && !strings.Contains(detail, item.expect) {
+					t.Errorf("%d: expected error detail either empty or %s, got %s", k, item.expect, detail)
+				}
+			}
+		}
+	}
+}
+
 func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
 		input   core.ResourceName
@@ -18649,7 +18697,7 @@ func TestValidateResourceNames(t *testing.T) {
 		{"kubernetes.io/will/not/work/", false, ""},
 	}
 	for k, item := range table {
-		err := validateResourceName(item.input, field.NewPath("field"))
+		err := validateComputeResourceName(item.input, field.NewPath("field"))
 		if len(err) != 0 && item.success {
 			t.Errorf("expected no failure for input %q", item.input)
 		} else if len(err) == 0 && !item.success {
@@ -23037,7 +23085,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 	tests := []struct {
 		name         string
 		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		opts         ResourceValidationOptions
 	}{{
 		name: "limits and requests of hugepage resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23050,7 +23098,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		opts: ResourceValidationOptions{},
 	}, {
 		name: "limits and requests of memory resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23061,7 +23109,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceMemory: resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		opts: ResourceValidationOptions{},
 	}, {
 		name: "limits and requests of cpu resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23072,7 +23120,18 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceCPU: resource.MustParse("10"),
 			},
 		},
-		opts: PodValidationOptions{},
+		opts: ResourceValidationOptions{},
+	}, {
+		name: "pod resource with supported native resources",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName("kubernetes.io/cpu"): resource.MustParse("2"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName("kubernetes.io/cpu"): resource.MustParse("2"),
+			},
+		},
+		opts: ResourceValidationOptions{PodLevelResource: true},
 	},
 	}
 
@@ -23087,7 +23146,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 	errTests := []struct {
 		name         string
 		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		opts         ResourceValidationOptions
 	}{{
 		name: "hugepage resource without cpu or memory",
 		requirements: core.ResourceRequirements{
@@ -23098,8 +23157,64 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		opts: ResourceValidationOptions{},
+	}, {
+		name: "pod resource with hugepages",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		opts: ResourceValidationOptions{PodLevelResource: true},
+	}, {
+		name: "pod resource with ephemeral-storage",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		opts: ResourceValidationOptions{PodLevelResource: true},
+	}, {
+		name: "pod resource with unsupported prefixed resources",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
+			},
+		},
+		opts: ResourceValidationOptions{PodLevelResource: true},
+	}, {
+		name: "pod resource with unsupported native resources",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+			},
+		},
+		opts: ResourceValidationOptions{PodLevelResource: true},
 	},
+		{
+			name: "pod resource with unsupported empty native resource name",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetes.io/"): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetes.io"): resource.MustParse("2"),
+				},
+			},
+			opts: ResourceValidationOptions{PodLevelResource: true},
+		},
 	}
 
 	for _, tc := range errTests {
@@ -23900,7 +24015,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v.Spec, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+			if errs := ValidatePodSpec(v, shortPodName, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -24036,7 +24151,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		if errs := ValidatePodSpec(v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -24433,7 +24548,7 @@ func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 			if tt.wantFieldErrors == nil {
 				tt.wantFieldErrors = field.ErrorList{}
 			}
-			errs := ValidatePodSpec(&podSpec, nil, fldPath, PodValidationOptions{})
+			errs := ValidatePodSpec(&core.Pod{Spec: podSpec}, nil, fldPath, PodValidationOptions{})
 			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
