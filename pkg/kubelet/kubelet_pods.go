@@ -1740,19 +1740,6 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
-func deleteCustomResourceFromResourceRequirements(target *v1.ResourceRequirements) {
-	for resource := range target.Limits {
-		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
-			delete(target.Limits, resource)
-		}
-	}
-	for resource := range target.Requests {
-		if resource != v1.ResourceCPU && resource != v1.ResourceMemory && resource != v1.ResourceEphemeralStorage {
-			delete(target.Requests, resource)
-		}
-	}
-}
-
 func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodResizeStatus {
 	var podResizeStatus v1.PodResizeStatus
 	if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
