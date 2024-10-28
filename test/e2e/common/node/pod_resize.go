@@ -850,7 +850,7 @@ func doPodResizeTests(f *framework.Framework) {
 		},
 	}
 
-	timeouts := framework.NewTimeoutContext()
+	timeouts := f.Timeouts
 
 	for idx := range tests {
 		tc := tests[idx]
@@ -882,7 +882,7 @@ func doPodResizeTests(f *framework.Framework) {
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
 
-			ginkgo.By("verifying initial pod resources, allocations are as expected")
+			ginkgo.By("verifying initial pod resources are as expected")
 			e2epod.VerifyPodResources(newPod, tc.containers)
 			ginkgo.By("verifying initial pod resize policy is as expected")
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
@@ -892,7 +892,7 @@ func doPodResizeTests(f *framework.Framework) {
 			ginkgo.By("verifying initial cgroup config are as expected")
 			framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool) {
+			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, opStr string) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{})
@@ -900,32 +900,27 @@ func doPodResizeTests(f *framework.Framework) {
 
 				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
 				e2epod.VerifyPodResources(patchedPod, expectedContainers)
-				gomega.Eventually(ctx, e2epod.VerifyPodAllocations, timeouts.PodStartShort, timeouts.Poll).
-					WithArguments(patchedPod, initialContainers).
-					Should(gomega.BeNil(), "failed to verify Pod allocations for patchedPod")
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, patchedPod, expectedContainers, initialContainers, isRollback)
-
-				// Check cgroup values only for containerd versions before 1.6.9
-				ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
-				framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
-
-				ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
-				e2epod.VerifyPodResources(resizedPod, expectedContainers)
-
-				ginkgo.By(fmt.Sprintf("verifying pod allocations after %s", opStr))
-				gomega.Eventually(ctx, e2epod.VerifyPodAllocations, timeouts.PodStartShort, timeouts.Poll).
-					WithArguments(resizedPod, expectedContainers).
-					Should(gomega.BeNil(), "failed to verify Pod allocations for resizedPod")
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod)
+				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 			}
 
-			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize", false)
+			patchAndVerify(tc.patchString, tc.expected, "resize")
+
+			// Resize has been actuated, test rollback
+			rollbackContainers := make([]e2epod.ResizableContainerInfo, len(tc.containers))
+			copy(rollbackContainers, tc.containers)
+			for i, c := range rollbackContainers {
+				gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
+					"test case containers & expectations should be in the same order")
+				// Resizes that trigger a restart should trigger a second restart when rolling back.
+				rollbackContainers[i].RestartCount = tc.expected[i].RestartCount * 2
+			}
 
 			rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
 			framework.ExpectNoError(err)
-			// Resize has been actuated, test rollback
-			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback", true)
+			patchAndVerify(rbPatchStr, rollbackContainers, "rollback")
 
 			ginkgo.By("deleting pod")
 			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
@@ -963,7 +958,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 		},
 	}
 
-	timeouts := framework.NewTimeoutContext()
+	timeouts := f.Timeouts
 
 	for idx := range tests {
 		tc := tests[idx]
@@ -981,7 +976,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
 
-			ginkgo.By("verifying initial pod resources, allocations, and policy are as expected")
+			ginkgo.By("verifying initial pod resources, and policy are as expected")
 			e2epod.VerifyPodResources(newPod, tc.containers)
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
@@ -1001,10 +996,8 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			ginkgo.By("verifying pod resources after patch")
 			e2epod.VerifyPodResources(patchedPod, tc.expected)
 
-			ginkgo.By("verifying pod allocations after patch")
-			gomega.Eventually(ctx, e2epod.VerifyPodAllocations, timeouts.PodStartShort, timeouts.Poll).
-				WithArguments(patchedPod, tc.expected).
-				Should(gomega.BeNil(), "failed to verify Pod allocations for patchedPod")
+			ginkgo.By("verifying pod status resources after patch")
+			e2epod.VerifyPodStatusResources(patchedPod, tc.expected)
 
 			ginkgo.By("deleting pod")
 			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
