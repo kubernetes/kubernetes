@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -571,20 +570,10 @@ func (pl *DynamicResources) listAllAllocatedDevices(logger klog.Logger) sets.Set
 	// Whatever is in flight also has to be checked.
 	pl.inFlightAllocations.Range(func(key, value any) bool {
 		claim := value.(*resourceapi.ResourceClaim)
-		for _, result := range claim.Status.Allocation.Devices.Results {
-			// Kubernetes 1.31 did not set this, 1.32 always does.
-			// Supporting 1.31 is not worth the additional code that
-			// would have to be written (= looking up in request) because
-			// it is extremely unlikely that there really is a result
-			// that still exists in a cluster from 1.31 where this matters.
-			if ptr.Deref(result.AdminAccess, false) {
-				// Is not considered as allocated.
-				continue
-			}
-			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
 			logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
 			allocated.Insert(deviceID)
-		}
+		})
 		return true
 	})
 	return allocated
