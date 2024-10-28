@@ -107,6 +107,11 @@ func newResourceOverheadPod(pod *v1.Pod, overhead v1.ResourceList) *v1.Pod {
 	return pod
 }
 
+func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) *v1.Pod {
+	pod.Spec.Resources = &podResources
+	return pod
+}
+
 func getErrReason(rn v1.ResourceName) string {
 	return fmt.Sprintf("Insufficient %v", rn)
 }
@@ -487,6 +492,65 @@ func TestEnoughRequests(t *testing.T) {
 				MilliCPU: 20, Memory: 30, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}})),
 			name:                      "skip checking resource request with quantity zero",
 			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 5})),
+			name:                      "both pod-level resources fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("7m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 5})),
+			name:       "one pod-level memory resource fits and all containers resources fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceCPU, Reason: getErrReason(v1.ResourceCPU), Requested: 7, Used: 5, Capacity: 10},
+			},
+		},
+		{
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
+			name:       "one pod-level cpu resource fits and all containers resources fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
+			},
+		},
+		{
+			pod: newResourceInitPod(newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+				framework.Resource{MilliCPU: 1, Memory: 1},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
+			name:       "one pod-level cpu resource fits and all init and non-init containers resources fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
+			},
 		},
 	}
 

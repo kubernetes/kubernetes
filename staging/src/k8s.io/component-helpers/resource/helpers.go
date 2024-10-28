@@ -293,3 +293,7 @@ func reuseOrClearResourceList(reuse v1.ResourceList) v1.ResourceList {
 	}
 	return reuse
 }
+
+func IsPodLevelResourcesSet(pod *v1.Pod, podLevelResourcesEnabled bool) bool {
+	return podLevelResourcesEnabled && pod.Spec.Resources != nil
+}

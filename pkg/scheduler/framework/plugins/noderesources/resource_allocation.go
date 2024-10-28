@@ -119,6 +119,7 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 
 	opts := resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 	if !r.useRequested {
 		opts.NonMissingContainerRequests = v1.ResourceList{

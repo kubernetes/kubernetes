@@ -26,9 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -88,6 +90,7 @@ type Fit struct {
 	ignoredResources                sets.Set[string]
 	ignoredResourceGroups           sets.Set[string]
 	enableInPlacePodVerticalScaling bool
+	enablePodLevelResources         bool
 	enableSidecarContainers         bool
 	enableSchedulingQueueHint       bool
 	handle                          framework.Handle
@@ -173,6 +176,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts fe
 		ignoredResources:                sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+		enablePodLevelResources:         fts.EnablePodLevelResources,
 		enableSidecarContainers:         fts.EnableSidecarContainers,
 		enableSchedulingQueueHint:       fts.EnableSchedulingQueueHint,
 		handle:                          h,
@@ -209,7 +213,9 @@ func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts fe
 // Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
-	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{})
+	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
+		PodLevelResourcesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)
 	return result

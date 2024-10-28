@@ -1050,15 +1050,20 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	})
 
-	non0Requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		NonMissingContainerRequests: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
-		},
-	})
+	non0Requests := requests
+	if !resourcehelper.IsPodLevelResourcesSet(pod, utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) {
+		non0Requests = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+			InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+			PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			NonMissingContainerRequests: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
+			},
+		})
+	}
 
 	non0CPU := non0Requests[v1.ResourceCPU]
 	non0Mem := non0Requests[v1.ResourceMemory]
