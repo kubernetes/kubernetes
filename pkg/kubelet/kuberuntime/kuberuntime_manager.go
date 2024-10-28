@@ -1275,7 +1275,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// Step 6: start the init container.
 		if container := podContainerChanges.NextInitContainerToStart; container != nil {
 			// Start the next init container.
-			if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
+			if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container, pod)); err != nil {
 				return
 			}
 
@@ -1287,7 +1287,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		for _, idx := range podContainerChanges.InitContainersToStart {
 			container := &pod.Spec.InitContainers[idx]
 			// Start the next init container.
-			if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
+			if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container, pod)); err != nil {
 				if types.IsRestartableInitContainer(container) {
 					klog.V(4).InfoS("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
 					continue
@@ -1310,7 +1310,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// Step 8: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx], pod))
 	}
 
 	return

@@ -105,8 +105,20 @@ type startSpec struct {
 	ephemeralContainer *v1.EphemeralContainer
 }
 
-func containerStartSpec(c *v1.Container) *startSpec {
-	return &startSpec{container: c}
+func containerStartSpec(c *v1.Container, pod *v1.Pod) *startSpec {
+	spec := &startSpec{container: c}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		if c.Resources.Requests.Cpu().IsZero() && !pod.Spec.Resources.Requests.Cpu().IsZero() {
+			spec.container.Resources.Requests.Cpu().Set(pod.Spec.Resources.Requests.Cpu().Value())
+		}
+
+		if c.Resources.Requests.Memory().IsZero() && !pod.Spec.Resources.Requests.Memory().IsZero() {
+			spec.container.Resources.Requests.Memory().Set(pod.Spec.Resources.Requests.Memory().Value())
+		}
+		spec.container.Resources.Limits.Cpu().Set(pod.Spec.Resources.Limits.Cpu().Value())
+		spec.container.Resources.Limits.Memory().Set(pod.Spec.Resources.Limits.Memory().Value())
+	}
+	return spec
 }
 
 func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
