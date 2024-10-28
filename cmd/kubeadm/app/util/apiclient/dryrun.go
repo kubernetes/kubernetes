@@ -415,6 +415,24 @@ func (d *DryRun) GetKubeadmConfigReactor() *testing.SimpleReactor {
 	}
 }
 
+// GetKubeadmCertsReactor returns a reactor that handles the GET action of the "kubeadm-certs" Secret.
+func (d *DryRun) GetKubeadmCertsReactor() *testing.SimpleReactor {
+	return &testing.SimpleReactor{
+		Verb:     "get",
+		Resource: "secrets",
+		Reaction: func(action testing.Action) (bool, runtime.Object, error) {
+			a := action.(testing.GetAction)
+			if a.GetName() != constants.KubeadmCertsSecret || a.GetNamespace() != metav1.NamespaceSystem {
+				return false, nil, nil
+			}
+
+			obj := getKubeadmCertsSecret()
+			d.LogObject(obj, action.GetResource().GroupVersion())
+			return true, obj, nil
+		},
+	}
+}
+
 // GetKubeletConfigReactor returns a reactor that handles the GET action of the "kubelet-config"
 // ConfigMap.
 func (d *DryRun) GetKubeletConfigReactor() *testing.SimpleReactor {
@@ -513,6 +531,17 @@ func getConfigMap(namespace, name string, data map[string]string) *corev1.Config
 	}
 }
 
+// getSecret returns a fake Secret object.
+func getSecret(namespace, name string, data map[string][]byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: data,
+	}
+}
+
 // getClusterInfoConfigMap returns a fake "cluster-info" ConfigMap.
 func getClusterInfoConfigMap() *corev1.ConfigMap {
 	kubeconfig := dedent.Dedent(`apiVersion: v1
@@ -546,6 +575,7 @@ controllerManager:
   extraArgs:
   - name: cluster-signing-duration
     value: 24h
+controlPlaneEndpoint: 192.168.0.101:6443
 dns: {}
 encryptionAlgorithm: RSA-2048
 etcd:
@@ -566,6 +596,23 @@ scheduler: {}
 		constants.ClusterConfigurationKind: ccData,
 	}
 	return getConfigMap(metav1.NamespaceSystem, constants.KubeadmConfigConfigMap, data)
+}
+
+// getKubeadmCertsSecret returns a fake "kubeadm-certs" Secret.
+func getKubeadmCertsSecret() *corev1.Secret {
+	// The cert data is empty because the actual content is not relevant for the dryrun test.
+	data := map[string][]byte{
+		constants.CACertName:                                   {},
+		constants.CAKeyName:                                    {},
+		constants.FrontProxyCACertName:                         {},
+		constants.FrontProxyCAKeyName:                          {},
+		constants.ServiceAccountPrivateKeyName:                 {},
+		constants.ServiceAccountPublicKeyName:                  {},
+		strings.ReplaceAll(constants.EtcdCACertName, "/", "-"): {},
+		strings.ReplaceAll(constants.EtcdCAKeyName, "/", "-"):  {},
+	}
+
+	return getSecret(metav1.NamespaceSystem, constants.KubeadmCertsSecret, data)
 }
 
 // getKubeletConfigMap returns a fake "kubelet-config" ConfigMap.

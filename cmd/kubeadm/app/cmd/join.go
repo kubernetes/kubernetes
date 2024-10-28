@@ -607,6 +607,7 @@ func (j *joinData) Client() (clientset.Interface, error) {
 			WithWriter(os.Stdout).
 			AppendReactor(dryRun.GetClusterInfoReactor()).
 			AppendReactor(dryRun.GetKubeadmConfigReactor()).
+			AppendReactor(dryRun.GetKubeadmCertsReactor()).
 			AppendReactor(dryRun.GetKubeProxyConfigReactor()).
 			AppendReactor(dryRun.GetKubeletConfigReactor())
 
