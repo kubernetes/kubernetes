@@ -24,11 +24,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"google.golang.org/grpc"
 
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -51,6 +53,7 @@ type server struct {
 	socketName string
 	socketDir  string
 	mutex      sync.Mutex
+	backoff    wait.Backoff
 	wg         sync.WaitGroup
 	grpc       *grpc.Server
 	rhandler   RegistrationHandler
@@ -76,6 +79,12 @@ func NewServer(socketPath string, rh RegistrationHandler, ch ClientHandler) (Ser
 		rhandler:   rh,
 		chandler:   ch,
 		clients:    make(map[string]Client),
+		backoff: wait.Backoff{
+			Duration: 500 * time.Millisecond,
+			Factor:   2,
+			Jitter:   0.2,
+			Steps:    5,
+		},
 	}
 
 	return s, nil
@@ -116,13 +125,24 @@ func (s *server) Start() error {
 	go func() {
 		defer s.wg.Done()
 		s.setHealthy()
-		if err = s.grpc.Serve(ln); err != nil {
+		if err := s.serveWithRetry(ln); err != nil {
 			s.setUnhealthy()
-			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+			klog.ErrorS(err, "Failed to serve device plugin registration grpc server after maximum retries", "maxRetries", s.backoff.Steps)
 		}
 	}()
 
 	return nil
+}
+
+// serveWithRetry serves the gRPC server with retry.
+func (s *server) serveWithRetry(ln net.Listener) error {
+	return wait.ExponentialBackoff(s.backoff, func() (bool, error) {
+		if err := s.grpc.Serve(ln); err != nil {
+			klog.V(2).InfoS("Error while serving device plugin registration grpc server, retrying...", "error", err)
+			return false, nil
+		}
+		return true, nil
+	})
 }
 
 func (s *server) Stop() error {
