@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,9 +26,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/munnerz/goautoneg"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
@@ -115,12 +119,51 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		content:          config,
+		content:          scrubCBORContentConfigIfDisabled(config),
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
 
 		Client: client,
 	}, nil
+}
+
+func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContentConfig {
+	if clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+		return content
+	}
+
+	if mediatype, _, err := mime.ParseMediaType(content.ContentType); err == nil && mediatype == "application/cbor" {
+		content.ContentType = "application/json"
+	}
+
+	clauses := goautoneg.ParseAccept(content.AcceptContentTypes)
+	scrubbed := false
+	for i, clause := range clauses {
+		if clause.Type == "application" && clause.SubType == "cbor" {
+			scrubbed = true
+			clauses[i].SubType = "json"
+		}
+	}
+	if !scrubbed {
+		// No application/cbor in AcceptContentTypes, nothing more to do.
+		return content
+	}
+
+	parts := make([]string, 0, len(clauses))
+	for _, clause := range clauses {
+		// ParseAccept does not store the parameter "q" in Params.
+		params := clause.Params
+		if clause.Q < 1 { // omit q=1, it's the default
+			if params == nil {
+				params = make(map[string]string, 1)
+			}
+			params["q"] = strconv.FormatFloat(clause.Q, 'g', 3, 32)
+		}
+		parts = append(parts, mime.FormatMediaType(fmt.Sprintf("%s/%s", clause.Type, clause.SubType), params))
+	}
+	content.AcceptContentTypes = strings.Join(parts, ",")
+
+	return content
 }
 
 // GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
