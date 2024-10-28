@@ -1000,16 +1000,16 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 								Status: metav1.ConditionTrue,
 							},
 						},
-						Data: &runtime.RawExtension{
+						Data: runtime.RawExtension{
 							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 						},
 						NetworkData: &resource.NetworkDeviceData{
-							InterfaceName: ptr.To("net-1"),
+							InterfaceName: "net-1",
 							Addresses: []string{
 								"10.9.8.0/24",
 								"2001:db8::/64",
 							},
-							HWAddress: ptr.To("ea:9f:cb:40:b1:7b"),
+							HWAddress: "ea:9f:cb:40:b1:7b",
 						},
 					},
 				}
@@ -1075,7 +1075,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Driver: goodName,
 						Pool:   goodName,
 						Device: goodName,
-						Data: &runtime.RawExtension{
+						Data: runtime.RawExtension{
 							Raw: []byte(`foo`),
 						},
 					},
@@ -1154,7 +1154,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Driver: goodName,
 						Pool:   goodName,
 						Device: goodName,
-						Data: &runtime.RawExtension{
+						Data: runtime.RawExtension{
 							Raw: []byte(`foo`),
 						},
 					},

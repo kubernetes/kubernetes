@@ -1027,7 +1027,7 @@ type AllocatedDeviceStatus struct {
 	// Data contains arbitrary driver-specific data.
 	//
 	// +optional
-	Data *runtime.RawExtension
+	Data runtime.RawExtension
 
 	// NetworkData contains network-related information specific to the device.
 	//
@@ -1044,7 +1044,7 @@ type NetworkDeviceData struct {
 	// network interface.
 	//
 	// +optional
-	InterfaceName *string
+	InterfaceName string
 
 	// Addresses lists the network addresses assigned to the device's network interface.
 	// This can include both IPv4 and IPv6 addresses.
@@ -1059,5 +1059,5 @@ type NetworkDeviceData struct {
 	// HWAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
 	// +optional
-	HWAddress *string
+	HWAddress string
 }

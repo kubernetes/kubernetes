@@ -257,24 +257,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
-	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
-	var v any
-	if len(config.Parameters.Raw) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
-	} else if !stored && len(config.Parameters.Raw) > resource.OpaqueParametersMaxLength {
-		// Don't even bother with parsing when too large.
-		// Only applies on create. Existing parameters are grand-fathered in
-		// because the limit was introduced in 1.32. This also means that it
-		// can be changed in the future.
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("parameters"), "" /* unused */, resource.OpaqueParametersMaxLength))
-	} else if err := json.Unmarshal(config.Parameters.Raw, &v); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
-	} else if v == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
-	} else if _, isObject := v.(map[string]any); !isObject {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", "parameters must be a valid JSON object"))
-	}
-
+	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
 
@@ -770,20 +753,23 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 			var allErrs field.ErrorList
 			return allErrs
 		}, fldPath.Child("conditions"))...)
-	allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"))...)
+	if len(device.Data.Raw) > 0 { // Data is an optional field.
+		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"))...)
+	}
 	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
 	return allErrs
 }
 
-func validateRawExtension(rawExtension *runtime.RawExtension, fldPath *field.Path) field.ErrorList {
+func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if rawExtension == nil {
-		return allErrs
-	}
 	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
 	var v any
-	if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
+	if len(rawExtension.Raw) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+	} else if v == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if _, isObject := v.(map[string]any); !isObject {
 		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "parameters must be a valid JSON object"))
 	}

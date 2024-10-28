@@ -438,11 +438,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 					Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
 					Conditions: []metav1.Condition{{Type: "a", Status: "b", Message: "c", Reason: "d"}},
-					Data:       &runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
+					Data:       runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
 					NetworkData: &resourceapi.NetworkDeviceData{
-						InterfaceName: ptr.To("inf1"),
+						InterfaceName: "inf1",
 						Addresses:     []string{"10.9.8.0/24", "2001:db8::/64"},
-						HWAddress:     ptr.To("bc:1c:b6:3e:b8:25"),
+						HWAddress:     "bc:1c:b6:3e:b8:25",
 					},
 				})
 			// Updates the ResourceClaim from the driver on the same node as the pod.
@@ -457,11 +457,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				Pool:       allocatedResourceClaim.Status.Allocation.Devices.Results[0].Pool,
 				Device:     allocatedResourceClaim.Status.Allocation.Devices.Results[0].Device,
 				Conditions: []metav1.Condition{{Type: "e", Status: "f", Message: "g", Reason: "h"}},
-				Data:       &runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
+				Data:       runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
 				NetworkData: &resourceapi.NetworkDeviceData{
-					InterfaceName: ptr.To("inf2"),
+					InterfaceName: "inf2",
 					Addresses:     []string{"10.9.8.1/24", "2001:db8::1/64"},
-					HWAddress:     ptr.To("bc:1c:b6:3e:b8:26"),
+					HWAddress:     "bc:1c:b6:3e:b8:26",
 				},
 			}
 			updatedResourceClaim2, err := driver.Nodes[scheduledPod.Spec.NodeName].ExamplePlugin.UpdateStatus(ctx, updatedResourceClaim)

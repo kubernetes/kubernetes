@@ -1038,7 +1038,7 @@ type AllocatedDeviceStatus struct {
 	// Data contains arbitrary driver-specific data.
 	//
 	// +optional
-	Data *runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,5,opt,name=data"`
+	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,5,opt,name=data"`
 
 	// NetworkData contains network-related information specific to the device.
 	//
@@ -1055,7 +1055,7 @@ type NetworkDeviceData struct {
 	// network interface.
 	//
 	// +optional
-	InterfaceName *string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
+	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
 
 	// Addresses lists the network addresses assigned to the device's network interface.
 	// This can include both IPv4 and IPv6 addresses.
@@ -1070,5 +1070,5 @@ type NetworkDeviceData struct {
 	// HWAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
 	// +optional
-	HWAddress *string `json:"hwAddress,omitempty" protobuf:"bytes,3,opt,name=hwAddress"`
+	HWAddress string `json:"hwAddress,omitempty" protobuf:"bytes,3,opt,name=hwAddress"`
 }
