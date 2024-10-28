@@ -56,6 +56,11 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
+	if data.DryRun() {
+		fmt.Println("[dryrun] Would check that the etcd cluster is healthy")
+		return nil
+	}
+
 	fmt.Println("[check-etcd] Checking that the etcd cluster is healthy")
 
 	// Checks that the etcd cluster is healthy
