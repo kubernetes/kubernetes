@@ -285,7 +285,12 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 
 	audit.LogResponseObject(req.Context(), object, gv, s)
 
-	encoder := s.EncoderForVersion(serializer.Serializer, gv)
+	var encoder runtime.Encoder
+	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		encoder = s.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), gv)
+	} else {
+		encoder = s.EncoderForVersion(serializer.Serializer, gv)
+	}
 	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
 		if listGVKInContentType {
 			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)

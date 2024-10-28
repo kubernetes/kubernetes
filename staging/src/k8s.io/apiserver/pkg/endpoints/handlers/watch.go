@@ -76,8 +76,12 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		return nil, err
 	}
 	framer := serializer.StreamSerializer.Framer
-	streamSerializer := serializer.StreamSerializer.Serializer
-	encoder := scope.Serializer.EncoderForVersion(streamSerializer, scope.Kind.GroupVersion())
+	var encoder runtime.Encoder
+	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		encoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.StreamSerializer.Serializer), scope.Kind.GroupVersion())
+	} else {
+		encoder = scope.Serializer.EncoderForVersion(serializer.StreamSerializer.Serializer, scope.Kind.GroupVersion())
+	}
 	useTextFraming := serializer.EncodesAsText
 	if framer == nil {
 		return nil, fmt.Errorf("no framer defined for %q available for embedded encoding", serializer.MediaType)
@@ -98,9 +102,17 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		if !ok {
 			return nil, fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer)
 		}
-		negotiatedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
+		if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+			negotiatedEncoder = contentSerializer.EncoderForVersion(runtime.UseNondeterministicEncoding(info.Serializer), contentKind.GroupVersion())
+		} else {
+			negotiatedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
+		}
 	} else {
-		negotiatedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+		if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+			negotiatedEncoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), contentKind.GroupVersion())
+		} else {
+			negotiatedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+		}
 	}
 
 	var memoryAllocator runtime.MemoryAllocator
