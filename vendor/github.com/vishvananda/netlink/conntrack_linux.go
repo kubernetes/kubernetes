@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/vishvananda/netlink/nl"
@@ -70,7 +71,7 @@ func ConntrackUpdate(table ConntrackTableType, family InetFamily, flow *Conntrac
 // ConntrackDeleteFilter deletes entries on the specified table on the base of the filter
 // conntrack -D [table] parameters         Delete conntrack or expectation
 //
-// Deprecated: use [ConntrackDeleteFilter] instead.
+// Deprecated: use [ConntrackDeleteFilters] instead.
 func ConntrackDeleteFilter(table ConntrackTableType, family InetFamily, filter CustomConntrackFilter) (uint, error) {
 	return pkgHandle.ConntrackDeleteFilters(table, family, filter)
 }
@@ -158,6 +159,7 @@ func (h *Handle) ConntrackDeleteFilters(table ConntrackTableType, family InetFam
 	}
 
 	var matched uint
+	var errMsgs []string
 	for _, dataRaw := range res {
 		flow := parseRawData(dataRaw)
 		for _, filter := range filters {
@@ -165,14 +167,18 @@ func (h *Handle) ConntrackDeleteFilters(table ConntrackTableType, family InetFam
 				req2 := h.newConntrackRequest(table, family, nl.IPCTNL_MSG_CT_DELETE, unix.NLM_F_ACK)
 				// skip the first 4 byte that are the netfilter header, the newConntrackRequest is adding it already
 				req2.AddRawData(dataRaw[4:])
-				req2.Execute(unix.NETLINK_NETFILTER, 0)
-				matched++
-				// flow is already deleted, no need to match on other filters and continue to the next flow.
-				break
+				if _, err = req2.Execute(unix.NETLINK_NETFILTER, 0); err == nil {
+					matched++
+					// flow is already deleted, no need to match on other filters and continue to the next flow.
+					break
+				}
+				errMsgs = append(errMsgs, fmt.Sprintf("failed to delete conntrack flow '%s': %s", flow.String(), err.Error()))
 			}
 		}
 	}
-
+	if len(errMsgs) > 0 {
+		return matched, fmt.Errorf(strings.Join(errMsgs, "; "))
+	}
 	return matched, nil
 }
 

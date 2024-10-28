@@ -4,6 +4,7 @@ package nl
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/vishvananda/netns"
@@ -656,9 +658,11 @@ func NewNetlinkRequest(proto, flags int) *NetlinkRequest {
 }
 
 type NetlinkSocket struct {
-	fd   int32
-	file *os.File
-	lsa  unix.SockaddrNetlink
+	fd             int32
+	file           *os.File
+	lsa            unix.SockaddrNetlink
+	sendTimeout    int64 // Access using atomic.Load/StoreInt64
+	receiveTimeout int64 // Access using atomic.Load/StoreInt64
 	sync.Mutex
 }
 
@@ -802,8 +806,44 @@ func (s *NetlinkSocket) GetFd() int {
 	return int(s.fd)
 }
 
+func (s *NetlinkSocket) GetTimeouts() (send, receive time.Duration) {
+	return time.Duration(atomic.LoadInt64(&s.sendTimeout)),
+		time.Duration(atomic.LoadInt64(&s.receiveTimeout))
+}
+
 func (s *NetlinkSocket) Send(request *NetlinkRequest) error {
-	return unix.Sendto(int(s.fd), request.Serialize(), 0, &s.lsa)
+	rawConn, err := s.file.SyscallConn()
+	if err != nil {
+		return err
+	}
+	var (
+		deadline time.Time
+		innerErr error
+	)
+	sendTimeout := atomic.LoadInt64(&s.sendTimeout)
+	if sendTimeout != 0 {
+		deadline = time.Now().Add(time.Duration(sendTimeout))
+	}
+	if err := s.file.SetWriteDeadline(deadline); err != nil {
+		return err
+	}
+	serializedReq := request.Serialize()
+	err = rawConn.Write(func(fd uintptr) (done bool) {
+		innerErr = unix.Sendto(int(s.fd), serializedReq, 0, &s.lsa)
+		return innerErr != unix.EWOULDBLOCK
+	})
+	if innerErr != nil {
+		return innerErr
+	}
+	if err != nil {
+		// The timeout was previously implemented using SO_SNDTIMEO on a blocking
+		// socket. So, continue to return EAGAIN when the timeout is reached.
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return unix.EAGAIN
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetlink, error) {
@@ -812,20 +852,33 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetli
 		return nil, nil, err
 	}
 	var (
+		deadline time.Time
 		fromAddr *unix.SockaddrNetlink
 		rb       [RECEIVE_BUFFER_SIZE]byte
 		nr       int
 		from     unix.Sockaddr
 		innerErr error
 	)
+	receiveTimeout := atomic.LoadInt64(&s.receiveTimeout)
+	if receiveTimeout != 0 {
+		deadline = time.Now().Add(time.Duration(receiveTimeout))
+	}
+	if err := s.file.SetReadDeadline(deadline); err != nil {
+		return nil, nil, err
+	}
 	err = rawConn.Read(func(fd uintptr) (done bool) {
 		nr, from, innerErr = unix.Recvfrom(int(fd), rb[:], 0)
 		return innerErr != unix.EWOULDBLOCK
 	})
 	if innerErr != nil {
-		err = innerErr
+		return nil, nil, innerErr
 	}
 	if err != nil {
+		// The timeout was previously implemented using SO_RCVTIMEO on a blocking
+		// socket. So, continue to return EAGAIN when the timeout is reached.
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return nil, nil, unix.EAGAIN
+		}
 		return nil, nil, err
 	}
 	fromAddr, ok := from.(*unix.SockaddrNetlink)
@@ -847,16 +900,14 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, *unix.SockaddrNetli
 
 // SetSendTimeout allows to set a send timeout on the socket
 func (s *NetlinkSocket) SetSendTimeout(timeout *unix.Timeval) error {
-	// Set a send timeout of SOCKET_SEND_TIMEOUT, this will allow the Send to periodically unblock and avoid that a routine
-	// remains stuck on a send on a closed fd
-	return unix.SetsockoptTimeval(int(s.fd), unix.SOL_SOCKET, unix.SO_SNDTIMEO, timeout)
+	atomic.StoreInt64(&s.sendTimeout, timeout.Nano())
+	return nil
 }
 
 // SetReceiveTimeout allows to set a receive timeout on the socket
 func (s *NetlinkSocket) SetReceiveTimeout(timeout *unix.Timeval) error {
-	// Set a read timeout of SOCKET_READ_TIMEOUT, this will allow the Read to periodically unblock and avoid that a routine
-	// remains stuck on a recvmsg on a closed fd
-	return unix.SetsockoptTimeval(int(s.fd), unix.SOL_SOCKET, unix.SO_RCVTIMEO, timeout)
+	atomic.StoreInt64(&s.receiveTimeout, timeout.Nano())
+	return nil
 }
 
 // SetReceiveBufferSize allows to set a receive buffer size on the socket
