@@ -545,12 +545,12 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// Claims are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
-		allocatedDevices := pl.listAllAllocatedDevices(logger)
+		allAllocatedDevices := pl.listAllAllocatedDevices(logger)
 		slices, err := pl.sliceLister.List(labels.Everything())
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, allocatedDevices, pl.classLister, slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, allAllocatedDevices, pl.classLister, slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
