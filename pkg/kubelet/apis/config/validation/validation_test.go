@@ -68,9 +68,10 @@ var (
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
 		MemoryThrottlingFactor:          ptr.To(0.9),
 		FeatureGates: map[string]bool{
-			"CustomCPUCFSQuotaPeriod": true,
-			"GracefulNodeShutdown":    true,
-			"MemoryQoS":               true,
+			"CustomCPUCFSQuotaPeriod":          true,
+			"GracefulNodeShutdown":             true,
+			"MemoryQoS":                        true,
+			"EnableKubeletCrashLoopBackoffMax": true,
 		},
 		Logging: logsapi.LoggingConfiguration{
 			Format: "text",
@@ -78,6 +79,9 @@ var (
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
+		CrashLoopBackOff: &kubeletconfig.CrashLoopBackOffConfig{
+			MaxSeconds: ptr.To(int32(3)),
+		},
 	}
 )
 
@@ -398,16 +402,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: crashloopbackoff.maxSeconds (got: 301) must be set between 1 and 300",
-	}, {
-		name: "CrashLoopBackOff.MaxSeconds ok",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			i := int32(3)
-			conf.FeatureGates = map[string]bool{"EnableKubeletCrashLoopBackoffMax": true, "CustomCPUCFSQuotaPeriod": true}
-			conf.CrashLoopBackOff = &kubeletconfig.CrashLoopBackOffConfig{
-				MaxSeconds: &i,
-			}
-			return conf
-		},
 	}, {
 		name: "CrashLoopBackOff.MaxSeconds feature gate on, no config, ok",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
