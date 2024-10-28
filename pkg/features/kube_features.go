@@ -223,7 +223,8 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
-	// // owner: @lauralorenz // kep: https://kep.k8s.io/4603
+	// owner: @lauralorenz
+	// kep: https://kep.k8s.io/4603
 	//
 	// Enables support for per-node backoff maximums for restarting containers
 	// (aka containers in CrashLoopBackOff)
