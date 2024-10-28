@@ -18,7 +18,9 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -63,6 +65,20 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// Note that this is a heuristic, it won't work if a container has many small processes.
 	memoryRequest := container.Resources.Requests.Memory().Value()
 	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
+
+	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
+	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isSidecarContainer(pod, container) {
+		// check min memory quantity in regular containers
+		minMemoryRequest := minRegularContainerMemory(*pod)
+		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
+		// the OOM adjustment for sidecar container will match
+		// or fall below the OOM score adjustment of regular containers in the Pod.
+		if oomScoreAdjust > minMemoryOomScoreAdjust {
+			oomScoreAdjust = minMemoryOomScoreAdjust
+		}
+	}
+
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
@@ -73,4 +89,19 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+// isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
+// Since v1.Container does not directly specify whether a container is a sidecar,
+// this function uses available indicators (container.RestartPolicy == v1.ContainerRestartPolicyAlways)
+// to make that determination.
+func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
+	if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		for _, initContainer := range pod.Spec.InitContainers {
+			if initContainer.Name == container.Name {
+				return true
+			}
+		}
+	}
+	return false
 }
