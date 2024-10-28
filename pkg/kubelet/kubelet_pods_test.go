@@ -6631,7 +6631,7 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 			podStatus := &kubecontainer.PodStatus{
 				Name: "test",
 				ContainerStatuses: []*kubecontainer.Status{
-					&kubecontainer.Status{
+					{
 						Name:      "c",
 						State:     state,
 						Resources: test.statusResources,

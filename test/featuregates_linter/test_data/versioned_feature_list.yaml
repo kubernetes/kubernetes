@@ -508,6 +508,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: InPlacePodVerticalScalingAllocatedStatus
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: InTreePluginPortworxUnregister
   versionedSpecs:
   - default: false
