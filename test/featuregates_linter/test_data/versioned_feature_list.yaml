@@ -1302,6 +1302,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.28"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.32"
 - name: TranslateStreamCloseWebsocketRequests
   versionedSpecs:
   - default: false
