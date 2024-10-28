@@ -23,6 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -34,6 +38,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "cpu-limit",
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							v1.ResourceName(v1.ResourceCPU): resource.MustParse("10"),
@@ -48,6 +53,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "memory-limit-cpu-request",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
@@ -65,6 +71,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "zero-memory-limit",
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("0"),
@@ -79,6 +86,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name:      "no-request-limit",
 					Resources: v1.ResourceRequirements{},
 				},
 			},
@@ -89,6 +97,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "equal-request-limit-cpu-memory",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
@@ -108,6 +117,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "cpu-unlimited-memory-limited-with-requests",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount/2, 10)),
@@ -126,6 +136,7 @@ var (
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
+					Name: "request-no-limit",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount-1, 10)),
@@ -145,6 +156,7 @@ var (
 			Priority:          &systemCritical,
 			Containers: []v1.Container{
 				{
+					Name:      "cluster-critical",
 					Resources: v1.ResourceRequirements{},
 				},
 			},
@@ -159,81 +171,273 @@ var (
 			Priority:          &systemNodeCritical,
 			Containers: []v1.Container{
 				{
+					Name:      "node-critical",
 					Resources: v1.ResourceRequirements{},
 				},
 			},
 		},
 	}
+	sampleDefaultMemRequest = resource.MustParse(strconv.FormatInt(standardMemoryAmount/8, 10))
+	sampleDefaultMemLimit   = resource.MustParse(strconv.FormatInt(1000+(standardMemoryAmount/8), 10))
+
+	sampleContainer = v1.Container{
+		Name: "main-1",
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemRequest,
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+			},
+		},
+	}
+
+	burstableUniqueContainerPod = v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "burstable-unique-container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(v1.ResourceMemory): sampleDefaultMemRequest,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	sampleInitContainer = v1.Container{
+		Name: "init-container",
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemRequest,
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+			},
+		},
+	}
+	restartPolicyAlways    = v1.ContainerRestartPolicyAlways
+	sampleSidecarContainer = v1.Container{
+		Name:          "sidecar-container",
+		RestartPolicy: &restartPolicyAlways,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemRequest,
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+			},
+		},
+	}
+
+	sampleSmallSidecarContainer = v1.Container{
+		Name:          "sidecar-small-container",
+		RestartPolicy: &restartPolicyAlways,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount/20, 10)),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+			},
+		},
+	}
+
+	sampleBigSidecarContainer = v1.Container{
+		Name:          "sidecar-big-container",
+		RestartPolicy: &restartPolicyAlways,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse(strconv.FormatInt(standardMemoryAmount/2, 10)),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceMemory): sampleDefaultMemLimit,
+			},
+		},
+	}
+
+	burstableMixedUniqueMainContainerPod = v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				sampleInitContainer,
+			}, Containers: []v1.Container{
+				sampleContainer,
+			},
+		},
+	}
+
+	burstableMixedMultiContainerSameRequestPod = v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				sampleInitContainer, sampleSidecarContainer,
+			}, Containers: []v1.Container{
+				sampleContainer,
+			},
+		},
+	}
+
+	burstableMixedMultiContainerSmallSidecarPod = v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				sampleInitContainer, sampleSmallSidecarContainer,
+			}, Containers: []v1.Container{
+				sampleContainer,
+			},
+		},
+	}
+
+	burstableMixedMultiContainerBigSidecarContainerPod = v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				sampleInitContainer, sampleBigSidecarContainer,
+			}, Containers: []v1.Container{
+				sampleContainer,
+			},
+		},
+	}
 )
 
+type lowHighOOMScoreAdjTest struct {
+	lowOOMScoreAdj  int
+	highOOMScoreAdj int
+}
 type oomTest struct {
-	pod             *v1.Pod
-	memoryCapacity  int64
-	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
-	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
+	pod                             *v1.Pod
+	memoryCapacity                  int64
+	lowHighOOMScoreAdj              map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
+	sidecarContainersFeatureEnabled bool
 }
 
 func TestGetContainerOOMScoreAdjust(t *testing.T) {
-	oomTests := []oomTest{
-		{
-			pod:             &cpuLimit,
-			memoryCapacity:  4000000000,
-			lowOOMScoreAdj:  999,
-			highOOMScoreAdj: 999,
+	oomTests := map[string]oomTest{
+		"cpu-limit": {
+			pod:            &cpuLimit,
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"cpu-limit": {lowOOMScoreAdj: 999, highOOMScoreAdj: 999},
+			},
 		},
-		{
-			pod:             &memoryLimitCPURequest,
-			memoryCapacity:  8000000000,
-			lowOOMScoreAdj:  999,
-			highOOMScoreAdj: 999,
+		"memory-limit-cpu-request": {
+			pod:            &memoryLimitCPURequest,
+			memoryCapacity: 8000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"memory-limit-cpu-request": {lowOOMScoreAdj: 999, highOOMScoreAdj: 999},
+			},
 		},
-		{
-			pod:             &zeroMemoryLimit,
-			memoryCapacity:  7230457451,
-			lowOOMScoreAdj:  1000,
-			highOOMScoreAdj: 1000,
+		"zero-memory-limit": {
+			pod:            &zeroMemoryLimit,
+			memoryCapacity: 7230457451,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"zero-memory-limit": {lowOOMScoreAdj: 1000, highOOMScoreAdj: 1000},
+			},
 		},
-		{
-			pod:             &noRequestLimit,
-			memoryCapacity:  4000000000,
-			lowOOMScoreAdj:  1000,
-			highOOMScoreAdj: 1000,
+		"no-request-limit": {
+			pod:            &noRequestLimit,
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"no-request-limit": {lowOOMScoreAdj: 1000, highOOMScoreAdj: 1000},
+			},
 		},
-		{
-			pod:             &equalRequestLimitCPUMemory,
-			memoryCapacity:  123456789,
-			lowOOMScoreAdj:  -997,
-			highOOMScoreAdj: -997,
+		"equal-request-limit-cpu-memory": {
+			pod:            &equalRequestLimitCPUMemory,
+			memoryCapacity: 123456789,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"equal-request-limit-cpu-memory": {lowOOMScoreAdj: -997, highOOMScoreAdj: -997},
+			},
 		},
-		{
-			pod:             &cpuUnlimitedMemoryLimitedWithRequests,
-			memoryCapacity:  standardMemoryAmount,
-			lowOOMScoreAdj:  495,
-			highOOMScoreAdj: 505,
+		"cpu-unlimited-memory-limited-with-requests": {
+			pod:            &cpuUnlimitedMemoryLimitedWithRequests,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"cpu-unlimited-memory-limited-with-requests": {lowOOMScoreAdj: 495, highOOMScoreAdj: 505},
+			},
 		},
-		{
-			pod:             &requestNoLimit,
-			memoryCapacity:  standardMemoryAmount,
-			lowOOMScoreAdj:  3,
-			highOOMScoreAdj: 3,
+		"request-no-limit": {
+			pod:            &requestNoLimit,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"request-no-limit": {lowOOMScoreAdj: 3, highOOMScoreAdj: 3},
+			},
 		},
-		{
-			pod:             &clusterCritical,
-			memoryCapacity:  4000000000,
-			lowOOMScoreAdj:  1000,
-			highOOMScoreAdj: 1000,
+		"cluster-critical": {
+			pod:            &clusterCritical,
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"cluster-critical": {lowOOMScoreAdj: 1000, highOOMScoreAdj: 1000},
+			},
 		},
-		{
-			pod:             &nodeCritical,
-			memoryCapacity:  4000000000,
-			lowOOMScoreAdj:  -997,
-			highOOMScoreAdj: -997,
+		"node-critical": {
+			pod:            &nodeCritical,
+			memoryCapacity: 4000000000,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"node-critical": {lowOOMScoreAdj: -997, highOOMScoreAdj: -997},
+			},
+		},
+		"burstable-unique-container-pod": {
+			pod:            &burstableUniqueContainerPod,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"burstable-unique-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+			},
+			sidecarContainersFeatureEnabled: true,
+		},
+		"burstable-mixed-unique-main-container-pod": {
+			pod:            &burstableMixedUniqueMainContainerPod,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"init-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+				"main-1":         {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+			},
+			sidecarContainersFeatureEnabled: true,
+		},
+		"burstable-mixed-multi-container-small-sidecar-pod": {
+			pod:            &burstableMixedMultiContainerSmallSidecarPod,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"init-container":          {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+				"sidecar-small-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
+				"main-1":                  {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
+			},
+			sidecarContainersFeatureEnabled: true,
+		},
+		"burstable-mixed-multi-container-sample-request-pod": {
+			pod:            &burstableMixedMultiContainerSameRequestPod,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"init-container":    {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+				"sidecar-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
+				"main-1":            {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
+			},
+			sidecarContainersFeatureEnabled: true,
+		},
+		"burstable-mixed-multi-container-big-sidecar-container-pod": {
+			pod:            &burstableMixedMultiContainerBigSidecarContainerPod,
+			memoryCapacity: standardMemoryAmount,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"init-container":        {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
+				"sidecar-big-container": {lowOOMScoreAdj: 500, highOOMScoreAdj: 500},
+				"main-1":                {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
+			},
+			sidecarContainersFeatureEnabled: true,
 		},
 	}
-	for _, test := range oomTests {
-		oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &test.pod.Spec.Containers[0], test.memoryCapacity)
-		if oomScoreAdj < test.lowOOMScoreAdj || oomScoreAdj > test.highOOMScoreAdj {
-			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
-		}
+	for name, test := range oomTests {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, test.sidecarContainersFeatureEnabled)
+			listContainers := test.pod.Spec.InitContainers
+			listContainers = append(listContainers, test.pod.Spec.Containers...)
+			for _, container := range listContainers {
+				oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &container, test.memoryCapacity)
+				if oomScoreAdj < test.lowHighOOMScoreAdj[container.Name].lowOOMScoreAdj || oomScoreAdj > test.lowHighOOMScoreAdj[container.Name].highOOMScoreAdj {
+					t.Errorf("oom_score_adj %s should be between %d and %d, but was %d", container.Name, test.lowHighOOMScoreAdj[container.Name].lowOOMScoreAdj, test.lowHighOOMScoreAdj[container.Name].highOOMScoreAdj, oomScoreAdj)
+				}
+			}
+		})
+
 	}
 }
