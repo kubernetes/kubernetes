@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -271,6 +272,13 @@ func (v *CounterVec) Reset() {
 	}
 
 	v.CounterVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the CounterVec.
+// NOTE: This should only be used in test.
+func (v *CounterVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped CounterVec with context

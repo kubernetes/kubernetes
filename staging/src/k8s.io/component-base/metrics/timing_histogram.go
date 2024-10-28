@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -265,6 +266,13 @@ func (v *TimingHistogramVec) Reset() {
 	}
 
 	v.TimingHistogramVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the TimingHistogramVec.
+// NOTE: This should only be used in test.
+func (v *TimingHistogramVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped TimingHistogramVec with context

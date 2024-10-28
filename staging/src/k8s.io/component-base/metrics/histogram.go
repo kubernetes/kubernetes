@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -239,6 +240,13 @@ func (v *HistogramVec) Reset() {
 	}
 
 	v.HistogramVec.Reset()
+}
+
+// ResetLabelAllowLists resets the label allow list for the HistogramVec.
+// NOTE: This should only be used in test.
+func (v *HistogramVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
 }
 
 // WithContext returns wrapped HistogramVec with context
