@@ -119,7 +119,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 			continue
 		}
 		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-		a.logger.V(6).Info("Device was allocated", "device", deviceID, "claim", klog.KObj(claim))
+		a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
 		deviceIDs = append(deviceIDs, deviceID)
 	}
 
@@ -146,7 +146,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 			continue
 		}
 		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-		a.logger.V(6).Info("Device was deallocated", "device", deviceID, "claim", klog.KObj(claim))
+		a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
 		deviceIDs = append(deviceIDs, deviceID)
 	}
 
