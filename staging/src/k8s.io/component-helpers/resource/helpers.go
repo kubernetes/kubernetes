@@ -186,7 +186,34 @@ func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.Resour
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := reuseOrClearResourceList(opts.Reuse)
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		addResourceList(limits, pod.Spec.Resources.Limits)
+		containerLimits := effectiveContainersLimits(pod, opts)
+		unsupportedLimits := v1.ResourceList{}
+		for resource, quantity := range containerLimits {
+			if !IsSupportedPodLevelResource(resource) {
+				unsupportedLimits[resource] = quantity
+			}
+		}
+		addResourceList(limits, unsupportedLimits)
+	} else {
+		addResourceList(limits, effectiveContainersRequests(pod, opts))
+	}
+	// Add overhead to non-zero limits if requested:
+	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
+		for name, quantity := range pod.Spec.Overhead {
+			if value, ok := limits[name]; ok && !value.IsZero() {
+				value.Add(quantity)
+				limits[name] = value
+			}
+		}
+	}
 
+	return limits
+}
+
+func effectiveContainersLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
+	limits := v1.ResourceList{}
 	for _, container := range pod.Spec.Containers {
 		if opts.ContainerFn != nil {
 			opts.ContainerFn(container.Resources.Limits, Containers)
@@ -226,17 +253,6 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	}
 
 	maxResourceList(limits, initContainerLimits)
-
-	// Add overhead to non-zero limits if requested:
-	if !opts.ExcludeOverhead && pod.Spec.Overhead != nil {
-		for name, quantity := range pod.Spec.Overhead {
-			if value, ok := limits[name]; ok && !value.IsZero() {
-				value.Add(quantity)
-				limits[name] = value
-			}
-		}
-	}
-
 	return limits
 }
 

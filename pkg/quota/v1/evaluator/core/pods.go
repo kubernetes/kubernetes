@@ -134,6 +134,15 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	for i := range pod.Spec.InitContainers {
 		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSetResourceToContainerNames)
 	}
+	missingPodResourceSet := sets.NewString()
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+
+		enforcePodResourcesConstraints(pod.Spec.Resources, requiredSet, missingPodResourceSet)
+		if len(missingSetResourceToContainerNames) == 0 && len(missingPodResourceSet) == 0 {
+			return nil
+		}
+	}
+
 	if len(missingSetResourceToContainerNames) == 0 {
 		return nil
 	}
@@ -141,9 +150,25 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	for resource := range missingSetResourceToContainerNames {
 		resources.Insert(resource)
 	}
-	var errorMessages = make([]string, 0, len(missingSetResourceToContainerNames))
+
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		for resource := range missingPodResourceSet {
+			resources.Insert(resource)
+		}
+	}
+
+	var errorMessages = make([]string, 0, len(resources))
 	for _, resource := range resources.List() {
-		errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+		if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+			if _, exists := missingSetResourceToContainerNames[resource]; exists {
+				errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+			} else {
+				errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, pod.Name))
+			}
+		} else {
+			errorMessages = append(errorMessages, fmt.Sprintf("%s for: %s", resource, strings.Join(missingSetResourceToContainerNames[resource].List(), ",")))
+		}
+
 	}
 	return fmt.Errorf("must specify %s", strings.Join(errorMessages, "; "))
 }
@@ -236,8 +261,20 @@ func (p *podEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageS
 // verifies we implement the required interface.
 var _ quota.Evaluator = &podEvaluator{}
 
+func enforcePodResourcesConstraints(resources *corev1.ResourceRequirements, requiredSet sets.String, missingPodResourcesSet sets.String) {
+	requests := resources.Requests
+	limits := resources.Limits
+	resourceUsage := podComputeUsageHelper(requests, limits)
+	podResourceSet := quota.ToSet(quota.ResourceNames(resourceUsage))
+	if !podResourceSet.Equal(requiredSet) {
+		missingPodResourcesSet = requiredSet.Difference(podResourceSet)
+	}
+}
+
 // enforcePodContainerConstraints checks for required resources that are not set on this container and
 // adds them to missingSet.
+// TODO(ndixita): Refactor to use enforceResourcesConstraints for both containers
+// and pod resources.
 func enforcePodContainerConstraints(container *corev1.Container, requiredSet sets.String, missingSetResourceToContainerNames map[string]sets.String) {
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
@@ -366,6 +403,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 
 	opts := resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)
