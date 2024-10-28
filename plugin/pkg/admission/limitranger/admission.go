@@ -525,6 +525,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
 				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				PodLevelResourcesEnabled:         feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
@@ -551,6 +552,9 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 type podResourcesOptions struct {
 	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
 	InPlacePodVerticalScalingEnabled bool
+	// PodLevelResourcesEnabled indicates that the PodLevelResources feature gate is
+	// enabled.
+	PodLevelResourcesEnabled bool
 }
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
@@ -559,6 +563,10 @@ type podResourcesOptions struct {
 // type and then using the pkg/api/v1/resource/PodRequests.
 func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	reqs := api.ResourceList{}
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		addResourceList(reqs, pod.Spec.Resources.Requests)
+		return reqs
+	}
 
 	var containerStatuses map[string]*api.ContainerStatus
 	if opts.InPlacePodVerticalScalingEnabled {
