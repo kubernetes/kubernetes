@@ -173,6 +173,11 @@ var (
 		{60 * 1024 * 1024 * 1024, "60GB-100GB"},
 		{100 * 1024 * 1024 * 1024, "GT100GB"},
 	}
+	// DRADurationBuckets is the bucket boundaries for DRA operation duration metrics
+	// DRAOperationsDuration and DRAGRPCOperationsDuration defined below in this file.
+	// The buckets max value 40 is based on the 45sec max gRPC timeout value defined
+	// for the DRA gRPC calls in the pkg/kubelet/cm/dra/plugin/registration.go
+	DRADurationBuckets = metrics.ExponentialBucketsRange(.1, 40, 15)
 )
 
 var (
@@ -950,7 +955,7 @@ var (
 			Subsystem:      DRASubsystem,
 			Name:           DRAOperationsDurationKey,
 			Help:           "Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        DRADurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_name", "is_error"},
@@ -962,7 +967,7 @@ var (
 			Subsystem:      DRASubsystem,
 			Name:           DRAGRPCOperationsDurationKey,
 			Help:           "Duration in seconds of the DRA gRPC operations",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        DRADurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"driver_name", "method_name", "grpc_status_code"},
