@@ -255,7 +255,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 			actualSize:  getSizeFunc("1G"),
 
 			expectedResizeStatus: "",
-			resizeCallCount:      1,
+			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},
 		{

@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/util/storage"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -99,7 +100,7 @@ func (ne *NodeExpander) runPreCheck() bool {
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
 	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 &&
 		ne.resizeStatus == "" &&
-		ne.hasReadWriteMany() {
+		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
 		ne.pvcAlreadyUpdated = true
 		return true
 	}
@@ -116,20 +117,6 @@ func (ne *NodeExpander) runPreCheck() bool {
 	if resizeStatusVal == v1.PersistentVolumeClaimNodeResizePending ||
 		resizeStatusVal == v1.PersistentVolumeClaimNodeResizeInProgress {
 		return true
-	}
-	return false
-}
-
-func (ne *NodeExpander) hasReadWriteMany() bool {
-	accessModes := ne.pvc.Spec.AccessModes
-	if accessModes == nil {
-		return false
-	}
-
-	for _, mode := range accessModes {
-		if mode == v1.ReadWriteMany {
-			return true
-		}
 	}
 	return false
 }
