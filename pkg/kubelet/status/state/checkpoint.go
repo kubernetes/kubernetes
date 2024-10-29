@@ -43,7 +43,7 @@ func NewCheckpoint(allocations *PodResourceAllocationInfo) (*Checkpoint, error) 
 
 	serializedAllocations, err := json.Marshal(allocations)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to serialize allocations for checkpointing: %w", err)
 	}
 
 	cp := &Checkpoint{
