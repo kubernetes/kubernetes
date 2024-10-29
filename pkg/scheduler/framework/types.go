@@ -1049,19 +1049,46 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.Generation = nextGeneration()
 }
 
+func getNonMissingContainerRequests(requests v1.ResourceList, podLevelResourcesSet bool) map[v1.ResourceName]resource.Quantity {
+	nonMissingContainerRequests := make(map[v1.ResourceName]resource.Quantity, 2)
+	if !podLevelResourcesSet {
+		return map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
+		}
+	}
+
+	// DefaultMilliCPURequest serves as the fallback value when both
+	// pod-level and container-level CPU requests are unspecified.
+	if _, exists := requests[v1.ResourceCPU]; !exists {
+		nonMissingContainerRequests[v1.ResourceCPU] = *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI)
+	}
+
+	// DefaultMemoryRequest serves as the fallback value when both
+	// pod-level and container-level CPU requests are unspecified.
+	if _, exists := requests[v1.ResourceMemory]; !exists {
+		nonMissingContainerRequests[v1.ResourceMemory] = *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI)
+	}
+	return nonMissingContainerRequests
+
+}
+
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	})
 
-	non0Requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-		NonMissingContainerRequests: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
-		},
-	})
+	nonMissingContainerRequests := getNonMissingContainerRequests(requests, resourcehelper.IsPodLevelResourcesSet(pod, utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)))
 
+	non0Requests := requests
+	if len(nonMissingContainerRequests) > 0 {
+		non0Requests = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+			InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+			PodLevelResourcesEnabled:         utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			NonMissingContainerRequests:      nonMissingContainerRequests,
+		})
+	}
 	non0CPU := non0Requests[v1.ResourceCPU]
 	non0Mem := non0Requests[v1.ResourceMemory]
 

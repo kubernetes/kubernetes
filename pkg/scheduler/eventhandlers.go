@@ -623,7 +623,9 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 // returns all failures.
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
-	insufficientResources := noderesources.Fits(pod, nodeInfo)
+	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{
+		EnablePodLevelResources: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	})
 	if len(insufficientResources) != 0 {
 		for i := range insufficientResources {
 			admissionResults = append(admissionResults, AdmissionResult{InsufficientResource: &insufficientResources[i]})

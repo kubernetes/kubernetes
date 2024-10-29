@@ -674,6 +674,38 @@ func TestPodResourcesDefaults(t *testing.T) {
 			},
 		},
 	}, {
+		name:                     "pod requests=unset cpu limits=set, container resources=unset",
+		podLevelResourcesEnabled: true,
+		podResources: &v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				"cpu": resource.MustParse("4m"),
+			},
+		},
+		containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{},
+			}, {
+				Resources: v1.ResourceRequirements{},
+			},
+		},
+		expectedPodSpec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					"cpu": resource.MustParse("4m"),
+				},
+				Limits: v1.ResourceList{
+					"cpu": resource.MustParse("4m"),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				}, {
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+		},
+	}, {
 		name:                     "pod requests=unset limits=set, container requests=set limits=set",
 		podLevelResourcesEnabled: true,
 		podResources: &v1.ResourceRequirements{

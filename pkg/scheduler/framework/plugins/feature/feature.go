@@ -27,4 +27,5 @@ type Features struct {
 	EnableInPlacePodVerticalScaling              bool
 	EnableSidecarContainers                      bool
 	EnableSchedulingQueueHint                    bool
+	EnablePodLevelResources                      bool
 }
