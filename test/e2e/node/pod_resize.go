@@ -118,7 +118,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 		patchedPodExceedMemory, pErrEx2 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(pErrEx2, "failed to get pod post exceed memory resize")
 		e2epod.VerifyPodResources(patchedPodExceedMemory, expected)
-		e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected)
+		framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected))
 
 		ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
 		_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
@@ -130,7 +130,7 @@ func doPodResizeResourceQuotaTests(f *framework.Framework) {
 		patchedPodExceedCPU, pErrEx1 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(pErrEx1, "failed to get pod post exceed CPU resize")
 		e2epod.VerifyPodResources(patchedPodExceedCPU, expected)
-		e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected)
+		framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected))
 
 		ginkgo.By("deleting pods")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, newPod1)

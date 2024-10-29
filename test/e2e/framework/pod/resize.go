@@ -19,6 +19,7 @@ package pod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -218,15 +219,28 @@ func VerifyPodResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	}
 }
 
-func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
+func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
-	gomega.Expect(gotPod.Status.ContainerStatuses).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
+
+	var errs []error
+
+	if len(gotPod.Status.ContainerStatuses) != len(wantCtrs) {
+		return fmt.Errorf("expectation length mismatch: got %d statuses, want %d",
+			len(gotPod.Status.ContainerStatuses), len(wantCtrs))
+	}
 	for i, wantCtr := range wantCtrs {
 		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
 		ctr := makeResizableContainer(wantCtr)
-		gomega.Expect(gotCtrStatus.Name).To(gomega.Equal(ctr.Name))
-		gomega.Expect(ctr.Resources).To(gomega.Equal(*gotCtrStatus.Resources))
+		if gotCtrStatus.Name != ctr.Name {
+			errs = append(errs, fmt.Errorf("container status %d name %q != expected name %q", i, gotCtrStatus.Name, ctr.Name))
+			continue
+		}
+		if err := framework.Gomega().Expect(*gotCtrStatus.Resources).To(gomega.Equal(ctr.Resources)); err != nil {
+			errs = append(errs, fmt.Errorf("container[%s] status resources mismatch: %w", ctr.Name, err))
+		}
 	}
+
+	return utilerrors.NewAggregate(errs)
 }
 
 // isPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
@@ -261,14 +275,16 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			pod.Namespace, pod.Name, cName, expectedCgValue, cgPath)
 		cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 		if err != nil {
-			return fmt.Errorf("failed to find expected value %q in container cgroup %q", expectedCgValue, cgPath)
+			return fmt.Errorf("failed to read cgroup %q for container %s: %w", cgPath, cName, err)
 		}
 		cgValue = strings.Trim(cgValue, "\n")
 		if cgValue != expectedCgValue {
-			return fmt.Errorf("cgroup value %q not equal to expected %q", cgValue, expectedCgValue)
+			return fmt.Errorf("container %s cgroup %q doesn't match expected: got %q want %q",
+				cName, cgPath, cgValue, expectedCgValue)
 		}
 		return nil
 	}
+	var errs []error
 	for _, ci := range tcInfo {
 		if ci.Resources == nil {
 			continue
@@ -304,22 +320,13 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
 			}
 			if expectedMemLimitString != "0" {
-				err := verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString)
-				if err != nil {
-					return err
-				}
+				errs = append(errs, verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString))
 			}
-			err := verifyCgroupValue(ci.Name, cgroupCPULimit, expectedCPULimitString)
-			if err != nil {
-				return err
-			}
-			err = verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10))
-			if err != nil {
-				return err
-			}
+			errs = append(errs, verifyCgroupValue(ci.Name, cgroupCPULimit, expectedCPULimitString))
+			errs = append(errs, verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
 		}
 	}
-	return nil
+	return utilerrors.NewAggregate(errs)
 }
 
 func verifyContainerRestarts(pod *v1.Pod, expectedContainers []ResizableContainerInfo) error {
@@ -337,7 +344,7 @@ func verifyContainerRestarts(pod *v1.Pod, expectedContainers []ResizableContaine
 			errs = append(errs, fmt.Errorf("unexpected number of restarts for container %s: got %d, want %d", cs.Name, cs.RestartCount, expectedRestarts))
 		}
 	}
-	return errors.NewAggregate(errs)
+	return utilerrors.NewAggregate(errs)
 }
 
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod) *v1.Pod {
@@ -358,14 +365,38 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 }
 
 func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
+	ginkgo.GinkgoHelper()
+
+	// Put each error on a new line for readability.
+	formatErrors := func(err error) error {
+		var agg utilerrors.Aggregate
+		if !errors.As(err, &agg) {
+			return err
+		}
+
+		errStrings := make([]string, len(agg.Errors()))
+		for i, err := range agg.Errors() {
+			errStrings[i] = err.Error()
+		}
+		return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
+	}
 	// Verify Pod Containers Cgroup Values
-	framework.ExpectNoError(VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers),
-		"container cgroup values should match expected")
-	VerifyPodStatusResources(resizedPod, expectedContainers)
-	// Verify container restarts
-	framework.ExpectNoError(
-		verifyContainerRestarts(resizedPod, expectedContainers),
-		"verify container restart counts")
+	var errs []error
+	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers); cgroupErrs != nil {
+		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
+	}
+	if resourceErrs := VerifyPodStatusResources(resizedPod, expectedContainers); resourceErrs != nil {
+		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
+	}
+	if restartErrs := verifyContainerRestarts(resizedPod, expectedContainers); restartErrs != nil {
+		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
+	}
+
+	if len(errs) > 0 {
+		resizedPod.ManagedFields = nil // Suppress managed fields in error output.
+		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
+			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizedPod))
+	}
 }
 
 // ResizeContainerPatch generates a patch string to resize the pod container.
