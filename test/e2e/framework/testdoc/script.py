@@ -92,10 +92,9 @@ if __name__ == "__main__":
     try:
         with open("build-log.txt", "r") as file:
             log_content = file.read()
-
         # Extract name and steps from the log content
         name = find_strings_between(log_content, "<testdoc:name>", "</testdoc:name>")
-        namePath = ["documentation/lifecycle_hooks/" + s.rsplit(':', 1)[0].replace(':','/') + ".md" for s in name]
+        namePath = ["content/en/docs/pod-lifecycle-events" + s.rsplit(':', 1)[0].replace(':','/') + ".md" for s in name]
         steps = find_strings_between(log_content, ("<testdoc:podspec>","<testdoc:step>"),("</testdoc:podspec>","</testdoc:step>"))
         logs = find_strings_between(log_content, "<testdoc:log>", "</testdoc:log>")
   
