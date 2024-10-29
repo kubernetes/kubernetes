@@ -208,3 +208,21 @@ metric2,label2: v3`,
 		})
 	}
 }
+
+func TestResetLabelValueAllowLists(t *testing.T) {
+	labelValueAllowLists = map[string]*MetricLabelAllowList{
+		"metric1": {
+			labelToAllowList: map[string]sets.Set[string]{
+				"label1": sets.New[string]("v1", "v2"),
+			},
+		},
+		"metric2": {
+			labelToAllowList: map[string]sets.Set[string]{
+				"label2": sets.New[string]("v3"),
+			},
+		},
+	}
+
+	ResetLabelValueAllowLists()
+	assert.Empty(t, labelValueAllowLists)
+}
