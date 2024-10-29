@@ -55,6 +55,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 		EnableSchedulingQueueHint:                    feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
 		EnableAsyncPreemption:                        feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption),
+		EnablePodLevelResources:                      feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 
 	registry := runtime.Registry{

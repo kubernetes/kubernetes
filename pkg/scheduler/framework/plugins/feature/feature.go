@@ -29,4 +29,5 @@ type Features struct {
 	EnableSidecarContainers                      bool
 	EnableSchedulingQueueHint                    bool
 	EnableAsyncPreemption                        bool
+	EnablePodLevelResources                      bool
 }

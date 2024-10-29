@@ -119,12 +119,18 @@ var defaultScoringStrategy = &config.ScoringStrategy{
 	},
 }
 
+func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) *v1.Pod {
+	pod.Spec.Resources = &podResources
+	return pod
+}
+
 func TestEnoughRequests(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod                       *v1.Pod
 		nodeInfo                  *framework.NodeInfo
 		name                      string
 		args                      config.NodeResourcesFitArgs
+		podLevelResourcesEnabled  bool
 		wantInsufficientResources []InsufficientResource
 		wantStatus                *framework.Status
 	}{
@@ -478,6 +484,7 @@ func TestEnoughRequests(t *testing.T) {
 			wantInsufficientResources: []InsufficientResource{},
 		},
 		{
+			podLevelResourcesEnabled: true,
 			pod: newResourcePod(
 				framework.Resource{
 					ScalarResources: map[v1.ResourceName]int64{
@@ -488,10 +495,74 @@ func TestEnoughRequests(t *testing.T) {
 			name:                      "skip checking resource request with quantity zero",
 			wantInsufficientResources: []InsufficientResource{},
 		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 5})),
+			name:                      "both pod-level and container-level resources fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("7m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 5})),
+			name:       "pod-level cpu resource not fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceCPU, Reason: getErrReason(v1.ResourceCPU), Requested: 7, Used: 5, Capacity: 10},
+			},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
+			name:       "pod-level memory resource not fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
+			},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newResourceInitPod(newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2")},
+				},
+			),
+				framework.Resource{MilliCPU: 1, Memory: 1},
+			),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 5, Memory: 19})),
+			name:       "one pod-level cpu resource fits and all init and non-init containers resources fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceMemory)),
+			wantInsufficientResources: []InsufficientResource{{
+				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
+			},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
+
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
@@ -502,7 +573,7 @@ func TestEnoughRequests(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			p, err := NewFit(ctx, &test.args, nil, plfeature.Features{})
+			p, err := NewFit(ctx, &test.args, nil, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -517,7 +588,7 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled}), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
@@ -1434,9 +1505,10 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 
 func TestIsFit(t *testing.T) {
 	testCases := map[string]struct {
-		pod      *v1.Pod
-		node     *v1.Node
-		expected bool
+		pod                      *v1.Pod
+		node                     *v1.Node
+		podLevelResourcesEnabled bool
+		expected                 bool
 	}{
 		"nil node": {
 			pod:      &v1.Pod{},
@@ -1452,11 +1524,26 @@ func TestIsFit(t *testing.T) {
 			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
 			expected: true,
 		},
+		"insufficient pod-level resource": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+			).Obj(),
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 false,
+		},
+		"sufficient pod-level resource": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+			).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			expected: true,
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node); got != tc.expected {
+			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{tc.podLevelResourcesEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -1589,7 +1676,7 @@ func TestHaveAnyRequestedResourcesIncreased(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode); got != tc.expected {
+			if got := haveAnyRequestedResourcesIncreased(tc.pod, tc.originalNode, tc.modifiedNode, ResourceRequestsOptions{}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})

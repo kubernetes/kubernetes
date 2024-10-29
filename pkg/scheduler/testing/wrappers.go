@@ -334,6 +334,12 @@ func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	return p
 }
 
+// Resources sets requests and limits at pod-level.
+func (p *PodWrapper) Resources(resources v1.ResourceRequirements) *PodWrapper {
+	p.Spec.Resources = &resources
+	return p
+}
+
 // OwnerReference updates the owning controller of the pod.
 func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
 	p.OwnerReferences = []metav1.OwnerReference{
