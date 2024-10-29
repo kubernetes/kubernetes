@@ -39,9 +39,9 @@ type Checkpoint struct {
 }
 
 // NewCheckpoint creates a new checkpoint from a list of claim info states
-func NewCheckpoint(data *PodResourceAllocationInfo) (*Checkpoint, error) {
+func NewCheckpoint(allocations *PodResourceAllocationInfo) (*Checkpoint, error) {
 
-	praData, err := json.Marshal(data)
+	serializedAllocations, err := json.Marshal(allocations)
 	if err != nil {
 		return nil, err
 	}
