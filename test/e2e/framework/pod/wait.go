@@ -498,7 +498,7 @@ func WaitForPodNameUnschedulableInNamespace(ctx context.Context, c clientset.Int
 			}
 		}
 		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v", podName, namespace, pod.Status.Phase)
+			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v, pod: \n%s", podName, namespace, pod.Status.Phase, format.Object(pod, 1))
 		}
 		return false, nil
 	})
