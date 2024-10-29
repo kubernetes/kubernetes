@@ -247,7 +247,7 @@ var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
 // dropNonEphemeralContainerUpdates discards all changes except for pod.Spec.EphemeralContainers and certain metadata
 func dropNonEphemeralContainerUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := mungePod(newPod, oldPod)
+	pod := dropPodUpdates(newPod, oldPod)
 	pod.Spec.EphemeralContainers = newPod.Spec.EphemeralContainers
 	return pod
 }
@@ -282,7 +282,7 @@ var ResizeStrategy = podResizeStrategy{Strategy}
 
 // dropNonPodResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
 func dropNonPodResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := mungePod(newPod, oldPod)
+	pod := dropPodUpdates(newPod, oldPod)
 
 	oldCtrToIndex := make(map[string]int)
 	for idx, ctr := range pod.Spec.Containers {
@@ -321,8 +321,8 @@ func (podResizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return nil
 }
 
-// mungePod mutates metadata information of old pod with the new pod.
-func mungePod(newPod, oldPod *api.Pod) *api.Pod {
+// dropPodUpdates drops any changes in the pod.
+func dropPodUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	pod := oldPod.DeepCopy()
 	pod.Name = newPod.Name
 	pod.Namespace = newPod.Namespace
