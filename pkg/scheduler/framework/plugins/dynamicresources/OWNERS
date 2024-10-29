@@ -6,3 +6,4 @@ reviewers:
   - bart0sh
 labels:
   - sig/node
+  - wg/device-management
