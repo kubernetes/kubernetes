@@ -20,8 +20,6 @@ limitations under the License.
 package winstats
 
 import (
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"os"
 	"runtime"
 	"strconv"
@@ -30,6 +28,9 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/pkg/errors"

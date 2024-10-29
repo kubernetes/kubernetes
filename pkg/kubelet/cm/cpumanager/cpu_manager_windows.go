@@ -29,21 +29,21 @@ import (
 )
 
 func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		affinities := winstats.CpusToGroupAffinity(cpus.List())
-		var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
-		for _, affinity := range affinities {
-			cpuGroupAffinities = append(cpuGroupAffinities, &runtimeapi.WindowsCpuGroupAffinity{
-				CpuGroup: uint32(affinity.Group),
-				CpuMask:  uint64(affinity.Mask),
-			})
-		}
-		return m.containerRuntime.UpdateContainerResources(ctx, containerID, &runtimeapi.ContainerResources{
-			Windows: &runtimeapi.WindowsContainerResources{
-				AffinityCpus: cpuGroupAffinities,
-			},
-		})
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		return nil
 	}
 
-	return nil
+	affinities := winstats.CpusToGroupAffinity(cpus.List())
+	var cpuGroupAffinities []*runtimeapi.WindowsCpuGroupAffinity
+	for _, affinity := range affinities {
+		cpuGroupAffinities = append(cpuGroupAffinities, &runtimeapi.WindowsCpuGroupAffinity{
+			CpuGroup: uint32(affinity.Group),
+			CpuMask:  uint64(affinity.Mask),
+		})
+	}
+	return m.containerRuntime.UpdateContainerResources(ctx, containerID, &runtimeapi.ContainerResources{
+		Windows: &runtimeapi.WindowsContainerResources{
+			AffinityCpus: cpuGroupAffinities,
+		},
+	})
 }
