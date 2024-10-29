@@ -98,8 +98,7 @@ func (sc *stateCheckpoint) storeState() error {
 		ResizeStatusEntries: podResizeStatus,
 	})
 	if err != nil {
-		klog.ErrorS(err, "Failed to create checkpoint")
-		return err
+		return fmt.Errorf("failed to create checkpoint: %w", err)
 	}
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
