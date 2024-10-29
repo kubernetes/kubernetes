@@ -1360,7 +1360,7 @@ func TestExtractModifyApply_ForceOwnership(t *testing.T) {
 	}
 }
 
-func TestGeneratedClientCBOREnablement(t *testing.T) {
+func TestClientCBOREnablement(t *testing.T) {
 	// Generated clients for built-in types force Protobuf by default. They are tested here to
 	// ensure that the CBOR client feature gates do not interfere with this.
 	DoRequestWithProtobufPreferredGeneratedClient := func(t *testing.T, config *rest.Config) error {
@@ -1394,6 +1394,34 @@ func TestGeneratedClientCBOREnablement(t *testing.T) {
 			context.TODO(),
 			&wardlev1alpha1.Fischer{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-generated-client-cbor-enablement"},
+			},
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		return err
+	}
+
+	DoRequestWithGenericTypedClient := func(t *testing.T, config *rest.Config) error {
+		clientset, err := clientset.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Generated clients for built-in types include the PreferProtobuf option, which
+		// forces Protobuf encoding on a per-request basis.
+		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
+			"namespaces",
+			clientset.CoreV1().RESTClient(),
+			clientscheme.ParameterCodec,
+			"",
+			func() *v1.Namespace { return &v1.Namespace{} },
+			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		)
+		_, err = client.Create(
+			context.TODO(),
+			&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-generic-client-cbor-enablement",
+				},
 			},
 			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
 		)
@@ -1591,6 +1619,62 @@ func TestGeneratedClientCBOREnablement(t *testing.T) {
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json and protobuf get protobuf",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/vnd.kubernetes.protobuf;q=1,application/cbor;q=0.9,application/json;q=0.8",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf;q=1,application/cbor;q=0.9,application/json;q=0.8",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get cbor",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get json cbor not served",
+			served:                  false,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get json",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=0.9,application/json;q=1",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=0.9,application/json;q=1",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
 		},
 	}
 
