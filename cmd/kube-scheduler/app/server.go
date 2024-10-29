@@ -169,8 +169,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Configz registration.
-	cz, err := configz.New("componentconfig")
-	if err != nil {
+	if cz, err := configz.New("componentconfig"); err != nil {
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 	cz.Set(cc.ComponentConfig)
