@@ -160,6 +160,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
+		name:                    pluginName,
 		backgroundCtx:           ctx,
 		cancel:                  cancel,
 		conn:                    nil,
@@ -170,7 +171,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	if draPlugins.add(pluginName, pluginInstance) {
+	if draPlugins.add(pluginInstance) {
 		logger.V(1).Info("Already registered, previous plugin was replaced")
 	}
 
