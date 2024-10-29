@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -104,7 +105,6 @@ const (
 )
 
 const (
-	configFile               = "config/performance-config.yaml"
 	extensionPointsLabelName = "extension_point"
 	resultLabelName          = "result"
 	pluginLabelName          = "plugin"
@@ -203,6 +203,47 @@ var (
 		names.VolumeZone,
 	}
 )
+
+var UseTestingLog *bool
+var PerfSchedulingLabelFilter *string
+var TestSchedulingLabelFilter *string
+
+// InitTests should be called in a TestMain in each config subdirectory.
+func InitTests() error {
+	// Run with -v=2, this is the default log level in production.
+	ktesting.SetDefaultVerbosity(DefaultLoggingVerbosity)
+
+	// test/integration/framework/flags.go unconditionally initializes the
+	// logging flags. That's correct for most tests, but in the
+	// scheduler_perf test we want more control over the flags, therefore
+	// here strip them out.
+	var fs flag.FlagSet
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		switch f.Name {
+		case "log-flush-frequency", "v", "vmodule":
+			// These will be added below ourselves, don't copy.
+		default:
+			fs.Var(f.Value, f.Name, f.Usage)
+		}
+	})
+	flag.CommandLine = &fs
+
+	flag.Var(LoggingFeatureGate, "feature-gate",
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+			"Options are:\n"+strings.Join(LoggingFeatureGate.KnownFeatures(), "\n"))
+
+	UseTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
+	PerfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
+	TestSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test,-performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
+
+	// This would fail if we hadn't removed the logging flags above.
+	logsapi.AddGoFlags(LoggingConfig, flag.CommandLine)
+
+	flag.Parse()
+
+	logs.InitLogs()
+	return logsapi.ValidateAndApply(LoggingConfig, LoggingFeatureGate)
+}
 
 // testCase defines a set of test cases that intends to test the performance of
 // similar workloads of varying sizes with shared overall settings such as
@@ -930,11 +971,9 @@ func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
 	return &scm, nil
 }
 
-var useTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
-
 func initTestOutput(tb testing.TB) io.Writer {
 	var output io.Writer
-	if *useTestingLog {
+	if *UseTestingLog {
 		output = framework.NewTBWriter(tb)
 	} else {
 		tmpDir := tb.TempDir()
@@ -966,9 +1005,9 @@ func initTestOutput(tb testing.TB) io.Writer {
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
 func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
-	tCtx := ktesting.Init(t, initoption.PerTestOutput(*useTestingLog))
+	tCtx := ktesting.Init(t, initoption.PerTestOutput(*UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
-	if !*useTestingLog && doArtifacts {
+	if !*UseTestingLog && doArtifacts {
 		// Reconfigure logging so that it goes to a separate file per
 		// test instead of stderr. If the test passes, the file gets
 		// deleted. The overall output can be very large (> 200 MB for
@@ -1055,13 +1094,12 @@ func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featurega
 	return result
 }
 
-// RunBenchmarkPerfScheduling runs the scheduler performance tests.
+// RunBenchmarkPerfScheduling runs the scheduler performance benchmark tests.
 //
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
-// testcaseLabelSelectors is available to select specific test cases to run with labels on them.
-func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry, testcaseLabelSelectors []string) {
+func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		b.Fatal(err)
@@ -1069,6 +1107,11 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 	if err = validateTestCases(testCases); err != nil {
 		b.Fatal(err)
 	}
+
+	if testing.Short() {
+		*PerfSchedulingLabelFilter += ",+short"
+	}
+	testcaseLabelSelectors := strings.Split(*PerfSchedulingLabelFilter, ",")
 
 	output := initTestOutput(b)
 
@@ -1086,7 +1129,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
-						b.Skipf("disabled by label filter %v", testcaseLabelSelectors)
+						b.Skipf("disabled by label filter %v", PerfSchedulingLabelFilter)
 					}
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
@@ -1135,7 +1178,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 							continue
 						}
 
-						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s.dat", tc.Name, w.Name, runID), "/", "_"))
+						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%s.dat", tc.Name, w.Name, topicName, runID), "/", "_"))
 						if err != nil {
 							b.Fatalf("prepare data file: %v", err)
 						}
@@ -1156,8 +1199,51 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 			}
 		})
 	}
-	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark"); err != nil {
+	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark_"+topicName); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
+	}
+}
+
+// RunIntegrationPerfScheduling runs the scheduler performance integration tests.
+func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
+	testCases, err := getTestCases(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = validateTestCases(testCases); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Short() {
+		*TestSchedulingLabelFilter += ",+short"
+	}
+	testcaseLabelSelectors := strings.Split(*TestSchedulingLabelFilter, ",")
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			for _, w := range tc.Workloads {
+				t.Run(w.Name, func(t *testing.T) {
+					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
+						t.Skipf("disabled by label filter %q", *TestSchedulingLabelFilter)
+					}
+					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
+					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
+
+					runWorkload(tCtx, tc, w, informerFactory)
+
+					if featureGates[features.SchedulerQueueingHints] {
+						// In any case, we should make sure InFlightEvents is empty after running the scenario.
+						if err = checkEmptyInFlightEvents(); err != nil {
+							tCtx.Errorf("%s: %s", w.Name, err)
+						}
+					}
+
+					// Reset metrics to prevent metrics generated in current workload gets
+					// carried over to the next workload.
+					legacyregistry.Reset()
+				})
+			}
+		})
 	}
 }
 
