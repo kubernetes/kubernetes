@@ -681,18 +681,7 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 
-			if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
-				return false
-			}
-
-			if memoryState1.SystemReserved != memoryState2.SystemReserved {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "SystemReserved", "SystemReserved1", memoryState1.SystemReserved, "SystemReserved2", memoryState2.SystemReserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
-				return false
-			}
-
-			if memoryState1.Allocatable != memoryState2.Allocatable {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "Allocatable", "Allocatable1", memoryState1.Allocatable, "Allocatable2", memoryState2.Allocatable, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+			if !areMemoryStatesEqual(memoryState1, memoryState2, nodeID, resourceName) {
 				return false
 			}
 
@@ -714,6 +703,24 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 		}
+	}
+	return true
+}
+
+func areMemoryStatesEqual(memoryState1, memoryState2 *state.MemoryTable, nodeID int, resourceName v1.ResourceName) bool {
+	if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
+	}
+
+	if memoryState1.SystemReserved != memoryState2.SystemReserved {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "SystemReserved", "SystemReserved1", memoryState1.SystemReserved, "SystemReserved2", memoryState2.SystemReserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
+	}
+
+	if memoryState1.Allocatable != memoryState2.Allocatable {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "Allocatable", "Allocatable1", memoryState1.Allocatable, "Allocatable2", memoryState2.Allocatable, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
 	}
 	return true
 }
