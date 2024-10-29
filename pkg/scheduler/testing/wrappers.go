@@ -22,12 +22,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 )
@@ -229,6 +231,64 @@ func (c *ContainerWrapper) ResourceLimits(limMap map[v1.ResourceName]string) *Co
 func (c *ContainerWrapper) RestartPolicy(restartPolicy v1.ContainerRestartPolicy) *ContainerWrapper {
 	c.Container.RestartPolicy = &restartPolicy
 	return c
+}
+
+// PodDisruptionBudgetWrapper wraps a PodDisruptionBudget inside.
+type PodDisruptionBudgetWrapper struct {
+	policy.PodDisruptionBudget
+}
+
+// MakePDB creates a PodDisruptionBudget wrapper.
+func MakePDB() *PodDisruptionBudgetWrapper {
+	return &PodDisruptionBudgetWrapper{policy.PodDisruptionBudget{}}
+}
+
+// Obj returns the inner PodDisruptionBudget.
+func (p *PodDisruptionBudgetWrapper) Obj() *policy.PodDisruptionBudget {
+	return &p.PodDisruptionBudget
+}
+
+// Name sets `name` as the name of the inner PodDisruptionBudget.
+func (p *PodDisruptionBudgetWrapper) Name(name string) *PodDisruptionBudgetWrapper {
+	p.SetName(name)
+	return p
+}
+
+// Namespace sets `namespace` as the namespace of the inner PodDisruptionBudget.
+func (p *PodDisruptionBudgetWrapper) Namespace(namespace string) *PodDisruptionBudgetWrapper {
+	p.SetNamespace(namespace)
+	return p
+}
+
+// MinAvailable sets `minAvailable` to the inner PodDisruptionBudget.Spec.MinAvailable.
+func (p *PodDisruptionBudgetWrapper) MinAvailable(minAvailable string) *PodDisruptionBudgetWrapper {
+	p.Spec.MinAvailable = &intstr.IntOrString{
+		Type:   intstr.String,
+		StrVal: minAvailable,
+	}
+	return p
+}
+
+// MatchLabel adds a {key,value} to the inner PodDisruptionBudget.Spec.Selector.MatchLabels.
+func (p *PodDisruptionBudgetWrapper) MatchLabel(key, value string) *PodDisruptionBudgetWrapper {
+	selector := p.Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{}
+	}
+	matchLabels := selector.MatchLabels
+	if matchLabels == nil {
+		matchLabels = map[string]string{}
+	}
+	matchLabels[key] = value
+	selector.MatchLabels = matchLabels
+	p.Spec.Selector = selector
+	return p
+}
+
+// DisruptionsAllowed sets `disruptionsAllowed` to the inner PodDisruptionBudget.Status.DisruptionsAllowed.
+func (p *PodDisruptionBudgetWrapper) DisruptionsAllowed(disruptionsAllowed int32) *PodDisruptionBudgetWrapper {
+	p.Status.DisruptionsAllowed = disruptionsAllowed
+	return p
 }
 
 // PodWrapper wraps a Pod inside.
