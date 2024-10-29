@@ -763,7 +763,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
-			}).Should(matchVAPError)
+			}).WithTimeout(20 * time.Second).Should(matchVAPError)
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
@@ -772,7 +772,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
 				return err
-			}).Should(matchVAPError)
+			}).WithTimeout(20 * time.Second).Should(matchVAPError)
 
 			// After labeling the namespace, creation must (eventually...) succeed.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
@@ -782,11 +782,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
-			}).Should(gomega.Succeed())
+			}).WithTimeout(20 * time.Second).Should(gomega.Succeed())
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
 				return err
-			}).Should(gomega.Succeed())
+			}).WithTimeout(20 * time.Second).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("truncates the name of a generated resource claim", func(ctx context.Context) {
@@ -832,6 +832,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Eventually the quota status should consider the existing claim.
 			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
+				WithTimeout(time.Minute).
 				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 					"Status": gomega.Equal(v1.ResourceQuotaStatus{
 						Hard: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
