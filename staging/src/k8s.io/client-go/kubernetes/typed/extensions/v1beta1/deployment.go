@@ -20,7 +20,6 @@ package v1beta1
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -30,6 +29,7 @@ import (
 	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.
@@ -118,20 +118,19 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &extensionsv1beta1.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
 		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

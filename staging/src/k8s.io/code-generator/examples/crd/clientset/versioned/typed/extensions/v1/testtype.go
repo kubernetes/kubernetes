@@ -20,7 +20,6 @@ package v1
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 	time "time"
 
@@ -28,6 +27,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
+	apply "k8s.io/client-go/util/apply"
 	consistencydetector "k8s.io/client-go/util/consistencydetector"
 	watchlist "k8s.io/client-go/util/watchlist"
 	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
@@ -204,21 +204,20 @@ func (c *testTypes) ApplyExtended(ctx context.Context, testType *applyconfigurat
 		return nil, fmt.Errorf("testType provided to ApplyExtended must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(testType)
-	if err != nil {
-		return nil, err
-	}
 	name := testType.Name
 	if name == nil {
 		return nil, fmt.Errorf("testType.Name must be provided to ApplyExtended")
 	}
+	request, err := apply.NewRequest(c.GetClient(), testType)
+	if err != nil {
+		return nil, err
+	}
 	result = &extensionsv1.TestType{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
 		Namespace(c.GetNamespace()).
 		Resource("testtypes").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return
@@ -275,19 +274,18 @@ func (c *testTypes) ApplySubresource(ctx context.Context, testTypeName string, t
 		return nil, fmt.Errorf("testSubresource provided to ApplySubresource must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(testSubresource)
+	request, err := apply.NewRequest(c.GetClient(), testSubresource)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &extensionsv1.TestSubresource{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
 		Namespace(c.GetNamespace()).
 		Resource("testtypes").
 		Name(testTypeName).
 		SubResource("subresource").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return
