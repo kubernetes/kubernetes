@@ -25009,7 +25009,7 @@ func TestValidatePodResize(t *testing.T) {
 			test: "storage limit change",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", "")),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", "")),
-			err:  "spec: Forbidden: pod resize may not change fields other than cpu and memory",
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		}, {
 			test: "cpu request change",
 			old:  mkPod(getResources("200m", "0", "", ""), core.ResourceList{}),
@@ -25024,7 +25024,7 @@ func TestValidatePodResize(t *testing.T) {
 			test: "storage request change",
 			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}),
 			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}),
-			err:  "spec: Forbidden: pod resize may not change fields other than cpu and memory",
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		}, {
 			test: "Pod QoS unchanged, guaranteed -> guaranteed",
 			old:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("100m", "100Mi", "1Gi", "")),
