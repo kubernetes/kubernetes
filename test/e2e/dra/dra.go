@@ -754,9 +754,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.externalClaim()
-			claim.Spec.Devices.Requests[0].AdminAccess = true
+			claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
-			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = true
+			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
@@ -849,7 +849,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		f.It("DaemonSet with admin access", feature.DRAAdminAccess, func(ctx context.Context) {
 			pod, template := b.podInline()
-			template.Spec.Spec.Devices.Requests[0].AdminAccess = true
+			template.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			// Limit the daemon set to the one node where we have the driver.
 			nodeName := nodes.NodeNames[0]
 			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
@@ -872,7 +872,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 
 			created := b.create(ctx, template, daemonSet)
-			if !created[0].(*resourceapi.ResourceClaimTemplate).Spec.Spec.Devices.Requests[0].AdminAccess {
+			if !ptr.Deref(created[0].(*resourceapi.ResourceClaimTemplate).Spec.Spec.Devices.Requests[0].AdminAccess, false) {
 				framework.Fail("AdminAccess field was cleared. This test depends on the DRAAdminAccess feature.")
 			}
 			ds := created[1].(*appsv1.DaemonSet)

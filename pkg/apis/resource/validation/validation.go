@@ -32,11 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -345,9 +343,6 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
-	if result.AdminAccess == nil && utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
-		allErrs = append(allErrs, field.Required(fldPath.Child("adminAccess"), ""))
-	}
 	return allErrs
 }
 

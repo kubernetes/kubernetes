@@ -12419,7 +12419,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
-      default: false
     - name: allocationMode
       type:
         scalar: string

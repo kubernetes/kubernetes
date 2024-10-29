@@ -478,27 +478,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
-		"invalid-add-allocation-missing-admin-access": {
-			adminAccess: true,
-			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("adminAccess"), ""),
-			},
-			oldClaim: validClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.Allocation = &resource.AllocationResult{
-					Devices: resource.DeviceAllocationResult{
-						Results: []resource.DeviceRequestAllocationResult{{
-							Request:     goodName,
-							Driver:      goodName,
-							Pool:        goodName,
-							Device:      goodName,
-							AdminAccess: nil, // Intentionally not set.
-						}},
-					},
-				}
-				return claim
-			},
-		},
 		"okay-add-allocation-missing-admin-access": {
 			adminAccess: false,
 			oldClaim:    validClaim,

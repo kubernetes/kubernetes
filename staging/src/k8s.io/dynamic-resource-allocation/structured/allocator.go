@@ -163,7 +163,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				}
 			}
 
-			if !a.adminAccessEnabled && request.AdminAccess {
+			if !a.adminAccessEnabled && request.AdminAccess != nil {
 				return nil, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.Name)
 			}
 
@@ -584,7 +584,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if !request.AdminAccess && alloc.allocated[deviceID] {
+				if !ptr.Deref(request.AdminAccess, false) && alloc.allocated[deviceID] {
 					alloc.logger.V(7).Info("Device in use", "device", deviceID)
 					continue
 				}
@@ -720,7 +720,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.Bas
 func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.BasicDevice, deviceID DeviceID, must bool) (bool, func(), error) {
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	request := &claim.Spec.Devices.Requests[r.requestIndex]
-	adminAccess := request.AdminAccess
+	adminAccess := ptr.Deref(request.AdminAccess, false)
 	if !adminAccess && alloc.allocated[deviceID] {
 		alloc.logger.V(7).Info("Device in use", "device", deviceID)
 		return false, nil, nil
@@ -751,11 +751,13 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 		alloc.allocated[deviceID] = true
 	}
 	result := resourceapi.DeviceRequestAllocationResult{
-		Request:     request.Name,
-		Driver:      deviceID.Driver,
-		Pool:        deviceID.Pool,
-		Device:      deviceID.Device,
-		AdminAccess: &request.AdminAccess,
+		Request: request.Name,
+		Driver:  deviceID.Driver,
+		Pool:    deviceID.Pool,
+		Device:  deviceID.Device,
+	}
+	if adminAccess {
+		result.AdminAccess = &adminAccess
 	}
 	previousNumResults := len(alloc.result[r.claimIndex].Devices.Results)
 	alloc.result[r.claimIndex].Devices.Results = append(alloc.result[r.claimIndex].Devices.Results, result)

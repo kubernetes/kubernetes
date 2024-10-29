@@ -135,11 +135,10 @@ var (
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
-				Driver:      driver,
-				Pool:        nodeName,
-				Device:      "instance-1",
-				Request:     "req-1",
-				AdminAccess: ptr.To(false),
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "req-1",
 			}},
 		},
 		NodeSelector: func() *v1.NodeSelector {
@@ -182,7 +181,7 @@ func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.Resourc
 func adminAccess(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
 	for i := range claim.Spec.Devices.Requests {
-		claim.Spec.Devices.Requests[i].AdminAccess = true
+		claim.Spec.Devices.Requests[i].AdminAccess = ptr.To(true)
 	}
 	if claim.Status.Allocation != nil {
 		for i := range claim.Status.Allocation.Devices.Results {

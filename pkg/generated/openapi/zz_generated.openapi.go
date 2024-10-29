@@ -46504,8 +46504,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 					},
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
-							Default:     false,
+							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -46560,13 +46559,13 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 					},
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess is a copy of the AdminAccess value in the request which caused this device to be allocated.\n\nNew allocations are required to have this set when the DRAAdminAccess feature gate is enabled. Old allocations made by Kubernetes 1.31 do not have it yet. Clients which want to support Kubernetes 1.31 need to look up the request and retrieve the value from there if this field is not set.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate.",
+							Description: "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"request", "driver", "pool", "device", "adminAccess"},
+				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 	}

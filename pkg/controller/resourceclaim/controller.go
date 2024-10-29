@@ -681,7 +681,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 
 func needsAdminAccess(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.AdminAccess {
+		if ptr.Deref(request.AdminAccess, false) {
 			return true
 		}
 	}

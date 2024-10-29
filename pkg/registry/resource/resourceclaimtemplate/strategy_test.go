@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var obj = &resource.ResourceClaimTemplate{
@@ -62,7 +63,7 @@ var objWithAdminAccess = &resource.ResourceClaimTemplate{
 						Name:            "req-0",
 						DeviceClassName: "class",
 						AllocationMode:  resource.DeviceAllocationModeAll,
-						AdminAccess:     true,
+						AdminAccess:     ptr.To(true),
 					},
 				},
 			},

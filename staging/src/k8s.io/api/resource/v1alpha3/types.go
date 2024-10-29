@@ -449,12 +449,12 @@ type DeviceRequest struct {
 	// any resource allocations.
 	//
 	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate.
+	// feature gate. Admin access is disabled if this field is unset or
+	// set to false, otherwise it is enabled.
 	//
 	// +optional
-	// +default=false
 	// +featureGate=DRAAdminAccess
-	AdminAccess bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
 }
 
 const (
@@ -793,19 +793,15 @@ type DeviceRequestAllocationResult struct {
 	// +required
 	Device string `json:"device" protobuf:"bytes,4,name=device"`
 
-	// AdminAccess is a copy of the AdminAccess value in the
-	// request which caused this device to be allocated.
-	//
-	// New allocations are required to have this set when the DRAAdminAccess
-	// feature gate is enabled. Old allocations made
-	// by Kubernetes 1.31 do not have it yet. Clients which want to
-	// support Kubernetes 1.31 need to look up the request and retrieve
-	// the value from there if this field is not set.
+	// AdminAccess indicates that this device was allocated for
+	// administrative access. See the corresponding request field
+	// for a definition of mode.
 	//
 	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate.
+	// feature gate. Admin access is disabled if this field is unset or
+	// set to false, otherwise it is enabled.
 	//
-	// +required
+	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
 }

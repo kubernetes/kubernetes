@@ -92,7 +92,7 @@ var objWithAdminAccess = &resource.ResourceClaim{
 					Name:            "req-0",
 					DeviceClassName: "class",
 					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     true,
+					AdminAccess:     ptr.To(true),
 				},
 			},
 		},
@@ -111,7 +111,7 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 					Name:            "req-0",
 					DeviceClassName: "class",
 					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     true,
+					AdminAccess:     ptr.To(true),
 				},
 			},
 		},
@@ -336,14 +336,14 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access-because-of-status": {
 			oldObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = false
+				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 			newObj:      objWithAdminAccessStatus,
 			adminAccess: false,
 			expectObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = false
+				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 		},

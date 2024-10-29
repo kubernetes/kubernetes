@@ -248,7 +248,9 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 		Pool:    pool,
 		Device:  device,
 	}
-	r.AdminAccess = &adminAccess
+	if adminAccess {
+		r.AdminAccess = &adminAccess
+	}
 	return r
 }
 
@@ -935,7 +937,7 @@ func TestAllocator(t *testing.T) {
 			adminAccess: false,
 			claimsToAllocate: func() []*resourceapi.ResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = true
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 				return []*resourceapi.ResourceClaim{c}
 			}(),
 			classes: objects(class(classA, driverA)),
@@ -949,7 +951,7 @@ func TestAllocator(t *testing.T) {
 			adminAccess: true,
 			claimsToAllocate: func() []*resourceapi.ResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = true
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 				return []*resourceapi.ResourceClaim{c}
 			}(),
 			allocatedClaims: objects(

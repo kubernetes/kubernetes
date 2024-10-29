@@ -427,6 +427,11 @@ func (in *DeviceRequest) DeepCopyInto(out *DeviceRequest) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.AdminAccess != nil {
+		in, out := &in.AdminAccess, &out.AdminAccess
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

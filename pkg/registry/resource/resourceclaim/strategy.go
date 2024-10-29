@@ -184,8 +184,8 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 	}
 
 	for i := range newClaim.Spec.Devices.Requests {
-		if oldClaim == nil || i >= len(oldClaim.Spec.Devices.Requests) || !oldClaim.Spec.Devices.Requests[i].AdminAccess {
-			newClaim.Spec.Devices.Requests[i].AdminAccess = false
+		if newClaim.Spec.Devices.Requests[i].AdminAccess != nil && !draAdminAccessFeatureInUse(oldClaim) {
+			newClaim.Spec.Devices.Requests[i].AdminAccess = nil
 		}
 	}
 
@@ -193,19 +193,30 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 		return
 	}
 	for i := range newClaim.Status.Allocation.Devices.Results {
-		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil &&
-			(oldClaim == nil || oldClaim.Status.Allocation == nil || i >= len(oldClaim.Status.Allocation.Devices.Results) || oldClaim.Status.Allocation.Devices.Results[i].AdminAccess == nil) &&
-			!requestHasAdminAccess(newClaim, newClaim.Status.Allocation.Devices.Results[i].Request) {
+		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil && !draAdminAccessFeatureInUse(oldClaim) {
 			newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
 		}
 	}
 }
 
-func requestHasAdminAccess(claim *resource.ResourceClaim, requestName string) bool {
+func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
 	for _, request := range claim.Spec.Devices.Requests {
-		if request.Name == requestName && request.AdminAccess {
+		if request.AdminAccess != nil {
 			return true
 		}
 	}
+
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if result.AdminAccess != nil {
+				return true
+			}
+		}
+	}
+
 	return false
 }
