@@ -1148,6 +1148,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.32"
 - name: StatefulSetAutoDeletePVC
   versionedSpecs:
   - default: false

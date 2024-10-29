@@ -602,6 +602,8 @@ const (
 	// owner: @derekwaynecarr
 	//
 	// Enables kubelet support to size memory backed volumes
+	// This is a kubelet only feature gate.
+	// Code can be removed in 1.35 without any consideration for emulated versions.
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
 	// owner: @mattcary
