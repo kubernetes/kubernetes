@@ -74,6 +74,8 @@ const (
 	//   1. the lease is an identity lease (different from leader election leases)
 	//   2. which component owns this lease
 	IdentityLeaseComponentLabelKey = "apiserver.kubernetes.io/identity"
+	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
+	KubeAPIServer = "kube-apiserver"
 )
 
 // Server is a struct that contains a generic control plane apiserver instance
@@ -212,7 +214,20 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 		if c.Extra.PeerProxy != nil {
-			s.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
+			// Run local-discovery sync loop
+			s.GenericAPIServer.AddPostStartHookOrDie("local-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
+				err := c.Extra.PeerProxy.RunLocalDiscoveryCacheSync(context.Done())
+				return err
+			})
+
+			// Run peer-discovery sync loop.
+			s.GenericAPIServer.AddPostStartHookOrDie("peer-discovery-cache-sync", func(context genericapiserver.PostStartHookContext) error {
+				go c.Extra.PeerProxy.RunPeerDiscoveryCacheSync(context, 1)
+				return nil
+			})
+
+			// Wait for handler to be ready.
+			s.GenericAPIServer.AddPostStartHookOrDie("mixed-version-proxy-handler", func(context genericapiserver.PostStartHookContext) error {
 				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
 				return err
 			})

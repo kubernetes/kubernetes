@@ -78,16 +78,6 @@ func validateNodeSelectorAuthorizationFeature() []error {
 	return nil
 }
 
-func validateUnknownVersionInteroperabilityProxyFeature() []error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
-			return nil
-		}
-		return []error{fmt.Errorf("UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled")}
-	}
-	return nil
-}
-
 func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error {
 	err := []error{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
@@ -142,7 +132,6 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
 	errs = append(errs, validateServiceAccountTokenSigningConfig(s)...)

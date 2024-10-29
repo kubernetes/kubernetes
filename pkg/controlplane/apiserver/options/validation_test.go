@@ -26,7 +26,6 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -161,34 +160,6 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 				t.Errorf("Expected error message to contain: %q, but got: %q", test.errShouldContain, errMessageGot)
 			}
 
-		})
-	}
-}
-
-func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
-	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
-	tests := []struct {
-		name            string
-		featuresEnabled []featuregate.Feature
-	}{
-		{
-			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: StorageVersionAPI",
-			featuresEnabled: []featuregate.Feature{features.UnknownVersionInteroperabilityProxy},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for _, feature := range test.featuresEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
-			}
-			var errMessageGot string
-			if errs := validateUnknownVersionInteroperabilityProxyFeature(); len(errs) > 0 {
-				errMessageGot = errs[0].Error()
-			}
-			if !strings.Contains(errMessageGot, conflict) {
-				t.Errorf("Expected error message to contain: %q, but got: %q", conflict, errMessageGot)
-			}
 		})
 	}
 }
