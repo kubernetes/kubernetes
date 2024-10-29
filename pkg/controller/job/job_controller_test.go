@@ -1453,7 +1453,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 	cases := map[string]struct {
 		job                  batch.Job
 		pods                 []*v1.Pod
-		expectedRmFinalizers sets.Set[string]
+		expectedRmFinalizers sets.Set[types.UID]
 		wantSucceeded        int32
 		wantFailed           int32
 	}{
@@ -1510,7 +1510,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.New("b", "f"),
+			expectedRmFinalizers: sets.New[types.UID]("b", "f"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).Pod,
 				buildPod().uid("b").phase(v1.PodSucceeded).trackingFinalizer().Pod,
@@ -1575,7 +1575,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		job                     batch.Job
 		pods                    []*v1.Pod
 		finishedCond            *batch.JobCondition
-		expectedRmFinalizers    sets.Set[string]
+		expectedRmFinalizers    sets.Set[types.UID]
 		needsFlush              bool
 		statusUpdateErr         error
 		podControlErr           error
@@ -1686,7 +1686,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.New("c", "d", "g", "h"),
+			expectedRmFinalizers: sets.New[types.UID]("c", "d", "g", "h"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).trackingFinalizer().Pod,
 				buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod,
@@ -7655,11 +7655,11 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	pods := append(newPodList(2, v1.PodSucceeded, job), newPodList(2, v1.PodFailed, job)...)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
 	podIndexer := podInformer.GetIndexer()
-	uids := sets.New[string]()
+	uids := sets.New[types.UID]()
 	for i := range pods {
 		clientset.Tracker().Add(pods[i])
 		podIndexer.Add(pods[i])
-		uids.Insert(string(pods[i].UID))
+		uids.Insert(pods[i].UID)
 	}
 	jobKey := testutil.GetKey(job, t)
 
@@ -7725,7 +7725,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Deleting pod that had finalizer: %v", err)
 	}
 
-	uids = sets.New(string(pods[2].UID))
+	uids = sets.New(pods[2].UID)
 	var diff string
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)
