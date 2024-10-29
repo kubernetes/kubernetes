@@ -171,8 +171,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err != nil {
 		return fmt.Errorf("unable to register configz: %s", err)
+	} else {
+		cz.Set(cc.ComponentConfig)
 	}
-	cz.Set(cc.ComponentConfig)
 
 	// Start events processing pipeline.
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
