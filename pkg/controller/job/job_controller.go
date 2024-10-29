@@ -917,11 +917,16 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 	}
 
-	// The failure conditions will be evaluated only when the Job finishedCondition has not been marked as SuccessCriteriaMet in the previous reconciliation
+	// The failure conditions will be evaluated only when the Job finishedCondition has not been marked as SuccessCriteriaMet in the previous and current reconciliation
 	// or the Job has already reached the Complete criteria, which recorded succeeded Pods greater or equal than the desired Job completion (.spec.completion).
 	if isIndexedJob(&job) {
 		jobCtx.prevSucceededIndexes, jobCtx.succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
 		jobCtx.succeeded = int32(jobCtx.succeededIndexes.total())
+		if jobCtx.finishedCondition == nil {
+			if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
+				jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
+			}
+		}
 	}
 	waitingComplete := isSuccessCriteriaMetCondition(jobCtx.finishedCondition) || (jobCtx.finishedCondition == nil && succeededPodsCountExceedCompletions(jobCtx, job))
 	if !waitingComplete {
@@ -949,12 +954,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 					}
 				}
 				jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
-			}
-			// The SuccessPolicies are evaluated only when the Job has not yet reached all failure conditions.
-			if jobCtx.finishedCondition == nil {
-				if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
-					jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
-				}
 			}
 		}
 	}

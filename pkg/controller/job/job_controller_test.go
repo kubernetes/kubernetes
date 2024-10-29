@@ -4528,7 +4528,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Succeeded:               1,
 				Terminating:             ptr.To[int32](1),
 				CompletedIndexes:        "1",
-				FailedIndexes:           ptr.To(""),
+				FailedIndexes:           nil,
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
@@ -4798,25 +4798,25 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Succeeded:               1,
 				Terminating:             ptr.To[int32](0),
 				CompletedIndexes:        "1",
-				FailedIndexes:           ptr.To("0"),
+				FailedIndexes:           nil,
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
-						Type:    batch.JobFailureTarget,
+						Type:    batch.JobSuccessCriteriaMet,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
+						Reason:  batch.JobReasonSuccessPolicy,
+						Message: "Matched rules at index 0",
 					},
 					{
-						Type:    batch.JobFailed,
+						Type:    batch.JobComplete,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
+						Reason:  batch.JobReasonSuccessPolicy,
+						Message: "Matched rules at index 0",
 					},
 				},
 			},
 		},
-		"job with successPolicy and backoffLimit; jobPodReplacementPolicy feature enabled; job has a failed condition when job meets to both successPolicy and backoffLimit": {
+		"job with successPolicy and backoffLimit; jobPodReplacementPolicy feature enabled; job has a SuccessCriteriaMet condition when job meets to both successPolicy and backoffLimit": {
 			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
@@ -4850,16 +4850,16 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
-						Type:    batch.JobFailureTarget,
+						Type:    batch.JobSuccessCriteriaMet,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonBackoffLimitExceeded,
-						Message: "Job has reached the specified backoff limit",
+						Reason:  batch.JobReasonSuccessPolicy,
+						Message: "Matched rules at index 0",
 					},
 					{
-						Type:    batch.JobFailed,
+						Type:    batch.JobComplete,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonBackoffLimitExceeded,
-						Message: "Job has reached the specified backoff limit",
+						Reason:  batch.JobReasonSuccessPolicy,
+						Message: "Matched rules at index 0",
 					},
 				},
 			},
