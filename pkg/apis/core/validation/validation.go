@@ -5508,10 +5508,10 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Ensure that only CPU and memory resources are mutable.
-	mungedPodSpec := *newPod.Spec.DeepCopy()
+	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
-	for ix, container := range mungedPodSpec.Containers {
-		mungeCPUMemResources := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+	for ix, container := range originalCPUMemPodSpec.Containers {
+		dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
 			if oldResourceList == nil {
 				return nil
 			}
@@ -5531,17 +5531,17 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 			}
 			return mungedResourceList
 		}
-		lim := mungeCPUMemResources(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
-		req := mungeCPUMemResources(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
+		lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
+		req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
 		container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 		container.ResizePolicy = oldPod.Spec.Containers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
 		newContainers = append(newContainers, container)
 	}
-	mungedPodSpec.Containers = newContainers
-	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
+	originalCPUMemPodSpec.Containers = newContainers
+	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
 		// This likely means that the user has made changes to resources other than CPU and Memory.
-		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
-		errs := field.Forbidden(specPath, fmt.Sprintf("pod resize may not change fields other than cpu and memory\n%v", specDiff))
+		specDiff := cmp.Diff(oldPod.Spec, originalCPUMemPodSpec)
+		errs := field.Forbidden(specPath, fmt.Sprintf("only cpu and memory resources are mutable\n%v", specDiff))
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
