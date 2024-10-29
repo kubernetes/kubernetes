@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
+	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -75,6 +77,7 @@ func getCompositionEnvTemplateWithoutStrictCost() *cel.CompositionEnv {
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
+	celmetrics.Metrics.Register()
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
 		return NewPlugin(configFile), nil
 	})
@@ -94,6 +97,36 @@ var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
 
+type ValidatingAction int
+
+const (
+	ValidatingActionAudit ValidatingAction = iota
+	ValidatingActionAuditWarn
+	ValidatingActionWarn
+	ValidatingActionDeny
+	ValidatingActionInvalid
+)
+
+func getValidatingAction(validationActions []v1.ValidationAction) ValidatingAction {
+	switch len(validationActions) {
+	case 1:
+		switch validationActions[0] {
+		case v1.Audit:
+			return ValidatingActionAudit
+		case v1.Warn:
+			return ValidatingActionWarn
+		case v1.Deny:
+			return ValidatingActionDeny
+		}
+	case 2:
+		if (validationActions[0] == v1.Warn && validationActions[1] == v1.Audit) ||
+			(validationActions[1] == v1.Warn && validationActions[0] == v1.Audit) {
+			return ValidatingActionAuditWarn
+		}
+	}
+	return ValidatingActionInvalid
+}
+
 func NewPlugin(_ io.Reader) *Plugin {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 
@@ -108,6 +141,27 @@ func NewPlugin(_ io.Reader) *Plugin {
 					NewValidatingAdmissionPolicyBindingAccessor,
 					compilePolicy,
 					f,
+					func(hooks []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]) {
+						var auditCount, auditWarnCount, warnCount, denyCount int
+						policyCount := len(hooks)
+						for _, hook := range hooks {
+							for _, binding := range hook.Bindings {
+								switch getValidatingAction(binding.Spec.ValidationActions) {
+								case ValidatingActionAudit:
+									auditCount++
+								case ValidatingActionAuditWarn:
+									auditWarnCount++
+								case ValidatingActionWarn:
+									warnCount++
+								case ValidatingActionDeny:
+									denyCount++
+								case ValidatingActionInvalid:
+									klog.V(2).InfoS("Invalid Validating Admission Policy Binding Action", "namespace", binding.Namespace, "name", binding.Name)
+								}
+							}
+						}
+						celmetrics.Metrics.ObserveActiveBindings(policyCount, auditCount, auditWarnCount, warnCount, denyCount)
+					},
 					dynamicClient,
 					restMapper,
 				)
