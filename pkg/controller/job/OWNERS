@@ -7,6 +7,7 @@ reviewers:
   - sig-apps-reviewers
   - mimowo
   - kannon92
+  - tenzen-y
 labels:
   - sig/apps
 emeritus_approvers:
