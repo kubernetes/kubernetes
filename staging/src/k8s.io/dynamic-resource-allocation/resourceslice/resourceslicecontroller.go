@@ -58,6 +58,13 @@ const (
 	//
 	// To mitigate this, we use a TTL and check a pool again once added slices expire.
 	defaultMutationCacheTTL = time.Minute
+
+	// defaultSyncDelay defines how long to wait between receiving the most recent
+	// informer event and syncing again. This is long enough that the informer cache
+	// should be up-to-date (matter mostly for deletes because an out-dated cache
+	// causes redundant delete API calls) and not too long that a human mistake
+	// doesn't get fixed while that human is waiting for it.
+	defaultSyncDelay = 30 * time.Second
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -74,6 +81,7 @@ type Controller struct {
 	queue            workqueue.TypedRateLimitingInterface[string]
 	sliceStore       cache.MutationCache
 	mutationCacheTTL time.Duration
+	syncDelay        time.Duration
 
 	// Must use atomic access...
 	numCreates int64
@@ -194,6 +202,15 @@ type Options struct {
 	// MutationCacheTTL can be used to change the default TTL of one minute.
 	// See source code for details.
 	MutationCacheTTL *time.Duration
+
+	// SyncDelay defines how long to wait between receiving the most recent
+	// informer event and syncing again. The default is 30 seconds.
+	//
+	// This is long enough that the informer cache should be up-to-date
+	// (matter mostly for deletes because an out-dated cache causes
+	// redundant delete API calls) and not too long that a human mistake
+	// doesn't get fixed while that human is waiting for it.
+	SyncDelay *time.Duration
 }
 
 // Stop cancels all background activity and blocks until the controller has stopped.
@@ -267,16 +284,14 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 		owner:            options.Owner.DeepCopy(),
 		queue:            options.Queue,
 		resources:        options.Resources,
-		mutationCacheTTL: defaultMutationCacheTTL,
+		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, defaultMutationCacheTTL),
+		syncDelay:        ptr.Deref(options.SyncDelay, defaultSyncDelay),
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
 		)
-	}
-	if options.MutationCacheTTL != nil {
-		c.mutationCacheTTL = *options.MutationCacheTTL
 	}
 	if err := c.initInformer(ctx); err != nil {
 		return nil, err
@@ -321,7 +336,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
-			c.queue.Add(slice.Spec.Pool.Name)
+			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 		},
 		UpdateFunc: func(old, new any) {
 			oldSlice, ok := old.(*resourceapi.ResourceSlice)
@@ -337,8 +352,8 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
-			c.queue.Add(oldSlice.Spec.Pool.Name)
-			c.queue.Add(newSlice.Spec.Pool.Name)
+			c.queue.AddAfter(oldSlice.Spec.Pool.Name, c.syncDelay)
+			c.queue.AddAfter(newSlice.Spec.Pool.Name, c.syncDelay)
 		},
 		DeleteFunc: func(obj any) {
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -349,7 +364,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
-			c.queue.Add(slice.Spec.Pool.Name)
+			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 		},
 	})
 	if err != nil {
@@ -674,7 +689,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		case err == nil:
 			atomic.AddInt64(&c.numDeletes, 1)
 		case apierrors.IsNotFound(err):
-			// okay
+			logger.V(5).Info("Resource slice was already deleted earlier", "slice", klog.KObj(slice))
 		default:
 			return fmt.Errorf("delete resource slice: %w", err)
 		}

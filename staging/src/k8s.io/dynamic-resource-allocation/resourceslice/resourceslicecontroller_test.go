@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,6 +88,7 @@ func TestControllerSyncPool(t *testing.T) {
 	)
 
 	testCases := map[string]struct {
+		syncDelay *time.Duration
 		// nodeUID is empty if not a node-local.
 		nodeUID types.UID
 		// noOwner completely disables setting an owner.
@@ -142,7 +144,8 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 		},
 		"remove-pool": {
-			nodeUID: nodeUID,
+			nodeUID:   nodeUID,
+			syncDelay: ptr.To(time.Duration(0)),
 			initialObjects: []runtime.Object{
 				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
@@ -653,6 +656,7 @@ func TestControllerSyncPool(t *testing.T) {
 				Owner:      owner,
 				Resources:  test.inputDriverResources,
 				Queue:      &queue,
+				SyncDelay:  test.syncDelay,
 			})
 			defer ctrl.Stop()
 			require.NoError(t, err, "unexpected controller creation error")
@@ -673,15 +677,14 @@ func TestControllerSyncPool(t *testing.T) {
 
 			assert.Equal(t, test.expectedStats, ctrl.GetStats())
 
-			// The informer might have added a work item after ctrl.run returned.
+			// The informer might have added a work item before or after ctrl.run returned,
+			// therefore we cannot compare the `Later` field. It's either defaultMutationCacheTTL
+			// (last AddAfter call was after a create) or defaultSyncDelay (last AddAfter was
+			// from informer event handler).
 			actualState := queue.State()
-			actualState.Ready = nil
+			actualState.Later = nil
 			var expectState workqueue.MockState[string]
-			if test.expectedStats.NumCreates > 0 {
-				expectState.Later = []workqueue.MockDelayedItem[string]{{Item: poolName, Duration: defaultMutationCacheTTL}}
-			}
 			assert.Equal(t, expectState, actualState)
-
 		})
 	}
 }
