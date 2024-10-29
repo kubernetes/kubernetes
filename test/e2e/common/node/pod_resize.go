@@ -888,7 +888,7 @@ func doPodResizeTests(f *framework.Framework) {
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources are as expected")
-			e2epod.VerifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, tc.containers))
 			ginkgo.By("verifying initial cgroup config are as expected")
 			framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
 
@@ -981,7 +981,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources and cgroup config are as expected")
-			e2epod.VerifyPodStatusResources(newPod, tc.containers)
+			framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, tc.containers))
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
@@ -997,7 +997,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			e2epod.VerifyPodResources(patchedPod, tc.expected)
 
 			ginkgo.By("verifying pod status resources after patch")
-			e2epod.VerifyPodStatusResources(patchedPod, tc.expected)
+			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPod, tc.expected))
 
 			ginkgo.By("deleting pod")
 			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
