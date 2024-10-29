@@ -392,16 +392,16 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	return volumeName, nil
 }
 
-func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (string, bool, error) {
-	if !feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		return "", false, nil
-	}
-
+// getSELinuxLabel returns the SELinux label for a given volume and combination of SELinux labels and bool indicating
+// if the plugin supports mounting the volume with SELinux context.
+// It returns error if the SELinux label cannot be constructed or when the volume is used with multiple SELinux
+// labels.
+func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (seLinuxFileLabel string, pluginSupportsSELinuxContextMount bool, err error) {
 	if !dsw.seLinuxTranslator.SELinuxEnabled() {
 		return "", false, nil
 	}
 
-	pluginSupportsSELinuxContextMount, err := dsw.getSELinuxMountSupport(volumeSpec)
+	pluginSupportsSELinuxContextMount, err = dsw.getSELinuxMountSupport(volumeSpec)
 	if err != nil {
 		return "", false, err
 	}
@@ -419,7 +419,6 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 	}
 
 	seLinuxSupported := util.VolumeSupportsSELinuxMount(volumeSpec)
-	var seLinuxFileLabel string
 	// Ensure that a volume that can be mounted with "-o context=XYZ" is
 	// used only by containers with the same SELinux contexts.
 	for _, containerContext := range seLinuxContainerContexts {
