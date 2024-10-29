@@ -766,7 +766,7 @@ func TestPodResizeRBAC(t *testing.T) {
 					v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
 				},
 			}
-			_, err = saClient.CoreV1().Pods(ns.Name).Resize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+			_, err = saClient.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
 			if tc.allowResize && err != nil {
 				t.Fatalf("Unexpected pod resize failure: %v", err)
 				integration.DeletePodOrErrorf(t, adminClient, ns.Name, pod.Name)
@@ -878,7 +878,7 @@ func TestPodResize(t *testing.T) {
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 		}
 
-		resp, err = client.CoreV1().Pods(ns.Name).Resize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		resp, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
 		if tc.valid && err != nil {
 			t.Fatalf("Unexpected pod resize failure: %v", err)
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
@@ -894,7 +894,7 @@ func TestPodResize(t *testing.T) {
 			continue
 		}
 		resp.Spec.Containers[0].Resources = tc.originalRes
-		_, err = client.CoreV1().Pods(ns.Name).Resize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
+		_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), resp.Name, resp, metav1.UpdateOptions{})
 		if tc.valid && err != nil {
 			t.Fatalf("Unexpected pod resize failure: %v", err)
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
