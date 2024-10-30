@@ -1575,7 +1575,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
-func (kl *Kubelet) initializeModules() error {
+func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	// Prometheus metrics.
 	metrics.Register(
 		collectors.NewVolumeStatsCollector(kl),
@@ -1614,7 +1614,7 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Start out of memory watcher.
 	if kl.oomWatcher != nil {
-		if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
+		if err := kl.oomWatcher.Start(ctx, kl.nodeRef); err != nil {
 			return fmt.Errorf("failed to start OOM watcher: %w", err)
 		}
 	}
@@ -1721,7 +1721,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
 	}
 
-	if err := kl.initializeModules(); err != nil {
+	if err := kl.initializeModules(ctx); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
 		klog.ErrorS(err, "Failed to initialize internal modules")
 		os.Exit(1)
