@@ -167,13 +167,14 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 	assert.NoError(t, err)
 
 	tests := []struct {
-		name         string
-		podResources v1.ResourceRequirements
-		expected     *runtimeapi.LinuxContainerResources
+		name               string
+		containerResources v1.ResourceRequirements
+		podResources       *v1.ResourceRequirements
+		expected           *runtimeapi.LinuxContainerResources
 	}{
 		{
 			name: "Request 128M/1C, Limit 256M/3C",
-			podResources: v1.ResourceRequirements{
+			containerResources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("128Mi"),
 					v1.ResourceCPU:    resource.MustParse("1"),
@@ -192,7 +193,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 		},
 		{
 			name: "Request 128M/2C, No Limit",
-			podResources: v1.ResourceRequirements{
+			containerResources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("128Mi"),
 					v1.ResourceCPU:    resource.MustParse("2"),
@@ -203,6 +204,27 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 				CpuQuota:           0,
 				CpuShares:          2048,
 				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name: "Container Level Request 128M/1C, Pod Level Limit 256M/3C",
+			containerResources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("128Mi"),
+					v1.ResourceCPU:    resource.MustParse("1"),
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+					v1.ResourceCPU:    resource.MustParse("3"),
+				},
+			},
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           300000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 256 * 1024 * 1024,
 			},
 		},
 	}
@@ -222,10 +244,15 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 						ImagePullPolicy: v1.PullIfNotPresent,
 						Command:         []string{"testCommand"},
 						WorkingDir:      "testWorkingDir",
-						Resources:       test.podResources,
+						Resources:       test.containerResources,
 					},
 				},
 			},
+		}
+
+		if test.podResources != nil {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			pod.Spec.Resources = test.podResources
 		}
 
 		linuxConfig, err := m.generateLinuxContainerConfig(&pod.Spec.Containers[0], pod, new(int64), "", nil, false)

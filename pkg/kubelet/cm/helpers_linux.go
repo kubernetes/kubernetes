@@ -118,16 +118,20 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
+	// sum requests and limits.
 	reqs := resource.PodRequests(allocatedPod, resource.PodResourcesOptions{
-		// pod is already configured to the allocated resources, and we explicitly don't want to use
-		// the actual resources if we're instantiating a resize.
-		UseStatusResources: false,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !podLevelResourcesEnabled,
+		UseStatusResources:    false,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
 
 	limits := resource.PodLimits(allocatedPod, resource.PodResourcesOptions{
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !podLevelResourcesEnabled,
 		ContainerFn: func(res v1.ResourceList, containerType resource.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false
@@ -137,6 +141,16 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 			}
 		},
 	})
+
+	if podLevelResourcesEnabled && resource.IsPodLevelResourcesSet(allocatedPod) {
+		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
+			cpuLimitsDeclared = true
+		}
+
+		if !allocatedPod.Spec.Resources.Limits.Memory().IsZero() {
+			memoryLimitsDeclared = true
+		}
+	}
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
 

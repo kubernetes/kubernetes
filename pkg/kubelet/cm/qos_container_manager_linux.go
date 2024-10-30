@@ -179,7 +179,11 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		req := resource.PodRequests(pod, resource.PodResourcesOptions{
+			Reuse: reuseReqs,
+			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
 		}
