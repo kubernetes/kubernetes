@@ -44,7 +44,7 @@ func TestProbeAttachableVolumePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProbeAttachableVolumePlugins failed: %s", err)
 	}
-	checkPlugins(t, plugins, []string{"kubernetes.io/csi", "kubernetes.io/fc", "kubernetes.io/iscsi", "kubernetes.io/portworx-volume"})
+	checkPlugins(t, plugins, []string{"kubernetes.io/csi", "kubernetes.io/fc", "kubernetes.io/iscsi"})
 }
 
 func TestProbeExpandableVolumePlugins(t *testing.T) {
