@@ -290,9 +290,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state *framework.CycleState, p
 
 	// 5) Perform preparation work before nominating the selected candidate.
 	if ev.enableAsyncPreemption {
-		if status := ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
-			return nil, status
-		}
+		ev.prepareCandidateAsync(bestCandidate, pod, ev.PluginName)
 	} else {
 		if status := ev.prepareCandidate(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
 			return nil, status
@@ -469,7 +467,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 // The Pod won't be retried until the goroutine triggered here completes.
 //
 // See http://kep.k8s.io/4832 for how the async preemption works.
-func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) *framework.Status {
+func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
 	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
 	// intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
@@ -509,6 +507,14 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// and the pod could end up stucking at the unschedulable pod pool
 		// by all the pod removal events being ignored.
 
+		if len(c.Victims().Pods) == 0 {
+			ev.mu.Lock()
+			delete(ev.preempting, pod.UID)
+			ev.mu.Unlock()
+
+			return
+		}
+
 		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
 		if err := errCh.ReceiveError(); err != nil {
 			logger.Error(err, "Error occurred during preemption")
@@ -524,8 +530,6 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name())
 	}()
-
-	return nil
 }
 
 func getPodDisruptionBudgets(pdbLister policylisters.PodDisruptionBudgetLister) ([]*policy.PodDisruptionBudget, error) {
