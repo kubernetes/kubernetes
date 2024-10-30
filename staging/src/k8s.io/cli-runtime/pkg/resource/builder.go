@@ -68,6 +68,7 @@ type Builder struct {
 
 	// codecFactory describes which codecs you want to use
 	negotiatedSerializer runtime.NegotiatedSerializer
+	contentType          string
 
 	// local indicates that we cannot make server calls
 	local bool
@@ -341,6 +342,14 @@ func (b *Builder) WithScheme(scheme *runtime.Scheme, decodingVersions ...schema.
 		decoder:      codecFactory.UniversalDecoder(decodingVersions...),
 	}
 
+	return b
+}
+
+// WithContentType appends the contentType to AcceptContentTypes with higher priority than
+// application/json. So that if resource supports it, given contentType will be used. Otherwise,
+// application/json as default will be used. For unstructured resources, this field is ignored.
+func (b *Builder) WithContentType(contentType string) *Builder {
+	b.contentType = contentType
 	return b
 }
 
@@ -960,7 +969,7 @@ func (b *Builder) getClient(gv schema.GroupVersion) (RESTClient, error) {
 	case b.fakeClientFn != nil:
 		client, err = b.fakeClientFn(gv)
 	case b.negotiatedSerializer != nil:
-		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).clientForGroupVersion(gv, b.negotiatedSerializer)
+		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).clientForGroupVersion(gv, b.negotiatedSerializer, b.contentType)
 	default:
 		client, err = b.clientConfigFn.withStdinUnavailable(b.stdinInUse).unstructuredClientForGroupVersion(gv)
 	}

@@ -17,13 +17,15 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
 
 // TODO require negotiatedSerializer.  leaving it optional lets us plumb current behavior and deal with the difference after major plumbing is complete
-func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVersion, negotiatedSerializer runtime.NegotiatedSerializer) (RESTClient, error) {
+func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVersion, negotiatedSerializer runtime.NegotiatedSerializer, contentType string) (RESTClient, error) {
 	cfg, err := clientConfigFn()
 	if err != nil {
 		return nil, err
@@ -31,6 +33,20 @@ func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVers
 	if negotiatedSerializer != nil {
 		cfg.ContentConfig.NegotiatedSerializer = negotiatedSerializer
 	}
+
+	if contentType != "" {
+		if contentType != runtime.ContentTypeJSON &&
+			contentType != runtime.ContentTypeYAML &&
+			contentType != runtime.ContentTypeProtobuf &&
+			contentType != runtime.ContentTypeCBOR {
+			return nil, fmt.Errorf("unsupported content type %q", contentType)
+		}
+		if contentType != runtime.ContentTypeJSON {
+			cfg.ContentConfig.AcceptContentTypes = fmt.Sprintf("%s;q=1,application/json;q=0.9", contentType)
+			cfg.ContentConfig.ContentType = contentType
+		}
+	}
+
 	cfg.GroupVersion = &gv
 	if len(gv.Group) == 0 {
 		cfg.APIPath = "/api"
