@@ -684,6 +684,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 	// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
+		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
 			if err = setPodCgroupConfig(rName, true); err != nil {
 				return err
@@ -700,11 +701,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 				return err
 			}
 		}
-		if newPodCgLimValue < currPodCgLimValue {
-			err = setPodCgroupConfig(rName, true)
-		}
+		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
 			if err = setPodCgroupConfig(rName, false); err != nil {
+				return err
+			}
+		}
+		if newPodCgLimValue < currPodCgLimValue {
+			if err = setPodCgroupConfig(rName, true); err != nil {
 				return err
 			}
 		}
