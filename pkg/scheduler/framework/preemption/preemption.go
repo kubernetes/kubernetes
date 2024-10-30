@@ -186,7 +186,7 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 			}
 			if err := util.DeletePod(ctx, ev.Handler.ClientSet(), victim); err != nil {
 				if !apierrors.IsNotFound(err) {
-					logger.Error(err, "Preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
+					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
 					return err
 				}
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
@@ -488,7 +488,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	ev.mu.Unlock()
 
 	logger := klog.FromContext(ctx)
-	go func() { // TODO: use paralizer
+	go func() {
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
 
