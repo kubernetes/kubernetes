@@ -53,6 +53,20 @@
     collectMetrics: true
   workloads:
   - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
@@ -125,6 +139,20 @@
     collectMetrics: true
   workloads:
   - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
@@ -238,6 +266,22 @@
     collectMetrics: true
   workloads:
   - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      initClaims: 0
+      measurePods: 10
+      measureClaims: 2 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
