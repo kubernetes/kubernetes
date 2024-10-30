@@ -124,6 +124,7 @@ func AuthzTestCases() []AuthzTestCase {
 		"/logs/":                              "log",
 		"/logs/{logpath:*}":                   "log",
 		"/metrics":                            "metrics",
+		"/metrics/slis":                       "metrics",
 		"/metrics/cadvisor":                   "metrics",
 		"/metrics/probes":                     "metrics",
 		"/metrics/resource":                   "metrics",
