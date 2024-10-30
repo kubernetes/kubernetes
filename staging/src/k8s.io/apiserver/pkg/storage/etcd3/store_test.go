@@ -285,6 +285,11 @@ func TestListContinuationWithFilter(t *testing.T) {
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
+func TestNamespaceScopedList(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
+}
+
 func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}

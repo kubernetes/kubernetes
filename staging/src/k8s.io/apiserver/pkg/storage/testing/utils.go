@@ -30,6 +30,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -388,4 +390,43 @@ func (s sortablePodList) Less(i, j int) bool {
 
 func (s sortablePodList) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+func CreatePodPredicate(field fields.Selector, namespaceScoped bool, indexField []string) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:       labels.Everything(),
+		Field:       field,
+		GetAttrs:    determinePodGetAttrFunc(namespaceScoped, indexField),
+		IndexFields: indexField,
+	}
+}
+
+func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.AttrFunc {
+	if indexField != nil {
+		if namespaceScoped {
+			return namespacedScopedNodeNameAttrFunc
+		}
+		return clusterScopedNodeNameAttrFunc
+	}
+	if namespaceScoped {
+		return storage.DefaultNamespaceScopedAttr
+	}
+	return storage.DefaultClusterScopedAttr
+}
+
+func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName":      pod.Spec.NodeName,
+		"metadata.name":      pod.ObjectMeta.Name,
+		"metadata.namespace": pod.ObjectMeta.Namespace,
+	}, nil
+}
+
+func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName": pod.Spec.NodeName,
+		"metadata.name": pod.ObjectMeta.Name,
+	}, nil
 }

@@ -2761,3 +2761,403 @@ func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interfac
 		t.Errorf("unexpected items: %#v", names)
 	}
 }
+
+func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage.Interface) {
+	tests := []struct {
+		name               string
+		requestedNamespace string
+		recursive          bool
+		indexFields        []string
+		fieldSelector      func(namespace string) fields.Selector
+		inputPods          func(namespace string) []example.Pod
+		expectPods         func(namespace string) []example.Pod
+	}{
+		{
+			name:          "request without namespace, without field selector",
+			recursive:     true,
+			fieldSelector: func(namespace string) fields.Selector { return fields.Everything() },
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", "ns1"),
+					*baseNamespacedPod("foo2", "ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", "ns1"),
+					*baseNamespacedPod("foo2", "ns2"),
+				}
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.namespace",
+			recursive: true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{"metadata.namespace": namespace + "ns1"})
+			},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:      "request without namespace, field selector with spec.nodename",
+			recursive: true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.ParseSelectorOrDie("spec.nodeName=bar1")
+			},
+			indexFields: []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+				}
+			},
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename to filter out",
+			recursive:     true,
+			fieldSelector: func(namespace string) fields.Selector { return fields.ParseSelectorOrDie("spec.nodeName!=bar1") },
+			indexFields:   []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, without field selector",
+			requestedNamespace: "ns1",
+			recursive:          true,
+			fieldSelector:      func(namespace string) fields.Selector { return fields.Everything() },
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "ns1",
+			recursive:          true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{"metadata.namespace": namespace + "ns1"})
+			},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "ns1",
+			recursive:          true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{"metadata.namespace": namespace + "ns2"})
+			},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPodUpdated("foo2", namespace+"ns1"),
+					*baseNamespacedPodUpdated("foo2", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod { return []example.Pod{} },
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename",
+			requestedNamespace: "ns1",
+			recursive:          true,
+			fieldSelector:      func(namespace string) fields.Selector { return fields.ParseSelectorOrDie("spec.nodeName=bar2") },
+			indexFields:        []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns2", "bar2"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns1", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo2", namespace+"ns1", "bar2"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename to filter out",
+			requestedNamespace: "ns2",
+			recursive:          true,
+			fieldSelector:      func(namespace string) fields.Selector { return fields.ParseSelectorOrDie("spec.nodeName!=bar1") },
+			indexFields:        []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPodAssigned("foo3", namespace+"ns2", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+				}
+			},
+		},
+		{
+			name:          "request without namespace, field selector with metadata.name",
+			recursive:     true,
+			fieldSelector: func(namespace string) fields.Selector { return fields.ParseSelectorOrDie("metadata.name=foo1") },
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+				}
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{
+					"metadata.name":      "foo1",
+					"metadata.namespace": namespace + "ns1",
+				})
+			},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and spec.nodeName",
+			recursive: true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{
+					"metadata.name": "foo1",
+					"spec.nodeName": "bar1",
+				})
+			},
+			indexFields: []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns1", "bar1"),
+				}
+			},
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			recursive: true,
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.AndSelectors(
+					fields.ParseSelectorOrDie("spec.nodeName!=bar1"),
+					fields.SelectorFromSet(fields.Set{"metadata.name": "foo1"}),
+				)
+			},
+			indexFields: []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns2", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns3", "bar2"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns3", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns3", "bar2"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name",
+			requestedNamespace: "ns1",
+			fieldSelector:      func(namespace string) fields.Selector { return fields.ParseSelectorOrDie("metadata.name=foo1") },
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPod("foo2", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
+			requestedNamespace: "ns1",
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{
+					"metadata.name":      "foo1",
+					"metadata.namespace": namespace + "ns1",
+				})
+			},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPod("foo2", namespace+"ns2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedNamespace: "ns2",
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.SelectorFromSet(fields.Set{
+					"metadata.name":      "foo2",
+					"metadata.namespace": namespace + "ns2",
+					"spec.nodeName":      "bar1",
+				})
+			},
+			indexFields: []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPod("foo1", namespace+"ns2"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns3", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns3", "bar1"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar1"),
+				}
+			},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "ns2",
+			fieldSelector: func(namespace string) fields.Selector {
+				return fields.AndSelectors(
+					fields.ParseSelectorOrDie("spec.nodeName!=bar2"),
+					fields.SelectorFromSet(fields.Set{"metadata.name": "foo1", "metadata.namespace": namespace + "ns2"}),
+				)
+			},
+			indexFields: []string{"spec.nodeName"},
+			inputPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPod("foo1", namespace+"ns1"),
+					*baseNamespacedPod("foo2", namespace+"ns1"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns2", "bar1"),
+					*baseNamespacedPodAssigned("foo2", namespace+"ns2", "bar2"),
+					*baseNamespacedPodAssigned("foo1", namespace+"ns3", "bar2"),
+				}
+			},
+			expectPods: func(namespace string) []example.Pod {
+				return []example.Pod{
+					*baseNamespacedPodAssigned("foo1", namespace+"ns2", "bar1"),
+				}
+			},
+		},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podNames := map[string]struct{}{}
+			namespace := fmt.Sprintf("t%d-", i)
+			for _, pod := range tt.inputPods(namespace) {
+				out := &example.Pod{}
+				key := computePodKey(&pod)
+				podNames[key] = struct{}{}
+				err := store.Create(ctx, key, &pod, out, 0)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+			}
+			opts := storage.ListOptions{
+				ResourceVersion: "",
+				Predicate:       CreatePodPredicate(tt.fieldSelector(namespace), true, tt.indexFields),
+				Recursive:       true,
+			}
+			listOut := &example.PodList{}
+			path := "/pods/"
+			if tt.requestedNamespace != "" {
+				path += namespace + tt.requestedNamespace
+			}
+			if err := store.GetList(ctx, path, opts, listOut); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			i := 0
+			for _, pod := range listOut.Items {
+				if _, found := podNames[computePodKey(&pod)]; !found {
+					continue
+				}
+				pod.ResourceVersion = ""
+				listOut.Items[i] = pod
+				i++
+			}
+			listOut.Items = listOut.Items[:i]
+
+			expectNoDiff(t, "incorrect list pods", tt.expectPods(namespace), listOut.Items)
+		})
+	}
+}
