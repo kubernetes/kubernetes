@@ -191,9 +191,7 @@ type Options struct {
 	// a driver uninstall because garbage collection won't work.
 	Owner *Owner
 
-	// This is the initial desired set of slices. As with
-	// [Controller.Update], the controller takes ownership of the resources
-	// instance.  The content must not get modified by the caller.
+	// This is the initial desired set of slices.
 	Resources *DriverResources
 
 	// Queue can be used to override the default work queue implementation.
@@ -224,9 +222,8 @@ func (c *Controller) Stop() {
 
 // Update sets the new desired state of the resource information.
 //
-// The controller takes over ownership, so these resources must
-// not get modified after this method returns. [DriverResources.DeepCopy]
-// can be used by the caller to clone some existing instance.
+// The controller is doing a deep copy, so the caller may update
+// the instance once Update returns.
 func (c *Controller) Update(resources *DriverResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -236,7 +233,7 @@ func (c *Controller) Update(resources *DriverResources) {
 		c.queue.Add(poolName)
 	}
 
-	c.resources = resources
+	c.resources = resources.DeepCopy()
 
 	// ... and the new ones (might be the same).
 	for poolName := range c.resources.Pools {
@@ -283,7 +280,7 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 		driverName:       options.DriverName,
 		owner:            options.Owner.DeepCopy(),
 		queue:            options.Queue,
-		resources:        options.Resources,
+		resources:        options.Resources.DeepCopy(),
 		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, defaultMutationCacheTTL),
 		syncDelay:        ptr.Deref(options.SyncDelay, defaultSyncDelay),
 	}
