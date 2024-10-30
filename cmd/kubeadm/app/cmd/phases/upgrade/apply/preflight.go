@@ -80,7 +80,7 @@ func runPreflight(c workflow.RunData) error {
 
 	// Run healthchecks against the cluster.
 	klog.V(1).Infoln("[upgrade/preflight] Verifying the cluster health")
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, printer); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, data.DryRun(), printer); err != nil {
 		return err
 	}
 

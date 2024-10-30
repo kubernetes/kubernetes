@@ -26,6 +26,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
@@ -33,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -122,12 +125,45 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	return initcfg, nil
 }
 
+// GetNodeName uses 3 different approaches for getting the node name.
+// First it attempts to construct a client from the given kubeconfig file
+// and get the SelfSubjectReview review for it - i.e. like "kubectl auth whoami".
+// If that fails it attempt to parse the kubeconfig client certificate subject.
+// Finally, it falls back to using the host name, which might not always be correct
+// due to node name overrides.
+func GetNodeName(kubeconfigFile string) (string, error) {
+	var (
+		nodeName string
+		err      error
+	)
+	if kubeconfigFile != "" {
+		client, err := kubeconfig.ClientSetFromFile(kubeconfigFile)
+		if err == nil {
+			ssr, err := client.AuthenticationV1().SelfSubjectReviews().
+				Create(context.Background(), &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
+
+			if err == nil && ssr.Status.UserInfo.Username != "" {
+				return ssr.Status.UserInfo.Username, nil
+			}
+		}
+		nodeName, err = getNodeNameFromKubeletConfig(kubeconfigFile)
+		if err == nil {
+			return nodeName, nil
+		}
+	}
+	nodeName, err = nodeutil.GetHostname("")
+	if err != nil {
+		return "", errors.Wrapf(err, "could not get node name")
+	}
+	return nodeName, nil
+}
+
 // GetNodeRegistration returns the nodeRegistration for the current node
 func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
-	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigFile)
+	nodeName, err := GetNodeName(kubeconfigFile)
 	if err != nil {
-		return errors.Wrap(err, "failed to get node name from kubelet config")
+		return err
 	}
 
 	// gets the corresponding node and retrieves attributes stored there.

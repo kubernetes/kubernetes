@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
@@ -71,7 +72,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		}
 	}
 
-	client, err := getClient(flags.kubeConfigPath, *isDryRun)
+	client, err := getClient(flags.kubeConfigPath, *isDryRun, printer)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
@@ -137,7 +138,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, printer); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
@@ -189,32 +190,57 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not
-func getClient(file string, dryRun bool) (clientset.Interface, error) {
+func getClient(file string, dryRun bool, printer output.Printer) (clientset.Interface, error) {
 	if dryRun {
+		// Default the server version to the kubeadm version.
+		serverVersion := constants.CurrentKubernetesVersion.Info()
+
 		dryRun := apiclient.NewDryRun()
-		if err := dryRun.WithKubeConfigFile(file); err != nil {
-			return nil, err
-		}
 		dryRun.WithDefaultMarshalFunction().
 			WithWriter(os.Stdout).
 			PrependReactor(dryRun.HealthCheckJobReactor()).
 			PrependReactor(dryRun.PatchNodeReactor())
 
-		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
-		// real version; we have to do some clever API machinery tricks. First, we get the real
-		// API Server's version.
-		realServerVersion, err := dryRun.Client().Discovery().ServerVersion()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get server version")
+		// If the kubeconfig exists, construct a real client from it and get the real serverVersion.
+		if _, err := os.Stat(file); err == nil {
+			_, _ = printer.Printf("[dryrun] Creating a real client from %q\n", file)
+			if err := dryRun.WithKubeConfigFile(file); err != nil {
+				return nil, err
+			}
+			serverVersion, err = dryRun.Client().Discovery().ServerVersion()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get server version")
+			}
+		} else if os.IsNotExist(err) {
+			// If the file (supposedly admin.conf) does not exist, add more reactors.
+			// Knowing the node name is required by the ListPodsReactor. For that we try to use
+			// the kubelet.conf client, if it exists. If not, it falls back to hostname.
+			_, _ = printer.Printf("[dryrun] Dryrunning without a real client\n")
+			kubeconfigPath := filepath.Join(constants.KubernetesDir, constants.KubeletKubeConfigFileName)
+			nodeName, err := configutil.GetNodeName(kubeconfigPath)
+			if err != nil {
+				return nil, err
+			}
+			dryRun.PrependReactor(dryRun.GetKubeadmConfigReactor()).
+				PrependReactor(dryRun.GetKubeletConfigReactor()).
+				PrependReactor(dryRun.GetKubeProxyConfigReactor()).
+				PrependReactor(dryRun.GetNodeReactor()).
+				PrependReactor(dryRun.ListPodsReactor(nodeName)).
+				PrependReactor(dryRun.GetCoreDNSConfigReactor()).
+				PrependReactor(dryRun.ListDeploymentsReactor())
+		} else {
+			// Throw an error if the file exists but there was a different stat error.
+			return nil, errors.Wrapf(err, "could not create a client from %q", file)
 		}
+
 		// Obtain the FakeDiscovery object for this fake client.
 		fakeClient := dryRun.FakeClient()
 		fakeClientDiscovery, ok := fakeClient.Discovery().(*fakediscovery.FakeDiscovery)
 		if !ok {
 			return nil, errors.New("could not set fake discovery's server version")
 		}
-		// Lastly, set the right server version to be used.
-		fakeClientDiscovery.FakedServerVersion = realServerVersion
+		// Set the right server version for it.
+		fakeClientDiscovery.FakedServerVersion = serverVersion
 
 		return fakeClient, nil
 	}

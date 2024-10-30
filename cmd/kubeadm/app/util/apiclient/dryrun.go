@@ -27,6 +27,7 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -425,7 +426,6 @@ func (d *DryRun) GetKubeadmCertsReactor() *testing.SimpleReactor {
 			if a.GetName() != constants.KubeadmCertsSecret || a.GetNamespace() != metav1.NamespaceSystem {
 				return false, nil, nil
 			}
-
 			obj := getKubeadmCertsSecret()
 			d.LogObject(obj, action.GetResource().GroupVersion())
 			return true, obj, nil
@@ -469,6 +469,24 @@ func (d *DryRun) GetKubeProxyConfigReactor() *testing.SimpleReactor {
 	}
 }
 
+// GetCoreDNSConfigReactor returns a reactor that handles the GET action of the "coredns"
+// ConfigMap.
+func (d *DryRun) GetCoreDNSConfigReactor() *testing.SimpleReactor {
+	return &testing.SimpleReactor{
+		Verb:     "get",
+		Resource: "configmaps",
+		Reaction: func(action testing.Action) (bool, runtime.Object, error) {
+			a := action.(testing.GetAction)
+			if a.GetName() != constants.CoreDNSConfigMap || a.GetNamespace() != metav1.NamespaceSystem {
+				return false, nil, nil
+			}
+			obj := getCoreDNSConfigMap()
+			d.LogObject(obj, action.GetResource().GroupVersion())
+			return true, obj, nil
+		},
+	}
+}
+
 // DeleteBootstrapTokenReactor returns a reactor that handles the DELETE action
 // of bootstrap token Secret.
 func (d *DryRun) DeleteBootstrapTokenReactor() *testing.SimpleReactor {
@@ -486,6 +504,40 @@ func (d *DryRun) DeleteBootstrapTokenReactor() *testing.SimpleReactor {
 					Namespace: a.GetNamespace(),
 				},
 			}
+			d.LogObject(obj, action.GetResource().GroupVersion())
+			return true, obj, nil
+		},
+	}
+}
+
+// ListPodsReactor returns a reactor that handles the LIST action on pods.
+func (d *DryRun) ListPodsReactor(nodeName string) *testing.SimpleReactor {
+	return &testing.SimpleReactor{
+		Verb:     "list",
+		Resource: "pods",
+		Reaction: func(action testing.Action) (bool, runtime.Object, error) {
+			a := action.(testing.ListAction)
+			if a.GetNamespace() != metav1.NamespaceSystem {
+				return false, nil, nil
+			}
+			obj := getPodList(nodeName)
+			d.LogObject(obj, action.GetResource().GroupVersion())
+			return true, obj, nil
+		},
+	}
+}
+
+// ListDeploymentsReactor returns a reactor that handles the LIST action on deployments.
+func (d *DryRun) ListDeploymentsReactor() *testing.SimpleReactor {
+	return &testing.SimpleReactor{
+		Verb:     "list",
+		Resource: "deployments",
+		Reaction: func(action testing.Action) (bool, runtime.Object, error) {
+			a := action.(testing.ListAction)
+			if a.GetNamespace() != metav1.NamespaceSystem {
+				return false, nil, nil
+			}
+			obj := getDeploymentList()
 			d.LogObject(obj, action.GetResource().GroupVersion())
 			return true, obj, nil
 		},
@@ -515,7 +567,9 @@ func getNode(name string) *corev1.Node {
 			Labels: map[string]string{
 				"kubernetes.io/hostname": name,
 			},
-			Annotations: map[string]string{},
+			Annotations: map[string]string{
+				"kubeadm.alpha.kubernetes.io/cri-socket": "dry-run-cri-socket",
+			},
 		},
 	}
 }
@@ -679,4 +733,80 @@ users:
 		"kubeconfig.conf":               kubeconfigData,
 	}
 	return getConfigMap(metav1.NamespaceSystem, constants.KubeProxyConfigMap, data)
+}
+
+// getCoreDNSConfigMap returns a fake "coredns" ConfigMap.
+func getCoreDNSConfigMap() *corev1.ConfigMap {
+	data := map[string]string{
+		"Corefile": "",
+	}
+	return getConfigMap(metav1.NamespaceSystem, constants.CoreDNSConfigMap, data)
+}
+
+// getPod returns a fake Pod.
+func getPod(name, nodeName string) corev1.Pod {
+	return corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name + "-" + nodeName,
+			Namespace: metav1.NamespaceSystem,
+			Labels: map[string]string{
+				"component": name,
+				"tier":      constants.ControlPlaneTier,
+			},
+			Annotations: map[string]string{
+				constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "127.0.0.1:6443",
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: nodeName,
+			Containers: []corev1.Container{
+				{
+					Name:  name,
+					Image: "registry.k8s.io/" + name + ":v1.1.1",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+}
+
+// getPodList returns a list of fake pods.
+func getPodList(nodeName string) *corev1.PodList {
+	return &corev1.PodList{
+		Items: []corev1.Pod{
+			getPod(constants.KubeAPIServer, nodeName),
+			getPod(constants.KubeControllerManager, nodeName),
+			getPod(constants.KubeScheduler, nodeName),
+			getPod(constants.Etcd, nodeName),
+		},
+	}
+}
+
+// getDeploymentList returns a fake list of deployments.
+func getDeploymentList() *appsv1.DeploymentList {
+	return &appsv1.DeploymentList{
+		Items: []appsv1.Deployment{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceSystem,
+					Labels: map[string]string{
+						"k8s-app": "kube-dns",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Image: "registry.k8s.io/coredns/coredns:" + constants.CoreDNSVersion,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
