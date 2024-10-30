@@ -32,6 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -57,16 +58,18 @@ func newTestGenericPLEG() *TestGenericPLEG {
 
 func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
+	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	clock := testingclock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
-	pleg := &GenericPLEG{
-		relistDuration: &RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
-		runtime:        fakeRuntime,
-		eventChannel:   make(chan *PodLifecycleEvent, eventChannelCap),
-		podRecords:     make(podRecords),
-		clock:          clock,
-	}
+	pleg := NewGenericPLEG(
+		klog.Logger{},
+		fakeRuntime,
+		make(chan *PodLifecycleEvent, eventChannelCap),
+		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
+		fakeCache,
+		clock,
+	).(*GenericPLEG)
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
 
