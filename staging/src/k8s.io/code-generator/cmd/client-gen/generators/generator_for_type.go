@@ -142,7 +142,6 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 				"ApplyOptions":  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
 				"PatchType":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
 				"PatchOptions":  c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
-				"jsonMarshal":   c.Universe.Function(types.Name{Package: "encoding/json", Name: "Marshal"}),
 				"context":       c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
 			},
 		}
@@ -172,11 +171,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"ApplyOptions":                     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
 		"UpdateOptions":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
 		"PatchType":                        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
-		"ApplyPatchType":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
 		"watchInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":              c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec":             c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
-		"jsonMarshal":                      c.Universe.Function(types.Name{Package: "encoding/json", Name: "Marshal"}),
 		"fmtErrorf":                        c.Universe.Function(types.Name{Package: "fmt", Name: "Errorf"}),
 		"klogWarningf":                     c.Universe.Function(types.Name{Package: "k8s.io/klog/v2", Name: "Warningf"}),
 		"context":                          c.Universe.Type(types.Name{Package: "context", Name: "Context"}),
@@ -186,6 +183,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"CheckListFromCacheDataConsistencyIfRequested":      c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckListFromCacheDataConsistencyIfRequested"}),
 		"CheckWatchListFromCacheDataConsistencyIfRequested": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckWatchListFromCacheDataConsistencyIfRequested"}),
 		"PrepareWatchListOptionsFromListOptions":            c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/watchlist", Name: "PrepareWatchListOptionsFromListOptions"}),
+		"applyNewRequest":                                   c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/apply", Name: "NewRequest"}),
 		"Client":                                            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "Client"}),
 		"ClientWithList":                                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithList"}),
 		"ClientWithApply":                                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithApply"}),
@@ -843,22 +841,21 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.inputType|private$
 		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := $.jsonMarshal|raw$($.inputType|private$)
-	if err != nil {
-		return nil, err
-	}
-    name := $.inputType|private$.Name
+	name := $.inputType|private$.Name
 	if name == nil {
 		return nil, $.fmtErrorf|raw$("$.inputType|private$.Name must be provided to $.verb$")
 	}
+	request, err := $.applyNewRequest|raw$(c.GetClient(), $.inputType|private$)
+	if err != nil {
+		return nil, err
+	}
 	result = &$.resultType|raw${}
-	err = c.GetClient().Patch($.ApplyPatchType|raw$).
+	err = request.
 		$if .prefersProtobuf$UseProtobufAsDefault().$end$
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(*name).
 		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return
@@ -873,20 +870,19 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 		return nil, $.fmtErrorf|raw$("$.inputType|private$ provided to $.verb$ must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := $.jsonMarshal|raw$($.inputType|private$)
+	request, err := $.applyNewRequest|raw$(c.GetClient(), $.inputType|private$)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &$.resultType|raw${}
-	err = c.GetClient().Patch($.ApplyPatchType|raw$).
+	err = request.
 		$if .prefersProtobuf$UseProtobufAsDefault().$end$
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

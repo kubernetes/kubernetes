@@ -20,7 +20,6 @@ package v1
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +31,7 @@ import (
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // StatefulSetsGetter has a method to return a StatefulSetInterface.
@@ -120,20 +120,19 @@ func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, s
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
 		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
 		Name(statefulSetName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

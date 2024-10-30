@@ -18,7 +18,6 @@ package gentype
 
 import (
 	"context"
-	json "encoding/json"
 	"fmt"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/apply"
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
@@ -337,20 +337,21 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return *new(T), err
-	}
 	if obj.GetName() == nil {
 		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
 	}
-	err = a.client.client.Patch(types.ApplyPatchType).
+
+	request, err := apply.NewRequest(a.client.client, obj)
+	if err != nil {
+		return *new(T), err
+	}
+
+	err = request.
 		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
 		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
 		Resource(a.client.resource).
 		Name(*obj.GetName()).
 		VersionedParams(&patchOpts, a.client.parameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return result, err
@@ -362,24 +363,24 @@ func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return *new(T), err
-	}
 
 	if obj.GetName() == nil {
 		return *new(T), fmt.Errorf("obj.Name must be provided to Apply")
 	}
 
+	request, err := apply.NewRequest(a.client.client, obj)
+	if err != nil {
+		return *new(T), err
+	}
+
 	result := a.client.newObject()
-	err = a.client.client.Patch(types.ApplyPatchType).
+	err = request.
 		UseProtobufAsDefaultIfPreferred(a.client.prefersProtobuf).
 		NamespaceIfScoped(a.client.namespace, a.client.namespace != "").
 		Resource(a.client.resource).
 		Name(*obj.GetName()).
 		SubResource("status").
 		VersionedParams(&patchOpts, a.client.parameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return result, err

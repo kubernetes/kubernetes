@@ -186,14 +186,15 @@ func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if patchType != types.ApplyPatchType {
-		if options.Force != nil {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
-		}
-	} else {
+	switch patchType {
+	case types.ApplyYAMLPatchType, types.ApplyCBORPatchType:
 		if options.FieldManager == "" {
 			// This field is defaulted to "kubectl" by kubectl, but HAS TO be explicitly set by controllers.
 			allErrs = append(allErrs, field.Required(field.NewPath("fieldManager"), "is required for apply patch"))
+		}
+	default:
+		if options.Force != nil {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("force"), "may not be specified for non-apply patch"))
 		}
 	}
 	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)

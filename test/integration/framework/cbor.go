@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -111,8 +112,6 @@ func EnableCBORServingAndStorageForTest(tb testing.TB) {
 // AssertRequestResponseAsCBOR returns a transport.WrapperFunc that will report a test error if a
 // non-empty request or response body contains data that does not appear to be CBOR-encoded.
 func AssertRequestResponseAsCBOR(t testing.TB) transport.WrapperFunc {
-	recognizer := cbor.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
-
 	unsupportedPatchContentTypes := sets.New(
 		"application/json-patch+json",
 		"application/merge-patch+json",
@@ -126,12 +125,11 @@ func AssertRequestResponseAsCBOR(t testing.TB) transport.WrapperFunc {
 				if err != nil {
 					t.Error(err)
 				}
-				recognized, _, err := recognizer.RecognizesData(requestbody)
-				if err != nil {
-					t.Error(err)
-				}
-				if len(requestbody) > 0 && !recognized {
-					t.Errorf("non-cbor request: 0x%x", requestbody)
+				if len(requestbody) > 0 {
+					err = direct.Unmarshal(requestbody, new(interface{}))
+					if err != nil {
+						t.Errorf("non-cbor request: 0x%x", requestbody)
+					}
 				}
 				request.Body = io.NopCloser(bytes.NewReader(requestbody))
 			}
@@ -152,11 +150,10 @@ func AssertRequestResponseAsCBOR(t testing.TB) transport.WrapperFunc {
 				Closer: response.Body,
 			}
 			t.Cleanup(func() {
-				recognized, _, err := recognizer.RecognizesData(buf.Bytes())
-				if err != nil {
-					t.Error(err)
+				if buf.Len() == 0 {
+					return
 				}
-				if buf.Len() > 0 && !recognized {
+				if err := direct.Unmarshal(buf.Bytes(), new(interface{})); err != nil {
 					t.Errorf("non-cbor response: 0x%x", buf.Bytes())
 				}
 			})
