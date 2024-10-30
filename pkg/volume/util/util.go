@@ -522,7 +522,6 @@ func GetPodVolumeNames(pod *v1.Pod, collectSELinuxOptions bool) (mounts sets.Set
 		if collectSELinuxOptions {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
-				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
 				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
 			}
 		}
