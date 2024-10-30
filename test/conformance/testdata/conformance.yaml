@@ -332,8 +332,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: custom-resource-definition-field-selectors-list-watch-register-informers
   codename: '[sig-api-machinery] CustomResourceFieldSelectors [Privileged:ClusterAdmin]
-    [FeatureGate:CustomResourceFieldSelectors] [Beta] CustomResourceFieldSelectors
-    MUST list and watch custom resources matching the field selector [Conformance]'
+    CustomResourceFieldSelectors MUST list and watch custom resources matching the
+    field selector [Conformance]'
   description: Create a Custom Resource Definition with SelectableFields. Create a
     custom resource with two versions and a conversion webhook that converts between
     the versions. Attempt to list, watch and register informers for the custom resources
