@@ -21,13 +21,17 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -259,6 +263,101 @@ func TestAPIServerMetricsLabels(t *testing.T) {
 			t.Errorf("No sample found for %#v", expectedMetric)
 		}
 	}
+}
+
+func TestAPIServerMetricsLabelsWithAllowList(t *testing.T) {
+	testCases := []struct {
+		name        string
+		metricName  string
+		labelName   model.LabelName
+		allowValues model.LabelValues
+		isHistogram bool
+	}{
+		{
+			name:        "check CounterVec metric",
+			metricName:  "apiserver_request_total",
+			labelName:   "code",
+			allowValues: model.LabelValues{"201", "500"},
+		},
+		{
+			name:        "check GaugeVec metric",
+			metricName:  "apiserver_current_inflight_requests",
+			labelName:   "request_kind",
+			allowValues: model.LabelValues{"mutating"},
+		},
+		{
+			name:        "check Histogram metric",
+			metricName:  "apiserver_request_duration_seconds",
+			labelName:   "verb",
+			allowValues: model.LabelValues{"POST", "LIST"},
+			isHistogram: true,
+		},
+	}
+
+	// Assemble the allow-metric-labels flag.
+	var allowMetricLabelFlagStrs []string
+	for _, tc := range testCases {
+		var allowValuesStr []string
+		for _, allowValue := range tc.allowValues {
+			allowValuesStr = append(allowValuesStr, string(allowValue))
+		}
+		allowMetricLabelFlagStrs = append(allowMetricLabelFlagStrs, fmt.Sprintf("\"%s,%s=%s\"", tc.metricName, tc.labelName, strings.Join(allowValuesStr, ",")))
+	}
+	allowMetricLabelsFlag := "--allow-metric-labels=" + strings.Join(allowMetricLabelFlagStrs, ",")
+
+	testServerFlags := framework.DefaultTestServerFlags()
+	testServerFlags = append(testServerFlags, allowMetricLabelsFlag)
+
+	// TODO: have a better way to setup and teardown for all the other tests.
+	metrics.Reset()
+	defer metrics.Reset()
+	metrics.ResetLabelAllowLists()
+	defer metrics.ResetLabelAllowLists()
+	defer compbasemetrics.ResetLabelValueAllowLists()
+
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	metrics, err := scrapeMetrics(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metricName := tc.metricName
+			if tc.isHistogram {
+				metricName += "_sum"
+			}
+			samples, found := metrics[metricName]
+			if !found {
+				t.Fatalf("metric %q not found", metricName)
+			}
+			for _, sample := range samples {
+				if value, ok := sample.Metric[tc.labelName]; ok {
+					if !slices.Contains(tc.allowValues, value) && value != "unexpected" {
+						t.Fatalf("value %q is not allowed for label %q", value, tc.labelName)
+					}
+				}
+			}
+		})
+
+	}
+
+	t.Run("check cardinality_enforcement_unexpected_categorizations_total", func(t *testing.T) {
+		samples, found := metrics["cardinality_enforcement_unexpected_categorizations_total"]
+		if !found {
+			t.Fatal("metric cardinality_enforcement_unexpected_categorizations_total not found")
+		}
+		if len(samples) != 1 {
+			t.Fatalf("Unexpected number of samples in cardinality_enforcement_unexpected_categorizations_total")
+		}
+		if samples[0].Value <= 0 {
+			t.Fatalf("Unexpected non-positive cardinality_enforcement_unexpected_categorizations_total, got: %s", samples[0].Value)
+		}
+
+	})
 }
 
 func TestAPIServerMetricsPods(t *testing.T) {
