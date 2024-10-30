@@ -725,13 +725,13 @@
       measurePods: 500
   - name: 5000Nodes
     labels: [performance]
-    threshold: 120
+    threshold: 200
     params:
       initNodes: 5000
       initPods: 20000
       measurePods: 5000
 
-# Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 100/s rate.
+# Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 5/s rate.
 - name: Unschedulable
   workloadTemplate:
   - opcode: createNodes
@@ -739,8 +739,8 @@
   - opcode: churn
     mode: create
     templatePaths:
-    - config/templates/pod-large-cpu.yaml
-    intervalMilliseconds: 10
+    - config/templates/pod-high-priority-large-cpu.yaml
+    intervalMilliseconds: 200
   - opcode: createPods
     countParam: $measurePods
     podTemplatePath: config/templates/pod-default.yaml
@@ -763,7 +763,7 @@
       measurePods: 1000
   - name: 5kNodes/10kPods
     labels: [performance]
-    threshold: 250
+    threshold: 200
     params:
       initNodes: 5000
       measurePods: 10000
