@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -93,6 +94,10 @@ func (cm *containerManagerStub) GetCapacity(localStorageCapacityIsolation bool) 
 
 func (cm *containerManagerStub) GetPluginRegistrationHandlers() map[string]cache.PluginHandler {
 	return nil
+}
+
+func (cm *containerManagerStub) GetHealthCheckers() []healthz.HealthChecker {
+	return []healthz.HealthChecker{}
 }
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

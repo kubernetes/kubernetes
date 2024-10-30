@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -28,6 +29,7 @@ import (
 	"google.golang.org/grpc"
 
 	core "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -39,6 +41,7 @@ import (
 // Server interface provides methods for Device plugin registration server.
 type Server interface {
 	cache.PluginHandler
+	healthz.HealthChecker
 	Start() error
 	Stop() error
 	SocketPath() string
@@ -53,6 +56,9 @@ type server struct {
 	rhandler   RegistrationHandler
 	chandler   ClientHandler
 	clients    map[string]Client
+
+	// isStarted indicates whether the service has started successfully.
+	isStarted bool
 }
 
 // NewServer returns an initialized device plugin registration server.
@@ -109,7 +115,9 @@ func (s *server) Start() error {
 	api.RegisterRegistrationServer(s.grpc, s)
 	go func() {
 		defer s.wg.Done()
+		s.setHealthy()
 		if err = s.grpc.Serve(ln); err != nil {
+			s.setUnhealthy()
 			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
 		}
 	}()
@@ -134,6 +142,9 @@ func (s *server) Stop() error {
 	s.grpc.Stop()
 	s.wg.Wait()
 	s.grpc = nil
+	// During kubelet termination, we do not need the registration server,
+	// and we consider the kubelet to be healthy even when it is down.
+	s.setHealthy()
 
 	return nil
 }
@@ -189,4 +200,25 @@ func (s *server) visitClients(visit func(r string, c Client)) {
 		s.mutex.Lock()
 	}
 	s.mutex.Unlock()
+}
+
+func (s *server) Name() string {
+	return "device-plugin"
+}
+
+func (s *server) Check(_ *http.Request) error {
+	if s.isStarted {
+		return nil
+	}
+	return fmt.Errorf("device plugin registration gRPC server failed and no device plugins can register")
+}
+
+// setHealthy sets the health status of the gRPC server.
+func (s *server) setHealthy() {
+	s.isStarted = true
+}
+
+// setUnhealthy sets the health status of the gRPC server to unhealthy.
+func (s *server) setUnhealthy() {
+	s.isStarted = false
 }

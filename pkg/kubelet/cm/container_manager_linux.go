@@ -41,6 +41,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -659,6 +660,10 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandlers() map[string]cache
 	}
 
 	return res
+}
+
+func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
+	return []healthz.HealthChecker{cm.deviceManager.GetHealthChecker()}
 }
 
 // TODO: move the GetResources logic to PodContainerManager.
