@@ -134,6 +134,25 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
+		"valid pod failure policy with negative exitCodes - need for Windows support": {
+			opts: JobValidationOptions{RequirePrefixedLabels: true},
+			job: batch.Job{
+				ObjectMeta: validJobObjectMeta,
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{{
+							Action: batch.PodFailurePolicyActionFailJob,
+							OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+								Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
+								Values:   []int32{-1073741819, -1073741676, -1073741510},
+							},
+						}},
+					},
+				},
+			},
+		},
 		"valid pod failure policy": {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
