@@ -53,7 +53,7 @@ func TestProbeExpandableVolumePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestProbeExpandableVolumePlugins failed: %s", err)
 	}
-	checkPlugins(t, plugins, []string{"kubernetes.io/fc", "kubernetes.io/portworx-volume"})
+	checkPlugins(t, plugins, []string{"kubernetes.io/portworx-volume"})
 }
 
 func TestProbeControllerVolumePlugins(t *testing.T) {
