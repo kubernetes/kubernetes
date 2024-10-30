@@ -182,20 +182,25 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 		// No need to drop anything.
 		return
 	}
+	if draAdminAccessFeatureInUse(oldClaim) {
+		// If anything was set in the past, then fields must not get
+		// dropped on potentially unrelated updates and, for example,
+		// adding a status with AdminAccess=true is allowed. The
+		// scheduler typically doesn't do that (it also checks the
+		// feature gate and refuses to schedule), but the apiserver
+		// would allow it.
+		return
+	}
 
 	for i := range newClaim.Spec.Devices.Requests {
-		if newClaim.Spec.Devices.Requests[i].AdminAccess != nil && !draAdminAccessFeatureInUse(oldClaim) {
-			newClaim.Spec.Devices.Requests[i].AdminAccess = nil
-		}
+		newClaim.Spec.Devices.Requests[i].AdminAccess = nil
 	}
 
 	if newClaim.Status.Allocation == nil {
 		return
 	}
 	for i := range newClaim.Status.Allocation.Devices.Results {
-		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil && !draAdminAccessFeatureInUse(oldClaim) {
-			newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
-		}
+		newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
 	}
 }
 

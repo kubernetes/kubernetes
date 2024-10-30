@@ -108,11 +108,14 @@ func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resour
 		// No need to drop anything.
 		return
 	}
+	if draAdminAccessFeatureInUse(oldClaimTemplate) {
+		// If anything was set in the past, then fields must not get
+		// dropped on potentially unrelated updates.
+		return
+	}
 
 	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		if newClaimTemplate.Spec.Spec.Devices.Requests[i].AdminAccess != nil && !draAdminAccessFeatureInUse(oldClaimTemplate) {
-			newClaimTemplate.Spec.Spec.Devices.Requests[i].AdminAccess = nil
-		}
+		newClaimTemplate.Spec.Spec.Devices.Requests[i].AdminAccess = nil
 	}
 }
 
