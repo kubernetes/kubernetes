@@ -40,7 +40,7 @@ func checkPlugins(t *testing.T, got []volume.VolumePlugin, expected []string) {
 
 func TestProbeAttachableVolumePlugins(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	plugins, err := ProbeAttachableVolumePlugins(logger)
+	plugins, err := ProbeAttachableVolumePlugins(logger, getConfig())
 	if err != nil {
 		t.Fatalf("ProbeAttachableVolumePlugins failed: %s", err)
 	}
@@ -58,7 +58,7 @@ func TestProbeExpandableVolumePlugins(t *testing.T) {
 
 func TestProbeControllerVolumePlugins(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	plugins, err := ProbeControllerVolumePlugins(logger, getConfig())
+	plugins, err := ProbeProvisionableRecyclableVolumePlugins(logger, getConfig())
 	if err != nil {
 		t.Fatalf("ProbeControllerVolumePlugins failed: %s", err)
 	}
