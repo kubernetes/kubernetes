@@ -29,8 +29,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -181,6 +184,95 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
 			ginkgo.By("Ensuring the metrics match the expectations about alignment metrics a few more times")
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
+		})
+
+		ginkgo.It("should report the default idle cpu pool size", func(ctx context.Context) {
+			ginkgo.By("Querying the podresources endpoint to get the baseline")
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+			defer func() {
+				framework.ExpectNoError(conn.Close())
+			}()
+
+			ginkgo.By("Checking the pool allocatable resources from the kubelet")
+			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err, "failed to get the kubelet allocatable resources")
+			allocatableCPUs, _ := demuxCPUsAndDevicesFromGetAllocatableResources(resp)
+
+			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_cpu_manager_shared_pool_size_millicores": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(int(allocatableCPUs.Size() * 1000)),
+				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(0),
+				}),
+			})
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics about idle pool size")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 10*time.Second).Should(matchResourceMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations about idle pool size a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 30*time.Second, 10*time.Second).Should(matchResourceMetrics)
+		})
+
+		ginkgo.It("should report mutating cpu pool size when handling guaranteed pods", func(ctx context.Context) {
+			ginkgo.By("Querying the podresources endpoint to get the baseline")
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+			defer func() {
+				framework.ExpectNoError(conn.Close())
+			}()
+
+			ginkgo.By("Checking the pool allocatable resources from the kubelet")
+			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err, "failed to get the kubelet allocatable resources")
+			allocatableCPUs, _ := demuxCPUsAndDevicesFromGetAllocatableResources(resp)
+
+			allocatableCPUsIdleMillis := int(allocatableCPUs.Size() * 1000)
+
+			matchResourceMetricsIdle := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_cpu_manager_shared_pool_size_millicores": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(allocatableCPUsIdleMillis),
+				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(0),
+				}),
+			})
+			ginkgo.By(fmt.Sprintf("Pool allocatable resources from the kubelet: shared pool %d cpus %d millis", allocatableCPUs.Size(), allocatableCPUsIdleMillis))
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics about idle pool size")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 10*time.Second).Should(matchResourceMetricsIdle)
+			ginkgo.By("Ensuring the metrics match the expectations about idle pool size a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 30*time.Second, 10*time.Second).Should(matchResourceMetricsIdle)
+
+			ginkgo.By("Creating the test pod to consume exclusive cpus from the pool")
+			testPod = e2epod.NewPodClient(f).CreateSync(ctx, makeGuaranteedCPUExclusiveSleeperPod("smt-cpupool", smtLevel))
+
+			matchResourceMetricsBusy := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"kubelet_cpu_manager_shared_pool_size_millicores": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(allocatableCPUsIdleMillis - (smtLevel * 1000)),
+				}),
+				"kubelet_cpu_manager_exclusive_cpu_allocation_count": gstruct.MatchAllElements(nodeID, gstruct.Elements{
+					"": timelessSample(smtLevel),
+				}),
+			})
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 10*time.Second).Should(matchResourceMetricsBusy)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 30*time.Second, 10*time.Second).Should(matchResourceMetricsBusy)
+
+			deletePodSyncByName(ctx, f, testPod.Name)
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 10*time.Second).Should(matchResourceMetricsIdle)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 30*time.Second, 10*time.Second).Should(matchResourceMetricsIdle)
 		})
 	})
 })
