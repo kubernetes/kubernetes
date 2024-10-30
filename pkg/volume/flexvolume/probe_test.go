@@ -345,14 +345,14 @@ func TestProberMultiThreaded(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			pluginNameMutex.Lock()
 			events, err := prober.Probe()
 			for _, event := range events {
 				if event.Op == volume.ProbeAddOrUpdate {
-					pluginNameMutex.Lock()
 					pluginName = event.Plugin.GetPluginName()
-					pluginNameMutex.Unlock()
 				}
 			}
+			pluginNameMutex.Unlock()
 			// this fails if ProbeAll is not complete before the next call comes in but we have assumed that it has
 			pluginNameMutex.RLock()
 			assert.Equal(t, "fake-driver", pluginName)

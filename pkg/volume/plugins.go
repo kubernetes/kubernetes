@@ -688,6 +688,8 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 // Check if probedPlugin cache update is required.
 // If it is, initialize all probed plugins and replace the cache with them.
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 	events, err := pm.prober.Probe()
 
 	if err != nil {
@@ -698,8 +700,6 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 		return
 	}
 
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
 	// because the probe function can return a list of valid plugins
 	// even when an error is present we still must add the plugins
 	// or they will be skipped because each event only fires once

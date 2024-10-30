@@ -17,7 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sync"
 	"sync/atomic"
@@ -180,7 +179,6 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 	require.NoError(t, err)
 
 	volumeSpec := &Spec{}
-	totalErrors := atomic.Int32{}
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
@@ -189,13 +187,11 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 			defer wg.Done()
 			_, err := vpm.FindPluginByName(testPluginName)
 			if err != nil {
-				totalErrors.Add(1)
+				require.NoError(t, err)
 			}
 		}()
 	}
 	wg.Wait()
-
-	assert.Equal(t, int32(0), totalErrors.Load())
 
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
@@ -203,13 +199,11 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 			defer wg.Done()
 			_, err := vpm.FindPluginBySpec(volumeSpec)
 			if err != nil {
-				totalErrors.Add(1)
+				require.NoError(t, err)
 			}
 		}()
 	}
 	wg.Wait()
-
-	assert.Equal(t, int32(0), totalErrors.Load())
 }
 
 type fakeProber struct {
