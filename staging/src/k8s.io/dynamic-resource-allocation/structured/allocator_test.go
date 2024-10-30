@@ -241,13 +241,17 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 	return slice
 }
 
-func deviceAllocationResult(request, driver, pool, device string) resourceapi.DeviceRequestAllocationResult {
-	return resourceapi.DeviceRequestAllocationResult{
+func deviceAllocationResult(request, driver, pool, device string, adminAccess bool) resourceapi.DeviceRequestAllocationResult {
+	r := resourceapi.DeviceRequestAllocationResult{
 		Request: request,
 		Driver:  driver,
 		Pool:    pool,
 		Device:  device,
 	}
+	if adminAccess {
+		r.AdminAccess = &adminAccess
+	}
+	return r
 }
 
 // nodeLabelSelector creates a node selector with a label match for "key" in "values".
@@ -356,6 +360,7 @@ func TestAllocator(t *testing.T) {
 	intAttribute := resourceapi.FullyQualifiedName("numa")
 
 	testcases := map[string]struct {
+		adminAccess      bool
 		claimsToAllocate []*resourceapi.ResourceClaim
 		allocatedClaims  []*resourceapi.ResourceClaim
 		classes          []*resourceapi.DeviceClass
@@ -375,7 +380,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"other-node": {
@@ -389,7 +394,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node2),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"small-and-large": {
@@ -418,8 +423,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"small-and-large-backtrack-requests": {
@@ -451,8 +456,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"small-and-large-backtrack-claims": {
@@ -487,8 +492,8 @@ func TestAllocator(t *testing.T) {
 			node: node(node1, region1),
 
 			expectResults: []any{
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverA, pool1, device2)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverA, pool1, device2, false)),
 			},
 		},
 		"devices-split-across-different-slices": {
@@ -507,8 +512,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"obsolete-slice": {
@@ -527,7 +532,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"no-slices": {
@@ -594,7 +599,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"all-devices-many": {
@@ -612,8 +617,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"all-devices-of-the-incomplete-pool": {
@@ -664,11 +669,11 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverB, pool1, device1),
+					deviceAllocationResult(req0, driverB, pool1, device1, false),
 				),
 			},
 		},
@@ -699,11 +704,11 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverB, pool1, device1),
+					deviceAllocationResult(req0, driverB, pool1, device1, false),
 				),
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 			},
 		},
@@ -737,12 +742,12 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req0, driverA, pool1, device2),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+					deviceAllocationResult(req0, driverA, pool1, device2, false),
 				),
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverB, pool1, device1),
+					deviceAllocationResult(req0, driverB, pool1, device1, false),
 				),
 			},
 		},
@@ -776,12 +781,12 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverB, pool1, device1),
+					deviceAllocationResult(req0, driverB, pool1, device1, false),
 				),
 				allocationResult(
 					localNodeSelector(node1),
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req0, driverA, pool1, device2),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+					deviceAllocationResult(req0, driverA, pool1, device2, false),
 				),
 			},
 		},
@@ -839,7 +844,7 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				nodeLabelSelector(regionKey, region1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
 		"unsuccessful-allocation-network-attached-device": {
@@ -875,10 +880,10 @@ func TestAllocator(t *testing.T) {
 						},
 					}},
 				},
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
-				deviceAllocationResult(req0, driverA, pool3, device1),
-				deviceAllocationResult(req0, driverA, pool4, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
+				deviceAllocationResult(req0, driverA, pool3, device1, false),
+				deviceAllocationResult(req0, driverA, pool4, device1, false),
 			)},
 		},
 		"local-and-network-attached-devices": {
@@ -893,8 +898,8 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{allocationResult(
 				// Once there is any node-local device, the selector is for that node.
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req0, driverA, pool2, device1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool2, device1, false),
 			)},
 		},
 		"several-different-drivers": {
@@ -910,16 +915,16 @@ func TestAllocator(t *testing.T) {
 			node: node(node1, region1),
 
 			expectResults: []any{
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1)),
-				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverB, pool1, device1)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverB, pool1, device1, false)),
 			},
 		},
 		"already-allocated-devices": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			allocatedClaims: objects(
 				allocatedClaim(claim0, req0, classA,
-					deviceAllocationResult(req0, driverA, pool1, device1),
-					deviceAllocationResult(req1, driverA, pool1, device2),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+					deviceAllocationResult(req1, driverA, pool1, device2, false),
 				),
 			),
 			classes: objects(class(classA, driverA)),
@@ -927,6 +932,57 @@ func TestAllocator(t *testing.T) {
 			node:    node(node1, region1),
 
 			expectResults: nil,
+		},
+		"admin-access-disabled": {
+			adminAccess: false,
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
+		},
+		"admin-access-enabled": {
+			adminAccess: true,
+			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []*resourceapi.ResourceClaim{c}
+			}(),
+			allocatedClaims: objects(
+				allocatedClaim(claim0, req0, classA,
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+					deviceAllocationResult(req1, driverA, pool1, device2, false),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+			},
+		},
+		"already-allocated-for-admin-access": {
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			allocatedClaims: objects(
+				allocatedClaim(claim0, req0, classA,
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+					deviceAllocationResult(req1, driverA, pool1, device2, true),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+			},
 		},
 		"with-constraint": {
 			claimsToAllocate: objects(claimWithRequests(
@@ -960,8 +1016,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"with-constraint-non-existent-attribute": {
@@ -1100,8 +1156,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1),
-				deviceAllocationResult(req1, driverA, pool1, device2),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
 			)},
 		},
 		"with-constraint-for-request-retry": {
@@ -1141,8 +1197,8 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device2),
-				deviceAllocationResult(req1, driverA, pool1, device3),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
 			)},
 		},
 		"with-class-device-config": {
@@ -1157,7 +1213,7 @@ func TestAllocator(t *testing.T) {
 					driverA,
 					resourceapi.AllocationConfigSourceClass,
 					"classAttribute",
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 			},
 		},
@@ -1173,7 +1229,7 @@ func TestAllocator(t *testing.T) {
 					driverA,
 					resourceapi.AllocationConfigSourceClaim,
 					"deviceAttribute",
-					deviceAllocationResult(req0, driverA, pool1, device1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
 				),
 			},
 		},
@@ -1335,7 +1391,7 @@ func TestAllocator(t *testing.T) {
 				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
 
-			allocator, err := NewAllocator(ctx, toAllocate.claims, allocated, classLister, sliceLister)
+			allocator, err := NewAllocator(ctx, tc.adminAccess, toAllocate.claims, allocated, classLister, sliceLister)
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)

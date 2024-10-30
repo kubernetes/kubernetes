@@ -206,6 +206,18 @@ const (
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
+	// Enables support for requesting admin access in a ResourceClaim.
+	// Admin access is granted even if a device is already in use and,
+	// depending on the DRA driver, may enable additional permissions
+	// when a container uses the allocated device.
+	//
+	// This feature gate is currently defined in KEP #4381. The intent
+	// is to move it into a separate KEP.
+	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
+
+	// owner: @pohly
+	// kep: http://kep.k8s.io/4381
+	//
 	// Enables support for resources with custom parameters and a lifecycle
 	// that is independent of a Pod. Resource allocation is done by the scheduler
 	// based on "structured parameters".

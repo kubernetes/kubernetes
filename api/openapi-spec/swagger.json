@@ -15524,7 +15524,7 @@
       "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
       "properties": {
         "adminAccess": {
-          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.",
+          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
           "type": "boolean"
         },
         "allocationMode": {
@@ -15562,6 +15562,10 @@
     "io.k8s.api.resource.v1alpha3.DeviceRequestAllocationResult": {
       "description": "DeviceRequestAllocationResult contains the allocation result for one request.",
       "properties": {
+        "adminAccess": {
+          "description": "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+          "type": "boolean"
+        },
         "device": {
           "description": "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
           "type": "string"

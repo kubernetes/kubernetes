@@ -12419,7 +12419,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
-      default: false
     - name: allocationMode
       type:
         scalar: string
@@ -12443,6 +12442,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.DeviceRequestAllocationResult
   map:
     fields:
+    - name: adminAccess
+      type:
+        scalar: boolean
     - name: device
       type:
         scalar: string

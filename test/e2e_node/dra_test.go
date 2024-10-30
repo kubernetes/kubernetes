@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -673,10 +674,11 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
 	for i, driverName := range driverNames {
 		results[i] = resourceapi.DeviceRequestAllocationResult{
-			Driver:  driverName,
-			Pool:    "some-pool",
-			Device:  "some-device",
-			Request: claim.Spec.Devices.Requests[0].Name,
+			Driver:      driverName,
+			Pool:        "some-pool",
+			Device:      "some-device",
+			Request:     claim.Spec.Devices.Requests[0].Name,
+			AdminAccess: ptr.To(false),
 		}
 		config[i] = resourceapi.DeviceAllocationConfiguration{
 			Source: resourceapi.AllocationConfigSourceClaim,

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/utils/ptr"
 )
 
 func testResourceClaim(name string, namespace string, spec api.ResourceClaimSpec) *api.ResourceClaim {
@@ -101,7 +102,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			claim: func() *api.ResourceClaim {
 				claim := validClaim.DeepCopy()
 				// Admins are *not* exempt from quota.
-				claim.Spec.Devices.Requests[0].AdminAccess = true
+				claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 				return claim
 			}(),
 			usage: corev1.ResourceList{

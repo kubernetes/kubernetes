@@ -33,6 +33,7 @@ import (
 	"github.com/onsi/gomega/types"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -732,7 +734,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
 
-		ginkgo.It("support validating admission policy for admin access", func(ctx context.Context) {
+		f.It("support validating admission policy for admin access", feature.DRAAdminAccess, func(ctx context.Context) {
 			// Create VAP, after making it unique to the current test.
 			adminAccessPolicyYAML := strings.ReplaceAll(adminAccessPolicyYAML, "dra.example.com", b.f.UniqueName)
 			driver.createFromYAML(ctx, []byte(adminAccessPolicyYAML), "")
@@ -752,9 +754,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.externalClaim()
-			claim.Spec.Devices.Requests[0].AdminAccess = true
+			claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
-			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = true
+			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
@@ -843,6 +845,42 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			claim2.Name = "claim-1"
 			_, err = f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
 			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
+		})
+
+		f.It("DaemonSet with admin access", feature.DRAAdminAccess, func(ctx context.Context) {
+			pod, template := b.podInline()
+			template.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+			// Limit the daemon set to the one node where we have the driver.
+			nodeName := nodes.NodeNames[0]
+			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+			pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			daemonSet := &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "monitoring-ds",
+				},
+				Spec: appsv1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "monitoring"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "monitoring"},
+						},
+						Spec: pod.Spec,
+					},
+				},
+			}
+
+			created := b.create(ctx, template, daemonSet)
+			if !ptr.Deref(created[0].(*resourceapi.ResourceClaimTemplate).Spec.Spec.Devices.Requests[0].AdminAccess, false) {
+				framework.Fail("AdminAccess field was cleared. This test depends on the DRAAdminAccess feature.")
+			}
+			ds := created[1].(*appsv1.DaemonSet)
+
+			gomega.Eventually(ctx, func(ctx context.Context) (bool, error) {
+				return e2edaemonset.CheckDaemonPodOnNodes(f, ds, []string{nodeName})(ctx)
+			}).WithTimeout(f.Timeouts.PodStart).Should(gomega.BeTrueBecause("DaemonSet pod should be running on node %s but isn't", nodeName))
+			framework.ExpectNoError(e2edaemonset.CheckDaemonStatus(ctx, f, daemonSet.Name))
 		})
 	})
 
@@ -1316,6 +1354,13 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := b.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
+			})
+		case *appsv1.DaemonSet:
+			createdObj, err = b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			// Cleanup not really needed, but speeds up namespace shutdown.
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Delete(ctx, obj.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete daemonset")
 			})
 		default:
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)

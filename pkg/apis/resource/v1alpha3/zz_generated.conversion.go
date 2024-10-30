@@ -712,7 +712,7 @@ func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *resourcev1
 	out.Selectors = *(*[]resource.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.AllocationMode = resource.DeviceAllocationMode(in.AllocationMode)
 	out.Count = in.Count
-	out.AdminAccess = in.AdminAccess
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 
@@ -727,7 +727,7 @@ func autoConvert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.D
 	out.Selectors = *(*[]resourcev1alpha3.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.AllocationMode = resourcev1alpha3.DeviceAllocationMode(in.AllocationMode)
 	out.Count = in.Count
-	out.AdminAccess = in.AdminAccess
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 
@@ -741,6 +741,7 @@ func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceReques
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 
@@ -754,6 +755,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1alpha3_DeviceReques
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
 }
 

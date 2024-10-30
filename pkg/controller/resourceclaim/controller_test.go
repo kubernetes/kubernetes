@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -83,17 +82,18 @@ var (
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name             string
-		key              string
-		claims           []*resourceapi.ResourceClaim
-		claimsInCache    []*resourceapi.ResourceClaim
-		pods             []*v1.Pod
-		podsLater        []*v1.Pod
-		templates        []*resourceapi.ResourceClaimTemplate
-		expectedClaims   []resourceapi.ResourceClaim
-		expectedStatuses map[string][]v1.PodResourceClaimStatus
-		expectedError    bool
-		expectedMetrics  expectedMetrics
+		name               string
+		key                string
+		adminAccessEnabled bool
+		claims             []*resourceapi.ResourceClaim
+		claimsInCache      []*resourceapi.ResourceClaim
+		pods               []*v1.Pod
+		podsLater          []*v1.Pod
+		templates          []*resourceapi.ResourceClaimTemplate
+		expectedClaims     []resourceapi.ResourceClaim
+		expectedStatuses   map[string][]v1.PodResourceClaimStatus
+		expectedError      bool
+		expectedMetrics    expectedMetrics
 	}{
 		{
 			name:           "create",
@@ -390,7 +390,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 
-			ec, err := NewController(klog.FromContext(tCtx), fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(tCtx.Logger(), tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -465,7 +465,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
 	claimClient := fakeKubeClient.ResourceV1alpha3().ResourceClaims(testNamespace)
 
-	_, err := NewController(tCtx.Logger(), fakeKubeClient, podInformer, claimInformer, templateInformer)
+	_, err := NewController(tCtx.Logger(), false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())

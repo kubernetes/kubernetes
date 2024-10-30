@@ -71,6 +71,9 @@ const (
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
+	// adminAccessEnabled matches the DRAAdminAccess feature gate state.
+	adminAccessEnabled bool
+
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
 	kubeClient clientset.Interface
@@ -118,20 +121,22 @@ const (
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
+	adminAccessEnabled bool,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
-		kubeClient:      kubeClient,
-		podLister:       podInformer.Lister(),
-		podIndexer:      podInformer.Informer().GetIndexer(),
-		podSynced:       podInformer.Informer().HasSynced,
-		claimLister:     claimInformer.Lister(),
-		claimsSynced:    claimInformer.Informer().HasSynced,
-		templateLister:  templateInformer.Lister(),
-		templatesSynced: templateInformer.Informer().HasSynced,
+		adminAccessEnabled: adminAccessEnabled,
+		kubeClient:         kubeClient,
+		podLister:          podInformer.Lister(),
+		podIndexer:         podInformer.Informer().GetIndexer(),
+		podSynced:          podInformer.Informer().HasSynced,
+		claimLister:        claimInformer.Lister(),
+		claimsSynced:       claimInformer.Informer().HasSynced,
+		templateLister:     templateInformer.Lister(),
+		templatesSynced:    templateInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
@@ -612,6 +617,10 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			return fmt.Errorf("resource claim template %q: %v", *templateName, err)
 		}
 
+		if !ec.adminAccessEnabled && needsAdminAccess(template) {
+			return errors.New("admin access is requested, but the feature is disabled")
+		}
+
 		// Create the ResourceClaim with pod as owner, with a generated name that uses
 		// <pod>-<claim name> as base.
 		isTrue := true
@@ -668,6 +677,15 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 	(*newPodClaims)[podClaim.Name] = claim.Name
 
 	return nil
+}
+
+func needsAdminAccess(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
+	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
+		if ptr.Deref(request.AdminAccess, false) {
+			return true
+		}
+	}
+	return false
 }
 
 // findPodResourceClaim looks for an existing ResourceClaim with the right

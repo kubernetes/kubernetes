@@ -23,13 +23,113 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 var obj = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
 		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+				},
+			},
+		},
+	},
+}
+
+var objWithStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithAdminAccess = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					AdminAccess:     ptr.To(true),
+				},
+			},
+		},
+	},
+}
+
+var objWithAdminAccessStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					AdminAccess:     ptr.To(true),
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request:     "req-0",
+						Driver:      "dra.example.com",
+						Pool:        "pool-0",
+						Device:      "device-0",
+						AdminAccess: ptr.To(true),
+					},
+				},
+			},
+		},
 	},
 }
 
@@ -47,6 +147,7 @@ func TestStrategyCreate(t *testing.T) {
 
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
+		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
 	}{
@@ -62,10 +163,22 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
+		"drop-fields-admin-access": {
+			obj:         objWithAdminAccess,
+			adminAccess: false,
+			expectObj:   obj,
+		},
+		"keep-fields-admin-access": {
+			obj:         objWithAdminAccess,
+			adminAccess: true,
+			expectObj:   objWithAdminAccess,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+
 			obj := tc.obj.DeepCopy()
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
@@ -91,6 +204,7 @@ func TestStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
+		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
 	}{
@@ -108,10 +222,30 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationError: true,
 		},
+		"drop-fields-admin-access": {
+			oldObj:      obj,
+			newObj:      objWithAdminAccess,
+			adminAccess: false,
+			expectObj:   obj,
+		},
+		"keep-fields-admin-access": {
+			oldObj:                obj,
+			newObj:                objWithAdminAccess,
+			adminAccess:           true,
+			expectValidationError: true, // Spec is immutable.
+		},
+		"keep-existing-fields-admin-access": {
+			oldObj:      objWithAdminAccess,
+			newObj:      objWithAdminAccess,
+			adminAccess: true,
+			expectObj:   objWithAdminAccess,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
@@ -143,6 +277,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
+		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
 	}{
@@ -172,10 +307,52 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			}(),
 			expectObj: obj,
 		},
+		"drop-fields-admin-access": {
+			oldObj:      obj,
+			newObj:      objWithAdminAccessStatus,
+			adminAccess: false,
+			expectObj:   objWithStatus,
+		},
+		"keep-fields-admin-access": {
+			oldObj:      obj,
+			newObj:      objWithAdminAccessStatus,
+			adminAccess: true,
+			expectObj: func() *resource.ResourceClaim {
+				expectObj := objWithAdminAccessStatus.DeepCopy()
+				// Spec remains unchanged.
+				expectObj.Spec = obj.Spec
+				return expectObj
+			}(),
+		},
+		"keep-fields-admin-access-because-of-spec": {
+			oldObj:      objWithAdminAccess,
+			newObj:      objWithAdminAccessStatus,
+			adminAccess: false,
+			expectObj:   objWithAdminAccessStatus,
+		},
+		// Normally a claim without admin access in the spec shouldn't
+		// have one in the status either, but it's not invalid and thus
+		// let's test this.
+		"keep-fields-admin-access-because-of-status": {
+			oldObj: func() *resource.ResourceClaim {
+				oldObj := objWithAdminAccessStatus.DeepCopy()
+				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				return oldObj
+			}(),
+			newObj:      objWithAdminAccessStatus,
+			adminAccess: false,
+			expectObj: func() *resource.ResourceClaim {
+				oldObj := objWithAdminAccessStatus.DeepCopy()
+				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				return oldObj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
