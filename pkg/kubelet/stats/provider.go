@@ -200,11 +200,11 @@ func (p *Provider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
 // KEP Issue Number 4191: Enhanced this to allow for the containers to be separate from images.
 func (p *Provider) HasDedicatedContainerFs(ctx context.Context) (bool, error) {
-	imageFs, err := p.cadvisor.ImagesFsInfo()
+	imageFs, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
 		return false, err
 	}
-	containerFs, err := p.cadvisor.ContainerFsInfo()
+	containerFs, err := p.cadvisor.ContainerFsInfo(ctx)
 	if err != nil {
 		return false, err
 	}
