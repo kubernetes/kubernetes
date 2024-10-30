@@ -145,7 +145,7 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 
 	// prepare old checkpoint, ResizeStatusEntries is unset,
 	// pretend that the old checkpoint is unaware for the field ResizeStatusEntries
-	checkpointContent := `{"data":"{\"allocationEntries\":{\"pod1\":{\"container1\":{\"requests\":{\"cpu\":\"1Ki\",\"memory\":\"1Ki\"}}}}}","checksum":1555601526}`
+	const checkpointContent = `{"data":"{\"allocationEntries\":{\"pod1\":{\"container1\":{\"requests\":{\"cpu\":\"1Ki\",\"memory\":\"1Ki\"}}}}}","checksum":1555601526}`
 	checkpoint := &Checkpoint{}
 	err := checkpoint.UnmarshalCheckpoint([]byte(checkpointContent))
 	require.NoError(t, err, "failed to unmarshal checkpoint")
