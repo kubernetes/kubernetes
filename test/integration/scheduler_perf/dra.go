@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -291,7 +292,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		reflect.TypeOf(&v1.Node{}):                   true,
 	}
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := structured.NewCELCache(10)
+	celCache := cel.NewCache(10)
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())

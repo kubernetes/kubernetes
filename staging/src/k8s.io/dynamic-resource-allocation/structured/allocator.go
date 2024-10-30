@@ -30,7 +30,6 @@ import (
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/keymutex"
 	"k8s.io/utils/ptr"
 )
 
@@ -46,8 +45,7 @@ type Allocator struct {
 	allocatedDevices   sets.Set[DeviceID]
 	classLister        resourcelisters.DeviceClassLister
 	slices             []*resourceapi.ResourceSlice
-	celCache           *CELCache
-	celMutex           keymutex.KeyMutex
+	celCache           *cel.Cache
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -60,7 +58,7 @@ func NewAllocator(ctx context.Context,
 	allocatedDevices sets.Set[DeviceID],
 	classLister resourcelisters.DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
-	celCache *CELCache,
+	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
 		adminAccessEnabled: adminAccessEnabled,
@@ -69,32 +67,12 @@ func NewAllocator(ctx context.Context,
 		classLister:        classLister,
 		slices:             slices,
 		celCache:           celCache,
-		celMutex:           keymutex.NewHashed(0),
 	}, nil
 }
 
 // ClaimsToAllocate returns the claims that the allocator was created for.
 func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 	return a.claimsToAllocate
-}
-
-func (a *Allocator) compileCELExpression(expression string) cel.CompilationResult {
-	// Compiling a CEL expression is expensive enough that it is cheaper
-	// to lock a mutex than doing it several times in parallel.
-	a.celMutex.LockKey(expression)
-	//nolint:errcheck // Only returns an error for unknown keys, which isn't the case here.
-	defer a.celMutex.UnlockKey(expression)
-
-	cached := a.celCache.get(expression)
-	if cached != nil {
-		return *cached
-	}
-
-	expr := cel.GetCompiler().CompileCELExpression(expression, cel.Options{})
-	if expr.Error == nil {
-		a.celCache.add(expression, &expr)
-	}
-	return expr
 }
 
 // Allocate calculates the allocation(s) for one particular node.
@@ -713,7 +691,7 @@ func (alloc *allocator) isSelectable(r requestIndices, slice *draapi.ResourceSli
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDevice, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
-		expr := alloc.compileCELExpression(selector.CEL.Expression)
+		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
 		if expr.Error != nil {
 			// Could happen if some future apiserver accepted some
 			// future expression and then got downgraded. Normally

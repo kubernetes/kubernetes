@@ -38,6 +38,7 @@ import (
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -111,7 +112,7 @@ type DynamicResources struct {
 	clientset        kubernetes.Interface
 	classLister      resourcelisters.DeviceClassLister
 	sliceLister      resourcelisters.ResourceSliceLister
-	celCache         *structured.CELCache
+	celCache         *cel.Cache
 	allocatedDevices *allocatedDevices
 
 	// claimAssumeCache enables temporarily storing a newer claim object
@@ -192,7 +193,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		// This is a LRU cache for compiled CEL expressions. The most
 		// recent 10 of them get reused across different scheduling
 		// cycles.
-		celCache: structured.NewCELCache(10),
+		celCache: cel.NewCache(10),
 
 		allocatedDevices: newAllocatedDevices(logger),
 	}
