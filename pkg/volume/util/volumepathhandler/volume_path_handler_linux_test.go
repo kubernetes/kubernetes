@@ -18,11 +18,35 @@ package volumepathhandler
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
+
+	utilexec "k8s.io/utils/exec"
 )
 
 func pathWithSuffix(suffix string) string {
 	return fmt.Sprintf("%s%s", "/var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/pvc-1d205234-06cd-4fe4-a7ea-0e8f3e2faf5f/dev/e196ebd3-2ab1-4185-bed4-b997ba38d1dc", suffix)
+}
+
+func createTestDevice(t *testing.T) string {
+	executor := utilexec.New()
+	backingFile := filepath.Join(t.TempDir(), "backingFile")
+
+	out, err := executor.Command("fallocate", "-l", "1M", backingFile).CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to create backing file: %v, %v", err, string(out))
+	}
+	devicePath, err := makeLoopDevice(backingFile)
+	if err != nil {
+		t.Fatalf("failed to create loop device: %v", err)
+	}
+	t.Cleanup(func() {
+		err := removeLoopDevice(devicePath)
+		if err != nil {
+			t.Errorf("failed to remove loop device: %v", err)
+		}
+	})
+	return devicePath
 }
 
 func TestCleanBackingFilePath(t *testing.T) {
@@ -59,6 +83,56 @@ func TestCleanBackingFilePath(t *testing.T) {
 			output := cleanBackingFilePath(tc.input)
 			if output != tc.expectedOuput {
 				t.Fatalf("expected %q, got %q", tc.expectedOuput, output)
+			}
+		})
+	}
+}
+
+func TestIsDeviceBindMountExist(t *testing.T) {
+	devicePath := createTestDevice(t)
+
+	handler := VolumePathHandler{}
+
+	mapPath := t.TempDir()
+	linkName := "link"
+	err := mapBindMountDevice(devicePath, mapPath, linkName)
+	if err != nil {
+		t.Fatalf("failed to map bind mount: %v", err)
+	}
+	t.Cleanup(func() {
+		err := unmapBindMountDevice(handler, mapPath, linkName)
+		if err != nil {
+			t.Fatalf("failed to unmap bind mount: %v", err)
+		}
+	})
+
+	linkPath := filepath.Join(mapPath, linkName)
+
+	testCases := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "existing device bind mount",
+			path:     linkPath,
+			expected: true,
+		},
+		{
+			name:     "non-existing path",
+			path:     filepath.Join(mapPath, "non_existing_link"),
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			exists, err := handler.IsDeviceBindMountExist(tc.path)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if exists != tc.expected {
+				t.Fatalf("expected %v, got %v", tc.expected, exists)
 			}
 		})
 	}
