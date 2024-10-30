@@ -138,6 +138,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.FilenameOptions).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Flatten().
 		Local().
 		Do()

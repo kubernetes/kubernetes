@@ -427,6 +427,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			ContinueOnError().
 			NamespaceParam(namespace).DefaultNamespace().
 			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).
+			WithContentType(runtime.ContentTypeProtobuf).
 			Flatten().
 			Do()
 		if err := o.DeleteOptions.DeleteResult(r); err != nil {

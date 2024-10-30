@@ -188,6 +188,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.builder = f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
+		WithContentType(runtime.ContentTypeProtobuf).
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {
 		o.builder = o.builder.LabelSelectorParam(o.selector).ResourceTypes("node")

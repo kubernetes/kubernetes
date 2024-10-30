@@ -164,6 +164,7 @@ func (o *RolloutStatusOptions) Run() error {
 		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		ContinueOnError().
 		Latest().
 		Flatten().

@@ -149,6 +149,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Flatten()
 
 	if o.Local {

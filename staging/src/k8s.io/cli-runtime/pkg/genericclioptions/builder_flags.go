@@ -147,6 +147,7 @@ func (o *ResourceBuilderFlags) ToBuilder(restClientGetter RESTClientGetter, reso
 
 	if o.Scheme != nil {
 		builder.WithScheme(o.Scheme, o.Scheme.PrioritizedVersionsAllGroups()...)
+		builder.WithContentType(runtime.ContentTypeProtobuf)
 	} else {
 		builder.Unstructured()
 	}

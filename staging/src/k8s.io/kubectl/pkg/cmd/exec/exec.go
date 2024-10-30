@@ -23,6 +23,8 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -317,6 +319,7 @@ func (p *ExecOptions) Run() error {
 		builder := p.Builder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			FilenameParam(p.EnforceNamespace, &p.FilenameOptions).
+			WithContentType(runtime.ContentTypeProtobuf).
 			NamespaceParam(p.Namespace).DefaultNamespace()
 		if len(p.ResourceName) > 0 {
 			builder = builder.ResourceNames("pods", p.ResourceName)

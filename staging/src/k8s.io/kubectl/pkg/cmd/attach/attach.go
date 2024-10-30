@@ -246,7 +246,7 @@ func (o *AttachOptions) Run() error {
 	if o.Pod == nil {
 		b := o.Builder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-			NamespaceParam(o.Namespace).DefaultNamespace()
+			NamespaceParam(o.Namespace).DefaultNamespace().WithContentType(runtime.ContentTypeProtobuf)
 
 		switch len(o.Resources) {
 		case 1:

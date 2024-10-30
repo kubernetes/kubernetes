@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -147,6 +149,7 @@ func (o *RolloutHistoryOptions) Run() error {
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		ResourceTypeOrNameArgs(true, o.Resources...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		ContinueOnError().
 		Latest().
 		Flatten().

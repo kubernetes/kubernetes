@@ -19,6 +19,8 @@ package rollout
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -149,6 +151,7 @@ func (o RestartOptions) RunRestart() error {
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		ResourceTypeOrNameArgs(true, o.Resources...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		ContinueOnError().
 		Latest().
 		Flatten().

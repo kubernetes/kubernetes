@@ -254,6 +254,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
+		WithContentType(kruntime.ContentTypeProtobuf).
 		Flatten().
 		Do()
 	err = r.Err()

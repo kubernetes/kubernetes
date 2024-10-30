@@ -164,6 +164,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileNameOptions).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Flatten()
 	if !o.local {
 		builder.ResourceTypeOrNameArgs(o.all, resources...).

@@ -290,6 +290,7 @@ func (o *EnvOptions) RunEnv() error {
 			ContinueOnError().
 			NamespaceParam(o.namespace).DefaultNamespace().
 			FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+			WithContentType(runtime.ContentTypeProtobuf).
 			Flatten()
 
 		if !o.Local {

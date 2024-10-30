@@ -300,6 +300,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Flatten().
 		Do()
 	err := r.Err()

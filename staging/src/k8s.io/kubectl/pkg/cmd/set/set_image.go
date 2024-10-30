@@ -186,6 +186,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Flatten()
 
 	if !o.Local {

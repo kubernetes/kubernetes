@@ -413,6 +413,7 @@ func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, 
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		FilenameParam(o.explicitNamespace, &o.FilenameOptions).
 		NamespaceParam(o.Namespace).DefaultNamespace().ResourceNames("pods", o.TargetNames...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Do()
 	if err := r.Err(); err != nil {
 		return err

@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -327,6 +329,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	builder := f.NewBuilder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
+		WithContentType(runtime.ContentTypeProtobuf).
 		NamespaceParam(o.Namespace).DefaultNamespace()
 
 	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)

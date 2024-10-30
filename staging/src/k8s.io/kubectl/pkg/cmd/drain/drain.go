@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -293,6 +295,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		RequestChunksOf(o.drainer.ChunkSize).
 		ResourceNames("nodes", args...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		SingleResourceType().
 		Flatten()
 

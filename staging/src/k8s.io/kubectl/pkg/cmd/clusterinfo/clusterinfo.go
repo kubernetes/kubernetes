@@ -21,6 +21,8 @@ import (
 	"io"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -99,6 +101,7 @@ func (o *ClusterInfoOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		Latest()
 	err := b.Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {

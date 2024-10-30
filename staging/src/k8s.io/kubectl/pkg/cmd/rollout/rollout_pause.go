@@ -19,6 +19,8 @@ package rollout
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -138,6 +140,7 @@ func (o *PauseOptions) RunPause() error {
 		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
+		WithContentType(runtime.ContentTypeProtobuf).
 		ContinueOnError().
 		Latest().
 		Flatten().

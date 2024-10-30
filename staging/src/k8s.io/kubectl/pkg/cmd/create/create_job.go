@@ -183,6 +183,7 @@ func (o *CreateJobOptions) Run() error {
 			ResourceTypeOrNameArgs(false, o.From).
 			Flatten().
 			Latest().
+			WithContentType(runtime.ContentTypeProtobuf).
 			Do().
 			Infos()
 		if err != nil {

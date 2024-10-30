@@ -298,6 +298,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		builder := f.NewBuilder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			NamespaceParam(o.Namespace).DefaultNamespace().
+			WithContentType(runtime.ContentTypeProtobuf).
 			SingleResourceType()
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
