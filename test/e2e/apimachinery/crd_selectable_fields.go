@@ -113,15 +113,15 @@ var _ = SIGDescribe("CustomResourceFieldSelectors [Privileged:ClusterAdmin]", fu
 		})
 
 		/*
-			Release: v1.31
-			Testname: Custom Resource Definition, list and watch with selectable fields
-			Description: Create a Custom Resource Definition with SelectableFields. Create custom resources. Attempt to
-			list and watch custom resources with object selectors; the list and watch MUST return only custom resources
-			matching the field selector. Delete and update some of the custom resources. Attempt to list and watch the
-			custom resources with object selectors; the list and watch MUST return only the custom resources matching
-			the object selectors.
+			Release: v1.32
+			Testname: custom-resource-definition-field-selectors-list-watch-register-informers
+			Description: Create a Custom Resource Definition with SelectableFields. Create a custom resource with
+			two versions and a conversion webhook that converts between the versions. Attempt to list, watch and register
+			informers for the custom resources with field selectors; the lists, watches and informers MUST return only
+			custom resources matching the field selector. Delete and update some of the resources with field selectors;
+			the lists, watches and informers MUST return only the custom resources matching custom resources.
 		*/
-		framework.It("MUST list and watch custom resources matching the field selector", func(ctx context.Context) {
+		framework.ConformanceIt("MUST list and watch custom resources matching the field selector", func(ctx context.Context) {
 			ginkgo.By("Creating a custom resource definition with selectable fields")
 			testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 				crd.Spec.Versions = apiVersions

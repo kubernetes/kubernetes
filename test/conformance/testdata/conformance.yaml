@@ -330,6 +330,19 @@
     resources are available.
   release: v1.16
   file: test/e2e/apimachinery/custom_resource_definition.go
+- testname: custom-resource-definition-field-selectors-list-watch-register-informers
+  codename: '[sig-api-machinery] CustomResourceFieldSelectors [Privileged:ClusterAdmin]
+    CustomResourceFieldSelectors MUST list and watch custom resources matching the
+    field selector [Conformance]'
+  description: Create a Custom Resource Definition with SelectableFields. Create a
+    custom resource with two versions and a conversion webhook that converts between
+    the versions. Attempt to list, watch and register informers for the custom resources
+    with field selectors; the lists, watches and informers MUST return only custom
+    resources matching the field selector. Delete and update some of the resources
+    with field selectors; the lists, watches and informers MUST return only the custom
+    resources matching custom resources.
+  release: v1.32
+  file: test/e2e/apimachinery/crd_selectable_fields.go
 - testname: Custom Resource OpenAPI Publish, stop serving version
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
     removes definition from spec when one version gets changed to not be served [Conformance]'
