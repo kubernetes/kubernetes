@@ -131,7 +131,7 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 			require.NoError(t, err)
 
 			actual = newSC.GetPodResourceAllocation()
-			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
+			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "restored pod resource allocation is not equal to original pod resource allocation")
 		})
 	}
 }
