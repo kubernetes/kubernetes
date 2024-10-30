@@ -342,6 +342,7 @@ func TestProberMultiThreaded(t *testing.T) {
 
 	// Act
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			events, err := prober.Probe()
@@ -361,7 +362,6 @@ func TestProberMultiThreaded(t *testing.T) {
 				totalErrors.Add(1)
 			}
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 

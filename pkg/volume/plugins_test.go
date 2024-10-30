@@ -184,6 +184,7 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_, err := vpm.FindPluginByName(testPluginName)
@@ -191,7 +192,6 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 				totalErrors.Add(1)
 			}
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 
