@@ -669,7 +669,7 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
-			name: "Higher priority Pod takes over the place for higher priority Pod that is running the preemption",
+			name: "Higher priority Pod takes over the place for lower priority Pod that is running the preemption",
 			scenarios: []scenario{
 				{
 					name: "create scheduled Pod",
@@ -864,11 +864,7 @@ func TestAsyncPreemption(t *testing.T) {
 					if ch, ok := preemptionDoneChannels[preemptor.Name]; ok {
 						<-ch
 					}
-					err := preemptPodFn(ctx, c, preemptor, victim, pluginName)
-					if err != nil {
-						return err
-					}
-					return nil
+					return preemptPodFn(ctx, c, preemptor, victim, pluginName)
 				}
 
 				return preemptionPlugin, nil
@@ -944,17 +940,22 @@ func TestAsyncPreemption(t *testing.T) {
 						createdPods = append(createdPods, pod)
 					}
 				case scenario.schedulePod != nil:
+					lastFailure := ""
 					if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-						activePods := testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()
-						return len(activePods) != 0, nil
-					}); err != nil {
-						t.Fatalf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
-					}
+						if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
+							lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
+							return false, nil
+						}
 
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-						return testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name == scenario.schedulePod.podName, nil
+						if testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name != scenario.schedulePod.podName {
+							// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
+							lastFailure = fmt.Sprintf("The pod %s is expected to be scheduled, but the top Pod is %s", scenario.schedulePod.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
+							return false, nil
+						}
+
+						return true, nil
 					}); err != nil {
-						t.Fatalf("The pod %s is expected to be scheduled, but the top Pod is %s", scenario.schedulePod.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
+						t.Fatal(lastFailure)
 					}
 
 					preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
