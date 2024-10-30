@@ -542,7 +542,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// expensive, we may have to maintain and update state more
 		// persistently.
 		//
-		// Claims are treated as "allocated" if they are in the assume cache
+		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
 		allAllocatedDevices := pl.listAllAllocatedDevices(logger)

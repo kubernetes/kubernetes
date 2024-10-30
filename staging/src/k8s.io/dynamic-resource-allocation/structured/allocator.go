@@ -53,8 +53,7 @@ type Allocator struct {
 // NewAllocator returns an allocator for a certain set of claims or an error if
 // some problem was detected which makes it impossible to allocate claims.
 //
-// The returned Allocator is stateless. It calls the listers anew for each
-// Allocate call.
+// The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	adminAccessEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
