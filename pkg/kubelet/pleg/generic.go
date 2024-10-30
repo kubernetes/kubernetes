@@ -253,27 +253,26 @@ func (g *GenericPLEG) Relist() {
 	updateRunningPodAndContainerMetrics(pods)
 	g.podRecords.setCurrent(pods)
 
-	// Compare the old and the current pods, and generate events.
-	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
+	needsReinspection := make(map[types.UID]*kubecontainer.Pod)
+
 	for pid := range g.podRecords {
+		// Compare the old and the current pods, and generate events.
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
 		// Get all containers in the old and the new pod.
 		allContainers := getContainersFromPods(oldPod, pod)
+		var events []*PodLifecycleEvent
 		for _, container := range allContainers {
-			events := computeEvents(g.logger, oldPod, pod, &container.ID)
-			for _, e := range events {
-				updateEvents(eventsByPodID, e)
-			}
+			containerEvents := computeEvents(g.logger, oldPod, pod, &container.ID)
+			events = append(events, containerEvents...)
 		}
-	}
 
-	needsReinspection := make(map[types.UID]*kubecontainer.Pod)
+		_, reinspect := g.podsToReinspect[pid]
 
-	// If there are events associated with a pod, we should update the
-	// podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
+		if len(events) == 0 && !reinspect {
+			// Nothing else needed for this pod.
+			continue
+		}
 
 		// updateCache() will inspect the pod and update the cache. If an
 		// error occurs during the inspection, we want PLEG to retry again
@@ -293,10 +292,6 @@ func (g *GenericPLEG) Relist() {
 
 			continue
 		} else {
-			// this pod was in the list to reinspect and we did so because it had events, so remove it
-			// from the list (we don't want the reinspection code below to inspect it a second time in
-			// this relist execution)
-			delete(g.podsToReinspect, pid)
 			if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 				if !updated {
 					continue
@@ -338,18 +333,6 @@ func (g *GenericPLEG) Relist() {
 						g.logger.V(2).Info("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
 					}
 				}
-			}
-		}
-	}
-
-	// reinspect any pods that failed inspection during the previous relist
-	if len(g.podsToReinspect) > 0 {
-		g.logger.V(5).Info("GenericPLEG: Reinspecting pods that previously failed inspection")
-		for pid, pod := range g.podsToReinspect {
-			if err, _ := g.updateCache(ctx, pod, pid); err != nil {
-				// Rely on updateCache calling GetPodStatus to log the actual error.
-				g.logger.V(5).Error(err, "PLEG: pod failed reinspection", "pod", klog.KRef(pod.Namespace, pod.Name))
-				needsReinspection[pid] = pod
 			}
 		}
 	}
