@@ -323,7 +323,11 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		shares := int64(cm.MilliCPUToShares(allocatableCPU.MilliValue()))
 		if IsCgroup2UnifiedMode() {
 			// convert to the cgroup v2 cpu.weight value
-			if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupName, "cpu.weight"), int64(util.CPUSharesToCPUWeight(uint64(shares))), 10); err != nil {
+			cpuShares, err := util.CPUSharesToCPUWeight(uint64(shares))
+			if err != nil {
+				return err
+			}
+			if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupName, "cpu.weight"), int64(cpuShares), 10); err != nil {
 				return err
 			}
 		} else {
@@ -369,7 +373,11 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
 	shares := int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue()))
 	if IsCgroup2UnifiedMode() {
-		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), int64(util.CPUSharesToCPUWeight(uint64(shares))), 10); err != nil {
+		cpuShares, err := util.CPUSharesToCPUWeight(uint64(shares))
+		if err != nil {
+			return err
+		}
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), int64(cpuShares), 10); err != nil {
 			return err
 		}
 	} else {
@@ -398,7 +406,11 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
 	shares = int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue()))
 	if IsCgroup2UnifiedMode() {
-		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), int64(util.CPUSharesToCPUWeight(uint64(shares))), 10); err != nil {
+		cpuShares, err := util.CPUSharesToCPUWeight(uint64(shares))
+		if err != nil {
+			return err
+		}
+		if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], cgroupPath, "cpu.weight"), int64(cpuShares), 10); err != nil {
 			return err
 		}
 	} else {

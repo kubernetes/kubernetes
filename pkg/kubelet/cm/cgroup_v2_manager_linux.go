@@ -124,7 +124,10 @@ func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 	if errWeight != nil {
 		return nil, fmt.Errorf("failed to read CPU weight for cgroup %v: %w", cgroupPath, errWeight)
 	}
-	cpuShares := cmutil.CPUWeightToCPUShares(cpuWeight)
+	cpuShares, err := cmutil.CPUWeightToCPUShares(cpuWeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert cgroup v1 CPU weight %d to v2 CPU shares: %w", cpuWeight, err)
+	}
 	return &ResourceConfig{CPUShares: &cpuShares, CPUQuota: &cpuLimit, CPUPeriod: &cpuPeriod}, nil
 }
 
