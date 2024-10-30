@@ -20,19 +20,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -49,6 +51,20 @@ const (
 	// poolNameIndex is the name for the ResourceSlice store's index function,
 	// which is to index by ResourceSlice.Spec.Pool.Name
 	poolNameIndex = "poolName"
+
+	// Including adds in the mutation cache is not safe: We could add a slice, store it,
+	// and then the slice gets deleted without the informer hearing anything about that.
+	// Then the obsolete slice remains in the mutation cache.
+	//
+	// To mitigate this, we use a TTL and check a pool again once added slices expire.
+	defaultMutationCacheTTL = time.Minute
+
+	// defaultSyncDelay defines how long to wait between receiving the most recent
+	// informer event and syncing again. This is long enough that the informer cache
+	// should be up-to-date (matter mostly for deletes because an out-dated cache
+	// causes redundant delete API calls) and not too long that a human mistake
+	// doesn't get fixed while that human is waiting for it.
+	defaultSyncDelay = 30 * time.Second
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -57,13 +73,20 @@ const (
 // controller as part of its kubelet plugin.
 type Controller struct {
 	cancel     func(cause error)
-	driver     string
-	owner      Owner
+	driverName string
+	owner      *Owner
 	kubeClient kubernetes.Interface
 	wg         sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
-	queue      workqueue.TypedRateLimitingInterface[string]
-	sliceStore cache.Indexer
+	queue            workqueue.TypedRateLimitingInterface[string]
+	sliceStore       cache.MutationCache
+	mutationCacheTTL time.Duration
+	syncDelay        time.Duration
+
+	// Must use atomic access...
+	numCreates int64
+	numUpdates int64
+	numDeletes int64
 
 	mutex sync.RWMutex
 
@@ -94,7 +117,28 @@ type Pool struct {
 	// by the controller.
 	Generation int64
 
-	// Device names must be unique inside the pool.
+	// Slices is a list of all ResourceSlices that the driver
+	// wants to publish for this pool. The driver must ensure
+	// that each resulting slice is valid. See the API
+	// definition for details, in particular the limit on
+	// the number of devices.
+	//
+	// If slices are not valid, then the controller will
+	// log errors produced by the apiserver.
+	//
+	// Drivers should publish at least one slice for each
+	// pool that they normally manage, even if that slice
+	// is empty. "Empty pool" is different from "no pool"
+	// because it shows that the driver is up-and-running
+	// and simply doesn't have any devices.
+	Slices []Slice
+}
+
+// +k8s:deepcopy-gen=true
+
+// Slice is turned into one ResourceSlice by the controller.
+type Slice struct {
+	// Devices lists all devices which are part of the slice.
 	Devices []resourceapi.Device
 }
 
@@ -110,19 +154,9 @@ type Owner struct {
 }
 
 // StartController constructs a new controller and starts it.
-// If the owner is a v1.Node, then the NodeName field in the
-// ResourceSlice objects is set and used to identify objects
-// managed by the controller. The UID is not needed in that
-// case, the controller will determine it automatically.
-//
-// If a kubeClient is provided, then it synchronizes ResourceSlices
-// with the resource information provided by plugins. Without it,
-// the controller is inactive. This can happen when kubelet is run stand-alone
-// without an apiserver. In that case we can't and don't need to publish
-// ResourceSlices.
-func StartController(ctx context.Context, kubeClient kubernetes.Interface, driver string, owner Owner, resources *DriverResources) (*Controller, error) {
+func StartController(ctx context.Context, options Options) (*Controller, error) {
 	logger := klog.FromContext(ctx)
-	c, err := newController(ctx, kubeClient, driver, owner, resources)
+	c, err := newController(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("create controller: %w", err)
 	}
@@ -134,13 +168,47 @@ func StartController(ctx context.Context, kubeClient kubernetes.Interface, drive
 		defer logger.V(3).Info("Stopping")
 		c.run(ctx)
 	}()
-
-	// Sync each pool once.
-	for poolName := range resources.Pools {
-		c.queue.Add(poolName)
-	}
-
 	return c, nil
+}
+
+// Options contains various optional settings for [StartController].
+type Options struct {
+	// DriverName is the required name of the DRA driver.
+	DriverName string
+
+	// KubeClient is used to read Node objects (if necessary) and to access
+	// ResourceSlices. It must be specified.
+	KubeClient kubernetes.Interface
+
+	// If the owner is a v1.Node, then the NodeName field in the
+	// ResourceSlice objects is set and used to identify objects
+	// managed by the controller. The UID is not needed in that
+	// case, the controller will determine it automatically.
+	//
+	// The owner must be cluster-scoped. This is not always possible,
+	// therefore it is optional. A driver without a owner must take
+	// care that remaining slices get deleted manually as part of
+	// a driver uninstall because garbage collection won't work.
+	Owner *Owner
+
+	// This is the initial desired set of slices.
+	Resources *DriverResources
+
+	// Queue can be used to override the default work queue implementation.
+	Queue workqueue.TypedRateLimitingInterface[string]
+
+	// MutationCacheTTL can be used to change the default TTL of one minute.
+	// See source code for details.
+	MutationCacheTTL *time.Duration
+
+	// SyncDelay defines how long to wait between receiving the most recent
+	// informer event and syncing again. The default is 30 seconds.
+	//
+	// This is long enough that the informer cache should be up-to-date
+	// (matter mostly for deletes because an out-dated cache causes
+	// redundant delete API calls) and not too long that a human mistake
+	// doesn't get fixed while that human is waiting for it.
+	SyncDelay *time.Duration
 }
 
 // Stop cancels all background activity and blocks until the controller has stopped.
@@ -154,8 +222,8 @@ func (c *Controller) Stop() {
 
 // Update sets the new desired state of the resource information.
 //
-// The controller takes over ownership, so these resources must
-// not get modified after this method returns.
+// The controller is doing a deep copy, so the caller may update
+// the instance once Update returns.
 func (c *Controller) Update(resources *DriverResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -165,7 +233,7 @@ func (c *Controller) Update(resources *DriverResources) {
 		c.queue.Add(poolName)
 	}
 
-	c.resources = resources
+	c.resources = resources.DeepCopy()
 
 	// ... and the new ones (might be the same).
 	for poolName := range c.resources.Pools {
@@ -173,29 +241,64 @@ func (c *Controller) Update(resources *DriverResources) {
 	}
 }
 
+// GetStats provides some insights into operations of the controller.
+func (c *Controller) GetStats() Stats {
+	s := Stats{
+		NumCreates: atomic.LoadInt64(&c.numCreates),
+		NumUpdates: atomic.LoadInt64(&c.numUpdates),
+		NumDeletes: atomic.LoadInt64(&c.numDeletes),
+	}
+	return s
+}
+
+type Stats struct {
+	// NumCreates counts the number of ResourceSlices that got created.
+	NumCreates int64
+	// NumUpdates counts the number of ResourceSlices that got update.
+	NumUpdates int64
+	// NumDeletes counts the number of ResourceSlices that got deleted.
+	NumDeletes int64
+}
+
 // newController creates a new controller.
-func newController(ctx context.Context, kubeClient kubernetes.Interface, driver string, owner Owner, resources *DriverResources) (*Controller, error) {
-	if kubeClient == nil {
-		return nil, fmt.Errorf("kubeClient is nil")
+func newController(ctx context.Context, options Options) (*Controller, error) {
+	if options.KubeClient == nil {
+		return nil, errors.New("KubeClient is nil")
+	}
+	if options.DriverName == "" {
+		return nil, errors.New("DRA driver name is empty")
+	}
+	if options.Resources == nil {
+		return nil, errors.New("DriverResources are nil")
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Controller{
-		cancel:     cancel,
-		kubeClient: kubeClient,
-		driver:     driver,
-		owner:      owner,
-		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+		cancel:           cancel,
+		kubeClient:       options.KubeClient,
+		driverName:       options.DriverName,
+		owner:            options.Owner.DeepCopy(),
+		queue:            options.Queue,
+		resources:        options.Resources.DeepCopy(),
+		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, defaultMutationCacheTTL),
+		syncDelay:        ptr.Deref(options.SyncDelay, defaultSyncDelay),
+	}
+	if c.queue == nil {
+		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
-		),
-		resources: resources,
+		)
 	}
-
 	if err := c.initInformer(ctx); err != nil {
 		return nil, err
 	}
+
+	// Sync each desired pool once.
+	for poolName := range options.Resources.Pools {
+		c.queue.Add(poolName)
+	}
+
 	return c, nil
 }
 
@@ -205,10 +308,10 @@ func (c *Controller) initInformer(ctx context.Context) error {
 
 	// We always filter by driver name, by node name only for node-local resources.
 	selector := fields.Set{
-		resourceapi.ResourceSliceSelectorDriver:   c.driver,
+		resourceapi.ResourceSliceSelectorDriver:   c.driverName,
 		resourceapi.ResourceSliceSelectorNodeName: "",
 	}
-	if c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
+	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
 	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, cache.Indexers{
@@ -222,7 +325,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	}, func(options *metav1.ListOptions) {
 		options.FieldSelector = selector.String()
 	})
-	c.sliceStore = informer.GetIndexer()
+	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
@@ -230,7 +333,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
-			c.queue.Add(slice.Spec.Pool.Name)
+			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 		},
 		UpdateFunc: func(old, new any) {
 			oldSlice, ok := old.(*resourceapi.ResourceSlice)
@@ -246,8 +349,8 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
-			c.queue.Add(oldSlice.Spec.Pool.Name)
-			c.queue.Add(newSlice.Spec.Pool.Name)
+			c.queue.AddAfter(oldSlice.Spec.Pool.Name, c.syncDelay)
+			c.queue.AddAfter(newSlice.Spec.Pool.Name, c.syncDelay)
 		},
 		DeleteFunc: func(obj any) {
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -258,7 +361,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
-			c.queue.Add(slice.Spec.Pool.Name)
+			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 		},
 	})
 	if err != nil {
@@ -348,7 +451,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	// The result gets cached and is expected to not change while
 	// the controller runs.
 	var nodeName string
-	if c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
+	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		nodeName = c.owner.Name
 		if c.owner.UID == "" {
 			node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
@@ -360,8 +463,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		}
 	}
 
-	// Slices that don't match any driver resource can either be updated (if there
-	// are new driver resources that need to be stored) or they need to be deleted.
+	// Slices that don't match any driver slice need to be deleted.
 	obsoleteSlices := make([]*resourceapi.ResourceSlice, 0, len(slices))
 
 	// Determine highest generation.
@@ -381,92 +483,233 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			currentSlices = append(currentSlices, slice)
 		}
 	}
-	slices = currentSlices
-
-	// Sort by name to ensure that keeping only the first slice is deterministic.
-	sort.Slice(slices, func(i, j int) bool {
-		return slices[i].Name < slices[j].Name
-	})
+	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
 	if pool, ok := resources.Pools[poolName]; ok {
-		if pool.Generation > generation {
-			generation = pool.Generation
-		}
-
-		// Right now all devices get published in a single slice.
-		// We simply pick the first one, if there is one, and copy
-		// it in preparation for updating it.
+		// Match each existing slice against the desired slices.
+		// Two slices match if they contain exactly the same
+		// device IDs, in an arbitrary order. Such a matched
+		// slice gets updated with the desired content if
+		// there is a difference.
 		//
-		// TODO: support splitting across slices, with unit tests.
-		if len(slices) > 0 {
-			obsoleteSlices = append(obsoleteSlices, slices[1:]...)
-			slices = []*resourceapi.ResourceSlice{slices[0].DeepCopy()}
-		} else {
-			slices = []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						GenerateName: c.owner.Name + "-" + c.driver + "-",
-					},
-				},
+		// This supports updating the definition of devices
+		// in a slice. Adding or removing devices is done
+		// by deleting the old slice and creating a new one.
+		//
+		// This is primarily a simplification of the code:
+		// to support adding or removing devices from
+		// existing slices, we would have to identify "most
+		// similar" slices (= minimal editing distance).
+		//
+		// In currentSliceForDesiredSlice we keep track of
+		// which desired slice has a matched slice.
+		//
+		// At the end of the loop, each current slice is either
+		// a match or obsolete.
+		currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
+		for _, currentSlice := range currentSlices {
+			matched := false
+			for i := range pool.Slices {
+				if _, ok := currentSliceForDesiredSlice[i]; ok {
+					// Already has a match.
+					continue
+				}
+				if sameSlice(currentSlice, &pool.Slices[i]) {
+					currentSliceForDesiredSlice[i] = currentSlice
+					logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				obsoleteSlices = append(obsoleteSlices, currentSlice)
+				logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
 			}
 		}
 
-		slice := slices[0]
-		slice.OwnerReferences = []metav1.OwnerReference{{
-			APIVersion: c.owner.APIVersion,
-			Kind:       c.owner.Kind,
-			Name:       c.owner.Name,
-			UID:        c.owner.UID,
-			Controller: ptr.To(true),
-		}}
-		slice.Spec.Driver = c.driver
-		slice.Spec.Pool.Name = poolName
-		slice.Spec.Pool.Generation = generation
-		slice.Spec.Pool.ResourceSliceCount = 1
-		slice.Spec.NodeName = nodeName
-		slice.Spec.NodeSelector = pool.NodeSelector
-		slice.Spec.AllNodes = pool.NodeSelector == nil && nodeName == ""
-		slice.Spec.Devices = pool.Devices
+		// Desired metadata which must be set in each slice.
+		resourceSliceCount := len(pool.Slices)
+		numMatchedSlices := len(currentSliceForDesiredSlice)
+		numNewSlices := resourceSliceCount - numMatchedSlices
+		desiredPool := resourceapi.ResourcePool{
+			Name:               poolName,
+			Generation:         generation, // May get updated later.
+			ResourceSliceCount: int64(resourceSliceCount),
+		}
+		desiredAllNodes := pool.NodeSelector == nil && nodeName == ""
 
-		if loggerV := logger.V(6); loggerV.Enabled() {
-			// Dump entire resource information.
-			loggerV.Info("Syncing resource slices", "obsoleteSlices", klog.KObjSlice(obsoleteSlices), "slices", klog.KObjSlice(slices), "pool", pool)
-		} else {
-			logger.V(5).Info("Syncing resource slices", "obsoleteSlices", klog.KObjSlice(obsoleteSlices), "slices", klog.KObjSlice(slices), "numDevices", len(pool.Devices))
+		// Now for each desired slice, figure out which of them are changed.
+		changedDesiredSlices := sets.New[int]()
+		for i, currentSlice := range currentSliceForDesiredSlice {
+			// Reordering entries is a difference and causes an update even if the
+			// entries are the same.
+			if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
+				currentSlice.Spec.AllNodes != desiredAllNodes ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) {
+				changedDesiredSlices.Insert(i)
+				logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+			}
+		}
+		logger.V(5).Info("Completed comparison",
+			"numObsolete", len(obsoleteSlices),
+			"numMatchedSlices", len(currentSliceForDesiredSlice),
+			"numChangedMatchedSlices", len(changedDesiredSlices),
+			"numNewSlices", numNewSlices,
+		)
+
+		bumpedGeneration := false
+		switch {
+		case pool.Generation > generation:
+			// Bump up the generation if the driver asked for it, or
+			// start with a non-zero generation.
+			generation = pool.Generation
+			bumpedGeneration = true
+			logger.V(5).Info("Bumped generation to driver-provided generation", "generation", generation)
+		case numNewSlices == 0 && len(changedDesiredSlices) <= 1:
+			logger.V(5).Info("Kept generation because at most one update API call is necessary", "generation", generation)
+		default:
+			generation++
+			bumpedGeneration = true
+			logger.V(5).Info("Bumped generation by one", "generation", generation)
+		}
+		desiredPool.Generation = generation
+
+		// Update existing slices.
+		for i, currentSlice := range currentSliceForDesiredSlice {
+			if !changedDesiredSlices.Has(i) && !bumpedGeneration {
+				continue
+			}
+			slice := currentSlice.DeepCopy()
+			slice.Spec.Pool = desiredPool
+			// No need to set the node name. If it was different, we wouldn't
+			// have listed the existing slice.
+			slice.Spec.NodeSelector = pool.NodeSelector
+			slice.Spec.AllNodes = desiredAllNodes
+			slice.Spec.Devices = pool.Slices[i].Devices
+
+			logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
+			slice, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("update resource slice: %w", err)
+			}
+			atomic.AddInt64(&c.numUpdates, 1)
+			c.sliceStore.Mutation(slice)
+		}
+
+		// Create new slices.
+		added := false
+		for i := 0; i < len(pool.Slices); i++ {
+			if _, ok := currentSliceForDesiredSlice[i]; ok {
+				// Was handled above through an update.
+				continue
+			}
+			var ownerReferences []metav1.OwnerReference
+			if c.owner != nil {
+				ownerReferences = append(ownerReferences,
+					metav1.OwnerReference{
+						APIVersion: c.owner.APIVersion,
+						Kind:       c.owner.Kind,
+						Name:       c.owner.Name,
+						UID:        c.owner.UID,
+						Controller: ptr.To(true),
+					},
+				)
+			}
+			generateName := c.driverName + "-"
+			if c.owner != nil {
+				generateName = c.owner.Name + "-" + generateName
+			}
+			slice := &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					OwnerReferences: ownerReferences,
+					GenerateName:    generateName,
+				},
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver:       c.driverName,
+					Pool:         desiredPool,
+					NodeName:     nodeName,
+					NodeSelector: pool.NodeSelector,
+					AllNodes:     desiredAllNodes,
+					Devices:      pool.Slices[i].Devices,
+				},
+			}
+
+			// It can happen that we create a missing slice, some
+			// other change than the create causes another sync of
+			// the pool, and then a second slice for the same set
+			// of devices would get created because the controller has
+			// no copy of the first slice instance in its informer
+			// cache yet.
+			//
+			// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
+			// avoids that.
+			logger.V(5).Info("Creating new resource slice")
+			slice, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("create resource slice: %w", err)
+			}
+			atomic.AddInt64(&c.numCreates, 1)
+			c.sliceStore.Mutation(slice)
+			added = true
+		}
+		if added {
+			// Check that the recently added slice(s) really exist even
+			// after they expired from the mutation cache.
+			c.queue.AddAfter(poolName, c.mutationCacheTTL)
 		}
 	} else if len(slices) > 0 {
 		// All are obsolete, pool does not exist anymore.
-
-		logger.V(5).Info("Removing resource slices after pool removal", "obsoleteSlices", klog.KObjSlice(obsoleteSlices), "slices", klog.KObjSlice(slices), "numDevices", len(pool.Devices))
-		obsoleteSlices = append(obsoleteSlices, slices...)
-		// No need to create or update the slices.
-		slices = nil
+		obsoleteSlices = slices
+		logger.V(5).Info("Removing resource slices after pool removal")
 	}
 
 	// Remove stale slices.
 	for _, slice := range obsoleteSlices {
-		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice))
-		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		options := metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{
+				UID:             &slice.UID,
+				ResourceVersion: &slice.ResourceVersion,
+			},
+		}
+		// It can happen that we sync again shortly after deleting a
+		// slice and before the slice gets removed from the informer
+		// cache. The MutationCache can't help here because it does not
+		// track pending deletes.
+		//
+		// If this happens, we get a "not found error" and nothing
+		// changes on the server. The only downside is the extra API
+		// call. This isn't as bad as extra creates.
+		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
+		err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, options)
+		switch {
+		case err == nil:
+			atomic.AddInt64(&c.numDeletes, 1)
+		case apierrors.IsNotFound(err):
+			logger.V(5).Info("Resource slice was already deleted earlier", "slice", klog.KObj(slice))
+		default:
 			return fmt.Errorf("delete resource slice: %w", err)
 		}
 	}
 
-	// Create or update slices.
-	for _, slice := range slices {
-		if slice.UID == "" {
-			logger.V(5).Info("Creating new resource slice", "slice", klog.KObj(slice))
-			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
-				return fmt.Errorf("create resource slice: %w", err)
-			}
-			continue
-		}
+	return nil
+}
 
-		// TODO: switch to SSA once unit testing supports it.
-		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
-		if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("update resource slice: %w", err)
+func sameSlice(existingSlice *resourceapi.ResourceSlice, desiredSlice *Slice) bool {
+	if len(existingSlice.Spec.Devices) != len(desiredSlice.Devices) {
+		return false
+	}
+
+	existingDevices := sets.New[string]()
+	for _, device := range existingSlice.Spec.Devices {
+		existingDevices.Insert(device.Name)
+	}
+	for _, device := range desiredSlice.Devices {
+		if !existingDevices.Has(device.Name) {
+			return false
 		}
 	}
 
-	return nil
+	// Same number of devices, names all present -> equal.
+	return true
 }

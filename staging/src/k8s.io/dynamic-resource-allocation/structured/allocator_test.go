@@ -535,6 +535,28 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
+		"duplicate-slice": {
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				// This simulates the problem that can
+				// (theoretically) occur when the resource
+				// slice controller wants to publish a pool
+				// with two slices but ends up creating some
+				// identical slices under different names
+				// because its informer cache was out-dated on
+				// another sync (see
+				// resourceslicecontroller.go).
+				sliceA := sliceWithOneDevice(slice1, node1, pool1, driverA)
+				sliceA.Spec.Pool.ResourceSliceCount = 2
+				sliceB := sliceA.DeepCopy()
+				sliceB.Name += "-2"
+				return []*resourceapi.ResourceSlice{sliceA, sliceB}
+			}(),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring(fmt.Sprintf("pool %s is invalid: duplicate device name %s", pool1, device1))),
+		},
 		"no-slices": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),

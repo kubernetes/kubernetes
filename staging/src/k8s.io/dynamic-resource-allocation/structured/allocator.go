@@ -198,6 +198,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					if pool.IsIncomplete {
 						return nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.Name, pool.PoolID)
 					}
+					if pool.IsInvalid {
+						return nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid", klog.KObj(claim), request.Name, pool.PoolID)
+					}
 
 					for _, slice := range pool.Slices {
 						for deviceIndex := range slice.Spec.Devices {
@@ -597,6 +600,13 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				if !selectable {
 					alloc.logger.V(7).Info("Device not selectable", "device", deviceID)
 					continue
+				}
+
+				// If the pool is not valid, then fail now. It's okay when pools of one driver
+				// are invalid if we allocate from some other pool, but it's not safe to
+				// allocated from an invalid pool.
+				if pool.IsInvalid {
+					return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
 				}
 
 				// Finally treat as allocated and move on to the next device.

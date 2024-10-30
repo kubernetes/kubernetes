@@ -40,8 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -728,6 +730,97 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
 	// executed with different parameters.
+
+	ginkgo.Context("ResourceSlice Controller", func() {
+		// This is a stress test for creating many large slices.
+		// Each slice is as large as API limits allow.
+		//
+		// Could become a conformance test because it only depends
+		// on the apiserver.
+		f.It("creates slices", func(ctx context.Context) {
+			// Define desired resource slices.
+			driverName := f.Namespace.Name
+			numSlices := 100
+			devicePrefix := "dev-"
+			domainSuffix := ".example.com"
+			poolName := "network-attached"
+			domain := strings.Repeat("x", 63 /* TODO(pohly): add to API */ -len(domainSuffix)) + domainSuffix
+			stringValue := strings.Repeat("v", resourceapi.DeviceAttributeMaxValueLength)
+			pool := resourceslice.Pool{
+				Slices: make([]resourceslice.Slice, numSlices),
+			}
+			for i := 0; i < numSlices; i++ {
+				devices := make([]resourceapi.Device, resourceapi.ResourceSliceMaxDevices)
+				for e := 0; e < resourceapi.ResourceSliceMaxDevices; e++ {
+					device := resourceapi.Device{
+						Name: devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-4) + fmt.Sprintf("%04d", e),
+						Basic: &resourceapi.BasicDevice{
+							Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice),
+						},
+					}
+					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; j++ {
+						name := resourceapi.QualifiedName(domain + "/" + strings.Repeat("x", resourceapi.DeviceMaxIDLength-4) + fmt.Sprintf("%04d", j))
+						device.Basic.Attributes[name] = resourceapi.DeviceAttribute{
+							StringValue: &stringValue,
+						}
+					}
+					devices[e] = device
+				}
+				pool.Slices[i].Devices = devices
+			}
+			resources := &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{poolName: pool},
+			}
+
+			ginkgo.By("Creating slices")
+			mutationCacheTTL := 10 * time.Second
+			controller, err := resourceslice.StartController(ctx, resourceslice.Options{
+				DriverName:       driverName,
+				KubeClient:       f.ClientSet,
+				Resources:        resources,
+				MutationCacheTTL: &mutationCacheTTL,
+			})
+			framework.ExpectNoError(err, "start controller")
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				controller.Stop()
+				err := f.ClientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
+					FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
+				})
+				framework.ExpectNoError(err, "delete resource slices")
+			})
+
+			// Eventually we should have all desired slices.
+			listSlices := framework.ListObjects(f.ClientSet.ResourceV1alpha3().ResourceSlices().List, metav1.ListOptions{
+				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
+			})
+			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+
+			// Verify state.
+			expectSlices, err := listSlices(ctx)
+			framework.ExpectNoError(err)
+			gomega.Expect(expectSlices.Items).ShouldNot(gomega.BeEmpty())
+			framework.Logf("Protobuf size of one slice is %d bytes = %d KB.", expectSlices.Items[0].Size(), expectSlices.Items[0].Size()/1024)
+			gomega.Expect(expectSlices.Items[0].Size()).Should(gomega.BeNumerically(">=", 600*1024), "ResourceSlice size")
+			gomega.Expect(expectSlices.Items[0].Size()).Should(gomega.BeNumerically("<", 1024*1024), "ResourceSlice size")
+			expectStats := resourceslice.Stats{NumCreates: int64(numSlices)}
+			gomega.Expect(controller.GetStats()).Should(gomega.Equal(expectStats))
+
+			// No further changes expected now, after after checking again.
+			gomega.Consistently(ctx, controller.GetStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
+
+			// Ask the controller to delete all slices except for one empty slice.
+			ginkgo.By("Deleting slices")
+			resources = resources.DeepCopy()
+			resources.Pools[poolName] = resourceslice.Pool{Slices: []resourceslice.Slice{{}}}
+			controller.Update(resources)
+
+			// One empty slice should remain, after removing the full ones and adding the empty one.
+			emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
+			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.ConsistOf(emptySlice)))
+			expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
+			gomega.Consistently(ctx, controller.GetStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
+		})
+	})
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 1)
