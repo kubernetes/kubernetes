@@ -555,7 +555,6 @@ func TestPrepareCandidate(t *testing.T) {
 				PluginName: "FakePreemptionScorePostFilter",
 				Handler:    fwk,
 				Interface:  fakePreemptionScorePostFilterPlugin,
-				State:      framework.NewCycleState(),
 			}
 
 			status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
@@ -810,7 +809,6 @@ func TestCallExtenders(t *testing.T) {
 				PluginName: "FakePreemptionScorePostFilter",
 				Handler:    fwk,
 				Interface:  fakePreemptionScorePostFilterPlugin,
-				State:      framework.NewCycleState(),
 			}
 			gotCandidates, status := pe.callExtenders(logger, preemptor, tt.candidates)
 			if (tt.wantStatus == nil) != (status == nil) || status.Code() != tt.wantStatus.Code() {
