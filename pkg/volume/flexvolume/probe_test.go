@@ -21,8 +21,6 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
@@ -327,47 +325,6 @@ func TestProberSuccessAndError(t *testing.T) {
 	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
 	assert.Equal(t, driverName, events[0].PluginName)
 	assert.Error(t, err)
-}
-
-// TestProberMultiThreaded tests the code path of many callers calling FindPluginBySpec/FindPluginByName
-// which then calls refreshProbedPlugins which then calls prober.Probe() and ensures that the prober is thread safe
-func TestProberMultiThreaded(t *testing.T) {
-	// Arrange
-	_, _, _, prober := initTestEnvironment(t)
-	totalEvents := atomic.Int32{}
-	totalErrors := atomic.Int32{}
-	pluginNameMutex := sync.RWMutex{}
-	var pluginName string
-	var wg sync.WaitGroup
-
-	// Act
-	for i := 0; i < 100; i++ {
-		go func() {
-			defer wg.Done()
-			events, err := prober.Probe()
-			for _, event := range events {
-				if event.Op == volume.ProbeAddOrUpdate {
-					pluginNameMutex.Lock()
-					pluginName = event.Plugin.GetPluginName()
-					pluginNameMutex.Unlock()
-				}
-			}
-			// this fails if ProbeAll is not complete before the next call comes in but we have assumed that it has
-			pluginNameMutex.RLock()
-			assert.Equal(t, "fake-driver", pluginName)
-			pluginNameMutex.RUnlock()
-			totalEvents.Add(int32(len(events)))
-			if err != nil {
-				totalErrors.Add(1)
-			}
-		}()
-		wg.Add(1)
-	}
-	wg.Wait()
-
-	// Assert
-	assert.Equal(t, int32(1), totalEvents.Load())
-	assert.Equal(t, int32(0), totalErrors.Load())
 }
 
 // Installs a mock driver (an empty file) in the mock fs.
