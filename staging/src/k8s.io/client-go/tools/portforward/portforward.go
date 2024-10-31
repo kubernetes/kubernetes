@@ -44,15 +44,13 @@ var (
 
 	// set of error we're expecting during port-forwarding
 	networkClosedError = "use of closed network connection"
+
 	// Containerd will return "network namespace for sandbox %q is closed", see:
 	// - 2.0: https://github.com/containerd/containerd/blob/v2.0.0-rc.6/internal/cri/server/sandbox_portforward_linux.go#L47
 	// - 1.7: https://github.com/containerd/containerd/blob/release/1.7/pkg/cri/server/sandbox_portforward_linux.go#L47
 	// CRI-O will return "sandbox %s is not running", see:
 	// - 1.31: https://github.com/cri-o/cri-o/blob/release-1.31/server/container_portforward.go#L54
 	networkClosedRe = regexp.MustCompile(`network namespace for sandbox "\w+" is closed|sandbox \w+ is not running`)
-	// this error matches the one returned in this file, in handleConnection, when we create
-	// data stream - https://github.com/kubernetes/kubernetes/blob/release-1.31/staging/src/k8s.io/client-go/tools/portforward/portforward.go#L374
-	streamTimeoutRe = regexp.MustCompile(`error creating forwarding stream for port \d+ -> \d+: Timeout occurred`)
 )
 
 // PortForwarder knows how to listen for local connections and forward them to
@@ -365,6 +363,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	errorStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err))
+		_ = pf.streamConn.Close()
 		return
 	}
 	// we're not writing to this stream
@@ -397,7 +396,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	go func() {
 		// Copy from the remote side to the local port.
-		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), networkClosedError) {
+		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(strings.ToLower(err.Error()), networkClosedError) {
 			runtime.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
 		}
 
@@ -410,7 +409,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		defer dataStream.Close()
 
 		// Copy from the local port to the remote side.
-		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), networkClosedError) {
+		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(strings.ToLower(err.Error()), networkClosedError) {
 			runtime.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
 			// break out of the select below without waiting for the other copy to finish
 			close(localError)
@@ -436,8 +435,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		// an error handling a single request, container runtime should handle
 		// the streaming error by reseting the connection, so we should be able
 		// to keep the connection open until a user explicitly requests an end
-
-		if networkClosedRe.MatchString(err.Error()) || streamTimeoutRe.MatchString(err.Error()) {
+		if networkClosedRe.MatchString(err.Error()) {
 			// there are two cases when we consider closing the entire connection:
 			// 1. networkClosedRe is happening when a pod is removed, in which case we should stop
 			//    port forwarding, although we'll only know about it only during subsequent
@@ -447,6 +445,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 			//    a subsequent stream, which fails with that error.
 			_ = pf.streamConn.Close()
 		}
+
 	}
 }
 

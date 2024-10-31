@@ -296,6 +296,8 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 }
 
 // Reproduces issue #74551 (https://github.com/kubernetes/kubernetes/issues/74551)
+//
+//nolint:unused
 func doTestConnectionNeverReadRequestBody(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Creating the target pod")
 	pod := pfNeverReadRequestBodyPod()
@@ -690,11 +692,14 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 		})
 	})
 
-	ginkgo.Describe("with a server that never read request body", func() {
-		ginkgo.It("port-forward service should be provided continuously", func(ctx context.Context) {
-			doTestConnectionNeverReadRequestBody(ctx, f)
-		})
-	})
+	// due to required CRI fixes from https://github.com/kubernetes/kubernetes/pull/128318
+	// we can only enable this test once we have that dependency updated in CRIO and containerd,
+	// at minimum
+	// ginkgo.Describe("with a server that never read request body", func() {
+	// 	ginkgo.It("port-forward service should be provided continuously", func(ctx context.Context) {
+	// 		doTestConnectionNeverReadRequestBody(ctx, f)
+	// 	})
+	// })
 
 	ginkgo.Describe("with a server that sends RST upon accepting a connection", func() {
 		ginkgo.It("should connect, send data, and then connect again", func(ctx context.Context) {
