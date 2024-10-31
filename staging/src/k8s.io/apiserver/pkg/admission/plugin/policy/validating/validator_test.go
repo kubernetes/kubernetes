@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
@@ -105,11 +106,13 @@ func TestValidate(t *testing.T) {
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -119,18 +122,22 @@ func TestValidate(t *testing.T) {
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -140,11 +147,13 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &ignore,
@@ -155,11 +164,13 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -169,11 +180,13 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -184,18 +197,22 @@ func TestValidate(t *testing.T) {
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &ignore,
@@ -206,18 +223,22 @@ func TestValidate(t *testing.T) {
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -227,18 +248,22 @@ func TestValidate(t *testing.T) {
 				{
 					EvalResult:         celtypes.True,
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -249,18 +274,22 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &ignore,
@@ -271,18 +300,22 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -292,18 +325,22 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 				{
 					Error:              errors.New(""),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 				{
-					Action: ActionDeny,
+					Action:  ActionDeny,
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -316,6 +353,7 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &ValidationCondition{
 						Expression: "this.expression == unit.test",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -323,6 +361,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonInvalid,
 					Message: "failed expression: this.expression == unit.test",
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -336,6 +375,7 @@ func TestValidate(t *testing.T) {
 						Reason:     &forbiddenReason,
 						Expression: "this.expression == unit.test",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -343,6 +383,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonForbidden,
 					Message: "failed expression: this.expression == unit.test",
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -356,6 +397,7 @@ func TestValidate(t *testing.T) {
 						Reason:     &forbiddenReason,
 						Expression: "this.expression == unit.test",
 					},
+					Elapsed: time.Millisecond,
 				},
 				{
 					EvalResult: celtypes.False,
@@ -363,6 +405,7 @@ func TestValidate(t *testing.T) {
 						Reason:     &unauthorizedReason,
 						Expression: "this.expression.2 == unit.test.2",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -370,11 +413,13 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonForbidden,
 					Message: "failed expression: this.expression == unit.test",
+					Elapsed: time.Millisecond,
 				},
 				{
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonUnauthorized,
 					Message: "failed expression: this.expression.2 == unit.test.2",
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -389,6 +434,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -396,6 +442,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonForbidden,
 					Message: "test",
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -410,6 +457,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 				{
 					EvalResult: celtypes.False,
@@ -418,6 +466,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test2",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -425,11 +474,13 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonForbidden,
 					Message: "test1",
+					Elapsed: time.Millisecond,
 				},
 				{
 					Action:  ActionDeny,
 					Reason:  metav1.StatusReasonForbidden,
 					Message: "test2",
+					Elapsed: time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -444,6 +495,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -465,6 +517,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 				{
 					EvalResult: celtypes.False,
@@ -473,6 +526,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test2",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -492,13 +546,15 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "'string value'",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
 			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Action: AuditAnnotationActionPublish,
-					Value:  "string value",
+					Action:  AuditAnnotationActionPublish,
+					Value:   "string value",
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 		},
@@ -512,6 +568,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			auditEvaluations: []cel.EvaluationResult{
@@ -520,17 +577,20 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "'string value'",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
 				{
-					Action: ActionAdmit,
+					Action:  ActionAdmit,
+					Elapsed: time.Millisecond,
 				},
 			},
 			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Action: AuditAnnotationActionPublish,
-					Value:  "string value",
+					Action:  AuditAnnotationActionPublish,
+					Value:   "string value",
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -543,21 +603,25 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "null",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 				{
 					EvalResult: celtypes.String("string value"),
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "'string value'",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Action: AuditAnnotationActionExclude,
+					Action:  AuditAnnotationActionExclude,
+					Elapsed: 2 * time.Millisecond,
 				},
 				{
-					Action: AuditAnnotationActionPublish,
-					Value:  "string value",
+					Action:  AuditAnnotationActionPublish,
+					Value:   "string value",
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -570,12 +634,14 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "'this is not valid CEL",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Action: AuditAnnotationActionError,
-					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+					Action:  AuditAnnotationActionError,
+					Error:   "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			failPolicy: &fail,
@@ -588,12 +654,14 @@ func TestValidate(t *testing.T) {
 					ExpressionAccessor: &AuditAnnotationCondition{
 						ValueExpression: "'this is not valid CEL",
 					},
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			auditAnnotations: []PolicyAuditAnnotation{
 				{
-					Action: AuditAnnotationActionExclude, // TODO: is this right?
-					Error:  "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+					Action:  AuditAnnotationActionExclude, // TODO: is this right?
+					Error:   "valueExpression ''this is not valid CEL' resulted in error: <nil>",
+					Elapsed: 2 * time.Millisecond,
 				},
 			},
 			failPolicy: &ignore,
@@ -607,11 +675,13 @@ func TestValidate(t *testing.T) {
 						Reason:     &forbiddenReason,
 						Expression: "this.expression == unit.test",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
 					EvalResult: celtypes.String("evaluated message"),
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -619,6 +689,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "evaluated message",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -632,6 +703,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "I am not overwritten",
 					},
+					Elapsed: time.Millisecond,
 				},
 				{
 					EvalResult: celtypes.False,
@@ -640,12 +712,14 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "I am overwritten",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{},
 				{
 					EvalResult: celtypes.String("evaluated message"),
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -653,11 +727,13 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "I am not overwritten",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 				{
 					Action:  ActionDeny,
 					Message: "evaluated message",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -671,11 +747,13 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "I am overwritten",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
 					EvalResult: celtypes.String("evaluated message"),
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -683,6 +761,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "evaluated message",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -696,11 +775,13 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
-					Error: &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid},
+					Error:   &apiservercel.Error{Type: apiservercel.ErrorTypeInvalid},
+					Elapsed: time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -708,6 +789,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "test1", // original message used
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -721,11 +803,13 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
 					EvalResult: celtypes.String(" "),
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -733,6 +817,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "test1",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -746,11 +831,13 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
 					EvalResult: celtypes.String("hello\nthere"),
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -758,6 +845,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "test1",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -771,6 +859,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
@@ -783,6 +872,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "test1",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -796,11 +886,13 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
 				{
 					EvalResult: celtypes.NullValue,
+					Elapsed:    time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -808,6 +900,7 @@ func TestValidate(t *testing.T) {
 					Action:  ActionDeny,
 					Message: "test1",
 					Reason:  forbiddenReason,
+					Elapsed: time.Millisecond,
 				},
 			},
 		},
@@ -821,6 +914,7 @@ func TestValidate(t *testing.T) {
 						Expression: "this.expression == unit.test",
 						Message:    "test1",
 					},
+					Elapsed: time.Millisecond,
 				},
 			},
 			messageEvaluations: []cel.EvaluationResult{
@@ -832,6 +926,7 @@ func TestValidate(t *testing.T) {
 				{
 					Action:  ActionDeny,
 					Message: "running out of cost budget",
+					Elapsed: time.Millisecond,
 				},
 			},
 			costBudget: 1, // shared between expression and messageExpression, needs 1 + 1 = 2 in total
@@ -843,6 +938,7 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New("expected"),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{},
@@ -855,6 +951,7 @@ func TestValidate(t *testing.T) {
 				{
 					Error:              errors.New("expected"),
 					ExpressionAccessor: &ValidationCondition{},
+					Elapsed:            time.Millisecond,
 				},
 			},
 			policyDecision: []PolicyDecision{
@@ -908,6 +1005,9 @@ func TestValidate(t *testing.T) {
 				if policyDecision.Reason != validateResult.Decisions[i].Reason {
 					t.Errorf("Expected policy decision reason '%v' but got '%v'", policyDecision.Reason, validateResult.Decisions[i].Reason)
 				}
+				if policyDecision.Elapsed != validateResult.Decisions[i].Elapsed {
+					t.Errorf("Expected policy decision elapsed time '%v', but got '%v'", policyDecision.Elapsed, validateResult.Decisions[i].Elapsed)
+				}
 			}
 			require.Equal(t, len(tc.auditEvaluations), len(validateResult.AuditAnnotations))
 
@@ -921,6 +1021,9 @@ func TestValidate(t *testing.T) {
 				}
 				if auditAnnotation.Value != actual.Value {
 					t.Errorf("Expected policy audit annotation value '%v' but got '%v'", auditAnnotation.Value, actual.Value)
+				}
+				if auditAnnotation.Elapsed != actual.Elapsed {
+					t.Errorf("Expected policy audit annotation elapsed time '%v', but got '%v'", auditAnnotation.Elapsed, actual.Elapsed)
 				}
 			}
 		})

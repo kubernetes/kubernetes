@@ -122,6 +122,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, ns, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
+		decision.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*ValidationCondition)
 		if !ok {
@@ -211,6 +212,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 			continue
 		}
 		var auditAnnotationResult = &auditAnnotationResults[i]
+		auditAnnotationResult.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*AuditAnnotationCondition)
 		if !ok {
