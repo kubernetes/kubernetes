@@ -23,6 +23,7 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -487,6 +488,10 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 
 	logger := klog.FromContext(ctx)
 	go func() {
+		startTime := time.Now()
+		result := metrics.GoroutineResultSuccess
+		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
+		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
 
@@ -497,6 +502,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		nominatedPods := getLowerPriorityNominatedPods(logger, ev.Handler, pod, c.Name())
 		if err := util.ClearNominatedNodeName(ctx, ev.Handler.ClientSet(), nominatedPods...); err != nil {
 			logger.Error(err, "Cannot clear 'NominatedNodeName' field")
+			result = metrics.GoroutineResultError
 			// We do not return as this error is not critical.
 		}
 
@@ -518,6 +524,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
 		if err := errCh.ReceiveError(); err != nil {
 			logger.Error(err, "Error occurred during preemption")
+			result = metrics.GoroutineResultError
 		}
 
 		ev.mu.Lock()
@@ -526,9 +533,10 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 
 		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
 			logger.Error(err, "Error occurred during preemption")
+			result = metrics.GoroutineResultError
 		}
 
-		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name())
+		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name(), "result", result)
 	}()
 }
 
