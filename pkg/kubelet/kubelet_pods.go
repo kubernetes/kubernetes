@@ -2098,7 +2098,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// allocation used by the current sync loop.
 		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
 		if !found {
-			// This case is expected for non-resizable containers.
+			// This case is expected for non-resizable containers (ephemeral & non-restartable init containers).
 			// Don't set status.Resources in this case.
 			return nil
 		}
