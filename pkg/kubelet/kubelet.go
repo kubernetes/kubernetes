@@ -115,6 +115,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -2813,6 +2814,14 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
 	if !updated {
+		// Unless a resize is in-progress, clear the resize status.
+		resizeStatus, _ := kl.statusManager.GetPodResizeStatus(string(pod.UID))
+		if resizeStatus != v1.PodResizeStatusInProgress {
+			if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
+				klog.ErrorS(err, "Failed to clear resize status", "pod", format.Pod(pod))
+			}
+		}
+
 		// Pod is not resizing, nothing more to do here.
 		return allocatedPod, nil
 	}
