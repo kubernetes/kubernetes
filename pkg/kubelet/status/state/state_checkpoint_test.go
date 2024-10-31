@@ -31,16 +31,7 @@ import (
 const testCheckpoint = "pod_status_manager_state"
 
 func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
-	// create temp dir
-	testingDir, err := os.MkdirTemp("", "pod_resource_allocation_state_test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(testingDir); err != nil {
-			t.Fatal(err)
-		}
-	})
+	testingDir := getTestDir(t)
 	cache := NewStateMemory()
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoError(t, err, "failed to create checkpoint manager")
@@ -55,9 +46,7 @@ func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
 
 func getTestDir(t *testing.T) string {
 	testingDir, err := os.MkdirTemp("", "pod_resource_allocation_state_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "failed to create temp dir")
 	t.Cleanup(func() {
 		if err := os.RemoveAll(testingDir); err != nil {
 			t.Fatal(err)
@@ -146,16 +135,6 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	// prepare old checkpoint, ResizeStatusEntries is unset,
 	// pretend that the old checkpoint is unaware for the field ResizeStatusEntries
 	const checkpointContent = `{"data":"{\"allocationEntries\":{\"pod1\":{\"container1\":{\"requests\":{\"cpu\":\"1Ki\",\"memory\":\"1Ki\"}}}}}","checksum":1555601526}`
-	checkpoint := &Checkpoint{}
-	err := checkpoint.UnmarshalCheckpoint([]byte(checkpointContent))
-	require.NoError(t, err, "failed to unmarshal checkpoint")
-
-	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
-	require.NoError(t, err, "failed to create old checkpoint")
-
-	err = sc.restoreState()
-	require.NoError(t, err, "failed to restore state")
-
 	expectedPodResourceAllocationInfo := &PodResourceAllocationInfo{
 		AllocationEntries: map[string]map[string]v1.ResourceRequirements{
 			"pod1": {
@@ -169,6 +148,16 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 		},
 		ResizeStatusEntries: map[string]v1.PodResizeStatus{},
 	}
+	checkpoint := &Checkpoint{}
+	err := checkpoint.UnmarshalCheckpoint([]byte(checkpointContent))
+	require.NoError(t, err, "failed to unmarshal checkpoint")
+
+	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
+	require.NoError(t, err, "failed to create old checkpoint")
+
+	err = sc.restoreState()
+	require.NoError(t, err, "failed to restore state")
+
 	actualPodResourceAllocationInfo := &PodResourceAllocationInfo{}
 	actualPodResourceAllocationInfo.AllocationEntries = sc.cache.GetPodResourceAllocation()
 	actualPodResourceAllocationInfo.ResizeStatusEntries = sc.cache.GetResizeStatus()
