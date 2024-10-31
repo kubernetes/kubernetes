@@ -22,6 +22,7 @@ import (
 	"io"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -81,9 +82,11 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 }
 
 func addNotReadyTaint(node *api.Node) {
+	now := metav1.Now()
 	notReadyTaint := api.Taint{
-		Key:    v1.TaintNodeNotReady,
-		Effect: api.TaintEffectNoSchedule,
+		Key:       v1.TaintNodeNotReady,
+		Effect:    api.TaintEffectNoSchedule,
+		TimeAdded: &now,
 	}
 	for _, taint := range node.Spec.Taints {
 		if taint.MatchTaint(notReadyTaint) {

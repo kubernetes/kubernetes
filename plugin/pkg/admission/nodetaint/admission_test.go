@@ -18,7 +18,6 @@ package nodetaint
 
 import (
 	"context"
-	"reflect"
 
 	"testing"
 
@@ -83,7 +82,7 @@ func Test_nodeTaints(t *testing.T) {
 				t.Errorf("nodePlugin.Admit() error = %v", err)
 			}
 			node, _ := attributes.GetObject().(*api.Node)
-			if !reflect.DeepEqual(node.Spec.Taints, tt.expectedTaints) {
+			if !node.Spec.Taints[0].MatchTaint(tt.expectedTaints[0]) {
 				t.Errorf("Unexpected Node taints. Got %v\nExpected: %v", node.Spec.Taints, tt.expectedTaints)
 			}
 		})
