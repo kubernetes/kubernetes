@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -1740,19 +1741,30 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodResizeStatus {
-	var podResizeStatus v1.PodResizeStatus
-	if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
-		// Clear last resize state from checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", allocatedPod.Name)
-		}
-	} else {
-		if resizeStatus, found := kl.statusManager.GetPodResizeStatus(string(allocatedPod.UID)); found {
-			podResizeStatus = resizeStatus
-		}
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodResizeStatus {
+	if kubetypes.IsStaticPod(allocatedPod) {
+		return ""
 	}
-	return podResizeStatus
+
+	// If pod is terminal, clear the resize status.
+	if podIsTerminal {
+		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
+			klog.ErrorS(err, "SetPodResizeStatus failed for terminal pod", "pod", format.Pod(allocatedPod))
+		}
+		return ""
+	}
+
+	resizeStatus, _ := kl.statusManager.GetPodResizeStatus(string(allocatedPod.UID))
+	// If the resize was in-progress and the actual resources match the allocated resources, mark
+	// the resize as complete by clearing the resize status.
+	if resizeStatus == v1.PodResizeStatusInProgress &&
+		allocatedResourcesMatchStatus(allocatedPod, podStatus) {
+		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
+			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", format.Pod(allocatedPod))
+		}
+		return ""
+	}
+	return resizeStatus
 }
 
 // allocatedResourcesMatchStatus tests whether the resizeable resources in the pod spec match the
@@ -1798,7 +1810,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		s.Resize = kl.determinePodResizeStatus(pod, podStatus)
+		s.Resize = kl.determinePodResizeStatus(pod, podStatus, podIsTerminal)
 	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
