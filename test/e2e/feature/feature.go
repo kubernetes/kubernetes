@@ -303,6 +303,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RegularResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
 
+	// Owner: sig-scheduling
+	// Marks tests of the asynchronous preemption (KEP-4832) that require the `SchedulerAsyncPreemption` feature gate.
+	SchedulerAsyncPreemption = framework.WithFeature(framework.ValidFeatures.Add("SchedulerAsyncPreemption"))
+
 	// Owner: sig-network
 	// Marks tests that require a pod networking implementation that supports SCTP
 	// traffic between pods.
