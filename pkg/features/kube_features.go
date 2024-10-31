@@ -477,6 +477,12 @@ const (
 	// Enables SleepAction in container lifecycle hooks
 	PodLifecycleSleepAction featuregate.Feature = "PodLifecycleSleepAction"
 
+	// owner: @sreeram-venkitesh
+	// kep: http://kep.k8s.io/4818
+	//
+	// Allows zero value for sleep duration in SleepAction in container lifecycle hooks
+	PodLifecycleSleepActionAllowZero featuregate.Feature = "PodLifecycleSleepActionAllowZero"
+
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	//

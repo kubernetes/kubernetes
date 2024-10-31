@@ -890,6 +890,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: PodLifecycleSleepActionAllowZero
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: PodReadyToStartContainersCondition
   versionedSpecs:
   - default: false
