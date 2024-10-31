@@ -57,6 +57,7 @@ type DefaultPreemption struct {
 }
 
 var _ framework.PostFilterPlugin = &DefaultPreemption{}
+var _ framework.PreEnqueuePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
