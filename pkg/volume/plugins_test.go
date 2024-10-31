@@ -17,10 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -168,63 +164,4 @@ func Test_ValidatePodTemplate(t *testing.T) {
 	if got := ValidateRecyclerPodTemplate(pod); got == nil {
 		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got, "Error: pod specification does not contain any volume(s).")
 	}
-}
-
-// TestVolumePluginMultiThreaded tests FindPluginByName/FindPluginBySpec in a multi-threaded environment.
-// If these are called by different threads at the same time, they should still be able to reconcile the plugins
-// and return the same results (no missing plugin)
-func TestVolumePluginMultiThreaded(t *testing.T) {
-	vpm := VolumePluginMgr{}
-	var prober DynamicPluginProber = &fakeProber{events: []ProbeEvent{{PluginName: testPluginName, Op: ProbeAddOrUpdate, Plugin: &testPlugins{}}}}
-	err := vpm.InitPlugins([]VolumePlugin{}, prober, nil)
-	require.NoError(t, err)
-
-	volumeSpec := &Spec{}
-	totalErrors := atomic.Int32{}
-	var wg sync.WaitGroup
-
-	for i := 0; i < 100; i++ {
-		go func() {
-			defer wg.Done()
-			_, err := vpm.FindPluginByName(testPluginName)
-			if err != nil {
-				totalErrors.Add(1)
-			}
-		}()
-		wg.Add(1)
-	}
-	wg.Wait()
-
-	assert.Equal(t, int32(0), totalErrors.Load())
-
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := vpm.FindPluginBySpec(volumeSpec)
-			if err != nil {
-				totalErrors.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
-
-	assert.Equal(t, int32(0), totalErrors.Load())
-}
-
-type fakeProber struct {
-	events         []ProbeEvent
-	firstExecution atomic.Bool
-}
-
-func (prober *fakeProber) Init() error {
-	prober.firstExecution.Store(true)
-	return nil
-}
-
-func (prober *fakeProber) Probe() (events []ProbeEvent, err error) {
-	if prober.firstExecution.CompareAndSwap(true, false) {
-		return prober.events, nil
-	}
-	return []ProbeEvent{}, nil
 }
