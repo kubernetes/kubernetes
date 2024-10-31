@@ -37,6 +37,14 @@ var (
 	allowListLock        sync.RWMutex
 )
 
+// ResetLabelValueAllowLists resets the allow lists for label values.
+// NOTE: This should only be used in test.
+func ResetLabelValueAllowLists() {
+	allowListLock.Lock()
+	defer allowListLock.Unlock()
+	labelValueAllowLists = map[string]*MetricLabelAllowList{}
+}
+
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure
 // is purposefully not embedded here because that would change struct initialization
 // in the manner which people are currently accustomed.
