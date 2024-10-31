@@ -133,7 +133,7 @@ type Evaluator struct {
 
 	enableAsyncPreemption bool
 	mu                    sync.RWMutex
-	// preempting is a map that records the pods that are currently triggering preemption asynchronously,
+	// preempting is a set that records the pods that are currently triggering preemption asynchronously,
 	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
 	preempting sets.Set[types.UID]
 
