@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -68,7 +69,12 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			framework.ExpectNoError(err)
 
 			pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
-			podErr := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
+				if len(pod.Status.ContainerStatuses) > 0 && pod.Status.Reason == images.ErrImagePullBackOff.Error() {
+					return true, nil
+				}
+				return false, nil
+			})
 			gomega.Expect(podErr).To(gomega.HaveOccurred())
 
 			eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
