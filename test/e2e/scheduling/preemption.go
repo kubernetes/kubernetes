@@ -307,18 +307,17 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 	})
 
 	/*
-		Release: v1.23
+		Release: v1.32
 		Testname: Scheduler runs the preemption with various priority classes expectedly
 		Description: When there are Pods with various priority classes running the preemption,
 		the scheduler must prioritize the Pods with the higher priority class.
 	*/
 	framework.It("validates various priority Pods preempt expectedly with the async preemption", feature.SchedulerAsyncPreemption, func(ctx context.Context) {
 		var podRes v1.ResourceList
-		// Create two pods per node that uses a lot of the node's resources.
+		// Create 10 pods per node that will eat up all the node's resources.
 		ginkgo.By("Create 10 low-priority pods on each node.")
 		lowPriorityPods := make([]*v1.Pod, 0, 10*len(nodeList.Items))
 		// Create pods in the cluster.
-		// One of them has low priority, making it the victim for preemption.
 		for i, node := range nodeList.Items {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
@@ -329,7 +328,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 
 			// Create 10 low priority pods on each node, which will use up 10/10 of the node's resources.
 			for j := 0; j < 10; j++ {
-				// Request 2 of the available resources for the victim pods
+				// Request 1 of the available resources for the victim pods
 				podRes = v1.ResourceList{}
 				podRes[testExtendedResource] = resource.MustParse("1")
 				pausePod := createPausePod(ctx, f, pausePodConfig{
@@ -426,7 +425,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				if err != nil {
 					return false, err
 				}
-				return highPod.Status.NominatedNodeName != "", err
+				return highPod.Status.NominatedNodeName != "", nil
 			}))
 		}
 
