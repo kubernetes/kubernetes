@@ -45,7 +45,7 @@ var generation int64
 type ActionType int64
 
 // Constants for ActionTypes.
-// Note: When you add a new ActionType, you must update the following:
+// CAUTION for contributors: When you add a new ActionType, you must update the following:
 // - The list of basic, podOnly, and nodeOnly.
 // - String() method.
 const (
@@ -145,6 +145,8 @@ type EventResource string
 
 // Constants for GVKs.
 //
+// CAUTION for contributors: When you add a new EventResource, you must register a new one to allResources.
+//
 // Note:
 // - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
 // Use specific events rather than general ones (updatePodLabel vs update) can make the requeueing process more efficient
@@ -221,6 +223,7 @@ var (
 		StorageClass,
 		VolumeAttachment,
 		ResourceClaim,
+		ResourceSlice,
 		DeviceClass,
 	}
 )
