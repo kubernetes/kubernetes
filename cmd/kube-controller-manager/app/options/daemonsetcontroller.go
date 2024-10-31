@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
@@ -32,6 +34,8 @@ func (o *DaemonSetControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
+
+	fs.Int32Var(&o.ConcurrentDaemonSetSyncs, "concurrent-daemonset-syncs", o.ConcurrentDaemonSetSyncs, "The number of daemonset objects that are allowed to sync concurrently. Larger number = more responsive daemonsets, but more CPU (and network) load")
 }
 
 // ApplyTo fills up DaemonSetController config with options.
@@ -52,5 +56,8 @@ func (o *DaemonSetControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentDaemonSetSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-daemonset-syncs must be greater than 0, but got %d", o.ConcurrentDaemonSetSyncs))
+	}
 	return errs
 }
