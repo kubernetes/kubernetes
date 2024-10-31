@@ -852,7 +852,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 					t.Errorf("got binding diff (-want, +got): %s", diff)
 				}
-				if len(queue.InFlightPods()) != 0 {
+				// We have to use wait here
+				// because the Pod goes to the binding cycle in some test cases and the inflight pods might not be empty immediately at this point in such case.
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					return len(queue.InFlightPods()) == 0, nil
+				}); err != nil {
 					t.Errorf("in-flight pods should be always empty after SchedulingOne. It has %v Pods", len(queue.InFlightPods()))
 				}
 				stopFunc()
