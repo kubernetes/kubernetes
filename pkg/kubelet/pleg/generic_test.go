@@ -736,3 +736,154 @@ kubelet_running_pods 2
 		})
 	}
 }
+
+func TestWatchConditions(t *testing.T) {
+	pods := []*containertest.FakePod{{
+		Pod: &kubecontainer.Pod{
+			Name: "running-pod",
+			ID:   "running",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s", kubecontainer.ContainerStateRunning),
+			},
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c", kubecontainer.ContainerStateRunning),
+			},
+		},
+	}, {
+		Pod: &kubecontainer.Pod{
+			Name: "terminating-pod",
+			ID:   "terminating",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s", kubecontainer.ContainerStateExited),
+			},
+		},
+	}, {
+		Pod: &kubecontainer.Pod{
+			Name: "reinspect-pod",
+			ID:   "reinspect",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s", kubecontainer.ContainerStateRunning),
+			},
+		},
+	}}
+	initialPods := append(pods, &containertest.FakePod{Pod: &kubecontainer.Pod{
+		Name: "terminated-pod",
+		ID:   "terminated",
+		Sandboxes: []*kubecontainer.Container{
+			createTestContainer("s", kubecontainer.ContainerStateExited),
+		},
+	}})
+
+	alwaysComplete := func(_ *kubecontainer.PodStatus) bool {
+		return true
+	}
+	neverComplete := func(_ *kubecontainer.PodStatus) bool {
+		return false
+	}
+
+	var pleg *GenericPLEG
+	var updatingCond WatchCondition
+	// updatingCond always completes, but updates the condition first.
+	updatingCond = func(_ *kubecontainer.PodStatus) bool {
+		pleg.SetPodWatchCondition("running", "updating", updatingCond)
+		return true
+	}
+
+	testCases := []struct {
+		name                  string
+		podUID                types.UID
+		watchConditions       map[string]WatchCondition
+		expectEvaluated       bool                               // Whether the watch conditions should be evaluated
+		expectRemoved         bool                               // Whether podUID should be present in the watch conditions map
+		expectWatchConditions map[string]versionedWatchCondition // The expected watch conditions for the podUIDa (only key & version checked)
+	}{{
+		name:   "no watch conditions",
+		podUID: "running",
+	}, {
+		name:   "running pod with conditions",
+		podUID: "running",
+		watchConditions: map[string]WatchCondition{
+			"completing": alwaysComplete,
+			"watching":   neverComplete,
+			"updating":   updatingCond,
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"watching": {version: 0},
+			"updating": {version: 1},
+		},
+	}, {
+		name:   "non-existant pod",
+		podUID: "non-existant",
+		watchConditions: map[string]WatchCondition{
+			"watching": neverComplete,
+		},
+		expectEvaluated: false,
+		expectRemoved:   true,
+	}, {
+		name:   "terminated pod",
+		podUID: "terminated",
+		watchConditions: map[string]WatchCondition{
+			"watching": neverComplete,
+		},
+		expectEvaluated: false,
+		expectRemoved:   true,
+	}, {
+		name:   "reinspecting pod",
+		podUID: "reinspect",
+		watchConditions: map[string]WatchCondition{
+			"watching": neverComplete,
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"watching": {version: 0},
+		},
+	}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			testPleg := newTestGenericPLEG()
+			pleg = testPleg.pleg
+			runtime := testPleg.runtime
+			runtime.AllPodList = initialPods
+			pleg.Relist() // Setup initial pod records.
+
+			runtime.AllPodList = pods // Doesn't have "terminated" pod.
+			pleg.podsToReinspect["reinspect"] = nil
+
+			var evaluatedConditions []string
+			for key, condition := range test.watchConditions {
+				wrappedCondition := func(status *kubecontainer.PodStatus) bool {
+					if !test.expectEvaluated {
+						assert.Fail(t, "conditions should not be evaluated")
+					} else {
+						evaluatedConditions = append(evaluatedConditions, key)
+					}
+					return condition(status)
+				}
+				pleg.SetPodWatchCondition(test.podUID, key, wrappedCondition)
+			}
+			pleg.Relist()
+
+			if test.expectEvaluated {
+				assert.Len(t, evaluatedConditions, len(test.watchConditions), "all conditions should be evaluated")
+			}
+
+			if test.expectRemoved {
+				assert.NotContains(t, pleg.watchConditions, test.podUID, "Pod should be removed from watch conditions")
+			} else {
+				actualConditions := pleg.watchConditions[test.podUID]
+				assert.Len(t, actualConditions, len(test.expectWatchConditions), "expected number of conditions")
+				for key, expected := range test.expectWatchConditions {
+					if !assert.Contains(t, actualConditions, key) {
+						continue
+					}
+					actual := actualConditions[key]
+					assert.Equal(t, key, actual.key)
+					assert.Equal(t, expected.version, actual.version)
+				}
+			}
+
+		})
+	}
+}
