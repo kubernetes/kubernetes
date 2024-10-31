@@ -206,10 +206,10 @@ message DeviceAttribute {
 
 // DeviceCapacity describes a quantity associated with a device.
 message DeviceCapacity {
-  // Quantity defines how much of a certain device capacity is available.
+  // Value defines how much of a certain device capacity is available.
   //
   // +required
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 1;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.

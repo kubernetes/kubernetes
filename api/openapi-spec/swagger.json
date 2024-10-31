@@ -16343,13 +16343,13 @@
     "io.k8s.api.resource.v1beta1.DeviceCapacity": {
       "description": "DeviceCapacity describes a quantity associated with a device.",
       "properties": {
-        "quantity": {
+        "value": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
-          "description": "Quantity defines how much of a certain device capacity is available."
+          "description": "Value defines how much of a certain device capacity is available."
         }
       },
       "required": [
-        "quantity"
+        "value"
       ],
       "type": "object"
     },

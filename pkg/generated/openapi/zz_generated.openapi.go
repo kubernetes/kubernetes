@@ -47892,14 +47892,14 @@ func schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref common.ReferenceCallba
 				Description: "DeviceCapacity describes a quantity associated with a device.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"quantity": {
+					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Quantity defines how much of a certain device capacity is available.",
+							Description: "Value defines how much of a certain device capacity is available.",
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
 				},
-				Required: []string{"quantity"},
+				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{

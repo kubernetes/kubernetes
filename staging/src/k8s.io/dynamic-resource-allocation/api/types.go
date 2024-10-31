@@ -64,5 +64,5 @@ type DeviceAttribute struct {
 }
 
 type DeviceCapacity struct {
-	Quantity resource.Quantity
+	Value resource.Quantity
 }

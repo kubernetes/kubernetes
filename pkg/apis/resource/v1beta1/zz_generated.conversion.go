@@ -530,7 +530,7 @@ func Convert_resource_DeviceAttribute_To_v1beta1_DeviceAttribute(in *resource.De
 }
 
 func autoConvert_v1beta1_DeviceCapacity_To_resource_DeviceCapacity(in *resourcev1beta1.DeviceCapacity, out *resource.DeviceCapacity, s conversion.Scope) error {
-	out.Quantity = in.Quantity
+	out.Value = in.Value
 	return nil
 }
 
@@ -540,7 +540,7 @@ func Convert_v1beta1_DeviceCapacity_To_resource_DeviceCapacity(in *resourcev1bet
 }
 
 func autoConvert_resource_DeviceCapacity_To_v1beta1_DeviceCapacity(in *resource.DeviceCapacity, out *resourcev1beta1.DeviceCapacity, s conversion.Scope) error {
-	out.Quantity = in.Quantity
+	out.Value = in.Value
 	return nil
 }
 

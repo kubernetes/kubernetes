@@ -44,7 +44,7 @@ spec:
           version: versionValue
       capacity:
         capacityKey:
-          quantity: "0"
+          value: "0"
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue

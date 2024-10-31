@@ -222,10 +222,10 @@ type BasicDevice struct {
 
 // DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacity struct {
-	// Quantity defines how much of a certain device capacity is available.
+	// Value defines how much of a certain device capacity is available.
 	//
 	// +required
-	Quantity resource.Quantity `json:"quantity" protobuf:"bytes,1,rep,name=quantity"`
+	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 
 	// potential future addition: fields which define how to "consume"
 	// capacity (= share a single device between different consumers).

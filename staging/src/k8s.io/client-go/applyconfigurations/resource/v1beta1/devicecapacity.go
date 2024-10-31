@@ -25,7 +25,7 @@ import (
 // DeviceCapacityApplyConfiguration represents a declarative configuration of the DeviceCapacity type for use
 // with apply.
 type DeviceCapacityApplyConfiguration struct {
-	Quantity *resource.Quantity `json:"quantity,omitempty"`
+	Value *resource.Quantity `json:"value,omitempty"`
 }
 
 // DeviceCapacityApplyConfiguration constructs a declarative configuration of the DeviceCapacity type for use with
@@ -34,10 +34,10 @@ func DeviceCapacity() *DeviceCapacityApplyConfiguration {
 	return &DeviceCapacityApplyConfiguration{}
 }
 
-// WithQuantity sets the Quantity field in the declarative configuration to the given value
+// WithValue sets the Value field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Quantity field is set to the value of the last call.
-func (b *DeviceCapacityApplyConfiguration) WithQuantity(value resource.Quantity) *DeviceCapacityApplyConfiguration {
-	b.Quantity = &value
+// If called multiple times, the Value field is set to the value of the last call.
+func (b *DeviceCapacityApplyConfiguration) WithValue(value resource.Quantity) *DeviceCapacityApplyConfiguration {
+	b.Value = &value
 	return b
 }

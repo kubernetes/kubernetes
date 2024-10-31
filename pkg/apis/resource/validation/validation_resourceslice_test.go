@@ -40,7 +40,7 @@ func testAttributes() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute 
 
 func testCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
 	return map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-		"memory": {Quantity: resource.MustParse("1Gi")},
+		"memory": {Value: resource.MustParse("1Gi")},
 	}
 }
 
@@ -418,7 +418,7 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
 				slice.Spec.Devices[1].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				quantity := resource.MustParse("1Gi")
-				capacity := resourceapi.DeviceCapacity{Quantity: quantity}
+				capacity := resourceapi.DeviceCapacity{Value: quantity}
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
 					slice.Spec.Devices[1].Basic.Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
 				}

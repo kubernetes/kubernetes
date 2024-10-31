@@ -219,10 +219,10 @@ type BasicDevice struct {
 
 // DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacity struct {
-	// Quantity defines how much of a certain device capacity is available.
+	// Value defines how much of a certain device capacity is available.
 	//
 	// +required
-	Quantity resource.Quantity
+	Value resource.Quantity
 
 	// potential future addition: fields which define how to "consume"
 	// capacity (= share a single device between different consumers).

@@ -195,7 +195,7 @@ func Convert_v1beta1_DeviceAttribute_To_api_DeviceAttribute(in *v1beta1.DeviceAt
 }
 
 func autoConvert_api_DeviceCapacity_To_v1beta1_DeviceCapacity(in *DeviceCapacity, out *v1beta1.DeviceCapacity, s conversion.Scope) error {
-	out.Quantity = in.Quantity
+	out.Value = in.Value
 	return nil
 }
 
@@ -205,7 +205,7 @@ func Convert_api_DeviceCapacity_To_v1beta1_DeviceCapacity(in *DeviceCapacity, ou
 }
 
 func autoConvert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(in *v1beta1.DeviceCapacity, out *DeviceCapacity, s conversion.Scope) error {
-	out.Quantity = in.Quantity
+	out.Value = in.Value
 	return nil
 }
 

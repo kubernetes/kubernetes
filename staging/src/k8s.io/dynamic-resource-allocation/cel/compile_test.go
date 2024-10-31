@@ -149,14 +149,14 @@ var testcases = map[string]struct {
 	},
 	"quantity": {
 		expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: resource.MustParse("1Mi")}},
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  6,
 	},
 	"check-positive": {
 		expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: resource.MustParse("1Mi")}},
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  10,
@@ -186,7 +186,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			"version": {VersionValue: ptr.To("1.0.0")},
 		},
 		capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-			"quantity": {Quantity: resource.MustParse("1Mi")},
+			"quantity": {Value: resource.MustParse("1Mi")},
 		},
 		driver:      "dra.example.com",
 		expectMatch: true,

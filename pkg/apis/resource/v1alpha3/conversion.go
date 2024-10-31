@@ -42,11 +42,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 }
 
 func Convert_resource_DeviceCapacity_To_resource_Quantity(in *resourceapi.DeviceCapacity, out *resource.Quantity, s conversion.Scope) error {
-	*out = in.Quantity
+	*out = in.Value
 	return nil
 }
 
 func Convert_resource_Quantity_To_resource_DeviceCapacity(in *resource.Quantity, out *resourceapi.DeviceCapacity, s conversion.Scope) error {
-	out.Quantity = *in
+	out.Value = *in
 	return nil
 }

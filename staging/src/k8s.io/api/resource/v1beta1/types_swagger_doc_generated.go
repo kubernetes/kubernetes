@@ -99,8 +99,8 @@ func (DeviceAttribute) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceCapacity = map[string]string{
-	"":         "DeviceCapacity describes a quantity associated with a device.",
-	"quantity": "Quantity defines how much of a certain device capacity is available.",
+	"":      "DeviceCapacity describes a quantity associated with a device.",
+	"value": "Value defines how much of a certain device capacity is available.",
 }
 
 func (DeviceCapacity) SwaggerDoc() map[string]string {

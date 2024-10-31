@@ -231,7 +231,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
 					},
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-						"memory": {Quantity: resource.MustParse("1Gi")},
+						"memory": {Value: resource.MustParse("1Gi")},
 					},
 				},
 			},

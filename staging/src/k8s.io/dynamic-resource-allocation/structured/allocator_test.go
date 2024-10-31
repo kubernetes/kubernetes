@@ -193,7 +193,7 @@ func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantit
 	}
 	device.Basic.Capacity = make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
 	for name, quantity := range capacity {
-		device.Basic.Capacity[name] = resourceapi.DeviceCapacity{Quantity: quantity}
+		device.Basic.Capacity[name] = resourceapi.DeviceCapacity{Value: quantity}
 	}
 	return device
 }
