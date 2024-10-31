@@ -77,10 +77,6 @@ github.com/cilium/ebpf/link
 # github.com/container-storage-interface/spec v1.9.0
 ## explicit; go 1.18
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/cgroups v1.1.0
-## explicit; go 1.17
-github.com/containerd/cgroups
-github.com/containerd/cgroups/stats/v1
 # github.com/containerd/containerd/api v1.7.19
 ## explicit; go 1.21
 github.com/containerd/containerd/api/services/containers/v1

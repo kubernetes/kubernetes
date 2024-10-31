@@ -11,6 +11,7 @@
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
+      "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -130,7 +131,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
       "github.com/gogo/protobuf": [
-        "github.com/containerd/cgroups",
         "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
         "github.com/google/cadvisor",

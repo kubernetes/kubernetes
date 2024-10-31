@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/cgroups"
 	cadvisorv1 "github.com/google/cadvisor/info/v1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
@@ -45,6 +44,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	cgroups "k8s.io/kubernetes/third_party/forked/cgroups"
 )
 
 var defaultPageSize = int64(os.Getpagesize())
