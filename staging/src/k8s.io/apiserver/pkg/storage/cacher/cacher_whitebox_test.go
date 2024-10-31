@@ -905,6 +905,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 			case 1:
 				podList.ListMeta = metav1.ListMeta{ResourceVersion: "10"}
 			default:
+				t.Errorf("unexpected list call: %d", listCalls)
 				err = fmt.Errorf("unexpected list call")
 			}
 			listCalls++
@@ -927,8 +928,11 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 				for i := 12; i < 18; i++ {
 					w.Add(makePod(i))
 				}
-				w.Stop()
+				// Keep the watch open to avoid another reinitialization,
+				// but register it for cleanup.
+				t.Cleanup(func() { w.Stop() })
 			default:
+				t.Errorf("unexpected watch call: %d", watchCalls)
 				err = fmt.Errorf("unexpected watch call")
 			}
 			watchCalls++
@@ -950,7 +954,6 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	errCh := make(chan error, concurrency)
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
@@ -974,11 +977,11 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 				}
 				rv, err := strconv.Atoi(object.(*example.Pod).ResourceVersion)
 				if err != nil {
-					errCh <- fmt.Errorf("incorrect resource version: %v", err)
+					t.Errorf("incorrect resource version: %v", err)
 					return
 				}
 				if prevRV != -1 && prevRV+1 != rv {
-					errCh <- fmt.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
+					t.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
 					return
 				}
 				prevRV = rv
@@ -987,11 +990,6 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		t.Error(err)
-	}
 }
 
 func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
