@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -26,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
@@ -37,6 +39,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // nodeOptions defines all the options exposed via flags by kubeadm upgrade node.
@@ -84,7 +87,15 @@ func newCmdNode(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			return nodeRunner.Run(args)
+			if err := nodeRunner.Run(args); err != nil {
+				return err
+			}
+			if nodeOptions.dryRun {
+				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+				return nil
+			}
+
+			return nil
 		},
 		Args: cobra.NoArgs,
 	}
@@ -150,6 +161,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	isControlPlaneNode := true
 	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		klog.V(1).Infof("assuming this is not a control plane node because %q is missing", filepath)
 		isControlPlaneNode = false
 	}
 	if len(nodeOptions.kubeConfigPath) == 0 {
@@ -171,7 +183,9 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	if !ok {
 		return nil, cmdutil.TypeMismatchErr("dryRun", "bool")
 	}
-	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun)
+
+	printer := &output.TextPrinter{}
+	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun, printer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", nodeOptions.kubeConfigPath)
 	}

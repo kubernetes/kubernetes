@@ -113,11 +113,6 @@ func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 	return w.errsToReturn[waitForPodsWithLabel]
 }
 
-// WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForPodToDisappear(podName string) error {
-	return nil
-}
-
 // SetTimeout is a no-op; we don't use it in this implementation
 func (w *fakeWaiter) SetTimeout(_ time.Duration) {}
 

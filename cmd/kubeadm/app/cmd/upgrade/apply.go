@@ -223,12 +223,12 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		return nil, cmdutil.TypeMismatchErr("printConfig", "bool")
 	}
 
-	client, err := getClient(applyFlags.kubeConfigPath, *dryRun)
+	printer := &output.TextPrinter{}
+
+	client, err := getClient(applyFlags.kubeConfigPath, *dryRun, printer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", applyFlags.kubeConfigPath)
 	}
-
-	printer := &output.TextPrinter{}
 
 	// Fetches the cluster configuration.
 	klog.V(1).Infoln("[upgrade] retrieving configuration from cluster")

@@ -106,12 +106,6 @@ func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
 	return nil
 }
 
-// WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForPodToDisappear(podName string) error {
-	fmt.Printf("[dryrun] Would wait for the %q Pod in the %s namespace to be deleted\n", podName, metav1.NamespaceSystem)
-	return nil
-}
-
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
 	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at http://%s:%d/healthz\n", healthzAddress, healthzPort)

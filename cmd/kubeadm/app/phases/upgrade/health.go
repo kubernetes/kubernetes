@@ -46,16 +46,18 @@ const createJobHealthCheckPrefix = "upgrade-health-check"
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
 type healthCheck struct {
-	name   string
-	client clientset.Interface
-	cfg    *kubeadmapi.ClusterConfiguration
+	name    string
+	client  clientset.Interface
+	cfg     *kubeadmapi.ClusterConfiguration
+	dryRun  bool
+	printer output.Printer
 	// f is invoked with a k8s client and a kubeadm ClusterConfiguration passed to it. Should return an optional error
-	f func(clientset.Interface, *kubeadmapi.ClusterConfiguration) error
+	f func(clientset.Interface, *kubeadmapi.ClusterConfiguration, bool, output.Printer) error
 }
 
 // Check is part of the preflight.Checker interface
 func (c *healthCheck) Check() (warnings, errors []error) {
-	if err := c.f(c.client, c.cfg); err != nil {
+	if err := c.f(c.client, c.cfg, c.dryRun, c.printer); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
@@ -70,24 +72,30 @@ func (c *healthCheck) Name() string {
 // - the cluster can accept a workload
 // - all control-plane Nodes are Ready
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], printer output.Printer) error {
+func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], dryRun bool, printer output.Printer) error {
 	_, _ = printer.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
 		&healthCheck{
-			name:   "CreateJob",
-			client: client,
-			cfg:    cfg,
-			f:      createJob,
+			name:    "CreateJob",
+			client:  client,
+			cfg:     cfg,
+			f:       createJob,
+			dryRun:  dryRun,
+			printer: printer,
 		},
 		&healthCheck{
-			name:   "ControlPlaneNodesReady",
-			client: client,
-			f:      controlPlaneNodesReady,
+			name:    "ControlPlaneNodesReady",
+			client:  client,
+			f:       controlPlaneNodesReady,
+			dryRun:  dryRun,
+			printer: printer,
 		},
 		&healthCheck{
-			name: "StaticPodManifest",
-			f:    staticPodManifestHealth,
+			name:    "StaticPodManifest",
+			f:       staticPodManifestHealth,
+			dryRun:  dryRun,
+			printer: printer,
 		},
 	}
 
@@ -95,7 +103,7 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 }
 
 // createJob is a check that verifies that a Job can be created in the cluster
-func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) error {
+func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
 	const (
 		fieldSelector = "spec.unschedulable=false"
 		ns            = metav1.NamespaceSystem
@@ -213,7 +221,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 }
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
-func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
+func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
 	selectorControlPlane := labels.SelectorFromSet(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
 	})
@@ -232,10 +240,14 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 }
 
 // staticPodManifestHealth makes sure the required static pods are presents
-func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
+func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration, dryRun bool, printer output.Printer) error {
 	var nonExistentManifests []string
 	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
+		if dryRun {
+			_, _ = printer.Printf("[dryrun] would check if %s exists\n", manifestFile)
+			continue
+		}
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
 			nonExistentManifests = append(nonExistentManifests, manifestFile)
 		}
@@ -243,7 +255,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 	if len(nonExistentManifests) == 0 {
 		return nil
 	}
-	return errors.Errorf("The control plane seems to be Static Pod-hosted, but some of the manifests don't seem to exist on disk. This probably means you're running 'kubeadm upgrade' on a remote machine, which is not supported for a Static Pod-hosted cluster. Manifest files not found: %v", nonExistentManifests)
+	return errors.Errorf("manifest files not found: %v", nonExistentManifests)
 }
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady

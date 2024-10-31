@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -48,8 +47,6 @@ type Waiter interface {
 	WaitForAPI() error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
 	WaitForPodsWithLabel(kvLabel string) error
-	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
-	WaitForPodToDisappear(staticPodName string) error
 	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
 	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
 	// WaitForStaticPodHashChange waits for the given static pod component's static pod hash to get updated.
@@ -225,20 +222,6 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 			}
 
 			return true, nil
-		})
-}
-
-// WaitForPodToDisappear blocks until it timeouts or gets a "NotFound" response from the API Server when getting the Static Pod in question
-func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
-	return wait.PollUntilContextTimeout(context.Background(),
-		constants.KubernetesAPICallRetryInterval, w.timeout,
-		true, func(_ context.Context) (bool, error) {
-			_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
-				return true, nil
-			}
-			return false, nil
 		})
 }
 
