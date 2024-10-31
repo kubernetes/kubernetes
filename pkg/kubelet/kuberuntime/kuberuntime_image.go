@@ -24,6 +24,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	credentialproviderplugin "k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -32,14 +34,26 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, serviceAccountName string) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
 		return "", err
 	}
 
-	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, m.keyring)
+	// construct the dynamic keyring using the providers we have in the kubelet
+	var podName, podNamespace, podUID string
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
+		sandboxMetadata := podSandboxConfig.GetMetadata()
+
+		podName = sandboxMetadata.Name
+		podNamespace = sandboxMetadata.Namespace
+		podUID = sandboxMetadata.Uid
+	}
+
+	externalCredentialProviderKeyring := credentialproviderplugin.NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, serviceAccountName)
+
+	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, credentialprovider.UnionDockerKeyring{m.keyring, externalCredentialProviderKeyring})
 	if err != nil {
 		return "", err
 	}
