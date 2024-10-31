@@ -30,15 +30,20 @@ import (
 	"testing"
 	"time"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/utils/ptr"
 )
 
@@ -139,6 +144,10 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 		// what we expect for DELETE on the corrupt object, after encryption has
 		// broken, with the option to ignore store read error enabled
 		corrupObjDeleteWithOption verifier
+		// what we expect for DELETE on the corrupt object, after encryption has
+		// broken, with the option to ignore store read error enabled, and
+		// the user has the permission to do unsafe delete
+		corrupObjDeleteWithOptionAndPrivilege verifier
 		// what we expect for GET on the corrupt object (post deletion)
 		corrupObjGetPostDelete verifier
 	}{
@@ -151,8 +160,12 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			},
 			corruptObjGetPreDelete:      wantAPIStatusError{reason: metav1.StatusReasonInternalError},
 			corrupObjDeletWithoutOption: wantAPIStatusError{reason: metav1.StatusReasonInternalError},
-			corrupObjDeleteWithOption:   wantNoError{},
-			corrupObjGetPostDelete:      wantAPIStatusError{reason: metav1.StatusReasonNotFound},
+			corrupObjDeleteWithOption: wantAPIStatusError{
+				reason:          metav1.StatusReasonForbidden,
+				messageContains: `not permitted to do "unsafe-delete-ignore-read-errors"`,
+			},
+			corrupObjDeleteWithOptionAndPrivilege: wantNoError{},
+			corrupObjGetPostDelete:                wantAPIStatusError{reason: metav1.StatusReasonNotFound},
 		},
 		{
 			featureEnabled: false,
@@ -160,10 +173,11 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 				return got.Status().Reason == metav1.StatusReasonInternalError &&
 					strings.Contains(got.Status().Message, "Internal error occurred: no matching prefix found")
 			},
-			corruptObjGetPreDelete:      wantAPIStatusError{reason: metav1.StatusReasonInternalError},
-			corrupObjDeletWithoutOption: wantAPIStatusError{reason: metav1.StatusReasonInternalError},
-			corrupObjDeleteWithOption:   wantAPIStatusError{reason: metav1.StatusReasonInternalError},
-			corrupObjGetPostDelete:      wantAPIStatusError{reason: metav1.StatusReasonInternalError},
+			corruptObjGetPreDelete:                wantAPIStatusError{reason: metav1.StatusReasonInternalError},
+			corrupObjDeletWithoutOption:           wantAPIStatusError{reason: metav1.StatusReasonInternalError},
+			corrupObjDeleteWithOption:             wantAPIStatusError{reason: metav1.StatusReasonInternalError},
+			corrupObjDeleteWithOptionAndPrivilege: wantAPIStatusError{reason: metav1.StatusReasonInternalError},
+			corrupObjGetPostDelete:                wantAPIStatusError{reason: metav1.StatusReasonInternalError},
 		},
 	}
 	for _, tc := range tests {
@@ -176,8 +190,27 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			}
 			defer test.cleanUp()
 
+			// a) set up a distinct client for the test user with the least
+			// privileges, we will grant permission as we progress through the test
+			testUser := "croc"
+			testUserConfig := restclient.CopyConfig(test.kubeAPIServer.ClientConfig)
+			testUserConfig.Impersonate.UserName = testUser
+			testUserClient := clientset.NewForConfigOrDie(testUserConfig)
+			adminClient := test.restClient
+
+			// b) use the admin client to grant the the test user initial permissions,
+			// we are not going to grant 'delete-ignore-read-errors' just yet
+			permitUserToDoVerbOnSecret(t, adminClient, testUser, testNamespace, []string{"create", "get", "delete", "update"})
+
+			// the test should not use the admin client going forward
+			test.restClient = testUserClient
+			defer func() {
+				// for any cleanup that requires admin privileges
+				test.restClient = adminClient
+			}()
+
 			secretCorrupt := "foo-with-unsafe-delete"
-			// a) create and delete the secret, we don't expect any error
+			// c) create and delete the secret, we don't expect any error
 			_, err = test.createSecret(secretCorrupt, testNamespace)
 			if err != nil {
 				t.Fatalf("'%s/%s' failed to create, got error: %v", err, testNamespace, secretCorrupt)
@@ -187,13 +220,13 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 				t.Fatalf("'%s/%s' failed to delete, got error: %v", err, testNamespace, secretCorrupt)
 			}
 
-			// b) re-create the secret
+			// d) re-create the secret
 			test.secret, err = test.createSecret(secretCorrupt, testNamespace)
 			if err != nil {
 				t.Fatalf("Failed to create test secret, error: %v", err)
 			}
 
-			// c) update the secret with a finalizer
+			// e) update the secret with a finalizer
 			withFinalizer := test.secret.DeepCopy()
 			withFinalizer.Finalizers = append(withFinalizer.Finalizers, "tes.k8s.io/fake")
 			test.secret, err = test.restClient.CoreV1().Secrets(testNamespace).Update(context.Background(), withFinalizer, metav1.UpdateOptions{})
@@ -203,7 +236,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 
 			test.runResource(test.TContext, unSealWithGCMTransformer, aesGCMPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
 
-			// d) override the config and break decryption of the old resources,
+			// f) override the config and break decryption of the old resources,
 			// the secret created in step b will be undecryptable
 			now := time.Now()
 			encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
@@ -216,7 +249,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			body, _ = ioutil.ReadFile(encryptionConf)
 			t.Logf("file after write: %s", body)
 
-			// e) wait for the breaking changes to take effect
+			// g) wait for the breaking changes to take effect
 			testCtx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			// TODO: dynamic encryption config reload takes about 1m, so can't use
@@ -237,7 +270,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			}
 			t.Logf("it took %s for the apiserver to reload the encryption config", time.Since(now))
 
-			// f) create a new secret, and then delete it, it should work
+			// h) create a new secret, and then delete it, it should work
 			secretNormal := "bar-with-normal-delete"
 			_, err = test.createSecret(secretNormal, testNamespace)
 			if err != nil {
@@ -248,21 +281,30 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 				t.Fatalf("'%s/%s' failed to create, got error: %v", err, testNamespace, secretNormal)
 			}
 
-			// g) let's try to get the broken secret created in step b, we expect it
+			// i) let's try to get the broken secret created in step b, we expect it
 			// to fail, the error will vary depending on whether the feature is enabled
 			_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), secretCorrupt, metav1.GetOptions{})
 			tc.corruptObjGetPreDelete.verify(t, err)
 
-			// h) let's try the normal deletion flow, we expect an error
+			// j) let's try the normal deletion flow, we expect an error
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, metav1.DeleteOptions{})
 			tc.corrupObjDeletWithoutOption.verify(t, err)
 
-			// i) make an attempt to delete the corrupt object by enabling the option
+			// k) make an attempt to delete the corrupt object by enabling the option,
+			// on the other hand, we have not granted the 'delete-ignore-read-errors'
+			// verb to the user yet, so we expect admission to deny the delete request
 			options := metav1.DeleteOptions{
 				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
 			}
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
 			tc.corrupObjDeleteWithOption.verify(t, err)
+
+			// l) grant the test user to do 'unsafe-delete-ignore-read-errors' on secrets
+			permitUserToDoVerbOnSecret(t, adminClient, testUser, testNamespace, []string{"unsafe-delete-ignore-read-errors"})
+
+			// m) let's try to do unsafe delete again
+			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
+			tc.corrupObjDeleteWithOptionAndPrivilege.verify(t, err)
 
 			// j) final get should return a NotFound error after the secret has been deleted
 			_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), secretCorrupt, metav1.GetOptions{})
@@ -479,6 +521,52 @@ func TestListCorruptObjects(t *testing.T) {
 
 		})
 	}
+}
+
+func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user, namespace string, verbs []string) {
+	t.Helper()
+
+	name := fmt.Sprintf("%s-can-do-%s-on-secrets-in-%s", user, strings.Join(verbs, "-"), namespace)
+	_, err := client.RbacV1().Roles(namespace).Create(context.TODO(), &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     verbs,
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("error while creating role: %s, err: %v", name, err)
+	}
+
+	_, err = client.RbacV1().RoleBindings(namespace).Create(context.TODO(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: rbacv1.UserKind,
+				Name: user,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     name,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("error while creating role binding: %s, err: %v", name, err)
+	}
+
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
+		user, namespace, verbs[0], "", schema.GroupResource{Resource: "secrets"}, true)
 }
 
 // Baseline (no enveloping) - use to contrast with enveloping benchmarks.

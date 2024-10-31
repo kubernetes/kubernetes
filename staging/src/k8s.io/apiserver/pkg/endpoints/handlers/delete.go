@@ -30,11 +30,14 @@ import (
 	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/finisher"
 	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -45,6 +48,8 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
+
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
 
@@ -128,6 +133,9 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
 
+		userInfo, _ := request.UserFrom(ctx)
+		staticAdmissionAttrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, options, dryrun.IsDryRun(options.DryRun), userInfo)
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
 			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
 				// let's make sure that the audit will reflect that this delete request
@@ -140,14 +148,21 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 					scope.err(errors.NewInternalError(fmt.Errorf("no unsafe deleter provided, can not honor ignoreStoreReadErrorWithClusterBreakingPotential")), w, req)
 					return
 				}
+				if scope.Authorizer == nil {
+					scope.err(errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize unsafe delete")), w, req)
+					return
+				}
+				if err := authorizeUnsafeDelete(ctx, staticAdmissionAttrs, scope.Authorizer); err != nil {
+					scope.err(err, w, req)
+					return
+				}
+
 				r = p.GetCorruptObjDeleter()
 			}
 		}
 
 		span.AddEvent("About to delete object from database")
 		wasDeleted := true
-		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		result, err := finisher.FinishRequest(ctx, func() (runtime.Object, error) {
 			obj, deleted, err := r.Delete(ctx, name, rest.AdmissionToValidateObjectDeleteFunc(admit, staticAdmissionAttrs, scope), options)
 			wasDeleted = deleted
@@ -330,4 +345,78 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		defer span.AddEvent("Writing http response done")
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
 	}
+}
+
+// authorizeUnsafeDelete ensures that the user has permission to do
+// 'unsafe-delete-ignore-read-errors' on the resource being deleted when
+// ignoreStoreReadErrorWithClusterBreakingPotential is enabled
+func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz authorizer.Authorizer) (err error) {
+	if attr.GetOperation() != admission.Delete || attr.GetOperationOptions() == nil {
+		return nil
+	}
+	options, ok := attr.GetOperationOptions().(*metav1.DeleteOptions)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("expected an option of type: %T, but got: %T", &metav1.DeleteOptions{}, attr.GetOperationOptions()))
+	}
+	if !ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
+		return nil
+	}
+
+	requestInfo, found := request.RequestInfoFrom(ctx)
+	if !found {
+		return admission.NewForbidden(attr, fmt.Errorf("no RequestInfo found in the context"))
+	}
+	if !requestInfo.IsResourceRequest || len(attr.GetSubresource()) > 0 {
+		return admission.NewForbidden(attr, fmt.Errorf("ignoreStoreReadErrorWithClusterBreakingPotential delete option is not allowed on a subresource or non-resource request"))
+	}
+
+	// if we are here, IgnoreStoreReadErrorWithClusterBreakingPotential
+	// is set to true in the delete options, the user must have permission
+	// to do 'unsafe-delete-ignore-read-errors' on the given resource.
+	record := authorizer.AttributesRecord{
+		User:            attr.GetUserInfo(),
+		Verb:            "unsafe-delete-ignore-read-errors",
+		Namespace:       attr.GetNamespace(),
+		Name:            attr.GetName(),
+		APIGroup:        attr.GetResource().Group,
+		APIVersion:      attr.GetResource().Version,
+		Resource:        attr.GetResource().Resource,
+		ResourceRequest: true,
+	}
+	// TODO: can't use ResourceAttributesFrom from k8s.io/kubernetes/pkg/registry/authorization/util
+	// due to prevent staging --> k8s.io/kubernetes dep issue
+	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeWithSelectors) {
+		if len(requestInfo.FieldSelector) > 0 {
+			fieldSelector, err := fields.ParseSelector(requestInfo.FieldSelector)
+			if err != nil {
+				record.FieldSelectorRequirements, record.FieldSelectorParsingErr = nil, err
+			} else {
+				if requirements := fieldSelector.Requirements(); len(requirements) > 0 {
+					record.FieldSelectorRequirements, record.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
+				}
+			}
+		}
+		if len(requestInfo.LabelSelector) > 0 {
+			labelSelector, err := labels.Parse(requestInfo.LabelSelector)
+			if err != nil {
+				record.LabelSelectorRequirements, record.LabelSelectorParsingErr = nil, err
+			} else {
+				if requirements, _ /*selectable*/ := labelSelector.Requirements(); len(requirements) > 0 {
+					record.LabelSelectorRequirements, record.LabelSelectorParsingErr = requirements, nil
+				}
+			}
+		}
+	}
+
+	decision, reason, err := authz.Authorize(ctx, record)
+	if err != nil {
+		err = fmt.Errorf("error while checking permission for %q, %w", record.Verb, err)
+		klog.FromContext(ctx).V(1).Error(err, "failed to authorize")
+		return admission.NewForbidden(attr, err)
+	}
+	if decision == authorizer.DecisionAllow {
+		return nil
+	}
+
+	return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", record.Verb, reason))
 }
