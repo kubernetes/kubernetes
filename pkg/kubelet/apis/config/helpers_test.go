@@ -301,6 +301,6 @@ var (
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
 		"FailCgroupV1",
-		"CrashLoopBackOff.MaxSeconds",
+		"CrashLoopBackOff.MaximumBackOffPeriod",
 	)
 )

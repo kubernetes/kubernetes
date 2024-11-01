@@ -401,13 +401,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: CrashLoopBackOff.MaximumBackOffPeriod (got: 301 seconds) must be set between 1s and 300s",
 	}, {
-		name: "CrashLoopBackOff.MaxSeconds feature gate on, no config, ok",
+		name: "KubeletCrashLoopBackOffMax feature gate on, no crashLoopBackOff config, ok",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true, "CustomCPUCFSQuotaPeriod": true}
 			return conf
 		},
 	}, {
-		name: "CrashLoopBackOff.MaxSeconds feature gate on, no seconds config, ok",
+		name: "KubeletCrashLoopBackOffMax feature gate on, no crashLoopBackOff.MaximumBackoffPeriod config, ok",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true, "CustomCPUCFSQuotaPeriod": true}
 			conf.CrashLoopBackOff = &kubeletconfig.CrashLoopBackOffConfig{}
