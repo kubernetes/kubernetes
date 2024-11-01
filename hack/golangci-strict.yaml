@@ -211,6 +211,8 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/kubernetes/test/e2e/dra/.*
           contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
           contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/token/.*
           
           # As long as contextual logging is alpha or beta, all WithName, WithValues,
           # NewContext calls have to go through klog. Once it is GA, we can lift
