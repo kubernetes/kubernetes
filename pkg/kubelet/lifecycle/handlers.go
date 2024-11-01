@@ -224,7 +224,7 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	}
 	return PodAdmitResult{
 		Admit:   false,
-		Reason:  "AppArmor",
+		Reason:  AppArmorReason,
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
 }

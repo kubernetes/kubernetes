@@ -66,7 +66,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		klog.ErrorS(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "InvalidNodeInfo",
+			Reason:  InvalidNodeInfoReason,
 			Message: "Kubelet cannot get node info.",
 		}
 	}
@@ -76,14 +76,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
+			Reason:  PodOSSelectorNodeLabelDoesNotMatchReason,
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
 		}
 	}
 	if rejectPodAdmissionBasedOnOSField(admitPod) {
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "PodOSNotSupported",
+			Reason:  PodOSNotSupportedReason,
 			Message: "Failed to admit pod as the OS field doesn't match node OS",
 		}
 	}
@@ -100,7 +100,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 				klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 				return PodAdmitResult{
 					Admit:   false,
-					Reason:  "InitContainerRestartPolicyForbidden",
+					Reason:  InitContainerRestartPolicyForbiddenReason,
 					Message: message,
 				}
 			}
@@ -113,7 +113,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "UnexpectedAdmissionError",
+			Reason:  UnexpectedAdmissionErrorReason,
 			Message: message,
 		}
 	}
@@ -138,7 +138,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
-				Reason:  "UnexpectedAdmissionError",
+				Reason:  UnexpectedAdmissionErrorReason,
 				Message: message,
 			}
 		}
@@ -151,7 +151,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
-				Reason:  "UnknownReason",
+				Reason:  UnknownReason,
 				Message: message,
 			}
 		}
@@ -163,11 +163,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			message = re.Error()
 			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		case *InsufficientResourceError:
-			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			reason = fmt.Sprintf(InsufficientResourceErrorReasonTemplate, re.ResourceName)
 			message = re.Error()
 			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		default:
-			reason = "UnexpectedPredicateFailureType"
+			reason = UnexpectedPredicateFailureTypeReason
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
 			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}

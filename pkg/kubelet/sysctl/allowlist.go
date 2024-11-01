@@ -26,10 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-const (
-	ForbiddenReason = "SysctlForbidden"
-)
-
 // patternAllowlist takes a list of sysctls or sysctl patterns (ending in *) and
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
@@ -115,7 +111,7 @@ func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		if err := w.validateSysctl(s.Name, pod.Spec.HostNetwork, pod.Spec.HostIPC); err != nil {
 			return lifecycle.PodAdmitResult{
 				Admit:   false,
-				Reason:  ForbiddenReason,
+				Reason:  lifecycle.ForbiddenReason,
 				Message: fmt.Sprintf("forbidden sysctl: %v", err),
 			}
 		}

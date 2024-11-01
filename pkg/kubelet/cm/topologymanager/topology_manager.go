@@ -38,8 +38,6 @@ const (
 	// present on a machine and the TopologyManager is enabled, an error will
 	// be returned and the TopologyManager will not be loaded.
 	defaultMaxAllowableNUMANodes = 8
-	// ErrorTopologyAffinity represents the type for a TopologyAffinityError
-	ErrorTopologyAffinity = "TopologyAffinityError"
 )
 
 // TopologyAffinityError represents an resource alignment error
@@ -50,7 +48,7 @@ func (e TopologyAffinityError) Error() string {
 }
 
 func (e TopologyAffinityError) Type() string {
-	return ErrorTopologyAffinity
+	return lifecycle.TopologyAffinityReason
 }
 
 // Manager interface provides methods for Kubelet to manage pod topology hints

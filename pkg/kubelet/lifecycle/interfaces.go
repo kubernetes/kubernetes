@@ -27,6 +27,22 @@ type PodAdmitAttributes struct {
 	OtherPods []*v1.Pod
 }
 
+const (
+	AppArmorReason                            = "AppArmor"
+	InvalidNodeInfoReason                     = "InvalidNodeInfo"
+	PodOSSelectorNodeLabelDoesNotMatchReason  = "PodOSSelectorNodeLabelDoesNotMatch"
+	PodOSNotSupportedReason                   = "PodOSNotSupported"
+	InitContainerRestartPolicyForbiddenReason = "InitContainerRestartPolicyForbidden"
+	UnexpectedAdmissionErrorReason            = "UnexpectedAdmissionError"
+	UnknownReason                             = "UnknownReason"
+	UnexpectedPredicateFailureTypeReason      = "UnexpectedPredicateFailureType"
+	NodeShutdownNotAdmittedReason             = "NodeShutdown"
+	ForbiddenReason                           = "SysctlForbidden"
+	EvictedReason                             = "Evicted"
+	TopologyAffinityReason                    = "TopologyAffinityError"
+	InsufficientResourceErrorReasonTemplate   = "OutOf%s"
+)
+
 // PodAdmitResult provides the result of a pod admission decision.
 type PodAdmitResult struct {
 	// if true, the pod should be admitted.

@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -106,7 +106,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(ctx context.Context, 
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, invalidPod)
 	framework.ExpectNoError(err)
-	gomega.Expect(ev.Reason).To(gomega.Equal(sysctl.ForbiddenReason))
+	gomega.Expect(ev.Reason).To(gomega.Equal(lifecycle.ForbiddenReason))
 
 	return invalidPod
 }
