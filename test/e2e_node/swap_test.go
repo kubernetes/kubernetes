@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -292,6 +293,90 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 	})
 })
 
+// SwapEviction tests that the node responds to node swap pressure by evicting only responsible pods.
+var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodefeature.Swap, func() {
+	f := framework.NewDefaultFramework("memory-swap-eviction-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	expectedNodeCondition := v1.NodeSwapPressure
+	var expectedStarvedResource v1.ResourceName = "swap"
+	pressureTimeout := 10 * time.Minute
+	var twoGig resource.Quantity
+	var oneGig resource.Quantity
+	var memoryAllocSize resource.Quantity
+	var fixedRequestSize resource.Quantity
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
+			if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
+				initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
+			}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalSwapMemoryAvailable): "60%"}
+		})
+		oneGig = resource.MustParse("1024Mi")
+		twoGig = resource.MustParse("2048Mi")
+		memoryAllocSize = resource.MustParse("64Mi")
+		fixedRequestSize = resource.MustParse("128Mi")
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logSwapMetrics, []podEvictSpec{
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests(&twoGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests(&twoGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority: 0,
+				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod-600", "guaranteed-pod-600", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("600Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("600Mi"),
+					},
+				}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod-400", "guaranteed-pod-400", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("400Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("400Mi"),
+					},
+				}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod-200", "guaranteed-pod-200", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				}),
+			},
+		})
+	})
+})
+
 // Note that memoryRequestEqualLimit is effective only when qosClass is not PodQOSBestEffort.
 func getSwapTestPod(f *framework.Framework, qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) *v1.Pod {
 	podMemoryAmount := resource.MustParse("128Mi")
@@ -362,6 +447,31 @@ func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Qua
 			},
 		},
 	}
+}
+
+func getStressPodDefaultNamespace(stressSize, memAllocSize *resource.Quantity) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "stress-pod-" + rand.String(5),
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:            "stress-container",
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					ImagePullPolicy: v1.PullAlways,
+					Args:            []string{"stress", "--mem-alloc-size", memAllocSize.String(), "--mem-alloc-sleep", "1000ms", "--mem-total", strconv.Itoa(int(stressSize.Value()))},
+				},
+			},
+		},
+	}
+}
+
+func getStressPodWithRequests(stressSize, memAllocSize, memoryRequest *resource.Quantity) *v1.Pod {
+	stressPod := getStressPodDefaultNamespace(stressSize, memAllocSize)
+	setPodMemoryResources(stressPod, memoryRequest, nil)
+	return stressPod
 }
 
 func getUpdatedPod(f *framework.Framework, pod *v1.Pod) *v1.Pod {
@@ -560,6 +670,25 @@ func setPodMemoryResources(pod *v1.Pod, memoryRequest, memoryLimit *resource.Qua
 			}
 
 			resources.Limits[v1.ResourceMemory] = *memoryLimit
+		}
+	}
+}
+
+func logSwapMetrics(ctx context.Context) {
+	summary, err := getNodeSummary(ctx)
+	if err != nil {
+		framework.Logf("Error getting summary: %v", err)
+		return
+	}
+	if summary.Node.Swap != nil && summary.Node.Swap.SwapAvailableBytes != nil && summary.Node.Swap.SwapUsageBytes != nil {
+		framework.Logf("Node.Swap.SwapAvailableBytes: %d, Node.Swap.SwapUsageBytes: %d", summary.Node.Swap.SwapAvailableBytes, *summary.Node.Swap.SwapUsageBytes)
+	}
+	for _, pod := range summary.Pods {
+		framework.Logf("Pod: %s", pod.PodRef.Name)
+		for _, container := range pod.Containers {
+			if container.Swap != nil && container.Swap.SwapAvailableBytes != nil && container.Swap.SwapUsageBytes != nil {
+				framework.Logf("--- summary Container: %s SwapAvailableBytes: %d SwapUsageBytes: %d", container.Name, *container.Swap.SwapAvailableBytes, *container.Swap.SwapUsageBytes)
+			}
 		}
 	}
 }

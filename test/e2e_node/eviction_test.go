@@ -548,6 +548,7 @@ type podEvictSpec struct {
 	// If two are ranked at P1, either is permitted to fail before the other.
 	// The test ends when all pods other than p0 have been evicted
 	evictionPriority           int
+	ignoreEvictionPriority     bool
 	pod                        *v1.Pod
 	wantPodDisruptionCondition *v1.PodConditionType
 
@@ -765,10 +766,15 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 				fmt.Sprintf("priority 0 pod: %s failed", priorityPod.Name))
 		}
 
-		// If a pod that is not evictionPriority 0 has not been evicted, we are not done
-		if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
-			pendingPods = append(pendingPods, priorityPod.ObjectMeta.Name)
-			done = false
+		// For Swap based eviction, we want to just verify that swap pressure is gone.
+		// If pods are swapping but there is no pressure, we don't want all swap pods to be evicted.
+		doEvictionPriorityCheck := !priorityPodSpec.ignoreEvictionPriority
+		if doEvictionPriorityCheck {
+			// If a pod that is not evictionPriority 0 has not been evicted, we are not done
+			if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
+				pendingPods = append(pendingPods, priorityPod.ObjectMeta.Name)
+				done = false
+			}
 		}
 	}
 	if done {
@@ -817,7 +823,7 @@ func verifyPodConditions(ctx context.Context, f *framework.Framework, testSpecs 
 func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec, expectedStarvedResource v1.ResourceName) {
 	for _, spec := range testSpecs {
 		pod := spec.pod
-		if spec.evictionPriority != 0 {
+		if !spec.ignoreEvictionPriority && spec.evictionPriority != 0 {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
 				"involvedObject.name":      pod.Name,

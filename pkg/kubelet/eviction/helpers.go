@@ -526,13 +526,13 @@ func processUsage(processStats *statsapi.ProcessStats) uint64 {
 	return usage
 }
 
-// swapUsage converts swap usage into a resource quantity
-func swapUsage(swapStats *statsapi.SwapStats) *resource.Quantity {
+// swapUsage gets usage in bytes.
+// zero if it is not found
+func swapUsage(swapStats *statsapi.SwapStats) int64 {
 	if swapStats == nil || swapStats.SwapUsageBytes == nil {
-		return &resource.Quantity{Format: resource.BinarySI}
+		return 0
 	}
-	usage := int64(*swapStats.SwapUsageBytes)
-	return resource.NewQuantity(usage, resource.BinarySI)
+	return int64(*swapStats.SwapUsageBytes)
 }
 
 // localVolumeNames returns the set of volumes for the pod that are local
@@ -753,7 +753,7 @@ func swap(stats statsFunc) cmpFunc {
 		p2Memory := swapUsage(p2Stats.Swap)
 
 		// prioritize evicting the pod which has the larger consumption of swap
-		return p2Memory.Cmp(*p1Memory)
+		return int(p2Memory - p1Memory)
 	}
 }
 
@@ -845,22 +845,10 @@ func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
 	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
 }
 
+// rankSwapPressure orders the input pods for eviction in response to swap pressure.
+// It ranks pods by decreasing order of swap usage.
 func rankSwapPressure(pods []*v1.Pod, stats statsFunc) {
-	podsWithSwapUsageNonZero := []*v1.Pod{}
-	// We only want to include active pods that are swapping
-	// when swap pressure is hit
-	// swap eviction will never evict non swapping pods
-	for _, val := range pods {
-		swapStats, _ := stats(val)
-		if swapStats.Swap != nil && swapStats.Swap.SwapUsageBytes != nil {
-			swapUsage := *swapStats.Swap.SwapUsageBytes
-			if swapUsage > 0 {
-				podsWithSwapUsageNonZero = append(podsWithSwapUsageNonZero, val)
-			}
-		}
-	}
-
-	orderedBy(swap(stats)).Sort(podsWithSwapUsageNonZero)
+	orderedBy(swap(stats)).Sort(pods)
 }
 
 // rankPIDPressure orders the input pods by priority in response to PID pressure.
