@@ -33,6 +33,10 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
@@ -67,6 +71,9 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		Scheme:                       legacyscheme.Scheme,
 		ParameterCodec:               legacyscheme.ParameterCodec,
 		NegotiatedSerializer:         legacyscheme.Codecs,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
 	}
 
 	eventStorage, err := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))

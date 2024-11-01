@@ -372,3 +372,18 @@ var selfDescribedCBOR = []byte{0xd9, 0xd9, 0xf7}
 func (s *serializer) RecognizesData(data []byte) (ok, unknown bool, err error) {
 	return bytes.HasPrefix(data, selfDescribedCBOR), false, nil
 }
+
+// NewSerializerInfo returns a default SerializerInfo for CBOR using the given creater and typer.
+func NewSerializerInfo(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
+	return runtime.SerializerInfo{
+		MediaType:        "application/cbor",
+		MediaTypeType:    "application",
+		MediaTypeSubType: "cbor",
+		Serializer:       NewSerializer(creater, typer),
+		StrictSerializer: NewSerializer(creater, typer, Strict(true)),
+		StreamSerializer: &runtime.StreamSerializerInfo{
+			Framer:     NewFramer(),
+			Serializer: NewSerializer(creater, typer, Transcode(false)),
+		},
+	}
+}

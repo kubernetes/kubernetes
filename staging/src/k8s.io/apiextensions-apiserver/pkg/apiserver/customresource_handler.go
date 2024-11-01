@@ -606,20 +606,6 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-func newCBORSerializerInfo(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
-	return runtime.SerializerInfo{
-		MediaType:        "application/cbor",
-		MediaTypeType:    "application",
-		MediaTypeSubType: "cbor",
-		Serializer:       cbor.NewSerializer(creater, typer),
-		StrictSerializer: cbor.NewSerializer(creater, typer, cbor.Strict(true)),
-		StreamSerializer: &runtime.StreamSerializerInfo{
-			Framer:     cbor.NewFramer(),
-			Serializer: cbor.NewSerializer(creater, typer, cbor.Transcode(false)),
-		},
-	}
-}
-
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
 // Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
 func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
@@ -914,7 +900,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-			negotiatedSerializer.supportedMediaTypes = append(negotiatedSerializer.supportedMediaTypes, newCBORSerializerInfo(creator, typer))
+			negotiatedSerializer.supportedMediaTypes = append(negotiatedSerializer.supportedMediaTypes, cbor.NewSerializerInfo(creator, typer))
 		}
 
 		var standardSerializers []runtime.SerializerInfo
@@ -982,7 +968,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleScope.Subresource = "scale"
 		var opts []serializer.CodecFactoryOptionsMutator
 		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-			opts = append(opts, serializer.WithSerializer(newCBORSerializerInfo))
+			opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
 		}
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme(), opts...)
 		scaleScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
