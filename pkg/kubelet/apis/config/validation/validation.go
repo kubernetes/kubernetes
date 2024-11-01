@@ -206,12 +206,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
-	if localFeatureGate.Enabled(features.EnableKubeletCrashLoopBackoffMax) {
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
 		switch {
 		case kc.CrashLoopBackOff == nil:
-		case kc.CrashLoopBackOff.MaxSeconds == nil:
-		case *kc.CrashLoopBackOff.MaxSeconds < 1 || *kc.CrashLoopBackOff.MaxSeconds > 300:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: crashloopbackoff.maxSeconds (got: %v) must be set between 1 and 300", *kc.CrashLoopBackOff.MaxSeconds))
+		case kc.CrashLoopBackOff.MaximumBackOffPeriod == nil:
+		case kc.CrashLoopBackOff.MaximumBackOffPeriod.Seconds() < 1 || kc.CrashLoopBackOff.MaximumBackOffPeriod.Seconds() > 300:
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaximumBackOffPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaximumBackOffPeriod.Seconds()))
 		}
 	}
 

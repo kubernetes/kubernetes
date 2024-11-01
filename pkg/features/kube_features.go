@@ -237,9 +237,9 @@ const (
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
 	//
-	// Enables support for per-node backoff maximums for restarting containers
-	// (aka containers in CrashLoopBackOff)
-	EnableKubeletCrashLoopBackoffMax featuregate.Feature = "EnableKubeletCrashLoopBackoffMax"
+	// Enables support for configurable per-node backoff maximums for restarting
+	// containers (aka containers in CrashLoopBackOff)
+	KubeletCrashLoopBackOffMax featuregate.Feature = "KubeletCrashLoopBackOffMax"
 
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386

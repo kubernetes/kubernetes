@@ -63475,16 +63475,17 @@ func schema_k8sio_kubelet_config_v1beta1_CrashLoopBackOffConfig(ref common.Refer
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"maxSeconds": {
+					"maximumBackOffPeriod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "maxSeconds is the maximum number of seconds the backoff delay can accrue to for container restarts",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Description: "maximumBackOffPeriod is the maximum duration the backoff delay can accrue to for container restarts, minimum 1 second, maximum 300 seconds.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
 				},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 
@@ -64616,7 +64617,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
-					"crashloopbackoff": {
+					"CrashLoopBackOff": {
 						SchemaProps: spec.SchemaProps{
 							Description: "crashLoopBackOff contains config to modify node-level parameters for container restart behavior",
 							Ref:         ref("k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig"),
