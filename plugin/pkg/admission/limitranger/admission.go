@@ -640,24 +640,3 @@ func maxResourceList(list, newList api.ResourceList) {
 		}
 	}
 }
-
-// max returns the result of max(a, b) for each named resource and is only used if we can't
-// accumulate into an existing resource list
-func max(a api.ResourceList, b api.ResourceList) api.ResourceList {
-	result := api.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
-	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
-	}
-	return result
-}
