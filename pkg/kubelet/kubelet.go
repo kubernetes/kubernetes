@@ -933,12 +933,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				base = max
 			}
 		} else {
-			klog.InfoS("EnableKubeletCrashLoopBackOffMax feature gate enabled, but crashloopbackoff.maxSeconds KubeletConfig not set. Using default CrashLoopBackOff maximum backoff.")
+			klog.InfoS("KubeletCrashLoopBackOffMax feature gate enabled, but crashLoopBackOff.MaximumBackoffPeriod KubeletConfig not set. Using default CrashLoopBackOff maximum backoff.")
 		}
 	} else {
 		if kubeCfg.CrashLoopBackOff != nil {
 			if kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod != nil {
-				klog.InfoS("EnableKubeletCrashLoopBackOffMax feature gate not enabled, but corresponding crashloopbackoff.maxSeconds KubeletConfig configured. Ignoring crashloopbackoff.maxSeconds.")
+				klog.InfoS("KubeletCrashLoopBackOffMax feature gate not enabled, but corresponding crashLoopBackOff.MaximumBackoffPeriod KubeletConfig configured. Ignoring crashLoopBackOff.MaximumBackoffPeriod.")
 			}
 		}
 	}

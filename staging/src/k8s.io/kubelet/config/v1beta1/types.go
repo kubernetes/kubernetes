@@ -779,7 +779,7 @@ type KubeletConfiguration struct {
 	// container restart behavior
 	// +featureGate=KubeletCrashLoopBackOffMax
 	// +optional
-	CrashLoopBackOff *CrashLoopBackOffConfig `json:"CrashLoopBackOff,omitempty"`
+	CrashLoopBackOff *CrashLoopBackOffConfig `json:"crashLoopBackOff,omitempty"`
 	// reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature.
 	// The memory manager will not allocate reserved memory for container workloads.
