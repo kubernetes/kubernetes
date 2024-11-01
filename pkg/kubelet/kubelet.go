@@ -878,19 +878,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
-	var clusterTrustBundleManager clustertrustbundle.Manager
+	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
 	if kubeDeps.KubeClient != nil && utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
-		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0)
-		clusterTrustBundleManager, err = clustertrustbundle.NewInformerManager(ctx, kubeInformers.Certificates().V1beta1().ClusterTrustBundles(), 2*int(kubeCfg.MaxPods), 5*time.Minute)
-		if err != nil {
-			return nil, fmt.Errorf("while starting informer-based ClusterTrustBundle manager: %w", err)
-		}
-		kubeInformers.Start(wait.NeverStop)
-		klog.InfoS("Started ClusterTrustBundle informer")
+		clusterTrustBundleManager = clustertrustbundle.NewLazyInformerManager(ctx, kubeDeps.KubeClient, 2*int(kubeCfg.MaxPods))
+		klog.InfoS("ClusterTrustBundle informer will be started eventually once a trust bundle is requested")
 	} else {
-		// In static kubelet mode, use a no-op manager.
-		clusterTrustBundleManager = &clustertrustbundle.NoopManager{}
-		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode")
+		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode or the ClusterTrustBundleProjection featuregate is disabled")
 	}
 
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
