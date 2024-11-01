@@ -26,6 +26,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // MediaTypesForSerializer returns a list of media and stream media types for the server.
@@ -33,6 +35,10 @@ func MediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, strea
 	for _, info := range ns.SupportedMediaTypes() {
 		mediaTypes = append(mediaTypes, info.MediaType)
 		if info.StreamSerializer != nil {
+			if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) && info.MediaType == runtime.ContentTypeCBOR {
+				streamMediaTypes = append(streamMediaTypes, runtime.ContentTypeCBORSequence)
+				continue
+			}
 			// stream=watch is the existing mime-type parameter for watch
 			streamMediaTypes = append(streamMediaTypes, info.MediaType+";stream=watch")
 		}

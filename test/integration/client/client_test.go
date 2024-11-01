@@ -1430,6 +1430,30 @@ func TestClientCBOREnablement(t *testing.T) {
 		return err
 	}
 
+	DoWatchRequestWithGenericTypedClient := func(t *testing.T, config *rest.Config) error {
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Generated clients for built-in types include the PreferProtobuf option, which
+		// forces Protobuf encoding on a per-request basis.
+		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
+			"namespaces",
+			clientset.CoreV1().RESTClient(),
+			clientscheme.ParameterCodec,
+			"",
+			func() *v1.Namespace { return &v1.Namespace{} },
+			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		)
+		w, err := client.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
+		if err != nil {
+			return err
+		}
+		w.Stop()
+		return nil
+	}
+
 	type testCase struct {
 		name                    string
 		served                  bool
@@ -1649,6 +1673,20 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantResponseStatus:      http.StatusCreated,
 			wantStatusError:         false,
 			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client watch accept cbor and json get cbor-seq",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/cbor-seq",
+			wantResponseStatus:      http.StatusOK,
+			wantStatusError:         false,
+			doRequest:               DoWatchRequestWithGenericTypedClient,
 		},
 		{
 			name:                    "generated client accept cbor and json get json cbor not served",
