@@ -53,8 +53,9 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
-	printer.Printf("[%s] Reading configuration from the cluster...\n", logPrefix)
-	printer.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	_, _ = printer.Printf("[%s] Reading configuration from the %q ConfigMap in namespace %q...\n",
+		logPrefix, constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
@@ -139,11 +140,9 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 	if kubeconfigFile != "" {
 		client, err := kubeconfig.ClientSetFromFile(kubeconfigFile)
 		if err == nil {
-			ssr, err := client.AuthenticationV1().SelfSubjectReviews().
-				Create(context.Background(), &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
-
-			if err == nil && ssr.Status.UserInfo.Username != "" {
-				return ssr.Status.UserInfo.Username, nil
+			nodeName, err = getNodeNameFromSSR(client)
+			if err == nil {
+				return nodeName, nil
 			}
 		}
 		nodeName, err = getNodeNameFromKubeletConfig(kubeconfigFile)
@@ -167,7 +166,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 	}
 
 	// gets the corresponding node and retrieves attributes stored there.
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
@@ -229,6 +228,22 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 
 	// gets the node name from the certificate common name
 	return strings.TrimPrefix(cert.Subject.CommonName, constants.NodesUserPrefix), nil
+}
+
+// getNodeNameFromSSR reads the node name from the SelfSubjectReview for a given client.
+// If the kubelet.conf is passed as fileName it can be used to retrieve the node name.
+func getNodeNameFromSSR(client clientset.Interface) (string, error) {
+	ssr, err := client.AuthenticationV1().SelfSubjectReviews().
+		Create(context.Background(), &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	user := ssr.Status.UserInfo.Username
+	if !strings.HasPrefix(user, constants.NodesUserPrefix) {
+		return "", errors.Errorf("%q is not a node client, must have %q prefix in the name",
+			user, constants.NodesUserPrefix)
+	}
+	return strings.TrimPrefix(user, constants.NodesUserPrefix), nil
 }
 
 func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {

@@ -26,8 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
@@ -96,11 +94,6 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			_, _ = printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
-			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-		}
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
