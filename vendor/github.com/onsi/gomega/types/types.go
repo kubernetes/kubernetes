@@ -29,6 +29,8 @@ type Gomega interface {
 	SetDefaultEventuallyPollingInterval(time.Duration)
 	SetDefaultConsistentlyDuration(time.Duration)
 	SetDefaultConsistentlyPollingInterval(time.Duration)
+	EnforceDefaultTimeoutsWhenUsingContexts()
+	DisableDefaultTimeoutsWhenUsingContext()
 }
 
 // All Gomega matchers must implement the GomegaMatcher interface

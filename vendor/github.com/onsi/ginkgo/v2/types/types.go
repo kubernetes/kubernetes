@@ -3,13 +3,21 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
 )
 
 const GINKGO_FOCUS_EXIT_CODE = 197
-const GINKGO_TIME_FORMAT = "01/02/06 15:04:05.999"
+
+var GINKGO_TIME_FORMAT = "01/02/06 15:04:05.999"
+
+func init() {
+	if os.Getenv("GINKGO_TIME_FORMAT") != "" {
+		GINKGO_TIME_FORMAT = os.Getenv("GINKGO_TIME_FORMAT")
+	}
+}
 
 // Report captures information about a Ginkgo test run
 type Report struct {

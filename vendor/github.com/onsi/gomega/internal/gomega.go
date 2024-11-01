@@ -127,3 +127,11 @@ func (g *Gomega) SetDefaultConsistentlyDuration(t time.Duration) {
 func (g *Gomega) SetDefaultConsistentlyPollingInterval(t time.Duration) {
 	g.DurationBundle.ConsistentlyPollingInterval = t
 }
+
+func (g *Gomega) EnforceDefaultTimeoutsWhenUsingContexts() {
+	g.DurationBundle.EnforceDefaultTimeoutsWhenUsingContexts = true
+}
+
+func (g *Gomega) DisableDefaultTimeoutsWhenUsingContext() {
+	g.DurationBundle.EnforceDefaultTimeoutsWhenUsingContexts = false
+}

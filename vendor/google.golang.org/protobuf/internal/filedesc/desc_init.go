@@ -495,6 +495,8 @@ func (xd *Extension) unmarshalOptions(b []byte) {
 			switch num {
 			case genid.FieldOptions_Packed_field_number:
 				xd.L1.EditionFeatures.IsPacked = protowire.DecodeBool(v)
+			case genid.FieldOptions_Lazy_field_number:
+				xd.L1.IsLazy = protowire.DecodeBool(v)
 			}
 		case protowire.BytesType:
 			v, m := protowire.ConsumeBytes(b)

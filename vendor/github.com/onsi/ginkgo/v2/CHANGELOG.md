@@ -1,3 +1,50 @@
+## 2.21.0
+
+
+  ### Features
+  - add support for GINKGO_TIME_FORMAT [a69eb39]
+  - add GINKGO_NO_COLOR to disable colors via environment variables [bcab9c8]
+
+  ### Fixes
+  - increase threshold in timeline matcher [e548367]
+  - Fix the document by replacing `SpecsThatWillBeRun` with `SpecsThatWillRun`
+  [c2c4d3c]
+
+  ### Maintenance
+  - bump various dependencies [7e65a00]
+
+## 2.20.2
+
+Require Go 1.22+
+
+### Maintenance
+- bump go to v1.22 [a671816]
+
+## 2.20.1
+
+### Fixes
+- make BeSpecEvent duration matcher more forgiving [d6f9640]
+
+## 2.20.0
+
+### Features
+- Add buildvcs flag [be5ab95]
+
+### Maintenance
+- Add update-deps to makefile [d303d14]
+- bump all dependencies [7a50221]
+
+## 2.19.1
+
+### Fixes
+- update supported platforms for race conditions [63c8c30]
+- [build] Allow custom name for binaries. [ff41e27]
+
+### Maintenance
+- bump gomega [76f4e0c]
+- Bump rexml from 3.2.6 to 3.2.8 in /docs (#1417) [b69c00d]
+- Bump golang.org/x/sys from 0.20.0 to 0.21.0 (#1425) [f097741]
+
 ## 2.19.0
 
 ### Features
