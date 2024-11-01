@@ -156,7 +156,7 @@ func NewRequest(c *RESTClient) *Request {
 		timeout = c.Client.Timeout
 	}
 
-	contentConfig := c.content
+	contentConfig := c.content.GetClientContentConfig()
 	contentTypeNotSet := len(contentConfig.ContentType) == 0
 	if contentTypeNotSet {
 		contentConfig.ContentType = "application/json"
@@ -188,7 +188,7 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          content,
+		content:          requestClientContentConfigProvider{base: content},
 		Client:           client,
 	})
 }
@@ -1234,6 +1234,9 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		// https://pkg.go.dev/net/http#Request
 		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
 			metrics.RequestSize.Observe(ctx, r.verb, r.URL().Host, float64(req.ContentLength))
+		}
+		if resp != nil && resp.StatusCode == http.StatusUnsupportedMediaType {
+			r.c.content.UnsupportedMediaType(resp.Request.Header.Get("Content-Type"))
 		}
 		retry.After(ctx, r, resp, err)
 

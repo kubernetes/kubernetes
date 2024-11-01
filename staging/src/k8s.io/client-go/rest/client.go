@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/munnerz/goautoneg"
@@ -89,7 +90,7 @@ type RESTClient struct {
 	versionedAPIPath string
 
 	// content describes how a RESTClient encodes and decodes responses.
-	content ClientContentConfig
+	content requestClientContentConfigProvider
 
 	// creates BackoffManager that is passed to requests.
 	createBackoffMgr func() BackoffManager
@@ -119,11 +120,10 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		content:          scrubCBORContentConfigIfDisabled(config),
+		content:          requestClientContentConfigProvider{base: scrubCBORContentConfigIfDisabled(config)},
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
-
-		Client: client,
+		Client:           client,
 	}, nil
 }
 
@@ -237,5 +237,60 @@ func (c *RESTClient) Delete() *Request {
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() schema.GroupVersion {
-	return c.content.GroupVersion
+	return c.content.GetClientContentConfig().GroupVersion
+}
+
+// requestClientContentConfigProvider observes HTTP 415 (Unsupported Media Type) responses to detect
+// that the server does not understand CBOR. Once this has happened, future requests are forced to
+// use JSON so they can succeed. This is convenient for client users that want to prefer CBOR, but
+// also need to interoperate with older servers so requests do not permanently fail. The clients
+// will not default to using CBOR until at least all supported kube-apiservers have enable-CBOR
+// locked to true, so this path will be rarely taken. Additionally, all generated clients accessing
+// built-in kube resources are forced to protobuf, so those will not degrade to JSON.
+type requestClientContentConfigProvider struct {
+	base ClientContentConfig
+
+	// Becomes permanently true if a server responds with HTTP 415 (Unsupported Media Type) to a
+	// request with "Content-Type" header containing the CBOR media type.
+	sawUnsupportedMediaTypeForCBOR atomic.Bool
+}
+
+// GetClientContentConfig returns the ClientContentConfig that should be used for new requests by
+// this client.
+func (p *requestClientContentConfigProvider) GetClientContentConfig() ClientContentConfig {
+	if !clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+		return p.base
+	}
+
+	if sawUnsupportedMediaTypeForCBOR := p.sawUnsupportedMediaTypeForCBOR.Load(); !sawUnsupportedMediaTypeForCBOR {
+		return p.base
+	}
+
+	if mediaType, _, _ := mime.ParseMediaType(p.base.ContentType); mediaType != runtime.ContentTypeCBOR {
+		return p.base
+	}
+
+	config := p.base
+	// The default ClientContentConfig sets ContentType to CBOR and the client has previously
+	// received an HTTP 415 in response to a CBOR request. Override ContentType to JSON.
+	config.ContentType = runtime.ContentTypeJSON
+	return config
+}
+
+// UnsupportedMediaType reports that the server has responded to a request with HTTP 415 Unsupported
+// Media Type.
+func (p *requestClientContentConfigProvider) UnsupportedMediaType(requestContentType string) {
+	if !clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+		return
+	}
+
+	// This could be extended to consider the Content-Encoding request header, the Accept and
+	// Accept-Encoding response headers, the request method, and URI (as mentioned in
+	// https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.16). The request Content-Type
+	// header is sufficient to implement a blanket CBOR fallback mechanism.
+	requestContentType, _, _ = mime.ParseMediaType(requestContentType)
+	switch requestContentType {
+	case runtime.ContentTypeCBOR, string(types.ApplyCBORPatchType):
+		p.sawUnsupportedMediaTypeForCBOR.Store(true)
+	}
 }
