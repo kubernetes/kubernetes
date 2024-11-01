@@ -920,7 +920,7 @@ type testContext struct {
 	client           *fake.Clientset
 	informerFactory  informers.SharedInformerFactory
 	claimAssumeCache *assumecache.AssumeCache
-	p                *dynamicResources
+	p                *DynamicResources
 	nodeInfos        []*framework.NodeInfo
 	state            *framework.CycleState
 }
@@ -1087,7 +1087,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	tc.p = pl.(*dynamicResources)
+	tc.p = pl.(*DynamicResources)
 
 	// The tests use the API to create the objects because then reactors
 	// get triggered.

@@ -100,8 +100,8 @@ type informationForClaim struct {
 	allocation *resourceapi.AllocationResult
 }
 
-// dynamicResources is a plugin that ensures that ResourceClaims are allocated.
-type dynamicResources struct {
+// DynamicResources is a plugin that ensures that ResourceClaims are allocated.
+type DynamicResources struct {
 	enabled                   bool
 	enableAdminAccess         bool
 	enableSchedulingQueueHint bool
@@ -171,10 +171,10 @@ type dynamicResources struct {
 func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	if !fts.EnableDynamicResourceAllocation {
 		// Disabled, won't do anything.
-		return &dynamicResources{}, nil
+		return &DynamicResources{}, nil
 	}
 
-	pl := &dynamicResources{
+	pl := &DynamicResources{
 		enabled:                   true,
 		enableAdminAccess:         fts.EnableDRAAdminAccess,
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
@@ -189,22 +189,22 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	return pl, nil
 }
 
-var _ framework.PreEnqueuePlugin = &dynamicResources{}
-var _ framework.PreFilterPlugin = &dynamicResources{}
-var _ framework.FilterPlugin = &dynamicResources{}
-var _ framework.PostFilterPlugin = &dynamicResources{}
-var _ framework.ReservePlugin = &dynamicResources{}
-var _ framework.EnqueueExtensions = &dynamicResources{}
-var _ framework.PreBindPlugin = &dynamicResources{}
+var _ framework.PreEnqueuePlugin = &DynamicResources{}
+var _ framework.PreFilterPlugin = &DynamicResources{}
+var _ framework.FilterPlugin = &DynamicResources{}
+var _ framework.PostFilterPlugin = &DynamicResources{}
+var _ framework.ReservePlugin = &DynamicResources{}
+var _ framework.EnqueueExtensions = &DynamicResources{}
+var _ framework.PreBindPlugin = &DynamicResources{}
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (pl *dynamicResources) Name() string {
+func (pl *DynamicResources) Name() string {
 	return Name
 }
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	if !pl.enabled {
 		return nil, nil
 	}
@@ -239,7 +239,7 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 // PreEnqueue checks if there are known reasons why a pod currently cannot be
 // scheduled. When this fails, one of the registered events can trigger another
 // attempt.
-func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
+func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
 	if !pl.enabled {
 		return nil
 	}
@@ -254,7 +254,7 @@ func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
 // happen. The delete claim event will not invoke it, so newObj will never be nil.
-func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	originalClaim, modifiedClaim, err := schedutil.As[*resourceapi.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
@@ -318,7 +318,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 // isSchedulableAfterPodChange is invoked for update pod events reported by
 // an informer. It checks whether that change adds the ResourceClaim(s) that the
 // pod has been waiting for.
-func (pl *dynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	_, modifiedPod, err := schedutil.As[*v1.Pod](nil, newObj)
 	if err != nil {
 		// Shouldn't happen.
@@ -351,7 +351,7 @@ func (pl *dynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod 
 // attempt.
 //
 // The delete claim event will not invoke it, so newObj will never be nil.
-func (pl *dynamicResources) isSchedulableAfterResourceSliceChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterResourceSliceChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	_, modifiedSlice, err := schedutil.As[*resourceapi.ResourceSlice](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
@@ -375,7 +375,7 @@ func (pl *dynamicResources) isSchedulableAfterResourceSliceChange(logger klog.Lo
 }
 
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
-func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.ResourceClaim, error) {
+func (pl *DynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.ResourceClaim, error) {
 	claims := make([]*resourceapi.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourceapi.ResourceClaim) {
 		// We store the pointer as returned by the lister. The
@@ -391,7 +391,7 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.Resou
 
 // foreachPodResourceClaim checks that each ResourceClaim for the pod exists.
 // It calls an optional handler for those claims that it finds.
-func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourceapi.ResourceClaim)) error {
+func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourceapi.ResourceClaim)) error {
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
 		if err != nil {
@@ -432,7 +432,7 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Skip)
 	}
@@ -563,7 +563,7 @@ func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.Resource
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *dynamicResources) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *DynamicResources) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
@@ -588,7 +588,7 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 //
 // For claims that are unbound, it checks whether the claim might get allocated
 // for the node.
-func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}
@@ -675,7 +675,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 // deallocated to help get the Pod schedulable. If yes, it picks one and
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
-func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Unschedulable, "plugin disabled")
 	}
@@ -708,7 +708,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 }
 
 // Reserve reserves claims for the pod.
-func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
+func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	if !pl.enabled {
 		return nil
 	}
@@ -784,7 +784,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 
 // Unreserve clears the ReservedFor field for all claims.
 // It's idempotent, and does nothing if no state found for the given pod.
-func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
 	if !pl.enabled {
 		return
 	}
@@ -832,7 +832,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 // If anything fails, we return an error and
 // the pod will have to go into the backoff queue. The scheduler will call
 // Unreserve as part of the error handling.
-func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}
@@ -863,7 +863,7 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
-func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourceapi.ResourceClaim, finalErr error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims[index].DeepCopy()
 	allocation := state.informationsForClaim[index].allocation
