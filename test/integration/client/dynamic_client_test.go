@@ -17,9 +17,11 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -32,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -137,6 +140,59 @@ func TestDynamicClientWatch(t *testing.T) {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
 
+	testDynamicClientWatch(t, client, dynamicClient)
+}
+
+func TestDynamicClientWatchWithCBOR(t *testing.T) {
+	framework.EnableCBORServingAndStorageForTest(t)
+	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	dynamicClientConfig := rest.CopyConfig(result.ClientConfig)
+	dynamicClientConfig.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	dynamicClientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+			response, rterr := rt.RoundTrip(request)
+			if rterr != nil {
+				return response, rterr
+			}
+
+			// We can't synchronously inspect streaming responses, so tee to a buffer
+			// and inspect it at the end of the test.
+			var buf bytes.Buffer
+			response.Body = struct {
+				io.Reader
+				io.Closer
+			}{
+				Reader: io.TeeReader(response.Body, &buf),
+				Closer: response.Body,
+			}
+			t.Cleanup(func() {
+				var event metav1.WatchEvent
+				if err := cbor.Unmarshal(buf.Bytes(), &event); err != nil {
+					t.Errorf("non-cbor event: 0x%x", buf.Bytes())
+					return
+				}
+				if err := cbor.Unmarshal(event.Object.Raw, new(interface{})); err != nil {
+					t.Errorf("non-cbor event object: 0x%x", buf.Bytes())
+				}
+			})
+
+			return response, rterr
+		})
+	})
+	dynamicClient, err := dynamic.NewForConfig(dynamicClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error creating dynamic client: %v", err)
+	}
+
+	testDynamicClientWatch(t, client, dynamicClient)
+}
+
+func testDynamicClientWatch(t *testing.T, client clientset.Interface, dynamicClient dynamic.Interface) {
 	resource := corev1.SchemeGroupVersion.WithResource("events")
 
 	mkEvent := func(i int) *corev1.Event {
