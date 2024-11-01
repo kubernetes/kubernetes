@@ -9,7 +9,6 @@ godebug default=go1.23
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/chai2010/gettext-go v1.0.2
-	github.com/daviddengcn/go-colortext v1.0.0
 	github.com/distribution/reference v0.6.0
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f
 	github.com/fatih/camelcase v1.0.0
