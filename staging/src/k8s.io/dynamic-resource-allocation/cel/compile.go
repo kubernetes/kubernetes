@@ -261,12 +261,7 @@ func mustBuildEnv() *environment.EnvSet {
 
 	versioned := []environment.VersionedOptions{
 		{
-			// Feature epoch was actually 1.31, but we artificially set it to 1.0 because these
-			// options should always be present.
-			//
-			// TODO (https://github.com/kubernetes/kubernetes/issues/123687): set this
-			// version properly before going to beta.
-			IntroducedVersion: version.MajorMinor(1, 0),
+			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
