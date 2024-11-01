@@ -1297,26 +1297,17 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 	}
 
 	for i, c := range newPod.Spec.Containers {
+		if c.Name != oldPod.Spec.Containers[i].Name {
+			return // Update is invalid (container mismatch): let validation handle it.
+		}
 		if c.Resources.Requests == nil {
 			continue
 		}
 		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
 			continue
 		}
-		findContainerStatus := func(css []api.ContainerStatus, cName string) (api.ContainerStatus, bool) {
-			for i := range css {
-				if css[i].Name == cName {
-					return css[i], true
-				}
-			}
-			return api.ContainerStatus{}, false
-		}
-		if cs, ok := findContainerStatus(newPod.Status.ContainerStatuses, c.Name); ok {
-			if !cmp.Equal(c.Resources.Requests, cs.AllocatedResources) {
-				newPod.Status.Resize = api.PodResizeStatusProposed
-				break
-			}
-		}
+		newPod.Status.Resize = api.PodResizeStatusProposed
+		return
 	}
 }
 
