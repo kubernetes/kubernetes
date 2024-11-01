@@ -1772,23 +1772,40 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kub
 func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	for _, c := range allocatedPod.Spec.Containers {
 		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
-			if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
+			if cs.State != kubecontainer.ContainerStateRunning {
 				// If the container isn't running, it isn't resizing.
 				continue
 			}
 
+			cpuReq, hasCPUReq := c.Resources.Requests[v1.ResourceCPU]
+			cpuLim, hasCPULim := c.Resources.Limits[v1.ResourceCPU]
+			memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
+
+			if cs.Resources == nil {
+				if hasCPUReq || hasCPULim || hasMemLim {
+					// Container status is missing Resources information, but the container does
+					// have resizable resources configured.
+					klog.ErrorS(nil, "Missing runtime resources information for resizing container",
+						"pod", format.Pod(allocatedPod), "container", c.Name)
+					return false // We don't want to clear resize status with insufficient information.
+				} else {
+					// No resizable resources configured; this might be ok.
+					continue
+				}
+			}
+
 			// Only compare resizeable resources, and only compare resources that are explicitly configured.
-			if cpuReq, present := c.Resources.Requests[v1.ResourceCPU]; present {
+			if hasCPUReq {
 				if !cpuReq.Equal(*cs.Resources.CPURequest) {
 					return false
 				}
 			}
-			if cpuLim, present := c.Resources.Limits[v1.ResourceCPU]; present {
+			if hasCPULim {
 				if !cpuLim.Equal(*cs.Resources.CPULimit) {
 					return false
 				}
 			}
-			if memLim, present := c.Resources.Limits[v1.ResourceMemory]; present {
+			if hasMemLim {
 				if !memLim.Equal(*cs.Resources.MemoryLimit) {
 					return false
 				}
