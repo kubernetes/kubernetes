@@ -926,9 +926,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	max := MaxContainerBackOff
 	base := containerBackOffPeriod
-	if utilfeature.DefaultFeatureGate.Enabled(features.EnableKubeletCrashLoopBackoffMax) {
-		if kubeCfg.CrashLoopBackOff.MaxSeconds != nil {
-			max = time.Duration(*kubeCfg.CrashLoopBackOff.MaxSeconds)
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		if kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod != nil {
+			max = kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod.Duration
 			if max < containerBackOffPeriod {
 				base = max
 			}
@@ -937,7 +937,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	} else {
 		if kubeCfg.CrashLoopBackOff != nil {
-			if kubeCfg.CrashLoopBackOff.MaxSeconds != nil {
+			if kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod != nil {
 				klog.InfoS("EnableKubeletCrashLoopBackOffMax feature gate not enabled, but corresponding crashloopbackoff.maxSeconds KubeletConfig configured. Ignoring crashloopbackoff.maxSeconds.")
 			}
 		}

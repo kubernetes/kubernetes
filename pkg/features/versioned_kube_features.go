@@ -182,7 +182,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	EnableKubeletCrashLoopBackoffMax: {
+	KubeletCrashLoopBackOffMax: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 

@@ -194,7 +194,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_CrashLoopBackOffConfig_To_config_CrashLoopBackOffConfig(in *configv1beta1.CrashLoopBackOffConfig, out *config.CrashLoopBackOffConfig, s conversion.Scope) error {
-	out.MaxSeconds = (*int32)(unsafe.Pointer(in.MaxSeconds))
+	out.MaximumBackOffPeriod = (*v1.Duration)(unsafe.Pointer(in.MaximumBackOffPeriod))
 	return nil
 }
 
@@ -204,7 +204,7 @@ func Convert_v1beta1_CrashLoopBackOffConfig_To_config_CrashLoopBackOffConfig(in 
 }
 
 func autoConvert_config_CrashLoopBackOffConfig_To_v1beta1_CrashLoopBackOffConfig(in *config.CrashLoopBackOffConfig, out *configv1beta1.CrashLoopBackOffConfig, s conversion.Scope) error {
-	out.MaxSeconds = (*int32)(unsafe.Pointer(in.MaxSeconds))
+	out.MaximumBackOffPeriod = (*v1.Duration)(unsafe.Pointer(in.MaximumBackOffPeriod))
 	return nil
 }
 
