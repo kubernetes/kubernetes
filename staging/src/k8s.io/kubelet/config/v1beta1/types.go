@@ -766,11 +766,11 @@ type KubeletConfiguration struct {
 	// +featureGate=GracefulNodeShutdownBasedOnPodPriority
 	// +optional
 	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority `json:"shutdownGracePeriodByPodPriority,omitempty"`
-	// crashLoopBackOff contains config to modify node-level parameters for
+	// CrashLoopBackOff contains config to modify node-level parameters for
 	// container restart behavior
-	// +featureGate=EnableCrashLoopBackOffMax
+	// +featureGate=KubeletCrashLoopBackOffMax
 	// +optional
-	CrashLoopBackOff *CrashLoopBackOffConfig `json:"crashloopbackoff,omitempty"`
+	CrashLoopBackOff *CrashLoopBackOffConfig `json:"CrashLoopBackOff,omitempty"`
 	// reservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
 	// The parameter makes sense only in the context of the memory manager feature.
 	// The memory manager will not allocate reserved memory for container workloads.
@@ -972,11 +972,11 @@ type MemorySwapConfiguration struct {
 }
 
 type CrashLoopBackOffConfig struct {
-	// maxSeconds is the maximum number of seconds the backoff delay can accrue
-	// to for container restarts
-	// +featureGate=EnableKubeletCrashLoopBackoffMax
+	// maximumBackOffPeriod is the maximum duration the backoff delay can accrue
+	// to for container restarts, minimum 1 second, maximum 300 seconds.
+	// +featureGate=KubeletCrashLoopBackOffMax
 	// +optional
-	MaxSeconds *int32 `json:"maxSeconds,omitempty"`
+	MaximumBackOffPeriod *metav1.Duration `json:"maximumBackOffPeriod,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
