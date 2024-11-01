@@ -22,12 +22,13 @@ import (
 	"net/http"
 	"net/url"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -385,6 +386,12 @@ type StorageVersionProvider interface {
 // implement if it wishes to provide the fields reset by its strategies.
 type ResetFieldsStrategy interface {
 	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
+}
+
+// ResetFieldsFilterStrategy is an optional interface that a storage object can
+// implement if it wishes to provide a fields filter reset by its strategies.
+type ResetFieldsFilterStrategy interface {
+	GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter
 }
 
 // CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy

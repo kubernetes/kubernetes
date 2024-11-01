@@ -1072,7 +1072,7 @@ func scopeWithFieldManager(typeConverter managedfields.TypeConverter, reqScope h
 		reqScope.Kind,
 		reqScope.HubGroupVersion,
 		subresource,
-		resetFields,
+		fieldpath.NewExcludeFilterSetMap(resetFields),
 	)
 	if err != nil {
 		return handlers.RequestScope{}, err
