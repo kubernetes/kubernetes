@@ -34,14 +34,12 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/lru"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -523,11 +521,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
-			opts := podResourcesOptions{
-				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
-			}
-			podRequests := podRequests(pod, opts)
-			podLimits := podLimits(pod, opts)
+			podRequests := podRequests(pod)
+			podLimits := podLimits(pod)
 			for k, v := range limit.Min {
 				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
@@ -548,39 +543,15 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 	return utilerrors.NewAggregate(errs)
 }
 
-type podResourcesOptions struct {
-	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
-	InPlacePodVerticalScalingEnabled bool
-}
-
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodRequests.
-func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
+func podRequests(pod *api.Pod) api.ResourceList {
 	reqs := api.ResourceList{}
-
-	var containerStatuses map[string]*api.ContainerStatus
-	if opts.InPlacePodVerticalScalingEnabled {
-		containerStatuses = map[string]*api.ContainerStatus{}
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-	}
 
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
-		if opts.InPlacePodVerticalScalingEnabled {
-			cs, found := containerStatuses[container.Name]
-			if found {
-				if pod.Status.Resize == api.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources
-				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
-				}
-			}
-		}
-
 		addResourceList(reqs, containerReqs)
 	}
 
@@ -616,7 +587,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 // pod. Any changes to that calculation should be reflected here.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodLimits.
-func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
+func podLimits(pod *api.Pod) api.ResourceList {
 	limits := api.ResourceList{}
 
 	for _, container := range pod.Spec.Containers {
