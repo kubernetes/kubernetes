@@ -160,21 +160,24 @@ var (
 					values: metrics.ExtentionPoints,
 				},
 			},
-			"scheduler_queueing_hint_execution_duration_seconds": {
-				{
-					label:  pluginLabelName,
-					values: PluginNames,
-				},
-				{
-					label:  eventLabelName,
-					values: schedframework.AllClusterEventLabels(),
-				},
+		},
+	}
+
+	qHintMetrics = map[string][]*labelValues{
+		"scheduler_queueing_hint_execution_duration_seconds": {
+			{
+				label:  pluginLabelName,
+				values: PluginNames,
 			},
-			"scheduler_event_handling_duration_seconds": {
-				{
-					label:  eventLabelName,
-					values: schedframework.AllClusterEventLabels(),
-				},
+			{
+				label:  eventLabelName,
+				values: schedframework.AllClusterEventLabels(),
+			},
+		},
+		"scheduler_event_handling_duration_seconds": {
+			{
+				label:  eventLabelName,
+				values: schedframework.AllClusterEventLabels(),
 			},
 		},
 	}
@@ -243,6 +246,18 @@ func InitTests() error {
 
 	logs.InitLogs()
 	return logsapi.ValidateAndApply(LoggingConfig, LoggingFeatureGate)
+}
+
+func registerQHintMetrics() {
+	for k, v := range qHintMetrics {
+		defaultMetricsCollectorConfig.Metrics[k] = v
+	}
+}
+
+func unregisterQHintMetrics() {
+	for k := range qHintMetrics {
+		delete(defaultMetricsCollectorConfig.Metrics, k)
+	}
 }
 
 // testCase defines a set of test cases that intends to test the performance of
@@ -1056,7 +1071,6 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		if err := logsapi.ValidateAndApplyWithOptions(LoggingConfig, opts, LoggingFeatureGate); err != nil {
 			t.Fatalf("Failed to apply the per-test logging configuration: %v", err)
 		}
-
 	}
 
 	// Ensure that there are no leaked
@@ -1079,6 +1093,13 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
 	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+		registerQHintMetrics()
+		t.Cleanup(func() {
+			unregisterQHintMetrics()
+		})
+	}
 
 	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, outOfTreePluginRegistry)
 }
@@ -1134,6 +1155,14 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					informerFactory, tCtx := setupTestCase(b, tc, featureGates, output, outOfTreePluginRegistry)
+
+					// TODO(#93795): make sure each workload within a test case has a unique
+					// name? The name is used to identify the stats in benchmark reports.
+					// TODO(#94404): check for unused template parameters? Probably a typo.
+					err := w.isValid(tc.MetricsCollectorConfig)
+					if err != nil {
+						b.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
 
 					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
@@ -1228,6 +1257,10 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
+					err := w.isValid(tc.MetricsCollectorConfig)
+					if err != nil {
+						t.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
 
 					runWorkload(tCtx, tc, w, informerFactory)
 
@@ -2144,15 +2177,6 @@ func validateTestCases(testCases []*testCase) error {
 		// benchmark if no statistics are collected for reporting?
 		if !tc.collectsMetrics() {
 			return fmt.Errorf("%s: no op in the workload template collects metrics", tc.Name)
-		}
-		// TODO(#93795): make sure each workload within a test case has a unique
-		// name? The name is used to identify the stats in benchmark reports.
-		// TODO(#94404): check for unused template parameters? Probably a typo.
-		for _, w := range tc.Workloads {
-			err := w.isValid(tc.MetricsCollectorConfig)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil
