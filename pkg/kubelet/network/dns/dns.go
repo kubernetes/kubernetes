@@ -409,7 +409,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 				dnsConfig.Servers = append(dnsConfig.Servers, ip.String())
 			}
 			dnsConfig.Searches = c.generateSearchesForDNSClusterFirst(dnsConfig.Searches, pod)
-			dnsConfig.Options = defaultDNSOptions
+			dnsConfig.Options = appendOptions(defaultDNSOptions, dnsConfig.Options...)
 			break
 		}
 		// clusterDNS is not known. Pod with ClusterDNSFirst Policy cannot be created.
