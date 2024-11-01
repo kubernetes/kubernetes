@@ -316,6 +316,17 @@ func (podResizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return nil
 }
 
+// GetResetFieldsFilter returns a set of fields filter reset by the strategy
+// and should not be modified by the user.
+func (podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter {
+	return map[fieldpath.APIVersion]fieldpath.Filter{
+		"v1": fieldpath.NewIncludeMatcherFilter(
+			fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resources"),
+			fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
+		),
+	}
+}
+
 // dropPodUpdates drops any changes in the pod.
 func dropPodUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	pod := oldPod.DeepCopy()
