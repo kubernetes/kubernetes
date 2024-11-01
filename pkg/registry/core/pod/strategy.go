@@ -226,6 +226,11 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	// don't allow the pods/status endpoint to touch owner references since old kubelets corrupt them in a way
 	// that breaks garbage collection
 	newPod.OwnerReferences = oldPod.OwnerReferences
+	// the Pod QoS is immutable and populated at creation time by the kube-apiserver.
+	// we need to backfill it for backward compatibility because the old kubelet dropped this field when the pod was rejected.
+	if newPod.Status.QOSClass == "" {
+		newPod.Status.QOSClass = oldPod.Status.QOSClass
+	}
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
