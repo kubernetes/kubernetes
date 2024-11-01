@@ -12,20 +12,25 @@ import (
 
 const File_google_protobuf_go_features_proto = "google/protobuf/go_features.proto"
 
-// Names for google.protobuf.GoFeatures.
+// Names for pb.GoFeatures.
 const (
 	GoFeatures_message_name     protoreflect.Name     = "GoFeatures"
-	GoFeatures_message_fullname protoreflect.FullName = "google.protobuf.GoFeatures"
+	GoFeatures_message_fullname protoreflect.FullName = "pb.GoFeatures"
 )
 
-// Field names for google.protobuf.GoFeatures.
+// Field names for pb.GoFeatures.
 const (
 	GoFeatures_LegacyUnmarshalJsonEnum_field_name protoreflect.Name = "legacy_unmarshal_json_enum"
 
-	GoFeatures_LegacyUnmarshalJsonEnum_field_fullname protoreflect.FullName = "google.protobuf.GoFeatures.legacy_unmarshal_json_enum"
+	GoFeatures_LegacyUnmarshalJsonEnum_field_fullname protoreflect.FullName = "pb.GoFeatures.legacy_unmarshal_json_enum"
 )
 
-// Field numbers for google.protobuf.GoFeatures.
+// Field numbers for pb.GoFeatures.
 const (
 	GoFeatures_LegacyUnmarshalJsonEnum_field_number protoreflect.FieldNumber = 1
+)
+
+// Extension numbers
+const (
+	FeatureSet_Go_ext_number protoreflect.FieldNumber = 1002
 )

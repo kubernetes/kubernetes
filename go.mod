@@ -46,8 +46,8 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/mrunalp/fileutils v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.19.0
-	github.com/onsi/gomega v1.33.1
+	github.com/onsi/ginkgo/v2 v2.21.0
+	github.com/onsi/gomega v1.35.1
 	github.com/opencontainers/runc v1.1.15
 	github.com/opencontainers/selinux v1.11.0
 	github.com/pkg/errors v0.9.1
@@ -83,7 +83,7 @@ require (
 	golang.org/x/tools v0.26.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094
 	google.golang.org/grpc v1.65.0
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.35.1
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 	k8s.io/api v0.0.0
@@ -157,7 +157,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
+	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect

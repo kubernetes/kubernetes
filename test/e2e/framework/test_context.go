@@ -510,6 +510,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
+	gomega.EnforceDefaultTimeoutsWhenUsingContexts()
 
 	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
 	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")

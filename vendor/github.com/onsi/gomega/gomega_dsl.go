@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.33.1"
+const GOMEGA_VERSION = "1.35.1"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -319,7 +319,19 @@ you an also use Eventually().WithContext(ctx) to pass in the context.  Passed-in
 		Eventually(client.FetchCount).WithContext(ctx).WithArguments("/users").Should(BeNumerically(">=", 17))
 	}, SpecTimeout(time.Second))
 
-Either way the context passd to Eventually is also passed to the underlying function.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
+Either way the context pasesd to Eventually is also passed to the underlying function.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
+
+By default, when a context is passed to Eventually *without* an explicit timeout, Gomega will rely solely on the context's cancellation to determine when to stop polling.  If you want to specify a timeout in addition to the context you can do so using the .WithTimeout() method.  For example:
+
+	Eventually(client.FetchCount).WithContext(ctx).WithTimeout(10*time.Second).Should(BeNumerically(">=", 17))
+
+now either the context cacnellation or the timeout will cause Eventually to stop polling.
+
+If, instead, you would like to opt out of this behavior and have Gomega's default timeouts govern Eventuallys that take a context you can call:
+
+	EnforceDefaultTimeoutsWhenUsingContexts()
+
+in the DSL (or on a Gomega instance).  Now all calls to Eventually that take a context will fail if eitehr the context is cancelled or the default timeout elapses.
 
 **Category 3: Making assertions _in_ the function passed into Eventually**
 
@@ -489,6 +501,16 @@ func SetDefaultConsistentlyDuration(t time.Duration) {
 // SetDefaultConsistentlyPollingInterval sets the default polling interval for Consistently.
 func SetDefaultConsistentlyPollingInterval(t time.Duration) {
 	Default.SetDefaultConsistentlyPollingInterval(t)
+}
+
+// EnforceDefaultTimeoutsWhenUsingContexts forces `Eventually` to apply a default timeout even when a context is provided.
+func EnforceDefaultTimeoutsWhenUsingContexts() {
+	Default.EnforceDefaultTimeoutsWhenUsingContexts()
+}
+
+// DisableDefaultTimeoutsWhenUsingContext disables the default timeout when a context is provided to `Eventually`.
+func DisableDefaultTimeoutsWhenUsingContext() {
+	Default.DisableDefaultTimeoutsWhenUsingContext()
 }
 
 // AsyncAssertion is returned by Eventually and Consistently and polls the actual value passed into Eventually against
