@@ -17,13 +17,13 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
