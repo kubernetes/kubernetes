@@ -39,9 +39,12 @@ import (
 
 var (
 	// testHostNameserver and testHostDomain are also being used in dns_windows_test.go.
-	testHostNameserver = "8.8.8.8"
-	testHostDomain     = "host.domain"
-	fetchEvent         = func(recorder *record.FakeRecorder) string {
+	testHostNameserver    = "8.8.8.8"
+	testHostDomain        = "host.domain"
+	testHostOptionTimeout = "timeout:2"
+	testHostOptionNdots   = "ndots:4"
+	testHostOptions       = fmt.Sprintf("%s %s", testHostOptionTimeout, testHostOptionNdots)
+	fetchEvent            = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -565,7 +568,11 @@ func TestGetPodDNSCustom(t *testing.T) {
 		},
 	}
 
-	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
+	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\noptions %s\n",
+		testHostNameserver,
+		testHostDomain,
+		testHostOptions,
+	))
 	tmpfile, err := os.CreateTemp("", "tmpResolvConf")
 	if err != nil {
 		t.Fatal(err)
@@ -623,7 +630,23 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "debug", testHostOptionTimeout},
+			},
+		},
+		{
+			desc:      "DNSClusterFirst with DNSConfig AND resolvConfOptions should merge from all 3 sources",
+			dnsPolicy: v1.DNSClusterFirst,
+			dnsConfig: &v1.PodDNSConfig{
+				Nameservers: []string{"10.0.0.11"},
+				Searches:    []string{"my.domain"},
+				Options: []v1.PodDNSConfigOption{
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{testClusterNameserver, "10.0.0.11"},
+				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
+				Options:  []string{"debug", testHostOptionTimeout, testHostOptionNdots},
 			},
 		},
 		{
@@ -641,7 +664,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "debug", testHostOptionTimeout},
 			},
 		},
 		{
@@ -658,7 +681,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testHostNameserver, "10.0.0.11"},
 				Searches: []string{testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "debug", testHostOptionTimeout},
 			},
 		},
 	}
