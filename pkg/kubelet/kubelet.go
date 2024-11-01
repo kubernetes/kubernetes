@@ -196,10 +196,10 @@ const (
 	// error.
 	backOffPeriod = time.Second * 10
 
-	// base period for the exponential backoff for container restarts.
+	// Initial period for the exponential backoff for container restarts.
 	containerBackOffPeriod = time.Second * 10
 
-	// base period for the exponential backoff for image pulls.
+	// Initial period for the exponential backoff for image pulls.
 	imageBackOffPeriod = time.Second * 10
 
 	// ContainerGCPeriod is the period for performing container garbage collection.
