@@ -173,7 +173,10 @@ type LeaderElectionConfig struct {
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(context.Context)
-	// OnStoppedLeading is called when a LeaderElector client stops leading
+	// OnStoppedLeading is called when a LeaderElector client stops leading.
+	// This callback is always called when the LeaderElector exits, even if it did not start leading.
+	// Users should not assume that OnStoppedLeading is only called after OnStartedLeading.
+	// see: https://github.com/kubernetes/kubernetes/pull/127675#discussion_r1780059887
 	OnStoppedLeading func()
 	// OnNewLeader is called when the client observes a leader that is
 	// not the previously observed leader. This includes the first observed
