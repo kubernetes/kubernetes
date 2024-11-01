@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
