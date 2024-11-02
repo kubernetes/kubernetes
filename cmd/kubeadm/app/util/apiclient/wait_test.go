@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -30,39 +31,42 @@ func TestGetControlPlaneComponents(t *testing.T) {
 		expected []controlPlaneComponent
 	}{
 		{
-			name: "port values from config",
+			name: "port and addresses from config",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: []kubeadmapi.Arg{
 							{Name: "secure-port", Value: "1111"},
+							{Name: "bind-address", Value: "0.0.0.0"},
 						},
 					},
 				},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: []kubeadmapi.Arg{
 						{Name: "secure-port", Value: "2222"},
+						{Name: "bind-address", Value: "0.0.0.0"},
 					},
 				},
 				Scheduler: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: []kubeadmapi.Arg{
 						{Name: "secure-port", Value: "3333"},
+						{Name: "bind-address", Value: "0.0.0.0"},
 					},
 				},
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: "https://127.0.0.1:1111/healthz"},
-				{name: "kube-controller-manager", url: "https://127.0.0.1:2222/healthz"},
-				{name: "kube-scheduler", url: "https://127.0.0.1:3333/healthz"},
+				{name: "kube-apiserver", url: fmt.Sprintf("https://0.0.0.0:1111/%s", endpointLivez)},
+				{name: "kube-controller-manager", url: fmt.Sprintf("https://0.0.0.0:2222/%s", endpointHealthz)},
+				{name: "kube-scheduler", url: fmt.Sprintf("https://0.0.0.0:3333/%s", endpointLivez)},
 			},
 		},
 		{
-			name: "default ports",
+			name: "default ports and addresses",
 			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: "https://127.0.0.1:6443/healthz"},
-				{name: "kube-controller-manager", url: "https://127.0.0.1:10257/healthz"},
-				{name: "kube-scheduler", url: "https://127.0.0.1:10259/healthz"},
+				{name: "kube-apiserver", url: fmt.Sprintf("https://127.0.0.1:6443/%s", endpointLivez)},
+				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:10257/%s", endpointHealthz)},
+				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:10259/%s", endpointLivez)},
 			},
 		},
 	}
