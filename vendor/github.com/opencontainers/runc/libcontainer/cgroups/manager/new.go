@@ -55,10 +55,10 @@ func NewWithPaths(config *configs.Cgroup, paths map[string]string) (cgroups.Mana
 	return fs.NewManager(config, paths)
 }
 
-// getUnifiedPath is an implementation detail of libcontainer factory.
-// Historically, it saves cgroup paths as per-subsystem path map (as returned
-// by cm.GetPaths(""), but with v2 we only have one single unified path
-// (with "" as a key).
+// getUnifiedPath is an implementation detail of libcontainer.
+// Historically, libcontainer.Create saves cgroup paths as per-subsystem path
+// map (as returned by cm.GetPaths(""), but with v2 we only have one single
+// unified path (with "" as a key).
 //
 // This function converts from that map to string (using "" as a key),
 // and also checks that the map itself is sane.
