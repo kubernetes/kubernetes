@@ -18,48 +18,64 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
-var _ checkpointmanager.Checkpoint = &PodResourceAllocationCheckpoint{}
+var _ checkpointmanager.Checkpoint = &Checkpoint{}
 
-// PodResourceAllocationCheckpoint is used to store resources allocated to a pod in checkpoint
-type PodResourceAllocationCheckpoint struct {
+type PodResourceAllocationInfo struct {
 	AllocationEntries   map[string]map[string]v1.ResourceRequirements `json:"allocationEntries,omitempty"`
 	ResizeStatusEntries map[string]v1.PodResizeStatus                 `json:"resizeStatusEntries,omitempty"`
-	Checksum            checksum.Checksum                             `json:"checksum"`
 }
 
-// NewPodResourceAllocationCheckpoint returns an instance of Checkpoint
-func NewPodResourceAllocationCheckpoint() *PodResourceAllocationCheckpoint {
-	//lint:ignore unexported-type-in-api user-facing error message
-	return &PodResourceAllocationCheckpoint{
-		AllocationEntries:   make(map[string]map[string]v1.ResourceRequirements),
-		ResizeStatusEntries: make(map[string]v1.PodResizeStatus),
+// Checkpoint represents a structure to store pod resource allocation checkpoint data
+type Checkpoint struct {
+	// Data is a serialized PodResourceAllocationInfo
+	Data string `json:"data"`
+	// Checksum is a checksum of Data
+	Checksum checksum.Checksum `json:"checksum"`
+}
+
+// NewCheckpoint creates a new checkpoint from a list of claim info states
+func NewCheckpoint(allocations *PodResourceAllocationInfo) (*Checkpoint, error) {
+
+	serializedAllocations, err := json.Marshal(allocations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize allocations for checkpointing: %w", err)
 	}
+
+	cp := &Checkpoint{
+		Data: string(serializedAllocations),
+	}
+	cp.Checksum = checksum.New(cp.Data)
+	return cp, nil
 }
 
-// MarshalCheckpoint returns marshalled checkpoint
-func (prc *PodResourceAllocationCheckpoint) MarshalCheckpoint() ([]byte, error) {
-	// make sure checksum wasn't set before so it doesn't affect output checksum
-	prc.Checksum = 0
-	prc.Checksum = checksum.New(prc)
-	return json.Marshal(*prc)
+func (cp *Checkpoint) MarshalCheckpoint() ([]byte, error) {
+	return json.Marshal(cp)
 }
 
-// UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint
-func (prc *PodResourceAllocationCheckpoint) UnmarshalCheckpoint(blob []byte) error {
-	return json.Unmarshal(blob, prc)
+// UnmarshalCheckpoint unmarshals checkpoint from JSON
+func (cp *Checkpoint) UnmarshalCheckpoint(blob []byte) error {
+	return json.Unmarshal(blob, cp)
 }
 
-// VerifyChecksum verifies that current checksum of checkpoint is valid
-func (prc *PodResourceAllocationCheckpoint) VerifyChecksum() error {
-	ck := prc.Checksum
-	prc.Checksum = 0
-	err := ck.Verify(prc)
-	prc.Checksum = ck
-	return err
+// VerifyChecksum verifies that current checksum
+// of checkpointed Data is valid
+func (cp *Checkpoint) VerifyChecksum() error {
+	return cp.Checksum.Verify(cp.Data)
+}
+
+// GetPodResourceAllocationInfo returns Pod Resource Allocation info states from checkpoint
+func (cp *Checkpoint) GetPodResourceAllocationInfo() (*PodResourceAllocationInfo, error) {
+	var data PodResourceAllocationInfo
+	if err := json.Unmarshal([]byte(cp.Data), &data); err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }

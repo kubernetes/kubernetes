@@ -61,7 +61,10 @@ func (sc *stateCheckpoint) restoreState() error {
 	defer sc.mux.Unlock()
 	var err error
 
-	checkpoint := NewPodResourceAllocationCheckpoint()
+	checkpoint, err := NewCheckpoint(nil)
+	if err != nil {
+		return fmt.Errorf("failed to create new checkpoint: %w", err)
+	}
 
 	if err = sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpoint); err != nil {
 		if err == errors.ErrCheckpointNotFound {
@@ -69,32 +72,35 @@ func (sc *stateCheckpoint) restoreState() error {
 		}
 		return err
 	}
-
-	sc.cache.SetPodResourceAllocation(checkpoint.AllocationEntries)
-	sc.cache.SetResizeStatus(checkpoint.ResizeStatusEntries)
+	praInfo, err := checkpoint.GetPodResourceAllocationInfo()
+	if err != nil {
+		return fmt.Errorf("failed to get pod resource allocation info: %w", err)
+	}
+	err = sc.cache.SetPodResourceAllocation(praInfo.AllocationEntries)
+	if err != nil {
+		return fmt.Errorf("failed to set pod resource allocation: %w", err)
+	}
+	err = sc.cache.SetResizeStatus(praInfo.ResizeStatusEntries)
+	if err != nil {
+		return fmt.Errorf("failed to set resize status: %w", err)
+	}
 	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
 	return nil
 }
 
 // saves state to a checkpoint, caller is responsible for locking
 func (sc *stateCheckpoint) storeState() error {
-	checkpoint := NewPodResourceAllocationCheckpoint()
-
 	podAllocation := sc.cache.GetPodResourceAllocation()
-	for pod := range podAllocation {
-		checkpoint.AllocationEntries[pod] = make(map[string]v1.ResourceRequirements)
-		for container, alloc := range podAllocation[pod] {
-			checkpoint.AllocationEntries[pod][container] = alloc
-		}
-	}
 
 	podResizeStatus := sc.cache.GetResizeStatus()
-	checkpoint.ResizeStatusEntries = make(map[string]v1.PodResizeStatus)
-	for pUID, rStatus := range podResizeStatus {
-		checkpoint.ResizeStatusEntries[pUID] = rStatus
+	checkpoint, err := NewCheckpoint(&PodResourceAllocationInfo{
+		AllocationEntries:   podAllocation,
+		ResizeStatusEntries: podResizeStatus,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create checkpoint: %w", err)
 	}
-
-	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
+	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
 		klog.ErrorS(err, "Failed to save pod allocation checkpoint")
 		return err
