@@ -52,7 +52,7 @@ const (
 )
 
 type fakeDRADriverGRPCServer struct {
-	drapb.UnimplementedNodeServer
+	drapb.UnimplementedDRAPluginServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
@@ -161,7 +161,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
+	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
 	go func(ctx context.Context) {
 		go func() {

@@ -32,9 +32,10 @@ option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 
-// The v1beta1 Node service has the exact same methods as the previous alpha,
-// so gRPC serves can provide both services with the same implementation.
-service Node {
+// The v1beta1 DRAPlugin service has the exact same methods as the Node
+// service in the previous alpha, so gRPC serves can provide both
+// services with the same implementation.
+service DRAPlugin {
   // NodePrepareResources prepares several ResourceClaims
   // for use on the node. If an error is returned, the
   // response is ignored. Failures for individual claims

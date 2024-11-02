@@ -134,7 +134,7 @@ func (p *Plugin) NodePrepareResources(
 	var response *drapbv1beta1.NodePrepareResourcesResponse
 	switch supportedAPI {
 	case apiV1beta1:
-		nodeClient := drapbv1beta1.NewNodeClient(conn)
+		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodePrepareResources(ctx, req)
 	case apiV1alpha4:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
@@ -142,7 +142,7 @@ func (p *Plugin) NodePrepareResources(
 	default:
 		// Try it, fall back if necessary.
 		supportedAPI = apiV1beta1
-		nodeClient := drapbv1beta1.NewNodeClient(conn)
+		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodePrepareResources(ctx, req)
 		if err != nil && status.Convert(err).Code() == codes.Unimplemented {
 			supportedAPI = apiV1alpha4
@@ -179,7 +179,7 @@ func (p *Plugin) NodeUnprepareResources(
 	var response *drapbv1beta1.NodeUnprepareResourcesResponse
 	switch supportedAPI {
 	case apiV1beta1:
-		nodeClient := drapbv1beta1.NewNodeClient(conn)
+		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
 	case apiV1alpha4:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
@@ -187,7 +187,7 @@ func (p *Plugin) NodeUnprepareResources(
 	default:
 		// Try it, fall back if necessary.
 		supportedAPI = apiV1beta1
-		nodeClient := drapbv1beta1.NewNodeClient(conn)
+		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
 		if err != nil && status.Convert(err).Code() == codes.Unimplemented {
 			supportedAPI = apiV1alpha4

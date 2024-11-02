@@ -97,7 +97,7 @@ type Device struct {
 	CDIDeviceID string
 }
 
-var _ drapb.NodeServer = &ExamplePlugin{}
+var _ drapb.DRAPluginServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {

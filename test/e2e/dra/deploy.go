@@ -65,8 +65,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod   = "/v1beta1.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/v1beta1.Node/NodeUnprepareResources"
+	NodePrepareResourcesMethod   = "/v1beta1.DRAPlugin/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1beta1.DRAPlugin/NodeUnprepareResources"
 )
 
 type Nodes struct {

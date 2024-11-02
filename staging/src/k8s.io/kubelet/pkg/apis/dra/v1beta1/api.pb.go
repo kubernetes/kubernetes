@@ -45,23 +45,23 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 243 bytes of a gzipped FileDescriptorProto
+	// 250 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4c, 0x2c, 0xc8, 0xd4,
 	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2f, 0x33, 0x4c, 0x4a, 0x2d, 0x49, 0x34, 0x94, 0xd2,
 	0x4d, 0xcf, 0x2c, 0xc9, 0x28, 0x4d, 0xd2, 0x4b, 0xce, 0xcf, 0xd5, 0x4f, 0xcf, 0x4f, 0xcf, 0xd7,
 	0x07, 0xcb, 0x27, 0x95, 0xa6, 0x81, 0x79, 0x60, 0x0e, 0x98, 0x05, 0xd1, 0x27, 0xa5, 0x97, 0x6d,
 	0x51, 0xac, 0x97, 0x99, 0xaf, 0x9f, 0x5d, 0x9a, 0x94, 0x9a, 0x93, 0x5a, 0xa2, 0x5f, 0x90, 0x9d,
 	0xae, 0x9f, 0x58, 0x90, 0x59, 0xac, 0x9f, 0x52, 0x94, 0xa8, 0x5f, 0x66, 0x98, 0x98, 0x53, 0x90,
-	0x91, 0x68, 0xa2, 0x0f, 0xb7, 0xc7, 0xe8, 0x1e, 0x23, 0x17, 0x8b, 0x5f, 0x7e, 0x4a, 0xaa, 0x50,
-	0x3a, 0x97, 0x08, 0x88, 0x0e, 0x28, 0x4a, 0x2d, 0x48, 0x2c, 0x4a, 0x0d, 0x4a, 0x2d, 0xce, 0x2f,
-	0x2d, 0x4a, 0x4e, 0x2d, 0x16, 0x52, 0xd5, 0x83, 0xea, 0x32, 0xd6, 0xc3, 0x26, 0x1f, 0x94, 0x5a,
-	0x58, 0x9a, 0x5a, 0x5c, 0x22, 0xa5, 0x46, 0x48, 0x59, 0x71, 0x41, 0x7e, 0x5e, 0x71, 0xaa, 0x12,
-	0x83, 0x50, 0x2e, 0x97, 0x18, 0x48, 0x45, 0x68, 0x5e, 0x01, 0xba, 0x55, 0xea, 0xa8, 0x66, 0x60,
-	0xaa, 0x80, 0x59, 0xa6, 0x41, 0x58, 0x21, 0xcc, 0x3a, 0x27, 0xc7, 0x13, 0x0f, 0xe5, 0x18, 0x6f,
-	0x3c, 0x94, 0x63, 0x68, 0x78, 0x24, 0xc7, 0x78, 0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c,
-	0x0f, 0x1e, 0xc9, 0x31, 0x4e, 0x78, 0x2c, 0xc7, 0x10, 0xa5, 0x8c, 0x3f, 0xb8, 0xc0, 0x51, 0x90,
-	0xc4, 0x06, 0x0e, 0x2a, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x20, 0x45, 0x28, 0xd3, 0x9f,
-	0x01, 0x00, 0x00,
+	0x91, 0x68, 0xa2, 0x0f, 0xb7, 0xc7, 0xe8, 0x31, 0x23, 0x17, 0xa7, 0x4b, 0x90, 0x63, 0x40, 0x4e,
+	0x69, 0x7a, 0x66, 0x9e, 0x50, 0x3a, 0x97, 0x88, 0x5f, 0x7e, 0x4a, 0x6a, 0x40, 0x51, 0x6a, 0x41,
+	0x62, 0x51, 0x6a, 0x50, 0x6a, 0x71, 0x7e, 0x69, 0x51, 0x72, 0x6a, 0xb1, 0x90, 0xaa, 0x1e, 0x54,
+	0xab, 0xb1, 0x1e, 0x36, 0xf9, 0xa0, 0xd4, 0xc2, 0xd2, 0xd4, 0xe2, 0x12, 0x29, 0x35, 0x42, 0xca,
+	0x8a, 0x0b, 0xf2, 0xf3, 0x8a, 0x53, 0x95, 0x18, 0x84, 0x72, 0xb9, 0xc4, 0x40, 0x2a, 0x42, 0xf3,
+	0x0a, 0xd0, 0xad, 0x52, 0x47, 0x35, 0x03, 0x53, 0x05, 0xcc, 0x32, 0x0d, 0xc2, 0x0a, 0x61, 0xd6,
+	0x39, 0x39, 0x9e, 0x78, 0x28, 0xc7, 0x78, 0xe3, 0xa1, 0x1c, 0x43, 0xc3, 0x23, 0x39, 0xc6, 0x13,
+	0x8f, 0xe4, 0x18, 0x2f, 0x3c, 0x92, 0x63, 0x7c, 0xf0, 0x48, 0x8e, 0x71, 0xc2, 0x63, 0x39, 0x86,
+	0x28, 0x65, 0xfc, 0x61, 0x06, 0x8e, 0x87, 0x24, 0x36, 0x70, 0x78, 0x19, 0x03, 0x02, 0x00, 0x00,
+	0xff, 0xff, 0xfc, 0xcd, 0x40, 0xde, 0xa4, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -72,10 +72,10 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// NodeClient is the client API for Node service.
+// DRAPluginClient is the client API for DRAPlugin service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type NodeClient interface {
+type DRAPluginClient interface {
 	// NodePrepareResources prepares several ResourceClaims
 	// for use on the node. If an error is returned, the
 	// response is ignored. Failures for individual claims
@@ -86,34 +86,34 @@ type NodeClient interface {
 	NodeUnprepareResources(ctx context.Context, in *v1alpha4.NodeUnprepareResourcesRequest, opts ...grpc.CallOption) (*v1alpha4.NodeUnprepareResourcesResponse, error)
 }
 
-type nodeClient struct {
+type dRAPluginClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewNodeClient(cc *grpc.ClientConn) NodeClient {
-	return &nodeClient{cc}
+func NewDRAPluginClient(cc *grpc.ClientConn) DRAPluginClient {
+	return &dRAPluginClient{cc}
 }
 
-func (c *nodeClient) NodePrepareResources(ctx context.Context, in *v1alpha4.NodePrepareResourcesRequest, opts ...grpc.CallOption) (*v1alpha4.NodePrepareResourcesResponse, error) {
+func (c *dRAPluginClient) NodePrepareResources(ctx context.Context, in *v1alpha4.NodePrepareResourcesRequest, opts ...grpc.CallOption) (*v1alpha4.NodePrepareResourcesResponse, error) {
 	out := new(v1alpha4.NodePrepareResourcesResponse)
-	err := c.cc.Invoke(ctx, "/v1beta1.Node/NodePrepareResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1beta1.DRAPlugin/NodePrepareResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *nodeClient) NodeUnprepareResources(ctx context.Context, in *v1alpha4.NodeUnprepareResourcesRequest, opts ...grpc.CallOption) (*v1alpha4.NodeUnprepareResourcesResponse, error) {
+func (c *dRAPluginClient) NodeUnprepareResources(ctx context.Context, in *v1alpha4.NodeUnprepareResourcesRequest, opts ...grpc.CallOption) (*v1alpha4.NodeUnprepareResourcesResponse, error) {
 	out := new(v1alpha4.NodeUnprepareResourcesResponse)
-	err := c.cc.Invoke(ctx, "/v1beta1.Node/NodeUnprepareResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/v1beta1.DRAPlugin/NodeUnprepareResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// NodeServer is the server API for Node service.
-type NodeServer interface {
+// DRAPluginServer is the server API for DRAPlugin service.
+type DRAPluginServer interface {
 	// NodePrepareResources prepares several ResourceClaims
 	// for use on the node. If an error is returned, the
 	// response is ignored. Failures for individual claims
@@ -124,68 +124,68 @@ type NodeServer interface {
 	NodeUnprepareResources(context.Context, *v1alpha4.NodeUnprepareResourcesRequest) (*v1alpha4.NodeUnprepareResourcesResponse, error)
 }
 
-// UnimplementedNodeServer can be embedded to have forward compatible implementations.
-type UnimplementedNodeServer struct {
+// UnimplementedDRAPluginServer can be embedded to have forward compatible implementations.
+type UnimplementedDRAPluginServer struct {
 }
 
-func (*UnimplementedNodeServer) NodePrepareResources(ctx context.Context, req *v1alpha4.NodePrepareResourcesRequest) (*v1alpha4.NodePrepareResourcesResponse, error) {
+func (*UnimplementedDRAPluginServer) NodePrepareResources(ctx context.Context, req *v1alpha4.NodePrepareResourcesRequest) (*v1alpha4.NodePrepareResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodePrepareResources not implemented")
 }
-func (*UnimplementedNodeServer) NodeUnprepareResources(ctx context.Context, req *v1alpha4.NodeUnprepareResourcesRequest) (*v1alpha4.NodeUnprepareResourcesResponse, error) {
+func (*UnimplementedDRAPluginServer) NodeUnprepareResources(ctx context.Context, req *v1alpha4.NodeUnprepareResourcesRequest) (*v1alpha4.NodeUnprepareResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeUnprepareResources not implemented")
 }
 
-func RegisterNodeServer(s *grpc.Server, srv NodeServer) {
-	s.RegisterService(&_Node_serviceDesc, srv)
+func RegisterDRAPluginServer(s *grpc.Server, srv DRAPluginServer) {
+	s.RegisterService(&_DRAPlugin_serviceDesc, srv)
 }
 
-func _Node_NodePrepareResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DRAPlugin_NodePrepareResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(v1alpha4.NodePrepareResourcesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).NodePrepareResources(ctx, in)
+		return srv.(DRAPluginServer).NodePrepareResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1beta1.Node/NodePrepareResources",
+		FullMethod: "/v1beta1.DRAPlugin/NodePrepareResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).NodePrepareResources(ctx, req.(*v1alpha4.NodePrepareResourcesRequest))
+		return srv.(DRAPluginServer).NodePrepareResources(ctx, req.(*v1alpha4.NodePrepareResourcesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Node_NodeUnprepareResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DRAPlugin_NodeUnprepareResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(v1alpha4.NodeUnprepareResourcesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).NodeUnprepareResources(ctx, in)
+		return srv.(DRAPluginServer).NodeUnprepareResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/v1beta1.Node/NodeUnprepareResources",
+		FullMethod: "/v1beta1.DRAPlugin/NodeUnprepareResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).NodeUnprepareResources(ctx, req.(*v1alpha4.NodeUnprepareResourcesRequest))
+		return srv.(DRAPluginServer).NodeUnprepareResources(ctx, req.(*v1alpha4.NodeUnprepareResourcesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _Node_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "v1beta1.Node",
-	HandlerType: (*NodeServer)(nil),
+var _DRAPlugin_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "v1beta1.DRAPlugin",
+	HandlerType: (*DRAPluginServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "NodePrepareResources",
-			Handler:    _Node_NodePrepareResources_Handler,
+			Handler:    _DRAPlugin_NodePrepareResources_Handler,
 		},
 		{
 			MethodName: "NodeUnprepareResources",
-			Handler:    _Node_NodeUnprepareResources_Handler,
+			Handler:    _DRAPlugin_NodeUnprepareResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -36,10 +36,10 @@ const (
 )
 
 type fakeV1alpha4GRPCServer struct {
-	drapb.UnimplementedNodeServer
+	drapb.UnimplementedDRAPluginServer
 }
 
-var _ drapb.NodeServer = &fakeV1alpha4GRPCServer{}
+var _ drapb.DRAPluginServer = &fakeV1alpha4GRPCServer{}
 
 func (f *fakeV1alpha4GRPCServer) NodePrepareResources(ctx context.Context, in *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
 	return &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"claim-uid": {
@@ -84,7 +84,7 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 	switch version {
 	case v1alpha4Version:
 		fakeGRPCServer := &fakeV1alpha4GRPCServer{}
-		drapb.RegisterNodeServer(s, fakeGRPCServer)
+		drapb.RegisterDRAPluginServer(s, fakeGRPCServer)
 	default:
 		return "", nil, fmt.Errorf("unsupported version: %s", version)
 	}

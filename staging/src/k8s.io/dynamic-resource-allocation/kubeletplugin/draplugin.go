@@ -333,13 +333,13 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	implemented := false
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
-			logger.V(5).Info("registering drapbv1alpha4.NodeServer")
+			logger.V(5).Info("registering v1alpha4.Node gGRPC service")
 			drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
-		if nodeServer, ok := nodeServer.(drapbv1beta1.NodeServer); ok && o.nodeV1beta1 {
-			logger.V(5).Info("registering drapbv1beta1.NodeServer")
-			drapbv1beta1.RegisterNodeServer(grpcServer, nodeServer)
+		if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
+			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+			drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
 			implemented = true
 		}
 	})

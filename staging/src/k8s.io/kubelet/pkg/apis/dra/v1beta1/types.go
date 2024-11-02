@@ -37,4 +37,5 @@ type (
 	Claim                          = v1alpha4.Claim
 )
 
-var _ NodeServer = v1alpha4.NodeServer(nil)
+// Ensure that the interfaces are equivalent.
+var _ DRAPluginServer = v1alpha4.NodeServer(nil)
