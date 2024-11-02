@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
 func getFakeNode() (*v1.Node, error) {
@@ -34,12 +35,12 @@ func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 	}
 
 	for _, test := range []struct {
-		description string
-		handler     func() *RegistrationHandler
-		pluginName  string
-		endpoint    string
-		versions    []string
-		shouldError bool
+		description       string
+		handler           func() *RegistrationHandler
+		pluginName        string
+		endpoint          string
+		supportedServices []string
+		shouldError       bool
 	}{
 		{
 			description: "no versions provided",
@@ -47,34 +48,15 @@ func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 			shouldError: true,
 		},
 		{
-			description: "unsupported version",
-			handler:     newRegistrationHandler,
-			versions:    []string{"v2.0.0"},
-			shouldError: true,
-		},
-		{
-			description: "plugin already registered with a higher supported version",
-			handler: func() *RegistrationHandler {
-				handler := newRegistrationHandler()
-				if err := handler.RegisterPlugin("this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide", "", []string{"v1.1.0"}, nil); err != nil {
-					t.Fatal(err)
-				}
-				return handler
-			},
-			pluginName:  "this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide",
-			versions:    []string{"v1.0.0"},
-			shouldError: true,
-		},
-		{
-			description: "should validate the plugin",
-			handler:     newRegistrationHandler,
-			pluginName:  "this-is-a-dummy-plugin-with-a-long-name-so-it-doesnt-collide",
-			versions:    []string{"v1.3.0"},
+			description:       "should validate the plugin",
+			handler:           newRegistrationHandler,
+			pluginName:        "this-is-a-dummy-plugin-with-a-long-name-so-it-doesnt-collide",
+			supportedServices: []string{drapb.DRAPluginService},
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			handler := test.handler()
-			err := handler.ValidatePlugin(test.pluginName, test.endpoint, test.versions)
+			err := handler.ValidatePlugin(test.pluginName, test.endpoint, test.supportedServices)
 			if test.shouldError {
 				assert.Error(t, err)
 			} else {

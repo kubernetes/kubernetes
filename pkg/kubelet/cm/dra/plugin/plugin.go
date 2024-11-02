@@ -25,12 +25,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -59,27 +57,19 @@ type Plugin struct {
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
-	mutex                   sync.Mutex
-	conn                    *grpc.ClientConn
-	supportedAPI            apiVersion
-	endpoint                string
-	highestSupportedVersion *utilversion.Version
-	clientCallTimeout       time.Duration
+	mutex             sync.Mutex
+	conn              *grpc.ClientConn
+	endpoint          string
+	chosenService     string // e.g. drapbv1beta1.DRAPluginService
+	clientCallTimeout time.Duration
 }
 
-type apiVersion string
-
-const (
-	apiV1alpha4 = apiVersion("v1alpha4")
-	apiV1beta1  = apiVersion("v1beta1")
-)
-
-func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, apiVersion, error) {
+func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
 	if p.conn != nil {
-		return p.conn, p.supportedAPI, nil
+		return p.conn, nil
 	}
 
 	ctx := p.backgroundCtx
@@ -101,18 +91,18 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, apiVersion, error) {
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
 	)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, "", errors.New("timed out waiting for gRPC connection to be ready")
+		return nil, errors.New("timed out waiting for gRPC connection to be ready")
 	}
 
 	p.conn = conn
-	return p.conn, "", nil
+	return p.conn, nil
 }
 
 func (p *Plugin) NodePrepareResources(
@@ -123,7 +113,7 @@ func (p *Plugin) NodePrepareResources(
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Calling NodePrepareResources rpc", "request", req)
 
-	conn, supportedAPI, err := p.getOrCreateGRPCConn()
+	conn, err := p.getOrCreateGRPCConn()
 	if err != nil {
 		return nil, err
 	}
@@ -132,29 +122,17 @@ func (p *Plugin) NodePrepareResources(
 	defer cancel()
 
 	var response *drapbv1beta1.NodePrepareResourcesResponse
-	switch supportedAPI {
-	case apiV1beta1:
+	switch p.chosenService {
+	case drapbv1beta1.DRAPluginService:
 		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodePrepareResources(ctx, req)
-	case apiV1alpha4:
+	case drapbv1alpha4.NodeService:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
 		response, err = nodeClient.NodePrepareResources(ctx, req)
 	default:
-		// Try it, fall back if necessary.
-		supportedAPI = apiV1beta1
-		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
-		response, err = nodeClient.NodePrepareResources(ctx, req)
-		if err != nil && status.Convert(err).Code() == codes.Unimplemented {
-			supportedAPI = apiV1alpha4
-			nodeClient := drapbv1alpha4.NewNodeClient(conn)
-			response, err = nodeClient.NodePrepareResources(ctx, req)
-		}
-		if err == nil || status.Convert(err).Code() != codes.Unimplemented {
-			// Store discovered version for future use.
-			p.mutex.Lock()
-			p.supportedAPI = supportedAPI
-			p.mutex.Unlock()
-		}
+		// Shouldn't happen, validateSupportedServices should only
+		// return services we support here.
+		return nil, fmt.Errorf("internal error: unsupported chosen service: %q", p.chosenService)
 	}
 	logger.V(4).Info("Done calling NodePrepareResources rpc", "response", response, "err", err)
 	return response, err
@@ -168,7 +146,7 @@ func (p *Plugin) NodeUnprepareResources(
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 
-	conn, supportedAPI, err := p.getOrCreateGRPCConn()
+	conn, err := p.getOrCreateGRPCConn()
 	if err != nil {
 		return nil, err
 	}
@@ -177,29 +155,17 @@ func (p *Plugin) NodeUnprepareResources(
 	defer cancel()
 
 	var response *drapbv1beta1.NodeUnprepareResourcesResponse
-	switch supportedAPI {
-	case apiV1beta1:
+	switch p.chosenService {
+	case drapbv1beta1.DRAPluginService:
 		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
-	case apiV1alpha4:
+	case drapbv1alpha4.NodeService:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
 	default:
-		// Try it, fall back if necessary.
-		supportedAPI = apiV1beta1
-		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
-		response, err = nodeClient.NodeUnprepareResources(ctx, req)
-		if err != nil && status.Convert(err).Code() == codes.Unimplemented {
-			supportedAPI = apiV1alpha4
-			nodeClient := drapbv1alpha4.NewNodeClient(conn)
-			response, err = nodeClient.NodeUnprepareResources(ctx, req)
-		}
-		if err == nil || status.Convert(err).Code() != codes.Unimplemented {
-			// Store discovered version for future use.
-			p.mutex.Lock()
-			p.supportedAPI = supportedAPI
-			p.mutex.Unlock()
-		}
+		// Shouldn't happen, validateSupportedServices should only
+		// return services we support here.
+		return nil, fmt.Errorf("internal error: unsupported chosen service: %q", p.chosenService)
 	}
 	logger.V(4).Info("Done calling NodeUnprepareResources rpc", "response", response, "err", err)
 	return response, err

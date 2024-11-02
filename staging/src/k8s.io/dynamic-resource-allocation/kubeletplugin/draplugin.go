@@ -330,29 +330,29 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	}()
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	implemented := false
+	var supportedServices []string
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
 			logger.V(5).Info("registering v1alpha4.Node gGRPC service")
 			drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
-			implemented = true
+			supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
 		}
 		if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
 			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 			drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
-			implemented = true
+			supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start node client: %v", err)
 	}
 	d.plugin = plugin
-	if !implemented {
+	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

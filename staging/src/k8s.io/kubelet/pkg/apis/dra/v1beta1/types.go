@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 has the same Go API  as v1alpha4. A DRA driver implementing
-// [v1beta1.NodeServer] also implements [v1alpha4.NodeServer] and vice versa.
+// Package v1beta1 has the same Go API as v1alpha4. A DRA driver implementing
+// [v1beta1.DRAPluginServer] also implements [v1alpha4.NodeServer] and vice versa.
 //
-// The k8s.io/dynamic-resource-allocation/kubeletplugin helper will
+// The [k8s.io/dynamic-resource-allocation/kubeletplugin] helper will
 // automatically register both API versions unless explicitly configured
 // otherwise.
 package v1beta1
@@ -35,6 +35,13 @@ type (
 	NodeUnprepareResourceResponse  = v1alpha4.NodeUnprepareResourceResponse
 	Device                         = v1alpha4.Device
 	Claim                          = v1alpha4.Claim
+)
+
+const (
+	// DRAPluginService needs to be listed in the "supported versions"
+	// array during plugin registration by a DRA plugin which provides
+	// an implementation of the v1beta1 DRAPlugin service.
+	DRAPluginService = "v1beta1.DRAPlugin"
 )
 
 // Ensure that the interfaces are equivalent.

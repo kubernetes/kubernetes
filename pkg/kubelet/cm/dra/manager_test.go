@@ -581,7 +581,7 @@ func TestPrepareResources(t *testing.T) {
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -718,7 +718,7 @@ func TestUnprepareResources(t *testing.T) {
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -888,7 +888,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	defer draServerInfo.teardownFn()
 
 	plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{"1.27"}, nil); err != nil {
+	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
 	defer plg.DeRegisterPlugin(driverName)
