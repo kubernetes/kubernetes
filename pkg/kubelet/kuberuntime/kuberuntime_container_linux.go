@@ -45,7 +45,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	cgroups "k8s.io/kubernetes/third_party/forked/cgroups"
 	"k8s.io/utils/ptr"
 )
 
@@ -354,12 +353,16 @@ var swapControllerAvailable = func() bool {
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 		if isCgroup2UnifiedMode() {
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
+			cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
 			if err != nil {
 				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
 				return
 			}
-			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+			// Fr cgroup v2 unified hierarchy, there are no per-controller
+			// cgroup paths, so the cm map returned by ParseCgroupFile above
+			// has a single element where the key is empty string ("") and
+			// the value is the cgroup path the <pid> is in.
+			p = filepath.Join("/sys/fs/cgroup", cm[""], "memory.swap.max")
 		}
 		if _, err := os.Stat(p); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
@@ -392,7 +395,6 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 
 	containerMemoryRequest := container.Resources.Requests.Memory()
 	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
-
 	if err != nil {
 		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
 		m.ConfigureNoSwap(lcr)
