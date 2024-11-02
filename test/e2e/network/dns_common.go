@@ -508,10 +508,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 		// grab logs from all the containers
 		for _, container := range pod.Spec.Containers {
 			logs, err := e2epod.GetPodLogs(ctx, client, pod.Namespace, pod.Name, container.Name)
-			if err != nil {
-				framework.Logf("Unable to get logs for %s: %v", container.Name, err)
-				continue
-			}
+			framework.ExpectNoError(err)
 			framework.Logf("Pod client logs for %s: %s", container.Name, logs)
 		}
 
