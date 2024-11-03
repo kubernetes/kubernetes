@@ -305,11 +305,9 @@ func (g *GenericPLEG) Relist() {
 			needsReinspection[pid] = pod
 
 			continue
-		} else {
-			if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-				if !updated {
-					continue
-				}
+		} else if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+			if !updated {
+				continue
 			}
 		}
 
@@ -481,15 +479,6 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 	}
 
 	return status, g.cache.Set(pod.ID, status, err, timestamp), err
-}
-
-func (g *GenericPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) (error, bool) {
-	ctx := context.Background()
-	if pod == nil {
-		return fmt.Errorf("pod cannot be nil"), false
-	}
-	_, updated, err := g.updateCache(ctx, pod, pid)
-	return err, updated
 }
 
 func (g *GenericPLEG) SetPodWatchCondition(podUID types.UID, conditionKey string, condition WatchCondition) {

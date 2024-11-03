@@ -766,7 +766,8 @@ func TestWatchConditions(t *testing.T) {
 			},
 		},
 	}}
-	initialPods := append(pods, &containertest.FakePod{Pod: &kubecontainer.Pod{
+	initialPods := pods
+	initialPods = append(initialPods, &containertest.FakePod{Pod: &kubecontainer.Pod{
 		Name: "terminated-pod",
 		ID:   "terminated",
 		Sandboxes: []*kubecontainer.Container{
@@ -813,8 +814,8 @@ func TestWatchConditions(t *testing.T) {
 			"updating": {version: 1},
 		},
 	}, {
-		name:   "non-existant pod",
-		podUID: "non-existant",
+		name:   "non-existent pod",
+		podUID: "non-existent",
 		watchConditions: map[string]WatchCondition{
 			"watching": neverComplete,
 		},

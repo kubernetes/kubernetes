@@ -1980,17 +1980,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, podStatus) {
-		// While resize is in progress, periodically request the latest status from the runtime via
-		// the PLEG. This is necessary since ordinarily pod status is only fetched when a container
-		// undergoes a state transition.
-		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
-			klog.ErrorS(err, "Failed to update pod cache", "pod", klog.KObj(pod))
-			return false, err
-		}
-	}
-
 	return false, nil
 }
 
@@ -3096,4 +3085,8 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 	for staticPod, mirrorPod := range staticPodToMirrorPodMap {
 		kl.tryReconcileMirrorPods(staticPod, mirrorPod)
 	}
+}
+
+func (kl *Kubelet) SetPodWatchCondition(podUID types.UID, conditionKey string, condition pleg.WatchCondition) {
+	kl.pleg.SetPodWatchCondition(podUID, conditionKey, condition)
 }

@@ -66,7 +66,6 @@ type PodLifecycleEventGenerator interface {
 	Start()
 	Watch() chan *PodLifecycleEvent
 	Healthy() (bool, error)
-	UpdateCache(*kubecontainer.Pod, types.UID) (error, bool)
 	// SetPodWatchCondition flags the pod for reinspection on every Relist iteration until the watch
 	// condition is met. The condition is keyed so it can be updated before the condition
 	// is met.
@@ -83,7 +82,7 @@ type podLifecycleEventGeneratorHandler interface {
 }
 
 // WatchCondition takes the latest PodStatus, and returns whether the condition is met.
-type WatchCondition func(*kubecontainer.PodStatus) bool
+type WatchCondition = func(*kubecontainer.PodStatus) bool
 
 // RunningContainerWatchCondition wraps a condition on the container status to make a pod
 // WatchCondition. If the container is no longer running, the condition is implicitly cleared.
