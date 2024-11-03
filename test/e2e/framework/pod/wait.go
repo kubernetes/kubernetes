@@ -475,7 +475,7 @@ func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interf
 			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
-			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: %+v", podName, pod.Status))
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: \n%s", podName, format.Object(pod.Status, 1)))
 		default:
 			return false, nil
 		}
