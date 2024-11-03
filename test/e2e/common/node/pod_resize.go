@@ -122,13 +122,16 @@ func doPodResizeTests(f *framework.Framework) {
 		patchString         string
 		expected            []e2epod.ResizableContainerInfo
 		addExtendedResource bool
+		// TODO(123940): test rollback for all test cases once resize is more responsive.
+		testRollback bool
 	}
 
 	noRestart := v1.NotRequired
 	doRestart := v1.RestartContainer
 	tests := []testCase{
 		{
-			name: "Guaranteed QoS pod, one container - increase CPU & memory",
+			name:         "Guaranteed QoS pod, one container - increase CPU & memory",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -208,7 +211,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2) ; decrease: CPU (c2), memory (c1,c3)",
+			name:         "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2) ; decrease: CPU (c2), memory (c1,c3)",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -256,7 +260,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only",
+			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -274,7 +279,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only",
+			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -328,7 +334,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
+			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -346,7 +353,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only",
+			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -634,7 +642,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
+			name:         "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -657,7 +666,8 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)",
+			name:         "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)",
+			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -850,8 +860,6 @@ func doPodResizeTests(f *framework.Framework) {
 		},
 	}
 
-	timeouts := f.Timeouts
-
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
@@ -862,7 +870,8 @@ func doPodResizeTests(f *framework.Framework) {
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			e2epod.InitDefaultResizePolicy(tc.containers)
 			e2epod.InitDefaultResizePolicy(tc.expected)
-			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, tc.containers)
+			testPod.GenerateName = "resize-test-"
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 
 			if tc.addExtendedResource {
@@ -908,22 +917,24 @@ func doPodResizeTests(f *framework.Framework) {
 
 			patchAndVerify(tc.patchString, tc.expected, "resize")
 
-			// Resize has been actuated, test rollback
-			rollbackContainers := make([]e2epod.ResizableContainerInfo, len(tc.containers))
-			copy(rollbackContainers, tc.containers)
-			for i, c := range rollbackContainers {
-				gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
-					"test case containers & expectations should be in the same order")
-				// Resizes that trigger a restart should trigger a second restart when rolling back.
-				rollbackContainers[i].RestartCount = tc.expected[i].RestartCount * 2
+			if tc.testRollback {
+				// Resize has been actuated, test rollback
+				rollbackContainers := make([]e2epod.ResizableContainerInfo, len(tc.containers))
+				copy(rollbackContainers, tc.containers)
+				for i, c := range rollbackContainers {
+					gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
+						"test case containers & expectations should be in the same order")
+					// Resizes that trigger a restart should trigger a second restart when rolling back.
+					rollbackContainers[i].RestartCount = tc.expected[i].RestartCount * 2
+				}
+
+				rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
+				framework.ExpectNoError(err)
+				patchAndVerify(rbPatchStr, rollbackContainers, "rollback")
 			}
 
-			rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
-			framework.ExpectNoError(err)
-			patchAndVerify(rbPatchStr, rollbackContainers, "rollback")
-
 			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
+			framework.ExpectNoError(podClient.Delete(ctx, newPod.Name, metav1.DeleteOptions{}))
 		})
 	}
 }
