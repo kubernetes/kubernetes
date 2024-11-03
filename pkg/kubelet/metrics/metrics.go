@@ -1065,10 +1065,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CPUManagerSharedPoolSizeMilliCores)
 		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocationCount)
 		legacyregistry.MustRegister(ContainerAlignedComputeResources)
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
-			legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
-		}
+		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
+		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
