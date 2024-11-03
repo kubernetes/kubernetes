@@ -147,6 +147,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - misspell
     - revive
     - staticcheck
     - stylecheck
@@ -234,6 +235,10 @@ linters-settings: # please keep this alphabetized
     enabled-checks:
       - equalFold
       - boolExprSimplify
+    misspell:
+      ignore-words:
+      - creater
+      - Creater
   revive:
     # Only these rules are enabled.
     rules:

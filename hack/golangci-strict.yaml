@@ -141,6 +141,7 @@ linters:
     - govet
     - ineffassign
     - logcheck
+    - misspell
     - revive
     - staticcheck
     - stylecheck
@@ -228,6 +229,10 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    misspell:
+      ignore-words:
+      - creater
+      - Creater
   revive:
     # Only these rules are enabled.
     rules:

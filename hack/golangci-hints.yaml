@@ -98,6 +98,7 @@ linters:
     - errorlint
     - ineffassign
     - logcheck
+    - misspell
     - revive
     - staticcheck
     - stylecheck
@@ -188,6 +189,10 @@ linters-settings: # please keep this alphabetized
     - p: ^gomega\.BeFalse$
       pkg: ^github.com/onsi/gomega$
       msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    misspell:
+      ignore-words:
+      - creater
+      - Creater
   revive:
     # Only these rules are enabled.
     rules:

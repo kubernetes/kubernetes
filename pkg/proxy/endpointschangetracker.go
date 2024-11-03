@@ -75,7 +75,7 @@ func NewEndpointsChangeTracker(hostname string, makeEndpointInfo makeEndpointFun
 // endpointSlice (depending on removeSlice). It returns true if this update contained a
 // change that needs to be synced; note that this is different from the return value of
 // ServiceChangeTracker.Update().
-func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+func (endpointTracker *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
 	if !supportedEndpointSliceAddressTypes.Has(endpointSlice.AddressType) {
 		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "addressType", endpointSlice.AddressType)
 		return false
@@ -95,10 +95,10 @@ func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.
 
 	metrics.EndpointChangesTotal.Inc()
 
-	ect.lock.Lock()
-	defer ect.lock.Unlock()
+	endpointTracker.lock.Lock()
+	defer endpointTracker.lock.Unlock()
 
-	changeNeeded := ect.endpointSliceCache.updatePending(endpointSlice, removeSlice)
+	changeNeeded := endpointTracker.endpointSliceCache.updatePending(endpointSlice, removeSlice)
 
 	if changeNeeded {
 		metrics.EndpointChangesPending.Inc()
@@ -108,10 +108,10 @@ func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.
 		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
 		// when other EndpointSlice for that service still exist.
 		if removeSlice {
-			delete(ect.lastChangeTriggerTimes, namespacedName)
-		} else if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && t.After(ect.trackerStartTime) {
-			ect.lastChangeTriggerTimes[namespacedName] =
-				append(ect.lastChangeTriggerTimes[namespacedName], t)
+			delete(endpointTracker.lastChangeTriggerTimes, namespacedName)
+		} else if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && t.After(endpointTracker.trackerStartTime) {
+			endpointTracker.lastChangeTriggerTimes[namespacedName] =
+				append(endpointTracker.lastChangeTriggerTimes[namespacedName], t)
 		}
 	}
 
@@ -120,19 +120,19 @@ func (ect *EndpointsChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.
 
 // checkoutChanges returns a map of pending endpointsChanges and marks them as
 // applied.
-func (ect *EndpointsChangeTracker) checkoutChanges() map[types.NamespacedName]*endpointsChange {
+func (endpointTracker *EndpointsChangeTracker) checkoutChanges() map[types.NamespacedName]*endpointsChange {
 	metrics.EndpointChangesPending.Set(0)
 
-	return ect.endpointSliceCache.checkoutChanges()
+	return endpointTracker.endpointSliceCache.checkoutChanges()
 }
 
 // checkoutTriggerTimes applies the locally cached trigger times to a map of
 // trigger times that have been passed in and empties the local cache.
-func (ect *EndpointsChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
-	ect.lock.Lock()
-	defer ect.lock.Unlock()
+func (endpointTracker *EndpointsChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
+	endpointTracker.lock.Lock()
+	defer endpointTracker.lock.Unlock()
 
-	for k, v := range ect.lastChangeTriggerTimes {
+	for k, v := range endpointTracker.lastChangeTriggerTimes {
 		prev, ok := (*lastChangeTriggerTimes)[k]
 		if !ok {
 			(*lastChangeTriggerTimes)[k] = v
@@ -140,7 +140,7 @@ func (ect *EndpointsChangeTracker) checkoutTriggerTimes(lastChangeTriggerTimes *
 			(*lastChangeTriggerTimes)[k] = append(prev, v...)
 		}
 	}
-	ect.lastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
+	endpointTracker.lastChangeTriggerTimes = make(map[types.NamespacedName][]time.Time)
 }
 
 // getLastChangeTriggerTime returns the time.Time value of the
@@ -190,22 +190,22 @@ type UpdateEndpointsMapResult struct {
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 
-// Update updates em based on the changes in ect, returns information about the diff since
+// Update updates em based on the changes in endpointTracker, returns information about the diff since
 // the last Update, triggers processEndpointsMapChange on every change, and clears the
 // changes map.
-func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapResult {
+func (em EndpointsMap) Update(endpointTracker *EndpointsChangeTracker) UpdateEndpointsMapResult {
 	result := UpdateEndpointsMapResult{
 		UpdatedServices:        sets.New[types.NamespacedName](),
 		LastChangeTriggerTimes: make(map[types.NamespacedName][]time.Time),
 	}
-	if ect == nil {
+	if endpointTracker == nil {
 		return result
 	}
 
-	changes := ect.checkoutChanges()
+	changes := endpointTracker.checkoutChanges()
 	for nn, change := range changes {
-		if ect.processEndpointsMapChange != nil {
-			ect.processEndpointsMapChange(change.previous, change.current)
+		if endpointTracker.processEndpointsMapChange != nil {
+			endpointTracker.processEndpointsMapChange(change.previous, change.current)
 		}
 		result.UpdatedServices.Insert(nn)
 
@@ -232,7 +232,7 @@ func (em EndpointsMap) Update(ect *EndpointsChangeTracker) UpdateEndpointsMapRes
 			}
 		}
 	}
-	ect.checkoutTriggerTimes(&result.LastChangeTriggerTimes)
+	endpointTracker.checkoutTriggerTimes(&result.LastChangeTriggerTimes)
 
 	return result
 }

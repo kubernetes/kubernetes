@@ -104,7 +104,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	endpointTracker := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
 	eps := &discovery.EndpointSlice{
 		TypeMeta:    metav1.TypeMeta{},
 		AddressType: discovery.AddressTypeIPv4,
@@ -142,9 +142,9 @@ func TestCleanStaleEntries(t *testing.T) {
 		},
 	}
 
-	ect.EndpointSliceUpdate(eps, false)
+	endpointTracker.EndpointSliceUpdate(eps, false)
 	endpointsMap := make(proxy.EndpointsMap)
-	_ = endpointsMap.Update(ect)
+	_ = endpointsMap.Update(endpointTracker)
 
 	tcpPortName := proxy.ServicePortName{
 		NamespacedName: types.NamespacedName{

@@ -156,6 +156,7 @@ linters:
     {{- end}}
     - ineffassign
     - logcheck
+    - misspell
     - revive
     - staticcheck
     - stylecheck
@@ -203,6 +204,10 @@ linters-settings: # please keep this alphabetized
       - equalFold
       - boolExprSimplify
   {{- end}}
+    misspell:
+      ignore-words:
+      - creater
+      - Creater
   revive:
     # Only these rules are enabled.
     rules:
