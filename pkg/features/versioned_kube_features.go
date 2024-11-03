@@ -496,6 +496,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MemoryManager: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	MemoryQoS: {

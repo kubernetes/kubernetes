@@ -388,7 +388,8 @@ const (
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
 
-	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk
+	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk, @Tal-or (only for GA graduation)
+	//
 	// Allows setting memory affinity for a container based on NUMA topology
 	MemoryManager featuregate.Feature = "MemoryManager"
 
