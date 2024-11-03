@@ -271,6 +271,12 @@ type draPlugin struct {
 //
 // If the plugin will be used to publish resources, [KubeClient] and [NodeName]
 // options are mandatory.
+//
+// By default, the DRA driver gets registered so that the plugin is compatible
+// with Kubernetes >= 1.32. To be compatible with Kubernetes >= 1.31, a driver
+// has to ask specifically to register only the alpha gRPC API, i.e. use:
+//
+//	Start(..., NodeV1beta1(false))
 func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
@@ -349,6 +355,15 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	d.plugin = plugin
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+	}
+
+	// Backwards compatibility hack: if only the alpha gRPC service is enabled,
+	// then we can support registration against a 1.31 kubelet by reporting "1.0.0"
+	// as version. That also works with 1.32 because 1.32 supports that legacy
+	// behavior and 1.31 works because it doesn't fail while parsing "v1alpha3.Node"
+	// as version.
+	if len(supportedServices) == 1 && supportedServices[0] == drapbv1alpha4.NodeService {
+		supportedServices = []string{"1.0.0"}
 	}
 
 	// Now make it available to kubelet.
