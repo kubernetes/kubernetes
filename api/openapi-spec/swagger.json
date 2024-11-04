@@ -20905,7 +20905,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ConfigMap",
         "operationId": "patchCoreV1NamespacedConfigMap",
@@ -21390,7 +21391,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Endpoints",
         "operationId": "patchCoreV1NamespacedEndpoints",
@@ -21875,7 +21877,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Event",
         "operationId": "patchCoreV1NamespacedEvent",
@@ -22360,7 +22363,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified LimitRange",
         "operationId": "patchCoreV1NamespacedLimitRange",
@@ -22845,7 +22849,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PersistentVolumeClaim",
         "operationId": "patchCoreV1NamespacedPersistentVolumeClaim",
@@ -23035,7 +23040,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified PersistentVolumeClaim",
         "operationId": "patchCoreV1NamespacedPersistentVolumeClaimStatus",
@@ -23520,7 +23526,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Pod",
         "operationId": "patchCoreV1NamespacedPod",
@@ -23898,7 +23905,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update ephemeralcontainers of the specified Pod",
         "operationId": "patchCoreV1NamespacedPodEphemeralcontainers",
@@ -24942,7 +24950,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Pod",
         "operationId": "patchCoreV1NamespacedPodStatus",
@@ -25427,7 +25436,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PodTemplate",
         "operationId": "patchCoreV1NamespacedPodTemplate",
@@ -25912,7 +25922,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ReplicationController",
         "operationId": "patchCoreV1NamespacedReplicationController",
@@ -26102,7 +26113,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update scale of the specified ReplicationController",
         "operationId": "patchCoreV1NamespacedReplicationControllerScale",
@@ -26292,7 +26304,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ReplicationController",
         "operationId": "patchCoreV1NamespacedReplicationControllerStatus",
@@ -26777,7 +26790,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ResourceQuota",
         "operationId": "patchCoreV1NamespacedResourceQuota",
@@ -26967,7 +26981,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ResourceQuota",
         "operationId": "patchCoreV1NamespacedResourceQuotaStatus",
@@ -27452,7 +27467,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Secret",
         "operationId": "patchCoreV1NamespacedSecret",
@@ -27937,7 +27953,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ServiceAccount",
         "operationId": "patchCoreV1NamespacedServiceAccount",
@@ -28514,7 +28531,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Service",
         "operationId": "patchCoreV1NamespacedService",
@@ -29205,7 +29223,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Service",
         "operationId": "patchCoreV1NamespacedServiceStatus",
@@ -29454,7 +29473,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Namespace",
         "operationId": "patchCoreV1Namespace",
@@ -29724,7 +29744,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Namespace",
         "operationId": "patchCoreV1NamespaceStatus",
@@ -30203,7 +30224,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Node",
         "operationId": "patchCoreV1Node",
@@ -30885,7 +30907,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Node",
         "operationId": "patchCoreV1NodeStatus",
@@ -31438,7 +31461,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PersistentVolume",
         "operationId": "patchCoreV1PersistentVolume",
@@ -31625,7 +31649,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified PersistentVolume",
         "operationId": "patchCoreV1PersistentVolumeStatus",
@@ -36021,7 +36046,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified MutatingWebhookConfiguration",
         "operationId": "patchAdmissionregistrationV1MutatingWebhookConfiguration",
@@ -36500,7 +36526,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1ValidatingAdmissionPolicy",
@@ -36687,7 +36714,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1ValidatingAdmissionPolicyStatus",
@@ -37166,7 +37194,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicyBinding",
         "operationId": "patchAdmissionregistrationV1ValidatingAdmissionPolicyBinding",
@@ -37645,7 +37674,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingWebhookConfiguration",
         "operationId": "patchAdmissionregistrationV1ValidatingWebhookConfiguration",
@@ -38781,7 +38811,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified MutatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
@@ -39260,7 +39291,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified MutatingAdmissionPolicyBinding",
         "operationId": "patchAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
@@ -39739,7 +39771,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
@@ -39926,7 +39959,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus",
@@ -40405,7 +40439,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicyBinding",
         "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
@@ -41541,7 +41576,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicy",
@@ -41728,7 +41764,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ValidatingAdmissionPolicy",
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicyStatus",
@@ -42207,7 +42244,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ValidatingAdmissionPolicyBinding",
         "operationId": "patchAdmissionregistrationV1beta1ValidatingAdmissionPolicyBinding",
@@ -43064,7 +43102,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CustomResourceDefinition",
         "operationId": "patchApiextensionsV1CustomResourceDefinition",
@@ -43251,7 +43290,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified CustomResourceDefinition",
         "operationId": "patchApiextensionsV1CustomResourceDefinitionStatus",
@@ -43952,7 +43992,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified APIService",
         "operationId": "patchApiregistrationV1APIService",
@@ -44139,7 +44180,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified APIService",
         "operationId": "patchApiregistrationV1APIServiceStatus",
@@ -45068,7 +45110,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ControllerRevision",
         "operationId": "patchAppsV1NamespacedControllerRevision",
@@ -45553,7 +45596,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified DaemonSet",
         "operationId": "patchAppsV1NamespacedDaemonSet",
@@ -45743,7 +45787,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified DaemonSet",
         "operationId": "patchAppsV1NamespacedDaemonSetStatus",
@@ -46228,7 +46273,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Deployment",
         "operationId": "patchAppsV1NamespacedDeployment",
@@ -46418,7 +46464,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update scale of the specified Deployment",
         "operationId": "patchAppsV1NamespacedDeploymentScale",
@@ -46608,7 +46655,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Deployment",
         "operationId": "patchAppsV1NamespacedDeploymentStatus",
@@ -47093,7 +47141,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ReplicaSet",
         "operationId": "patchAppsV1NamespacedReplicaSet",
@@ -47283,7 +47332,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update scale of the specified ReplicaSet",
         "operationId": "patchAppsV1NamespacedReplicaSetScale",
@@ -47473,7 +47523,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ReplicaSet",
         "operationId": "patchAppsV1NamespacedReplicaSetStatus",
@@ -47958,7 +48009,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified StatefulSet",
         "operationId": "patchAppsV1NamespacedStatefulSet",
@@ -48148,7 +48200,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update scale of the specified StatefulSet",
         "operationId": "patchAppsV1NamespacedStatefulSetScale",
@@ -48338,7 +48391,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified StatefulSet",
         "operationId": "patchAppsV1NamespacedStatefulSetStatus",
@@ -51140,7 +51194,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscaler",
@@ -51330,7 +51385,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
@@ -52158,7 +52214,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV2NamespacedHorizontalPodAutoscaler",
@@ -52348,7 +52405,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified HorizontalPodAutoscaler",
         "operationId": "patchAutoscalingV2NamespacedHorizontalPodAutoscalerStatus",
@@ -53283,7 +53341,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CronJob",
         "operationId": "patchBatchV1NamespacedCronJob",
@@ -53473,7 +53532,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified CronJob",
         "operationId": "patchBatchV1NamespacedCronJobStatus",
@@ -53958,7 +54018,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Job",
         "operationId": "patchBatchV1NamespacedJob",
@@ -54148,7 +54209,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Job",
         "operationId": "patchBatchV1NamespacedJobStatus",
@@ -55165,7 +55227,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CertificateSigningRequest",
         "operationId": "patchCertificatesV1CertificateSigningRequest",
@@ -55352,7 +55415,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update approval of the specified CertificateSigningRequest",
         "operationId": "patchCertificatesV1CertificateSigningRequestApproval",
@@ -55539,7 +55603,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified CertificateSigningRequest",
         "operationId": "patchCertificatesV1CertificateSigningRequestStatus",
@@ -56207,7 +56272,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ClusterTrustBundle",
         "operationId": "patchCertificatesV1alpha1ClusterTrustBundle",
@@ -56988,7 +57054,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Lease",
         "operationId": "patchCoordinationV1NamespacedLease",
@@ -57816,7 +57883,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified LeaseCandidate",
         "operationId": "patchCoordinationV1alpha1NamespacedLeaseCandidate",
@@ -58677,7 +58745,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified EndpointSlice",
         "operationId": "patchDiscoveryV1NamespacedEndpointSlice",
@@ -59538,7 +59607,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Event",
         "operationId": "patchEventsV1NamespacedEvent",
@@ -60319,7 +60389,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1FlowSchema",
@@ -60506,7 +60577,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1FlowSchemaStatus",
@@ -60985,7 +61057,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1PriorityLevelConfiguration",
@@ -61172,7 +61245,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1PriorityLevelConfigurationStatus",
@@ -61996,7 +62070,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1beta3FlowSchema",
@@ -62183,7 +62258,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified FlowSchema",
         "operationId": "patchFlowcontrolApiserverV1beta3FlowSchemaStatus",
@@ -62662,7 +62738,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfiguration",
@@ -62849,7 +62926,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified PriorityLevelConfiguration",
         "operationId": "patchFlowcontrolApiserverV1beta3PriorityLevelConfigurationStatus",
@@ -63706,7 +63784,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified StorageVersion",
         "operationId": "patchInternalApiserverV1alpha1StorageVersion",
@@ -63893,7 +63972,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified StorageVersion",
         "operationId": "patchInternalApiserverV1alpha1StorageVersionStatus",
@@ -64594,7 +64674,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified IngressClass",
         "operationId": "patchNetworkingV1IngressClass",
@@ -65153,7 +65234,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Ingress",
         "operationId": "patchNetworkingV1NamespacedIngress",
@@ -65343,7 +65425,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified Ingress",
         "operationId": "patchNetworkingV1NamespacedIngressStatus",
@@ -65828,7 +65911,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified NetworkPolicy",
         "operationId": "patchNetworkingV1NamespacedNetworkPolicy",
@@ -67042,7 +67126,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified IPAddress",
         "operationId": "patchNetworkingV1beta1IPAddress",
@@ -67521,7 +67606,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ServiceCIDR",
         "operationId": "patchNetworkingV1beta1ServiceCIDR",
@@ -67708,7 +67794,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ServiceCIDR",
         "operationId": "patchNetworkingV1beta1ServiceCIDRStatus",
@@ -68565,7 +68652,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified RuntimeClass",
         "operationId": "patchNodeV1RuntimeClass",
@@ -69272,7 +69360,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PodDisruptionBudget",
         "operationId": "patchPolicyV1NamespacedPodDisruptionBudget",
@@ -69462,7 +69551,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified PodDisruptionBudget",
         "operationId": "patchPolicyV1NamespacedPodDisruptionBudgetStatus",
@@ -70317,7 +70407,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ClusterRoleBinding",
         "operationId": "patchRbacAuthorizationV1ClusterRoleBinding",
@@ -70796,7 +70887,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ClusterRole",
         "operationId": "patchRbacAuthorizationV1ClusterRole",
@@ -71281,7 +71373,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified RoleBinding",
         "operationId": "patchRbacAuthorizationV1NamespacedRoleBinding",
@@ -71766,7 +71859,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified Role",
         "operationId": "patchRbacAuthorizationV1NamespacedRole",
@@ -73243,7 +73337,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified DeviceClass",
         "operationId": "patchResourceV1alpha3DeviceClass",
@@ -73728,7 +73823,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ResourceClaim",
         "operationId": "patchResourceV1alpha3NamespacedResourceClaim",
@@ -73918,7 +74014,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified ResourceClaim",
         "operationId": "patchResourceV1alpha3NamespacedResourceClaimStatus",
@@ -74403,7 +74500,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ResourceClaimTemplate",
         "operationId": "patchResourceV1alpha3NamespacedResourceClaimTemplate",
@@ -75030,7 +75128,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified ResourceSlice",
         "operationId": "patchResourceV1alpha3ResourceSlice",
@@ -76359,7 +76458,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified PriorityClass",
         "operationId": "patchSchedulingV1PriorityClass",
@@ -77060,7 +77160,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CSIDriver",
         "operationId": "patchStorageV1CSIDriver",
@@ -77539,7 +77640,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CSINode",
         "operationId": "patchStorageV1CSINode",
@@ -78098,7 +78200,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified CSIStorageCapacity",
         "operationId": "patchStorageV1NamespacedCSIStorageCapacity",
@@ -78577,7 +78680,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified StorageClass",
         "operationId": "patchStorageV1StorageClass",
@@ -79056,7 +79160,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified VolumeAttachment",
         "operationId": "patchStorageV1VolumeAttachment",
@@ -79243,7 +79348,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified VolumeAttachment",
         "operationId": "patchStorageV1VolumeAttachmentStatus",
@@ -80615,7 +80721,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified VolumeAttributesClass",
         "operationId": "patchStorageV1alpha1VolumeAttributesClass",
@@ -81283,7 +81390,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified VolumeAttributesClass",
         "operationId": "patchStorageV1beta1VolumeAttributesClass",
@@ -81984,7 +82092,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update the specified StorageVersionMigration",
         "operationId": "patchStoragemigrationV1alpha1StorageVersionMigration",
@@ -82171,7 +82280,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update status of the specified StorageVersionMigration",
         "operationId": "patchStoragemigrationV1alpha1StorageVersionMigrationStatus",
