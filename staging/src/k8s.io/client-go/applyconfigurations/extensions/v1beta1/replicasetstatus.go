@@ -25,6 +25,7 @@ type ReplicaSetStatusApplyConfiguration struct {
 	FullyLabeledReplicas *int32                                  `json:"fullyLabeledReplicas,omitempty"`
 	ReadyReplicas        *int32                                  `json:"readyReplicas,omitempty"`
 	AvailableReplicas    *int32                                  `json:"availableReplicas,omitempty"`
+	TerminatingReplicas  *int32                                  `json:"terminatingReplicas,omitempty"`
 	ObservedGeneration   *int64                                  `json:"observedGeneration,omitempty"`
 	Conditions           []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty"`
 }
@@ -64,6 +65,14 @@ func (b *ReplicaSetStatusApplyConfiguration) WithReadyReplicas(value int32) *Rep
 // If called multiple times, the AvailableReplicas field is set to the value of the last call.
 func (b *ReplicaSetStatusApplyConfiguration) WithAvailableReplicas(value int32) *ReplicaSetStatusApplyConfiguration {
 	b.AvailableReplicas = &value
+	return b
+}
+
+// WithTerminatingReplicas sets the TerminatingReplicas field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TerminatingReplicas field is set to the value of the last call.
+func (b *ReplicaSetStatusApplyConfiguration) WithTerminatingReplicas(value int32) *ReplicaSetStatusApplyConfiguration {
+	b.TerminatingReplicas = &value
 	return b
 }
 
