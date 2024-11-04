@@ -275,19 +275,31 @@ func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj,
 
 type podResizeStrategy struct {
 	podStrategy
+
+	resetFieldsFilter fieldpath.Filter
 }
 
 // ResizeStrategy wraps and exports the used podStrategy for the storage package.
-var ResizeStrategy = podResizeStrategy{Strategy}
+var ResizeStrategy = podResizeStrategy{
+	podStrategy: Strategy,
+	resetFieldsFilter: fieldpath.NewIncludeMatcherFilter(
+		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resources"),
+		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
+	),
+}
 
-// dropNonPodResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
-func dropNonPodResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
+// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
+func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	pod := dropPodUpdates(newPod, oldPod)
 
+	// Containers are not allowed to be re-ordered, but in case they were,
+	// we don't want to corrupt them here. It will get caught in validation.
 	oldCtrToIndex := make(map[string]int)
 	for idx, ctr := range pod.Spec.Containers {
 		oldCtrToIndex[ctr.Name] = idx
 	}
+	// TODO: Once we add in-place pod resize support for sidecars, we need to allow
+	// modifying sidecar resources via resize subresource too.
 	for _, ctr := range newPod.Spec.Containers {
 		idx, ok := oldCtrToIndex[ctr.Name]
 		if !ok {
@@ -303,7 +315,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 
-	*newPod = *dropNonPodResizeUpdates(newPod, oldPod)
+	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
@@ -323,12 +335,9 @@ func (podResizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 
 // GetResetFieldsFilter returns a set of fields filter reset by the strategy
 // and should not be modified by the user.
-func (podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter {
+func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter {
 	return map[fieldpath.APIVersion]fieldpath.Filter{
-		"v1": fieldpath.NewIncludeMatcherFilter(
-			fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resources"),
-			fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
-		),
+		"v1": p.resetFieldsFilter,
 	}
 }
 

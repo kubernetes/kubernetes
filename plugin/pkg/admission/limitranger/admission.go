@@ -415,7 +415,8 @@ func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange,
 // SupportsAttributes ignores all calls that do not deal with pod resources or storage requests (PVCs).
 // Also ignores any call that has a subresource defined.
 func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) bool {
-	// Handle the special case for in-place pod vertical scaling
+	// Handle in-place vertical scaling of pods, where users modify container
+	// resources using the resize subresource.
 	if a.GetSubresource() == "resize" && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
 		return true
 	}
