@@ -1955,7 +1955,11 @@
       measurePods: 1000 # Must be initNodes * 10
 
 # This test case is used to measure the impact of Queuing Hints on scheduling throughput when handling unschedulable pods.
-# Various pods are created that are unschedulable for different reasons, each filtered out by different scheduling plugins.
+# First, 10 nodes are created using the default node template.
+# Then, 25 pods are created that become unschedulable due to the NodeResourcesFit plugin.
+# Next, 25 pods are created that become unschedulable due to the NodeAffinity plugin.
+# Then, 25 pods are created that become unschedulable due to the TaintToleration plugin.
+# Finally, 25 pods are created that become unschedulable due to the InterPodAffinity plugin.
 # The test compares the scheduler's performance with Queuing Hints enabled and disabled.
 # Plugins covered: NodeResourcesFit, NodeAffinity, TaintToleration, InterPodAffinity.
 - name: UnschedulablePodsTest
