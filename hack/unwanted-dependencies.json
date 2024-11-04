@@ -210,7 +210,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "k8s.io/kubectl",
         "k8s.io/kubernetes",
-        "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
