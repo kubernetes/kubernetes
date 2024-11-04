@@ -31,8 +31,8 @@ import (
 	"golang.org/x/time/rate"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/lru"
 
-	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
@@ -2654,7 +2654,7 @@ func assertState(s state) step {
 				}
 				if len(s.absentOwnerCache) != ctx.gc.absentOwnerCache.cache.Len() {
 					// only way to inspect is to drain them all, but that's ok because we're failing the test anyway
-					ctx.gc.absentOwnerCache.cache.OnEvicted = func(key lru.Key, item interface{}) {
+					err := ctx.gc.absentOwnerCache.cache.SetEvictionFunc(func(key lru.Key, item interface{}) {
 						found := false
 						for _, absent := range s.absentOwnerCache {
 							if absent == key {
@@ -2665,6 +2665,9 @@ func assertState(s state) step {
 						if !found {
 							ctx.t.Errorf("unexpected item in absent owner cache: %s", key)
 						}
+					})
+					if err != nil {
+						ctx.t.Error("unexpected error setting eviction function: %w", err)
 					}
 					ctx.gc.absentOwnerCache.cache.Clear()
 					ctx.t.Error("unexpected items in absent owner cache")

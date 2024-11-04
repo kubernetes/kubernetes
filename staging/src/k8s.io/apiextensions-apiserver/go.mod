@@ -33,7 +33,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20240827152857-f7e401e7b4c2
-	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
+	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2
 	sigs.k8s.io/yaml v1.4.0
@@ -59,7 +59,6 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
