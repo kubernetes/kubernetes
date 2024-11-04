@@ -4181,6 +4181,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = new(AppArmorProfile)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SELinuxChangePolicy != nil {
+		in, out := &in.SELinuxChangePolicy, &out.SELinuxChangePolicy
+		*out = new(PodSELinuxChangePolicy)
+		**out = **in
+	}
 	return
 }
 

@@ -766,7 +766,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -813,7 +813,7 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -860,7 +860,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -907,7 +907,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
@@ -954,7 +954,7 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 
 	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod)
+	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
 		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 

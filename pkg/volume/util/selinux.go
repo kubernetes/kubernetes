@@ -174,16 +174,20 @@ func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
 	if volumeSpec.PersistentVolume == nil {
 		return false
 	}
-	if len(volumeSpec.PersistentVolume.Spec.AccessModes) != 1 {
-		return false
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMount) {
 		return true
 	}
-	// Only SELinuxMountReadWriteOncePod feature enabled
-	if !v1helper.ContainsAccessMode(volumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
+
+	// Only SELinuxMountReadWriteOncePod feature is enabled
+	if len(volumeSpec.PersistentVolume.Spec.AccessModes) != 1 {
+		// RWOP volumes must be the only access mode of the volume
 		return false
 	}
+	if !v1helper.ContainsAccessMode(volumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
+		// Not a RWOP volume
+		return false
+	}
+	// RWOP volume
 	return true
 }
 
