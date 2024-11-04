@@ -52,7 +52,7 @@ func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else {
 		if len(name) > resource.PoolNameMaxLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath, name, resource.PoolNameMaxLength))
+			allErrs = append(allErrs, field.TooLong(fldPath, name, resource.PoolNameMaxLength))
 		}
 		parts := strings.Split(name, "/")
 		for _, part := range parts {
@@ -168,7 +168,7 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 		envType = environment.StoredExpressions
 	}
 	if len(celSelector.Expression) > resource.CELSelectorExpressionMaxLength {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("expression"), "<value omitted>", resource.CELSelectorExpressionMaxLength))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("expression"), "<value omitted>", resource.CELSelectorExpressionMaxLength))
 		// Don't bother compiling too long expressions.
 		return allErrs
 	}
@@ -561,7 +561,7 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 	}
 	if attribute.StringValue != nil {
 		if len(*attribute.StringValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("string"), *attribute.StringValue, resource.DeviceAttributeMaxValueLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("string"), *attribute.StringValue, resource.DeviceAttributeMaxValueLength))
 		}
 		numFields++
 	}
@@ -571,7 +571,7 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
 		}
 		if len(*attribute.VersionValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("version"), *attribute.VersionValue, resource.DeviceAttributeMaxValueLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("version"), *attribute.VersionValue, resource.DeviceAttributeMaxValueLength))
 		}
 	}
 
@@ -628,7 +628,7 @@ func validateFullyQualifiedName(name resource.FullyQualifiedName, fldPath *field
 func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(id) > resource.DeviceMaxIDLength {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, id, resource.DeviceMaxIDLength))
+		allErrs = append(allErrs, field.TooLong(fldPath, id, resource.DeviceMaxIDLength))
 	}
 	for _, msg := range validation.IsCIdentifier(id) {
 		allErrs = append(allErrs, field.TypeInvalid(fldPath, id, msg))
@@ -649,7 +649,7 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(slice), maxSize))
+		allErrs = append(allErrs, field.TooMany(fldPath, len(slice), maxSize))
 	}
 	return allErrs
 }
@@ -685,7 +685,7 @@ func stringKey(item string) (string, string) {
 func validateMap[K ~string, T any](m map[K]T, maxSize int, validateKey func(K, *field.Path) field.ErrorList, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if maxSize >= 0 && len(m) > maxSize {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(m), maxSize))
+		allErrs = append(allErrs, field.TooMany(fldPath, len(m), maxSize))
 	}
 	for key, item := range m {
 		allErrs = append(allErrs, validateKey(key, fldPath)...)

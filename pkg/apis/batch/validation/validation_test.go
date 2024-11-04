@@ -436,7 +436,7 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
-		`spec.managedBy: Too long: may not be longer than 63`: {
+		`spec.managedBy: Too long: may not be more than 63 bytes`: {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
@@ -519,7 +519,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		`spec.successPolicy.rules[0].succeededIndexes: Too long: must have at most 65536 bytes`: {
+		`spec.successPolicy.rules[0].succeededIndexes: Too long: may not be more than 65536 bytes`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{

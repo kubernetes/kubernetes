@@ -218,7 +218,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.ManagedBy != nil {
 		allErrs = append(allErrs, apimachineryvalidation.IsDomainPrefixedPath(fldPath.Child("managedBy"), *spec.ManagedBy)...)
 		if len(*spec.ManagedBy) > maxManagedByLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("managedBy"), *spec.ManagedBy, maxManagedByLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("managedBy"), *spec.ManagedBy, maxManagedByLength))
 		}
 	}
 	if spec.CompletionMode != nil {

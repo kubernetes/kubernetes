@@ -381,7 +381,7 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 		})
 
 		err := writeConfigMap(client.CoreV1(), cm)
-		if err == nil || err.Error() != `ConfigMap "extension-apiserver-authentication" is invalid: []: Too long: must have at most 1048576 bytes` {
+		if err == nil || err.Error() != `ConfigMap "extension-apiserver-authentication" is invalid: []: Too long: may not be more than 1048576 bytes` {
 			t.Fatal(err)
 		}
 		if len(client.Actions()) != 2 {

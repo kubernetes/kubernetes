@@ -190,7 +190,7 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
+				allErrs = append(allErrs, field.TooLong(errPath, value, int(max)))
 
 			case openapierrors.MaxItemsFailCode:
 				actual := int64(-1)
