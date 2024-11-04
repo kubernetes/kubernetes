@@ -32,14 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/utils/lru"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -528,8 +531,11 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
-			podRequests := podRequests(pod)
-			podLimits := podLimits(pod)
+			opts := podResourcesOptions{
+				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			}
+			podRequests := podRequests(pod, opts)
+			podLimits := podLimits(pod, opts)
 			for k, v := range limit.Min {
 				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
@@ -550,13 +556,22 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 	return utilerrors.NewAggregate(errs)
 }
 
+type podResourcesOptions struct {
+	// PodLevelResourcesEnabled indicates that the PodLevelResources feature gate is
+	// enabled.
+	PodLevelResourcesEnabled bool
+}
+
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
 // NOTE: We do not want to check status resources here, only the spec. This is equivalent to setting
 // UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodRequests.
-func podRequests(pod *api.Pod) api.ResourceList {
+// TODO(ndixita): PodRequests method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go. Refactor the code to
+// avoid duplicating podRequests method.
+func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	reqs := api.ResourceList{}
 
 	for _, container := range pod.Spec.Containers {
@@ -589,6 +604,19 @@ func podRequests(pod *api.Pod) api.ResourceList {
 	}
 
 	maxResourceList(reqs, initContainerReqs)
+
+	// If PodLevelResources feature is enabled and resources are set at pod-level,
+	// override aggregated container requests of resources supported by pod-level
+	// resources with quantities specified at pod-level.
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		for resourceName, quantity := range pod.Spec.Resources.Requests {
+			if isSupportedPodLevelResource(resourceName) {
+				// override with pod-level resource requests
+				reqs[resourceName] = quantity
+			}
+		}
+	}
+
 	return reqs
 }
 
@@ -598,7 +626,10 @@ func podRequests(pod *api.Pod) api.ResourceList {
 // UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodLimits.
-func podLimits(pod *api.Pod) api.ResourceList {
+// TODO(ndixita): PodLimits method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go. Refactor the code to
+// avoid duplicating podLimits method.
+func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	limits := api.ResourceList{}
 
 	for _, container := range pod.Spec.Containers {
@@ -628,7 +659,33 @@ func podLimits(pod *api.Pod) api.ResourceList {
 
 	maxResourceList(limits, initContainerLimits)
 
+	// If PodLevelResources feature is enabled and resources are set at pod-level,
+	// override aggregated container limits of resources supported by pod-level
+	// resources with quantities specified at pod-level.
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		for resourceName, quantity := range pod.Spec.Resources.Limits {
+			if isSupportedPodLevelResource(resourceName) {
+				// override with pod-level resource limits
+				limits[resourceName] = quantity
+			}
+		}
+	}
+
 	return limits
+}
+
+var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory)
+
+// isSupportedPodLevelResources checks if a given resource is supported by pod-level
+// resource management through the PodLevelResources feature. Returns true if
+// the resource is supported.
+// isSupportedPodLevelResource method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go.
+// isSupportedPodLevelResource is added here to avoid conversion of v1.
+// Pod to api.Pod.
+// TODO(ndixita): Find alternatives to avoid duplicating the code.
+func isSupportedPodLevelResource(name api.ResourceName) bool {
+	return supportedPodLevelResources.Has(name)
 }
 
 // addResourceList adds the resources in newList to list.
