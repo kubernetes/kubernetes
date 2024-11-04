@@ -68,8 +68,8 @@ func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerNam
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
-func (m *fakeManager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
-	return m.state.GetPodResizeStatus(podUID)
+func (m *fakeManager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
+	return m.state.GetPodResizeStatus(string(podUID))
 }
 
 func (m *fakeManager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
@@ -86,8 +86,8 @@ func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 	return nil
 }
 
-func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
-	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
+	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
 }
 
 // NewFakeManager creates empty/fake memory manager

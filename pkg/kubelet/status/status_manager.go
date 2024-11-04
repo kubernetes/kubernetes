@@ -143,11 +143,11 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
-	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
+	// GetPodResizeStatus returns cached PodStatus.Resize value
+	GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus
 
-	// SetPodResizeStatus checkpoints the last resizing decision for the pod.
-	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus) error
+	// SetPodResizeStatus caches the last resizing decision for the pod.
+	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus)
 
 	allocationManager
 }
@@ -285,12 +285,11 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 	return pod, updated
 }
 
-// GetPodResizeStatus returns the last checkpointed ResizeStaus value
-// If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
+// GetPodResizeStatus returns the last cached ResizeStatus value.
+func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.GetPodResizeStatus(podUID)
+	return m.state.GetPodResizeStatus(string(podUID))
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
@@ -307,10 +306,10 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 }
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
-func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
+func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {

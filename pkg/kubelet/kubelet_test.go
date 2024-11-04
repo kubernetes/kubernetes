@@ -2777,7 +2777,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			require.True(t, found, "container allocation")
 			assert.Equal(t, tt.expectedAllocations, alloc.Requests, "stored container allocation")
 
-			resizeStatus, _ := kubelet.statusManager.GetPodResizeStatus(string(newPod.UID))
+			resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
 			assert.Equal(t, tt.expectedResize, resizeStatus)
 		})
 	}

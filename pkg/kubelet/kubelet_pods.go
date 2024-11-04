@@ -1750,13 +1750,11 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kub
 
 	// If pod is terminal, clear the resize status.
 	if podIsTerminal {
-		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
-			klog.ErrorS(err, "SetPodResizeStatus failed for terminal pod", "pod", format.Pod(allocatedPod))
-		}
+		kl.statusManager.SetPodResizeStatus(allocatedPod.UID, "")
 		return ""
 	}
 
-	resizeStatus, _ := kl.statusManager.GetPodResizeStatus(string(allocatedPod.UID))
+	resizeStatus := kl.statusManager.GetPodResizeStatus(allocatedPod.UID)
 	return resizeStatus
 }
 
