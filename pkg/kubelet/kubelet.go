@@ -114,7 +114,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -2817,14 +2816,10 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
 		if resizeInProgress {
 			// If a resize in progress, make sure the cache has the correct state in case the Kubelet restarted.
-			if err := kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress); err != nil {
-				klog.ErrorS(err, "Failed to set resize status to InProgress", "pod", format.Pod(pod))
-			}
+			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
 		} else {
 			// (Desired == Allocated == Actual) => clear the resize status.
-			if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
-				klog.ErrorS(err, "Failed to clear resize status", "pod", format.Pod(pod))
-			}
+			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
 
 		// Pod is not resizing, nothing more to do here.
@@ -2842,9 +2837,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		allocatedPod = pod
 	}
 	if resizeStatus != "" {
-		if err := kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus); err != nil {
-			klog.ErrorS(err, "Failed to set resize status", "pod", format.Pod(pod), "resizeStatus", resizeStatus)
-		}
+		kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus)
 	}
 	return allocatedPod, nil
 }
