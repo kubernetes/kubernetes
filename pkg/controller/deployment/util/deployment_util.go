@@ -497,16 +497,22 @@ func getReplicaSetFraction(logger klog.Logger, rs apps.ReplicaSet, d apps.Deploy
 
 	deploymentMaxReplicas := *(d.Spec.Replicas) + MaxSurge(d)
 	deploymentMaxReplicasBeforeScale, ok := getMaxReplicasAnnotation(logger, &rs)
-	if !ok {
-		// If we cannot find the annotation then fallback to the current deployment size. Note that this
-		// will not be an accurate proportion estimation in case other replica sets have different values
+	if !ok || deploymentMaxReplicasBeforeScale == 0 {
+		// If we cannot find the annotation then fallback to the current deployment size.
+		// This can occur if someone tampers with the annotation (removes it, sets it to an invalid value, or to 0).
+		// Note that this will not be an accurate proportion estimation in case other replica sets have different values
 		// which means that the deployment was scaled at some point but we at least will stay in limits
 		// due to the min-max comparisons in GetReplicaSetProportion.
 		deploymentMaxReplicasBeforeScale = d.Status.Replicas
+		if deploymentMaxReplicasBeforeScale == 0 {
+			// Rare situation: missing annotation; some actor has removed it and pods are failing to be created.
+			return 0
+		}
 	}
 
 	// We should never proportionally scale up from zero (see GetReplicaSetProportion) which means rs.spec.replicas will never be zero here.
 	scaleBase := *(rs.Spec.Replicas)
+	// deploymentMaxReplicasBeforeScale should normally be a positive value, and we have made sure that it is not a zero.
 	newRSsize := (float64(scaleBase * deploymentMaxReplicas)) / float64(deploymentMaxReplicasBeforeScale)
 	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
 }
