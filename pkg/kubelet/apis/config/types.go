@@ -509,7 +509,7 @@ type KubeletConfiguration struct {
 
 	// CrashLoopBackOff contains config to modify node-level parameters for
 	// container restart behavior
-	// +featureGate=EnableKubeletCrashLoopBackoffMax
+	// +featureGate=KubeletCrashLoopBackoffMax
 	// +optional
 	CrashLoopBackOff *CrashLoopBackOffConfig
 }
