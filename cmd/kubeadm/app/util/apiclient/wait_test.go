@@ -24,13 +24,16 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
+// TestGetControlPlaneComponents tests the getControlPlaneComponents function
 func TestGetControlPlaneComponents(t *testing.T) {
+	// Define test cases with different ClusterConfiguration inputs and expected outputs
 	testcases := []struct {
 		name     string
 		cfg      *kubeadmapi.ClusterConfiguration
 		expected []controlPlaneComponent
 	}{
 		{
+			// Test case: Custom port and address settings from config
 			name: "port and addresses from config",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				APIServer: kubeadmapi.APIServer{
@@ -61,6 +64,7 @@ func TestGetControlPlaneComponents(t *testing.T) {
 			},
 		},
 		{
+			// Test case: Default port and address values
 			name: "default ports and addresses",
 			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []controlPlaneComponent{
@@ -71,9 +75,12 @@ func TestGetControlPlaneComponents(t *testing.T) {
 		},
 	}
 
+	// Iterate over each test case and run the test
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Call the function being tested
 			actual := getControlPlaneComponents(tc.cfg)
+			// Compare the actual result with the expected result
 			if !reflect.DeepEqual(tc.expected, actual) {
 				t.Fatalf("expected result: %+v, got: %+v", tc.expected, actual)
 			}
