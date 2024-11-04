@@ -492,6 +492,13 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		result := metrics.GoroutineResultSuccess
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+		defer func() {
+			if result == metrics.GoroutineResultError {
+				// When API call isn't successful, the Pod may get stuck in the unschedulable pod pool in the worst case.
+				// So, we should move the Pod to the activeQ anyways.
+				ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
+			}
+		}()
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
 
@@ -506,13 +513,6 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// We do not return as this error is not critical.
 		}
 
-		// We can evict all victims in parallel, but the last one.
-		// We have to remove the pod from the preempting map before the last one is evicted
-		// because, otherwise, the pod removal might be notified to the scheduling queue before
-		// we remove this pod from the preempting map,
-		// and the pod could end up stucking at the unschedulable pod pool
-		// by all the pod removal events being ignored.
-
 		if len(c.Victims().Pods) == 0 {
 			ev.mu.Lock()
 			delete(ev.preempting, pod.UID)
@@ -521,9 +521,15 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			return
 		}
 
+		// We can evict all victims in parallel, but the last one.
+		// We have to remove the pod from the preempting map before the last one is evicted
+		// because, otherwise, the pod removal might be notified to the scheduling queue before
+		// we remove this pod from the preempting map,
+		// and the pod could end up stucking at the unschedulable pod pool
+		// by all the pod removal events being ignored.
 		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
 		if err := errCh.ReceiveError(); err != nil {
-			logger.Error(err, "Error occurred during preemption")
+			logger.Error(err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
 
@@ -532,7 +538,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		ev.mu.Unlock()
 
 		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
-			logger.Error(err, "Error occurred during preemption")
+			logger.Error(err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
 

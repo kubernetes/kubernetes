@@ -770,6 +770,8 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+	// SetPodActivator sets the PodActivator
+	SetPodActivator(activator PodActivator)
 
 	// Close calls Close method of each plugin.
 	Close() error
@@ -783,6 +785,8 @@ type Handle interface {
 	PodNominator
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
+	// PodActivator abstracts operations in the scheduling queue.
+	PodActivator
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point.
@@ -894,6 +898,12 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 		return ModeNoop
 	}
 	return ni.NominatingMode
+}
+
+// PodActivator abstracts operations in the scheduling queue.
+type PodActivator interface {
+	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.

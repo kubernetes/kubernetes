@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -84,6 +86,16 @@ func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(_ context.Context, po
 
 func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
 	return nil
+}
+
+type fakePodActivator struct {
+	activatedPods map[string]*v1.Pod
+}
+
+func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
+	for name, pod := range pods {
+		f.activatedPods[name] = pod
+	}
 }
 
 type FakePreemptionScorePostFilterPlugin struct{}
@@ -437,6 +449,7 @@ func TestPrepareCandidate(t *testing.T) {
 		expectedStatus *framework.Status
 		// Only compared when async preemption is enabled.
 		expectedPreemptingMap sets.Set[types.UID]
+		expectedActivatedPods map[string]*v1.Pod
 	}{
 		{
 			name: "no victims",
@@ -527,6 +540,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        framework.AsStatus(errors.New("delete pod failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, not-found victim error is ignored when deleting",
@@ -563,6 +577,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        framework.AsStatus(errors.New("patch pod status failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "two victims without condition, one passes successfully and the second fails",
@@ -585,6 +600,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim2"},
 			expectedStatus:        framework.AsStatus(errors.New("patch pod status failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 	}
 
@@ -638,6 +654,7 @@ func TestPrepareCandidate(t *testing.T) {
 
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
 				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
+				fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod)}
 				fwk, err := tf.NewFramework(
 					ctx,
 					registeredPlugins, "",
@@ -648,6 +665,7 @@ func TestPrepareCandidate(t *testing.T) {
 					frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.testPods, nodes)),
 					frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 					frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, "test-scheduler")),
+					frameworkruntime.WithPodActivator(fakeActivator),
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -671,8 +689,6 @@ func TestPrepareCandidate(t *testing.T) {
 					pe.mu.Unlock()
 					// make the requests complete
 					close(requestStopper)
-
-					return
 				} else {
 					close(requestStopper) // no need to stop requests
 					status := pe.prepareCandidate(ctx, tt.candidate, tt.preemptor, "test-plugin")
@@ -705,6 +721,18 @@ func TestPrepareCandidate(t *testing.T) {
 						lastErrMsg = fmt.Sprintf("expected patch error %v, got %v", tt.expectedPatchError, patchFailure)
 						return false, nil
 					}
+
+					if asyncPreemptionEnabled {
+						if tt.expectedActivatedPods != nil && !reflect.DeepEqual(tt.expectedActivatedPods, fakeActivator.activatedPods) {
+							lastErrMsg = fmt.Sprintf("expected activated pods %v, got %v", tt.expectedActivatedPods, fakeActivator.activatedPods)
+							return false, nil
+						}
+						if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
+							lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
+							return false, nil
+						}
+					}
+
 					return true, nil
 				}); err != nil {
 					t.Fatal(lastErrMsg)
