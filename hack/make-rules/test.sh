@@ -19,6 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+KUBE_SUBDIR=${KUBE_SUBDIR:-"n"}
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -35,6 +36,10 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 kube::test::find_go_packages() {
   (
+    local dir="${1:-}"
+    dir=$(echo "$dir" | sed 's:^./::')
+    dir="k8s.io/kubernetes/${dir}"
+
     cd "${KUBE_ROOT}"
 
     # Get a list of all the modules in this workspace.
@@ -43,7 +48,7 @@ kube::test::find_go_packages() {
 
     # Get a list of all packages which have test files, but filter out ones
     # that we don't want to run by default (i.e. are not unit-tests).
-    go list -find \
+    kube::util::read-array workspace_module_patterns < <(go list -find \
         -f '{{if or (gt (len .TestGoFiles) 0) (gt (len .XTestGoFiles) 0)}}{{.ImportPath}}{{end}}' \
         "${workspace_module_patterns[@]}" \
         | grep -vE \
@@ -53,6 +58,18 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/test/e2e_node(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
             -e '^k8s.io/.*/test/integration(/.*)?$'
+    )
+
+    if [[ -n "${dir}" ]]; then
+      # If dir is not empty, filter out packages from workspace_module_patterns that contain dir
+      for pattern in "${workspace_module_patterns[@]}"; do
+        if [[ "$pattern" == "${dir}"* ]]; then
+          echo "$pattern"
+        fi
+      done
+    else
+      printf "%s\n" "${workspace_module_patterns[@]}"
+    fi
   )
 }
 
@@ -160,7 +177,17 @@ else
   # If the user passed targets, we should normalize them.
   # This can be slow for large numbers of inputs.
   kube::log::status "Normalizing Go targets"
+  sub_path_testcases=()
+  if [[ "${KUBE_SUBDIR,,}" == "y" ]]; then
+    for test_path in "${testcases[@]}"; do
+      cases=()
+      kube::util::read-array cases < <(kube::test::find_go_packages "$test_path")
+      sub_path_testcases=("${sub_path_testcases[@]}" "${cases[@]}")
+
+    done
+  fi
   kube::util::read-array testcases < <(kube::golang::normalize_go_targets "${testcases[@]}")
+  testcases=("${testcases[@]}" "${sub_path_testcases[@]}")
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
