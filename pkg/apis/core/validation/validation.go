@@ -5524,7 +5524,7 @@ func isPodResizeRequestValid(pod core.Pod) bool {
 	// This code handles the version skew as described in the KEP.
 	// For handling version skew we're only allowing to update the Pod's Resources
 	// if the Pod already has Pod.Status.ContainerStatuses[i].Resources. This means
-	// that the apiserver would only allow updates to Pods running on Nodes with 
+	// that the apiserver would only allow updates to Pods running on Nodes with
 	// the InPlacePodVerticalScaling feature gate enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false
