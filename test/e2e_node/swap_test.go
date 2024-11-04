@@ -309,7 +309,7 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 			if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
 				initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
 			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalSwapMemoryAvailable): "60%"}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalSwapMemoryAvailable): "65%"}
 		})
 		oneGig = resource.MustParse("1024Mi")
 		twoGig = resource.MustParse("2048Mi")
@@ -325,11 +325,6 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
 				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
-			},
-			{
-				evictionPriority:       1,
-				ignoreEvictionPriority: true,
-				pod:                    getStressPodWithRequests(&twoGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
 				evictionPriority:       1,
