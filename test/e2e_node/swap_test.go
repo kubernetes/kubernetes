@@ -329,6 +329,11 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 			{
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
 				pod:                    getStressPodWithRequests(&twoGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
