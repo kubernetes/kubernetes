@@ -464,10 +464,10 @@ func MaxSurge(deployment apps.Deployment) int32 {
 	return maxSurge
 }
 
-// GetProportion will estimate the proportion for the provided replica set using 1. the current size
+// GetReplicaSetProportion will estimate the proportion for the provided replica set using 1. the current size
 // of the parent deployment, 2. the replica count that needs be added on the replica sets of the
 // deployment, and 3. the total replicas added in the replica sets of the deployment so far.
-func GetProportion(logger klog.Logger, rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
+func GetReplicaSetProportion(logger klog.Logger, rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
 	if rs == nil || *(rs.Spec.Replicas) == 0 || deploymentReplicasToAdd == 0 || deploymentReplicasToAdd == deploymentReplicasAdded {
 		return int32(0)
 	}
@@ -495,19 +495,19 @@ func getReplicaSetFraction(logger klog.Logger, rs apps.ReplicaSet, d apps.Deploy
 		return -*(rs.Spec.Replicas)
 	}
 
-	deploymentReplicas := *(d.Spec.Replicas) + MaxSurge(d)
-	annotatedReplicas, ok := getMaxReplicasAnnotation(logger, &rs)
+	deploymentMaxReplicas := *(d.Spec.Replicas) + MaxSurge(d)
+	deploymentMaxReplicasBeforeScale, ok := getMaxReplicasAnnotation(logger, &rs)
 	if !ok {
 		// If we cannot find the annotation then fallback to the current deployment size. Note that this
 		// will not be an accurate proportion estimation in case other replica sets have different values
 		// which means that the deployment was scaled at some point but we at least will stay in limits
-		// due to the min-max comparisons in getProportion.
-		annotatedReplicas = d.Status.Replicas
+		// due to the min-max comparisons in GetReplicaSetProportion.
+		deploymentMaxReplicasBeforeScale = d.Status.Replicas
 	}
 
-	// We should never proportionally scale up from zero which means rs.spec.replicas and annotatedReplicas
-	// will never be zero here.
-	newRSsize := (float64(*(rs.Spec.Replicas) * deploymentReplicas)) / float64(annotatedReplicas)
+	// We should never proportionally scale up from zero (see GetReplicaSetProportion) which means rs.spec.replicas will never be zero here.
+	scaleBase := *(rs.Spec.Replicas)
+	newRSsize := (float64(scaleBase * deploymentMaxReplicas)) / float64(deploymentMaxReplicasBeforeScale)
 	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
 }
 
