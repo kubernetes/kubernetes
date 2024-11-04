@@ -59,7 +59,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			if err := resetCRIProxyInjector(); err != nil {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
 
@@ -68,7 +68,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			err := resetCRIProxyInjector()
+			err := resetCRIProxyInjector(e2eCriProxy)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("cleanup pods")
@@ -82,7 +82,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			timeout := 20 * time.Second
 			callCh := make(chan struct{})
 			callStatus := make(map[int]chan struct{})
-			err := addCRIProxyInjector(func(apiName string) error {
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
 				if apiName == criproxy.PullImage {
 					mu.Lock()
 					callID := len(callStatus)
@@ -142,7 +142,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		var testpods []*v1.Pod
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			if err := resetCRIProxyInjector(); err != nil {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
 
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			err := resetCRIProxyInjector()
+			err := resetCRIProxyInjector(e2eCriProxy)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("cleanup pods")
@@ -166,7 +166,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 			var mu sync.Mutex
 			callCh := make(chan struct{})
 			callStatus := make(map[int]chan struct{})
-			err := addCRIProxyInjector(func(apiName string) error {
+			err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
 				if apiName == criproxy.PullImage {
 					mu.Lock()
 					callID := len(callStatus)
