@@ -360,7 +360,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			// Estimate proportions if we have replicas to add, otherwise simply populate
 			// nameToSize with the current sizes for each replica set.
 			if deploymentReplicasToAdd != 0 {
-				proportion := deploymentutil.GetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
+				proportion := deploymentutil.GetReplicaSetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
 
 				nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion
 				deploymentReplicasAdded += proportion

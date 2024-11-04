@@ -1401,3 +1401,121 @@ func TestMinAvailable(t *testing.T) {
 		})
 	}
 }
+
+func TestGetReplicaSetFraction(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		deploymentReplicas                   int32
+		deploymentStatusReplicas             int32
+		deploymentMaxSurge                   int32
+		rsReplicas                           int32
+		rsAnnotations                        map[string]string
+		expectedFraction                     int32
+	}{
+		{
+			name:               "empty deployment always scales to 0",
+			deploymentReplicas: 0,
+			rsReplicas:         10,
+			expectedFraction:   -10,
+		},
+		{
+			name:               "unsynced deployment does not scale when max-replicas annotation is missing (removed by a 3rd party)",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			expectedFraction:   0,
+		},
+		{
+			name:               "unsynced deployment does not scale when max-replicas annotation is incorrectly set to 0 (by a 3rd party)",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "0",
+			},
+			expectedFraction: 0,
+		},
+		{
+			name:                     "scale up by 1/5 should increase RS replicas by 1/5 when max-replicas annotation is missing (removed by a 3rd party)",
+			deploymentReplicas:       120,
+			deploymentStatusReplicas: 100,
+			rsReplicas:               50,
+			expectedFraction:         10,
+		},
+		{
+			name:                     "scale up by 1/5 should increase RS replicas by 1/5 when max-replicas annotation is incorrectly set to 0 (by a 3rd party)",
+			deploymentReplicas:       120,
+			deploymentStatusReplicas: 100,
+			rsReplicas:               50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "0",
+			},
+			expectedFraction: 10,
+		},
+		{
+			name:               "scale up by 1/5 should increase RS replicas by 1/5",
+			deploymentReplicas: 120,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "100",
+			},
+			expectedFraction: 10,
+		},
+		{
+			name:               "scale up with maxSurge by 1/5 should increase RS replicas approximately by 1/5",
+			deploymentReplicas: 120,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "110",
+			},
+			// expectedFraction is not the whole 1/5 (10) since maxSurge pods have to be taken into account
+			// and replica sets with these surge pods should proportionally scale as well during a rollout
+			expectedFraction: 9,
+		},
+		{
+			name:               "scale down by 1/6 should decrease RS replicas by 1/6",
+			deploymentReplicas: 10,
+			rsReplicas:         6,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "12",
+			},
+			expectedFraction: -1,
+		},
+		{
+			name:               "scale down with maxSurge by 1/6 should decrease RS replicas approximately by 1/6",
+			deploymentReplicas: 100,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "130",
+			},
+			expectedFraction: -8,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			tDeployment := generateDeployment("nginx")
+			tDeployment.Status.Replicas = test.deploymentStatusReplicas
+			tDeployment.Spec.Replicas = ptr.To(test.deploymentReplicas)
+			tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       ptr.To(intstr.FromInt32(test.deploymentMaxSurge)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				},
+			}
+
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.rsAnnotations
+			tRS.Spec.Replicas = ptr.To(test.rsReplicas)
+
+			fraction := getReplicaSetFraction(logger, tRS, tDeployment)
+			if test.expectedFraction != fraction {
+				t.Fatalf("expected fraction: %v, got:%v", test.expectedFraction, fraction)
+			}
+		})
+	}
+}
