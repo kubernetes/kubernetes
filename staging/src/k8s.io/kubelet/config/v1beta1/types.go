@@ -674,12 +674,12 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice
 	// if the next release hides additional metrics, rather than being surprised
 	// when they are permanently removed in the release after that.
-	// Deprecated: Use `metrics` (Metrics) instead.
+	// Deprecated: Use KubeletConfiguration.Metrics.ShowHiddenMetricsForVersion instead, which has a higher precedence.
 	// Default: ""
 	// +optional
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// Metrics specifies the options of metrics.
-	// Refer k8s.io/component-base/metrics/api/ for more information.
+	// Refer https://github.com/kubernetes/component-base/tree/master/metrics/api/ for more information.
 	// Default: nil
 	// +optional
 	Metrics metricsapi.MetricsConfiguration `json:"metrics,omitempty"`
@@ -732,8 +732,7 @@ type KubeletConfiguration struct {
 	// +optional
 	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
 	// logging specifies the options of logging.
-	// Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go)
-	// for more information.
+	// Refer to https://github.com/kubernetes/component-base/tree/master/logs/api/ for more information.
 	// Default:
 	//   Format: text
 	// + optional
