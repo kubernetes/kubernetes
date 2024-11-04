@@ -55,6 +55,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -66,6 +67,7 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -75,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -90,12 +93,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
@@ -3457,6 +3462,203 @@ func TestIsPodResizeInProgress(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.expectResize, isPodResizeInProgress(pod, test.status))
+		})
+	}
+}
+
+func TestRecordAdmissionRejection(t *testing.T) {
+	metrics.Register()
+
+	testCases := []struct {
+		name   string
+		reason string
+		wants  string
+	}{
+		{
+			name:   "AppArmor",
+			reason: lifecycle.AppArmorNotAdmittedReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="AppArmor"} 1
+			`,
+		},
+		{
+			name:   "PodOSSelectorNodeLabelDoesNotMatch",
+			reason: lifecycle.PodOSSelectorNodeLabelDoesNotMatch,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="PodOSSelectorNodeLabelDoesNotMatch"} 1
+            `,
+		},
+		{
+			name:   "PodOSNotSupported",
+			reason: lifecycle.PodOSNotSupported,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="PodOSNotSupported"} 1
+            `,
+		},
+		{
+			name:   "InvalidNodeInfo",
+			reason: lifecycle.InvalidNodeInfo,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="InvalidNodeInfo"} 1
+            `,
+		},
+		{
+			name:   "InitContainerRestartPolicyForbidden",
+			reason: lifecycle.InitContainerRestartPolicyForbidden,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="InitContainerRestartPolicyForbidden"} 1
+            `,
+		},
+		{
+			name:   "UnexpectedAdmissionError",
+			reason: lifecycle.UnexpectedAdmissionError,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="UnexpectedAdmissionError"} 1
+            `,
+		},
+		{
+			name:   "UnknownReason",
+			reason: lifecycle.UnknownReason,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="UnknownReason"} 1
+            `,
+		},
+		{
+			name:   "UnexpectedPredicateFailureType",
+			reason: lifecycle.UnexpectedPredicateFailureType,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="UnexpectedPredicateFailureType"} 1
+            `,
+		},
+		{
+			name:   "node(s) had taints that the pod didn't tolerate",
+			reason: tainttoleration.ErrReasonNotMatch,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="node(s) had taints that the pod didn't tolerate"} 1
+            `,
+		},
+		{
+			name:   "Evicted",
+			reason: eviction.Reason,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="Evicted"} 1
+            `,
+		},
+		{
+			name:   "SysctlForbidden",
+			reason: sysctl.ForbiddenReason,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="SysctlForbidden"} 1
+            `,
+		},
+		{
+			name:   "TopologyAffinityError",
+			reason: topologymanager.ErrorTopologyAffinity,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="TopologyAffinityError"} 1
+            `,
+		},
+		{
+			name:   "NodeShutdown",
+			reason: nodeshutdown.NodeShutdownNotAdmittedReason,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="NodeShutdown"} 1
+            `,
+		},
+		{
+			name:   "OutOfcpu",
+			reason: "OutOfcpu",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="OutOfcpu"} 1
+            `,
+		},
+		{
+			name:   "OutOfmemory",
+			reason: "OutOfmemory",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="OutOfmemory"} 1
+            `,
+		},
+		{
+			name:   "OutOfephemeral-storage",
+			reason: "OutOfephemeral-storage",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="OutOfephemeral-storage"} 1
+            `,
+		},
+		{
+			name:   "OutOfpods",
+			reason: "OutOfpods",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="OutOfpods"} 1
+            `,
+		},
+		{
+			name:   "OutOfgpu",
+			reason: "OutOfgpu",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="OutOfExtendedResources"} 1
+            `,
+		},
+		{
+			name:   "OtherReason",
+			reason: "OtherReason",
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="Other"} 1
+            `,
+		},
+	}
+
+	// Run tests.
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Clear the metrics after the test.
+			metrics.AdmissionRejectionsTotal.Reset()
+
+			// Call the function.
+			recordAdmissionRejection(tc.reason)
+
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), "kubelet_admission_rejections_total"); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }

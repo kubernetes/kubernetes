@@ -149,6 +149,9 @@ const (
 
 	AlignedPhysicalCPU = "physical_cpu"
 	AlignedNUMANode    = "numa_node"
+
+	// Metrics to track kubelet admission rejections.
+	AdmissionRejectionsTotalKey = "admission_rejections_total"
 )
 
 type imageSizeBucket struct {
@@ -994,6 +997,17 @@ var (
 		},
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
+
+	// AdmissionRejectionsTotal tracks the number of failed admission times, currently, just record it for pod additions
+	AdmissionRejectionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           AdmissionRejectionsTotalKey,
+			Help:           "Cumulative number pod admission rejections by the Kubelet.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1091,6 +1105,8 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(DRAOperationsDuration)
 			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
 		}
+
+		legacyregistry.MustRegister(AdmissionRejectionsTotal)
 	})
 }
 
