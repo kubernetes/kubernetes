@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1015,6 +1016,87 @@ func TestMaxUnavailable(t *testing.T) {
 			maxUnavailable := MaxUnavailable(test.deployment)
 			if test.expected != maxUnavailable {
 				t.Fatalf("expected:%v, got:%v", test.expected, maxUnavailable)
+			}
+		})
+	}
+}
+
+func TestGetNonNegativeInt32FromAnnotation(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue int32
+		expectedValid bool
+		expectedErr   string
+	}{
+		{
+			name: "invalid empty",
+		},
+		{
+			name:        "invalid",
+			annotations: map[string]string{"test": "invalid", "foo": "2"},
+			expectedErr: "invalid syntax",
+		},
+		{
+			name:        "invalid negative ",
+			annotations: map[string]string{"test": "-1", "foo": "2"},
+			expectedErr: "invalid syntax",
+		},
+		{
+			name:          "valid zero",
+			annotations:   map[string]string{"test": "0", "foo": "2"},
+			expectedValue: 0,
+			expectedValid: true,
+		},
+		{
+			name:          "valid",
+			annotations:   map[string]string{"test": "13", "foo": "2"},
+			expectedValue: 13,
+			expectedValid: true,
+		},
+		{
+			name:          "valid max",
+			annotations:   map[string]string{"test": fmt.Sprintf("%d", math.MaxInt32), "foo": "2"},
+			expectedValue: math.MaxInt32,
+			expectedValid: true,
+		},
+		{
+			name:        "invalid max out of range",
+			annotations: map[string]string{"test": fmt.Sprintf("%d", uint32(math.MaxInt32)+1), "foo": "2"},
+			expectedErr: "out of range",
+		},
+		{
+			name:        "invalid max out of range 2",
+			annotations: map[string]string{"test": fmt.Sprintf("%d", uint64(math.MaxUint32)+1), "foo": "2"},
+			expectedErr: "out of range",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tDeployment := generateDeployment("nginx")
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.annotations
+			value, valid, err := getNonNegativeInt32FromAnnotation(&tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
+			}
+			if err != nil && !strings.Contains(err.Error(), test.expectedErr) {
+				t.Fatalf("unexpected error, expected: %s, got %v", test.expectedErr, err)
+			}
+			if err == nil && len(test.expectedErr) != 0 {
+				t.Fatalf("didn't return error expected %s", test.expectedErr)
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			value, valid = getNonNegativeInt32FromAnnotationVerbose(logger, &tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
 			}
 		})
 	}
