@@ -21,16 +21,17 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
@@ -45,6 +46,7 @@ import (
 // on the results.
 func TestCompilation(t *testing.T) {
 	deploymentGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	deploymentGVK := schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
 	testCases := []struct {
 		name           string
 		policy         *Policy
@@ -56,429 +58,6 @@ func TestCompilation(t *testing.T) {
 		expectedErr    string
 		expectedResult runtime.Object
 	}{
-		{
-			name: "jsonPatch with false test operation",
-			policy: jsonPatches(policy("d1"),
-				v1alpha1.JSONPatch{
-					Expression: `[
-						JSONPatch{op: "test", path: "/spec/replicas", value: 100}, 
-						JSONPatch{op: "replace", path: "/spec/replicas", value: 3},
-					]`,
-				}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-		},
-		{
-			name: "jsonPatch with true test operation",
-			policy: jsonPatches(policy("d1"),
-				v1alpha1.JSONPatch{
-					Expression: `[
-						JSONPatch{op: "test", path: "/spec/replicas", value: 1}, 
-						JSONPatch{op: "replace", path: "/spec/replicas", value: 3},
-					]`,
-				}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3)}},
-		},
-		{
-			name: "jsonPatch remove to unset field",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "remove", path: "/spec/replicas"}, 
-				]`,
-			}),
-
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch remove map entry by key",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "remove", path: "/metadata/labels/y"}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1", "y": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch remove element in list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "remove", path: "/spec/template/spec/containers/1"}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "c"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch copy map entry by key",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "copy", from: "/metadata/labels/x", path: "/metadata/labels/y"}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1", "y": "1"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch copy first element to end of list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "copy", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}, {Name: "a"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch move map entry by key",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "move", from: "/metadata/labels/x", path: "/metadata/labels/y"}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch move first element to end of list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "move", from: "/spec/template/spec/containers/0", path: "/spec/template/spec/containers/-"}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}, {Name: "c"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "b"}, {Name: "c"}, {Name: "a"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch add map entry by key and value",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/metadata/labels/x", value: "2"}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1", "x": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch add map value to field",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/metadata/labels", value: {"y": "2"}}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch add map to existing map", // performs a replacement
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/metadata/labels", value: {"y": "2"}}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch add to start of list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "x"}, {Name: "a"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch add to end of list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "x"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch replace key in map",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/metadata/labels/x", value: "2"}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "1", "x": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch replace map value of unset field", // adds the field value
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/metadata/labels", value: {"y": "2"}}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch replace map value of set field",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/metadata/labels", value: {"y": "2"}}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "1"}}, Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"y": "2"}}, Spec: appsv1.DeploymentSpec{}},
-		},
-		{
-			name: "jsonPatch replace first element in list",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/spec/template/spec/containers/0", value: {"name": "x"}}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "x"}},
-			}}}},
-		},
-		{
-			name: "jsonPatch replace end of list with - not allowed",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/spec/template/spec/containers/-", value: {"name": "x"}}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedErr: "JSON Patch: replace operation does not apply: doc is missing key: /spec/template/spec/containers/-: missing value",
-		},
-		{
-			name: "jsonPatch replace with variable",
-			policy: jsonPatches(variables(policy("d1"), v1alpha1.Variable{Name: "desired", Expression: "10"}), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "replace", path: "/spec/replicas", value: variables.desired + 1}, 
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](11)}},
-		},
-		{
-			name: "jsonPatch with CEL initializer",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: Object.spec.template.spec.containers{
-							name: "x",
-							ports: [Object.spec.template.spec.containers.ports{containerPort: 8080}],
-						}
-					}, 
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}, {Name: "x", Ports: []corev1.ContainerPort{{ContainerPort: 8080}}}},
-			}}}},
-		},
-		{
-			name: "jsonPatch invalid CEL initializer field",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/spec/template/spec/containers/-", 
-						value: Object.spec.template.spec.containers{
-							name: "x",
-							ports: [Object.spec.template.spec.containers.ports{containerPortZ: 8080}]
-						}
-					}
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedErr: "strict decoding error: unknown field \"spec.template.spec.containers[1].ports[0].containerPortZ\"",
-		},
-		{
-			name: "jsonPatch invalid CEL initializer type",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/spec/template/spec/containers/-", 
-						value: Object.spec.template.spec.containers{
-							name: "x",
-							ports: [Object.spec.template.spec.containers.portsZ{containerPort: 8080}]
-						}
-					}
-				]`,
-			}),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: "a"}},
-			}}}},
-			expectedErr: " mismatch: unexpected type name \"Object.spec.template.spec.containers.portsZ\", expected \"Object.spec.template.spec.containers.ports\", which matches field name path from root Object type",
-		},
-		{
-			name: "jsonPatch add map entry by key and value",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{op: "add", path: "/spec", value: Object.spec{selector: Object.spec.selector{}, replicas: 10}}
-				]`,
-			}),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{}, Replicas: ptr.To[int32](10)}},
-		},
-		{
-			name: "JSONPatch patch type has field access",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/metadata/labels",
-						value: {
-							"op": JSONPatch{op: "opValue"}.op,
-							"path": JSONPatch{path: "pathValue"}.path,
-							"from": JSONPatch{from: "fromValue"}.from,
-							"value": string(JSONPatch{value: "valueValue"}.value),
-						}
-					}
-				]`,
-			}),
-			gvr:    deploymentGVR,
-			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
-				"op":    "opValue",
-				"path":  "pathValue",
-				"from":  "fromValue",
-				"value": "valueValue",
-			}}},
-		},
-		{
-			name: "JSONPatch patch type has field testing",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/metadata/labels",
-						value: {
-							"op": string(has(JSONPatch{op: "opValue"}.op)),
-							"path": string(has(JSONPatch{path: "pathValue"}.path)),
-							"from": string(has(JSONPatch{from: "fromValue"}.from)),
-							"value": string(has(JSONPatch{value: "valueValue"}.value)),
-							"op-unset": string(has(JSONPatch{}.op)),
-							"path-unset": string(has(JSONPatch{}.path)),
-							"from-unset": string(has(JSONPatch{}.from)),
-							"value-unset": string(has(JSONPatch{}.value)),
-						}
-					}
-				]`,
-			}),
-			gvr:    deploymentGVR,
-			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
-				"op":          "true",
-				"path":        "true",
-				"from":        "true",
-				"value":       "true",
-				"op-unset":    "false",
-				"path-unset":  "false",
-				"from-unset":  "false",
-				"value-unset": "false",
-			}}},
-		},
-		{
-			name: "JSONPatch patch type equality",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/metadata/labels",
-						value: {
-							"empty": string(JSONPatch{} == JSONPatch{}),
-							"partial": string(JSONPatch{op: "add"} == JSONPatch{op: "add"}),
-							"same-all": string(JSONPatch{op: "add", path: "path", from: "from", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
-							"different-op": string(JSONPatch{op: "add"} == JSONPatch{op: "remove"}),
-							"different-path": string(JSONPatch{op: "add", path: "x", from: "from", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
-							"different-from": string(JSONPatch{op: "add", path: "path", from: "x", value: 1} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
-							"different-value": string(JSONPatch{op: "add", path: "path", from: "from", value: "1"} == JSONPatch{op: "add", path: "path", from: "from", value: 1}),
-						}
-					}
-				]`,
-			}),
-			gvr:    deploymentGVR,
-			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
-				"empty":           "true",
-				"partial":         "true",
-				"same-all":        "true",
-				"different-op":    "false",
-				"different-path":  "false",
-				"different-from":  "false",
-				"different-value": "false",
-			}}},
-		},
-		{
-			name: "JSONPatch key escaping",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
-				Expression: `[
-					JSONPatch{
-						op: "add", path: "/metadata/labels", value: {}
-					},
-					JSONPatch{
-						op: "add", path: "/metadata/labels/" + jsonpatch.escapeKey("k8s.io/x~y"), value: "true"
-					}
-				]`,
-			}),
-			gvr:    deploymentGVR,
-			object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
-			expectedResult: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{
-				"k8s.io/x~y": "true",
-			}}},
-		},
 		{
 			name: "applyConfiguration then jsonPatch",
 			policy: mutations(policy("d1"), v1alpha1.Mutation{
@@ -529,92 +108,15 @@ func TestCompilation(t *testing.T) {
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](111)}},
 		},
 		{
-			name: "apply configuration add to listType=map",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						template: Object.spec.template{
-							spec: Object.spec.template.spec{
-								volumes: [Object.spec.template.spec.volumes{
-									name: "y"
-								}]
-							}
-						}
-					}
-				}`),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}},
-					},
-				},
-			}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}, {Name: "y"}},
-					},
-				},
-			}},
-		},
-		{
-			name: "apply configuration update listType=map entry",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						template: Object.spec.template{
-							spec: Object.spec.template.spec{
-								volumes: [Object.spec.template.spec.volumes{
-									name: "y",
-									hostPath: Object.spec.template.spec.volumes.hostPath{
-										path: "a"
-									}
-								}]
-							}
-						}
-					}
-				}`),
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}, {Name: "y"}},
-					},
-				},
-			}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}, {Name: "y", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "a"}}}},
-					},
-				},
-			}},
-		},
-		{
-			name: "apply configuration with conditionals",
-			policy: applyConfigurations(policy("d1"), `
-				Object{
-					spec: Object.spec{
-						replicas: object.spec.replicas % 2 == 0?object.spec.replicas + 1:object.spec.replicas
-					}
-				}`),
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](2)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3)}},
-		},
-		{
-			name: "apply configuration with old object",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						replicas: oldObject.spec.replicas % 2 == 0?oldObject.spec.replicas + 1:oldObject.spec.replicas
-					}
-				}`),
+			name: "jsonPatch with variable",
+			policy: jsonPatches(variables(policy("d1"), v1alpha1.Variable{Name: "desired", Expression: "10"}), v1alpha1.JSONPatch{
+				Expression: `[
+					JSONPatch{op: "replace", path: "/spec/replicas", value: variables.desired + 1}, 
+				]`,
+			}),
 			gvr:            deploymentGVR,
 			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			oldObject:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](2)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](3)}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](11)}},
 		},
 		{
 			name: "apply configuration with variable",
@@ -640,95 +142,6 @@ func TestCompilation(t *testing.T) {
 			gvr:            deploymentGVR,
 			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](100)}},
-		},
-		{
-			name: "complex apply configuration initialization",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						replicas: 1,
-						template: Object.spec.template{
-							metadata: Object.spec.template.metadata{
-								labels: {"app": "nginx"}
-							},
-							spec: Object.spec.template.spec{
-								containers: [Object.spec.template.spec.containers{
-									name: "nginx",
-									image: "nginx:1.14.2",
-									ports: [Object.spec.template.spec.containers.ports{
-										containerPort: 80
-									}],
-									resources: Object.spec.template.spec.containers.resources{
-										limits: {"cpu": "128M"},
-									}
-								}]
-							}
-						}
-					}
-				}`),
-
-			gvr:    deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Replicas: ptr.To[int32](1),
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{"app": "nginx"},
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{
-							Name:  "nginx",
-							Image: "nginx:1.14.2",
-							Ports: []corev1.ContainerPort{
-								{ContainerPort: 80},
-							},
-							Resources: corev1.ResourceRequirements{
-								Limits: corev1.ResourceList{corev1.ResourceName("cpu"): resource.MustParse("128M")},
-							},
-						}},
-					},
-				},
-			}},
-		},
-		{
-			name: "apply configuration with invalid type name",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.specx{
-						replicas: 1
-					}
-				}`),
-			gvr:         deploymentGVR,
-			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedErr: "type mismatch: unexpected type name \"Object.specx\", expected \"Object.spec\", which matches field name path from root Object type",
-		},
-		{
-			name: "apply configuration with invalid field name",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						replicasx: 1
-					}
-				}`),
-			gvr:         deploymentGVR,
-			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedErr: "error applying patch: failed to convert patch object to typed object: .spec.replicasx: field not declared in schema",
-		},
-		{
-			name: "apply configuration with invalid return type",
-			policy: applyConfigurations(policy("d1"),
-				`"I'm a teapot!"`),
-			gvr:         deploymentGVR,
-			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedErr: "must evaluate to Object but got string",
-		},
-		{
-			name: "apply configuration with invalid initializer return type",
-			policy: applyConfigurations(policy("d1"),
-				`Object.spec.metadata{}`),
-			gvr:         deploymentGVR,
-			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedErr: "must evaluate to Object but got Object.spec.metadata",
 		},
 		{
 			name: "jsonPatch with excessive cost",
@@ -792,20 +205,6 @@ func TestCompilation(t *testing.T) {
 			gvr:            deploymentGVR,
 			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](10)}},
-		},
-		{
-			name: "apply configuration with change to atomic",
-			policy: applyConfigurations(policy("d1"),
-				`Object{
-					spec: Object.spec{
-						selector: Object.spec.selector{
-							matchLabels: {"l": "v"}
-						}
-					}
-				}`),
-			gvr:         deploymentGVR,
-			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedErr: "error applying patch: invalid ApplyConfiguration: may not mutate atomic arrays, maps or structs: .spec.selector",
 		},
 		{
 			name: "object type has field access",
@@ -901,9 +300,17 @@ func TestCompilation(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
 	tcManager := patch.NewTypeConverterManager(nil, openapitest.NewEmbeddedFileClient())
 	go tcManager.Run(ctx)
+
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Second, true, func(context.Context) (done bool, err error) {
+		converter := tcManager.GetTypeConverter(deploymentGVK)
+		return converter != nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -939,7 +346,7 @@ func TestCompilation(t *testing.T) {
 
 			for _, patcher := range policyEvaluator.Mutators {
 				attrs := admission.NewAttributesRecord(obj, tc.oldObject, gvk,
-					metaAccessor.GetName(), metaAccessor.GetNamespace(), tc.gvr,
+					metaAccessor.GetNamespace(), metaAccessor.GetName(), tc.gvr,
 					"", admission.Create, &metav1.CreateOptions{}, false, nil)
 				vAttrs := &admission.VersionedAttributes{
 					Attributes:         attrs,
@@ -1035,6 +442,11 @@ func paramKind(policy *v1alpha1.MutatingAdmissionPolicy, paramKind *v1alpha1.Par
 
 func mutations(policy *v1alpha1.MutatingAdmissionPolicy, mutations ...v1alpha1.Mutation) *v1alpha1.MutatingAdmissionPolicy {
 	policy.Spec.Mutations = append(policy.Spec.Mutations, mutations...)
+	return policy
+}
+
+func matchConstraints(policy *v1alpha1.MutatingAdmissionPolicy, matchConstraints *v1alpha1.MatchResources) *v1alpha1.MutatingAdmissionPolicy {
+	policy.Spec.MatchConstraints = matchConstraints
 	return policy
 }
 

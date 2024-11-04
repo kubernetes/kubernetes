@@ -235,11 +235,11 @@ func convertField(value ref.Val) (any, error) {
 	// unstructured maps, as seen in annotations
 	// map keys must be strings
 	if mapOfVal, ok := value.Value().(map[ref.Val]ref.Val); ok {
-		result := make(map[string]any)
+		result := make(map[string]any, len(mapOfVal))
 		for k, v := range mapOfVal {
 			stringKey, ok := k.Value().(string)
 			if !ok {
-				return nil, fmt.Errorf("map key %q is of type %t, not string", k, k)
+				return nil, fmt.Errorf("map key %q is of type %T, not string", k, k)
 			}
 			result[stringKey] = v.Value()
 		}

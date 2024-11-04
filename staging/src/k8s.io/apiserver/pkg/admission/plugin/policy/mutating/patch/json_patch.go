@@ -21,6 +21,7 @@ import (
 	gojson "encoding/json"
 	"errors"
 	"fmt"
+	celgo "github.com/google/cel-go/cel"
 	"reflect"
 	"strconv"
 
@@ -40,6 +41,24 @@ import (
 	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
 	pointer "k8s.io/utils/ptr"
 )
+
+// JSONPatchCondition contains the inputs needed to compile and evaluate a cel expression
+// that returns a JSON patch value.
+type JSONPatchCondition struct {
+	Expression string
+}
+
+var _ plugincel.ExpressionAccessor = &JSONPatchCondition{}
+
+func (v *JSONPatchCondition) GetExpression() string {
+	return v.Expression
+}
+
+func (v *JSONPatchCondition) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{celgo.ListType(jsonPatchType)}
+}
+
+var jsonPatchType = types.NewObjectType("JSONPatch")
 
 // NewJSONPatcher creates a patcher that performs a JSON Patch mutation.
 func NewJSONPatcher(patchEvaluator plugincel.MutatingEvaluator) Patcher {

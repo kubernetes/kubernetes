@@ -53,7 +53,6 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// Plugin is an implementation of admission.Interface.
 type Policy = v1alpha1.MutatingAdmissionPolicy
 type PolicyBinding = v1alpha1.MutatingAdmissionPolicyBinding
 type PolicyMutation = v1alpha1.Mutation
@@ -80,6 +79,7 @@ type PolicyEvaluator struct {
 	Error          error
 }
 
+// Plugin is an implementation of admission.Interface.
 type Plugin struct {
 	*generic.Plugin[PolicyHook]
 }

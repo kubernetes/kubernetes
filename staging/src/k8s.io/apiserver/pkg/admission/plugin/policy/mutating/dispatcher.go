@@ -42,9 +42,8 @@ import (
 
 func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
 	res := &dispatcher{
-		matcher: m,
-		authz:   a,
-		//!TODO: pass in static type converter to reduce network calls
+		matcher:              m,
+		authz:                a,
 		typeConverterManager: tcm,
 	}
 	res.Dispatcher = generic.NewPolicyDispatcher[*Policy, *PolicyBinding, PolicyEvaluator](
@@ -138,7 +137,7 @@ func (d *dispatcher) dispatchInvocations(
 			// This would be a bug. The compiler should always return exactly as
 			// many evaluators as there are mutations
 			return nil, k8serrors.NewInternalError(fmt.Errorf("expected %v compiled evaluators for policy %v, got %v",
-				invocation.Policy.Name, len(invocation.Policy.Spec.Mutations), len(invocation.Evaluator.Mutators)))
+				len(invocation.Policy.Spec.Mutations), invocation.Policy.Name, len(invocation.Evaluator.Mutators)))
 		}
 
 		versionedAttr, err := versionedAttributes.VersionedAttribute(invocation.Kind)
@@ -152,6 +151,7 @@ func (d *dispatcher) dispatchInvocations(
 			matchResults := invocation.Evaluator.Matcher.Match(ctx, versionedAttr, invocation.Param, authz)
 			if matchResults.Error != nil {
 				addConfigError(matchResults.Error, invocation, metav1.StatusReasonInvalid)
+				continue
 			}
 
 			// if preconditions are not met, then skip mutations

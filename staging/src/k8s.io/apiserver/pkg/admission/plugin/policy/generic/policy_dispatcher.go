@@ -95,7 +95,7 @@ func NewPolicyDispatcher[P runtime.Object, B runtime.Object, E Evaluator](
 	}
 }
 
-// Start implements generic.Dispatcher Start. It loops through all active hooks
+// Dispatch implements generic.Dispatcher. It loops through all active hooks
 // (policy x binding pairs) and selects those which are active for the current
 // request. It then resolves all params and creates an Invocation for each
 // matching policy-binding-param tuple. The delegate is then called with the
@@ -413,5 +413,5 @@ func (c PolicyError) Error() string {
 		return fmt.Sprintf("policy '%s' with binding '%s' denied request: %s", c.Policy.GetName(), c.Binding.GetName(), c.Message.Error())
 	}
 
-	return fmt.Sprintf("policy '%s' denied request: %s", c.Policy.GetName(), c.Message.Error())
+	return fmt.Sprintf("policy %q denied request: %s", c.Policy.GetName(), c.Message.Error())
 }

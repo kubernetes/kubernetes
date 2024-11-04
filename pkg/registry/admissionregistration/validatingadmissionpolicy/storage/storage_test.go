@@ -202,7 +202,7 @@ func newValidatingAdmissionPolicy(name string) *admissionregistration.Validating
 }
 
 func newInsecureStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
-	return newStorage(t, nil, replicaLimitsResolver)
+	return newStorage(t, nil, resolver.ResourceResolverFunc(replicaLimitsResolver))
 }
 
 func newStorage(t *testing.T, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, *etcd3testing.EtcdTestServer) {
@@ -227,7 +227,7 @@ func TestCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage, expected)
 }
 
-var replicaLimitsResolver resolver.ResourceResolverFunc = func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+func replicaLimitsResolver(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 	return schema.GroupVersionResource{
 		Group:    "rules.example.com",
 		Version:  "v1",

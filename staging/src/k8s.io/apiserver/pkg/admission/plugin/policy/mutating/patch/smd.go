@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	celgo "github.com/google/cel-go/cel"
+	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -34,6 +36,24 @@ import (
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/mutation/dynamic"
 )
+
+// ApplyConfigurationCondition contains the inputs needed to compile and evaluate a cel expression
+// that returns an apply configuration
+type ApplyConfigurationCondition struct {
+	Expression string
+}
+
+var _ plugincel.ExpressionAccessor = &ApplyConfigurationCondition{}
+
+func (v *ApplyConfigurationCondition) GetExpression() string {
+	return v.Expression
+}
+
+func (v *ApplyConfigurationCondition) ReturnTypes() []*celgo.Type {
+	return []*celgo.Type{applyConfigObjectType}
+}
+
+var applyConfigObjectType = celtypes.NewObjectType("Object")
 
 // NewApplyConfigurationPatcher creates a patcher that performs an applyConfiguration mutation.
 func NewApplyConfigurationPatcher(expressionEvaluator plugincel.MutatingEvaluator) Patcher {
@@ -147,6 +167,9 @@ func ApplyStructuredMergeDiff(
 
 // validatePatch searches an apply configuration for any arrays, maps or structs elements that are atomic and returns
 // an error if any are found.
+// This prevents accidental removal of fields that can occur when the user intends to modify some
+// fields in an atomic type, not realizing that all fields not explicitly set in the new value
+// of the atomic will be removed.
 func validatePatch(v *typed.TypedValue) error {
 	atomics := findAtomics(nil, v.Schema(), v.TypeRef(), v.AsValue())
 	if len(atomics) > 0 {

@@ -64,13 +64,13 @@ func compilePolicy(policy *Policy) PolicyEvaluator {
 		switch m.PatchType {
 		case v1alpha1.PatchTypeJSONPatch:
 			if m.JSONPatch != nil {
-				accessor := &JSONPatchCondition{Expression: m.JSONPatch.Expression}
+				accessor := &patch.JSONPatchCondition{Expression: m.JSONPatch.Expression}
 				compileResult := compiler.CompileMutatingEvaluator(accessor, patchOptions, environment.StoredExpressions)
 				patchers = append(patchers, patch.NewJSONPatcher(compileResult))
 			}
 		case v1alpha1.PatchTypeApplyConfiguration:
 			if m.ApplyConfiguration != nil {
-				accessor := &ApplyConfigurationCondition{Expression: m.ApplyConfiguration.Expression}
+				accessor := &patch.ApplyConfigurationCondition{Expression: m.ApplyConfiguration.Expression}
 				compileResult := compiler.CompileMutatingEvaluator(accessor, patchOptions, environment.StoredExpressions)
 				patchers = append(patchers, patch.NewApplyConfigurationPatcher(compileResult))
 			}

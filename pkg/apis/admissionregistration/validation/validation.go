@@ -33,7 +33,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/cel"
@@ -1493,7 +1493,7 @@ func validateApplyConfiguration(compiler plugincel.Compiler, applyConfig *admiss
 		if opts.preexistingExpressions.applyConfigurationExpressions.Has(applyConfig.Expression) {
 			envType = environment.StoredExpressions
 		}
-		accessor := &mutating.ApplyConfigurationCondition{
+		accessor := &patch.ApplyConfigurationCondition{
 			Expression: trimmedExpression,
 		}
 		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}
@@ -1516,7 +1516,7 @@ func validateJSONPatch(compiler plugincel.Compiler, jsonPatch *admissionregistra
 		if opts.preexistingExpressions.applyConfigurationExpressions.Has(jsonPatch.Expression) {
 			envType = environment.StoredExpressions
 		}
-		accessor := &mutating.JSONPatchCondition{
+		accessor := &patch.JSONPatchCondition{
 			Expression: trimmedExpression,
 		}
 		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}

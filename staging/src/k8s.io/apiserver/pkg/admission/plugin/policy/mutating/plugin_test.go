@@ -119,6 +119,68 @@ func TestBasicPatch(t *testing.T) {
 	require.Equal(t, expectedAnnotations, testObject.Annotations)
 }
 
+func TestJSONPatch(t *testing.T) {
+	patchObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"annotations": map[string]interface{}{
+					"foo": "bar",
+				},
+			},
+			"data": map[string]interface{}{
+				"myfield": "myvalue",
+			},
+		},
+	}
+
+	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
+		return mutating.PolicyEvaluator{
+			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
+		}
+	})
+
+	// Set up a policy and binding that match, no params
+	require.NoError(t, testContext.UpdateAndWait(
+		&mutating.Policy{
+			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
+			Spec: v1alpha1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1alpha1.MatchResources{
+					MatchPolicy:       ptr.To(v1alpha1.Equivalent),
+					NamespaceSelector: &metav1.LabelSelector{},
+					ObjectSelector:    &metav1.LabelSelector{},
+				},
+				Mutations: []v1alpha1.Mutation{
+					{
+						JSONPatch: &v1alpha1.JSONPatch{
+							Expression: "ignored, but required",
+						},
+						PatchType: v1alpha1.PatchTypeApplyConfiguration,
+					},
+				},
+			},
+		},
+		&mutating.PolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
+			Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+				PolicyName: "policy",
+			},
+		},
+	))
+
+	// Show that if we run an object through the policy, it gets the annotation
+	testObject := &corev1.ConfigMap{}
+	err := testContext.Dispatch(testObject, nil, admission.Create)
+	require.NoError(t, err)
+	require.Equal(t, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{"foo": "bar"},
+		},
+		Data: map[string]string{"myfield": "myvalue"},
+	}, testObject)
+}
+
 func TestSSAPatch(t *testing.T) {
 	patchObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{

@@ -121,14 +121,21 @@ func (p *JSONPatchVal) ConvertToType(typeValue ref.Type) ref.Val {
 	} else if typeValue == types.TypeType {
 		return types.NewTypeTypeWithParam(jsonPatchType)
 	}
-	return types.NewErr("Unsupported type: %s", typeValue.TypeName())
+	return types.NewErr("unsupported type: %s", typeValue.TypeName())
 }
 
 func (p *JSONPatchVal) Equal(other ref.Val) ref.Val {
 	if o, ok := other.(*JSONPatchVal); ok && p != nil && o != nil {
-		if *p == *o {
+		if p.Op != o.Op || p.From != o.From || p.Path != o.Path {
+			return types.False
+		}
+		if (p.Val == nil) != (o.Val == nil) {
+			return types.False
+		}
+		if p.Val == nil {
 			return types.True
 		}
+		return p.Val.Equal(o.Val)
 	}
 	return types.False
 }

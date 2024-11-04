@@ -29,6 +29,8 @@ import (
 
 // Patcher provides a patch function to perform a mutation to an object in the admission chain.
 type Patcher interface {
+	// Patch returns a copy of the object in the request, modified to change specified by the patch.
+	// The original object in the request MUST NOT be modified in-place.
 	Patch(ctx context.Context, request Request, runtimeCELCostBudget int64) (runtime.Object, error)
 }
 
