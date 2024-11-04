@@ -509,6 +509,7 @@ const (
 
 	// owner: @gnufied
 	// kep: https://kep.k8s.io/1790
+	// beta - v1.32
 	//
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"

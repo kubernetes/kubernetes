@@ -110,8 +110,19 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
-			name: "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			name: "RWO volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
 			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", nil),
+			pv:   getTestPV("test-vol0", "2G"),
+
+			expectedResizeStatus:     "",
+			expectResizeCall:         false,
+			assumeResizeOpAsFinished: true,
+			expectFinalErrors:        false,
+			expectedStatusSize:       resource.MustParse("2G"),
+		},
+		{
+			name: "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			pvc:  addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
 			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     "",
