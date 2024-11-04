@@ -235,13 +235,6 @@ const (
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
-
-	// owner: @tkashem
-	//
-	// Allow Priority & Fairness in the API server to use a zero value for
-	// the 'nominalConcurrencyShares' field of the 'limited' section of a
-	// priority level.
-	ZeroLimitedNominalConcurrencyShares featuregate.Feature = "ZeroLimitedNominalConcurrencyShares"
 )
 
 func init() {
@@ -409,11 +402,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WatchList: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	ZeroLimitedNominalConcurrencyShares: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 }
 
