@@ -111,9 +111,6 @@ github.com/cyphar/filepath-securejoin
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/daviddengcn/go-colortext v1.0.0
-## explicit; go 1.14
-github.com/daviddengcn/go-colortext
 # github.com/distribution/reference v0.6.0
 ## explicit; go 1.20
 github.com/distribution/reference
