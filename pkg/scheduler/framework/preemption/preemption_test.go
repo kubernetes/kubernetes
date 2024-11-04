@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -90,9 +91,12 @@ func (pl *FakePostFilterPlugin) OrderedScoreFuncs(ctx context.Context, nodesToVi
 
 type fakePodActivator struct {
 	activatedPods map[string]*v1.Pod
+	mu            *sync.RWMutex
 }
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for name, pod := range pods {
 		f.activatedPods[name] = pod
 	}
@@ -626,6 +630,7 @@ func TestPrepareCandidate(t *testing.T) {
 				}
 
 				requestStopper := make(chan struct{})
+				mu := &sync.RWMutex{}
 				deletedPods := sets.New[string]()
 				deletionFailure := false // whether any request to delete pod failed
 				patchFailure := false    // whether any request to patch pod status failed
@@ -633,6 +638,8 @@ func TestPrepareCandidate(t *testing.T) {
 				cs := clientsetfake.NewClientset(objs...)
 				cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					<-requestStopper
+					mu.Lock()
+					defer mu.Unlock()
 					name := action.(clienttesting.DeleteAction).GetName()
 					if name == "fail-victim" {
 						deletionFailure = true
@@ -645,6 +652,8 @@ func TestPrepareCandidate(t *testing.T) {
 
 				cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					<-requestStopper
+					mu.Lock()
+					defer mu.Unlock()
 					if action.(clienttesting.PatchAction).GetName() == "fail-victim" {
 						patchFailure = true
 						return true, nil, fmt.Errorf("patch pod status failed")
@@ -654,7 +663,7 @@ func TestPrepareCandidate(t *testing.T) {
 
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
 				eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
-				fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod)}
+				fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
 				fwk, err := tf.NewFramework(
 					ctx,
 					registeredPlugins, "",
@@ -709,6 +718,8 @@ func TestPrepareCandidate(t *testing.T) {
 
 				var lastErrMsg string
 				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					mu.RLock()
+					defer mu.RUnlock()
 					if !deletedPods.Equal(sets.New(tt.expectedDeletedPods...)) {
 						lastErrMsg = fmt.Sprintf("expected deleted pods %v, got %v", tt.expectedDeletedPods, deletedPods.UnsortedList())
 						return false, nil
