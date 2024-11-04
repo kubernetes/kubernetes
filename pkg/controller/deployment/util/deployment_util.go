@@ -378,24 +378,34 @@ func FindActiveOrLatest(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) *apps
 
 // GetDesiredReplicasAnnotation returns the number of desired replicas
 func GetDesiredReplicasAnnotation(logger klog.Logger, rs *apps.ReplicaSet) (int32, bool) {
-	return getIntFromAnnotation(logger, rs, DesiredReplicasAnnotation)
+	return getNonNegativeInt32FromAnnotationVerbose(logger, rs, DesiredReplicasAnnotation)
 }
 
 func getMaxReplicasAnnotation(logger klog.Logger, rs *apps.ReplicaSet) (int32, bool) {
-	return getIntFromAnnotation(logger, rs, MaxReplicasAnnotation)
+	return getNonNegativeInt32FromAnnotationVerbose(logger, rs, MaxReplicasAnnotation)
 }
 
-func getIntFromAnnotation(logger klog.Logger, rs *apps.ReplicaSet, annotationKey string) (int32, bool) {
+func getNonNegativeInt32FromAnnotationVerbose(logger klog.Logger, rs *apps.ReplicaSet, annotationKey string) (int32, bool) {
+	value, ok, err := getNonNegativeInt32FromAnnotation(rs, annotationKey)
+	if err != nil {
+		logger.V(2).Info("Could not convert the value with annotation key for the replica set", "annotationValue", rs.Annotations[annotationKey], "annotationKey", annotationKey, "replicaSet", klog.KObj(rs))
+	}
+	return value, ok
+}
+
+func getNonNegativeInt32FromAnnotation(rs *apps.ReplicaSet, annotationKey string) (int32, bool, error) {
 	annotationValue, ok := rs.Annotations[annotationKey]
 	if !ok {
-		return int32(0), false
+		return int32(0), false, nil
 	}
-	intValue, err := strconv.Atoi(annotationValue)
+	intValue, err := strconv.ParseUint(annotationValue, 10, 32)
 	if err != nil {
-		logger.V(2).Info("Could not convert the value with annotation key for the replica set", "annotationValue", annotationValue, "annotationKey", annotationKey, "replicaSet", klog.KObj(rs))
-		return int32(0), false
+		return int32(0), false, err
 	}
-	return int32(intValue), true
+	if intValue > math.MaxInt32 {
+		return int32(0), false, fmt.Errorf("value %d is out of range (higher than %d)", intValue, math.MaxInt32)
+	}
+	return int32(intValue), true, nil
 }
 
 // SetReplicasAnnotations sets the desiredReplicas and maxReplicas into the annotations
