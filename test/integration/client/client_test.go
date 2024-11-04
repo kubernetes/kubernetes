@@ -51,6 +51,8 @@ import (
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/discovery"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/gentype"
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -1754,7 +1756,8 @@ func TestClientCBOREnablement(t *testing.T) {
 				}
 
 				t.Run(tc.name, func(t *testing.T) {
-					framework.SetTestOnlyCBORClientFeatureGatesForTest(t, tc.allowed, tc.preferred)
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, tc.allowed)
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, tc.preferred)
 
 					config := rest.CopyConfig(server.ClientConfig)
 					config.ContentType = tc.configuredContentType
@@ -1795,7 +1798,8 @@ func TestClientCBOREnablement(t *testing.T) {
 
 func TestCBORWithTypedClient(t *testing.T) {
 	framework.EnableCBORServingAndStorageForTest(t)
-	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
@@ -1986,7 +1990,8 @@ func TestCBORWithTypedClient(t *testing.T) {
 }
 
 func TestUnsupportedMediaTypeCircuitBreaker(t *testing.T) {
-	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)

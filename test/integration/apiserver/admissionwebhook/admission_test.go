@@ -53,6 +53,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
@@ -458,7 +460,8 @@ func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
 
 func TestWebhookAdmissionWithCBOR(t *testing.T) {
 	framework.EnableCBORServingAndStorageForTest(t)
-	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 	testWebhookAdmission(t, false, func(t testing.TB, config *rest.Config) {
 		config.Wrap(framework.AssertRequestResponseAsCBOR(t))
 	})

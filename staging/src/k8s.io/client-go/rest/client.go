@@ -128,7 +128,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 }
 
 func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContentConfig {
-	if clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
 		return content
 	}
 
@@ -258,7 +258,7 @@ type requestClientContentConfigProvider struct {
 // GetClientContentConfig returns the ClientContentConfig that should be used for new requests by
 // this client.
 func (p *requestClientContentConfigProvider) GetClientContentConfig() ClientContentConfig {
-	if !clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
 		return p.base
 	}
 
@@ -280,7 +280,7 @@ func (p *requestClientContentConfigProvider) GetClientContentConfig() ClientCont
 // UnsupportedMediaType reports that the server has responded to a request with HTTP 415 Unsupported
 // Media Type.
 func (p *requestClientContentConfigProvider) UnsupportedMediaType(requestContentType string) {
-	if !clientfeatures.TestOnlyFeatureGates.Enabled(clientfeatures.TestOnlyClientAllowsCBOR) {
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
 		return
 	}
 

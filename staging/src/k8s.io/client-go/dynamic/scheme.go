@@ -53,7 +53,7 @@ func newBasicNegotiatedSerializer() basicNegotiatedSerializer {
 			},
 		},
 	}
-	if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) {
+	if features.FeatureGates().Enabled(features.ClientsAllowCBOR) {
 		supportedMediaTypes = append(supportedMediaTypes, runtime.SerializerInfo{
 			MediaType:        "application/cbor",
 			MediaTypeType:    "application",

@@ -424,7 +424,7 @@ func TestNewErrorForbiddenSerializer(t *testing.T) {
 }
 
 func TestNewFeatureGatedSerializer(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 
 	config := NewConfig(serializer.NewCodecFactory(scheme, serializer.WithSerializer(func(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
 		return runtime.SerializerInfo{
