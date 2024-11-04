@@ -5473,6 +5473,12 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
+	isPodResizeRequestValid := isPodResizeRequestValid(*oldPod)
+
+	if !isPodResizeRequestValid {
+		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without IPPVS enabled may not be updated"))
+	}
+
 	// Ensure that only CPU and memory resources are mutable.
 	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
@@ -5511,6 +5517,25 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
+}
+
+func isPodResizeRequestValid(pod core.Pod) bool {
+	// TODO: Remove this after GA+3 releases of InPlacePodVerticalScaling
+	// This code handles the version skew as described in the KEP.
+	// For handling version skew we're only allowing to update the Pod's Resources
+	// if the Pod already has Pod.Status.ContainerStatuses[i].Resources. This means
+	// that the apiserver would only allow updates to Pods running on Nodes with 
+	// the InPlacePodVerticalScaling feature gate enabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.State.Running != nil {
+			return c.Resources != nil
+		}
+	}
+	// No running containers
+	return true
 }
 
 // ValidatePodBinding tests if required fields in the pod binding are legal.
