@@ -100,7 +100,7 @@ func validateParameters(params map[string]string, allowEmpty bool, fldPath *fiel
 	allErrs := field.ErrorList{}
 
 	if len(params) > maxProvisionerParameterLen {
-		allErrs = append(allErrs, field.TooLong(fldPath, "Provisioner Parameters exceeded max allowed", maxProvisionerParameterLen))
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterLen))
 		return allErrs
 	}
 
@@ -223,7 +223,7 @@ func validateAttachmentMetadata(metadata map[string]string, fldPath *field.Path)
 		size += (int64)(len(k)) + (int64)(len(v))
 	}
 	if size > maxAttachedVolumeMetadataSize {
-		allErrs = append(allErrs, field.TooLong(fldPath, metadata, maxAttachedVolumeMetadataSize))
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxAttachedVolumeMetadataSize))
 	}
 	return allErrs
 }
@@ -235,7 +235,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 		return allErrs
 	}
 	if len(e.Message) > maxVolumeErrorMessageSize {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), e.Message, maxAttachedVolumeMetadataSize))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "", maxAttachedVolumeMetadataSize))
 	}
 	return allErrs
 }

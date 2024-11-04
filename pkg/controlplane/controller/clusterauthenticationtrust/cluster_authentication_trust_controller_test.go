@@ -374,7 +374,7 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 	t.Run("ca bundle too large", func(t *testing.T) {
 		client := fake.NewSimpleClientset()
 		client.PrependReactor("update", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-			return true, nil, apierrors.NewInvalid(schema.GroupKind{Kind: "ConfigMap"}, cm.Name, field.ErrorList{field.TooLong(field.NewPath(""), cm, corev1.MaxSecretSize)})
+			return true, nil, apierrors.NewInvalid(schema.GroupKind{Kind: "ConfigMap"}, cm.Name, field.ErrorList{field.TooLong(field.NewPath(""), "", corev1.MaxSecretSize)})
 		})
 		client.PrependReactor("delete", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, nil, nil

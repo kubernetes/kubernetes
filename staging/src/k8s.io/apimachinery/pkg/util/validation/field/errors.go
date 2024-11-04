@@ -220,10 +220,10 @@ func Forbidden(field *Path, detail string) *Error {
 	return &Error{ErrorTypeForbidden, field.String(), "", detail}
 }
 
-// TooLong returns a *Error indicating "too long".  This is used to
-// report that the given value is too long.  This is similar to
-// Invalid, but the returned error will not include the too-long
-// value. If maxLength is negative, it will be included in the message.
+// TooLong returns a *Error indicating "too long".  This is used to report that
+// the given value is too long.  This is similar to Invalid, but the returned
+// error will not include the too-long value. If maxLength is negative, it will
+// be included in the message.  The value argument is not used.
 func TooLong(field *Path, value interface{}, maxLength int) *Error {
 	var msg string
 	if maxLength >= 0 {
@@ -231,7 +231,7 @@ func TooLong(field *Path, value interface{}, maxLength int) *Error {
 	} else {
 		msg = "value is too long"
 	}
-	return &Error{ErrorTypeTooLong, field.String(), value, msg}
+	return &Error{ErrorTypeTooLong, field.String(), "<value omitted>", msg}
 }
 
 // TooLongMaxLength returns a *Error indicating "too long".

@@ -322,7 +322,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"CEL-length": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices", "requests").Index(1).Child("selectors").Index(1).Child("cel", "expression"), "<value omitted>", resource.CELSelectorExpressionMaxLength),
+				field.TooLong(field.NewPath("spec", "devices", "requests").Index(1).Child("selectors").Index(1).Child("cel", "expression"), "", resource.CELSelectorExpressionMaxLength),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
