@@ -1159,6 +1159,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark"); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
+	klog.Infof("%#v", dataItems)
+	b.Errorf("Failing for output")
 }
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {

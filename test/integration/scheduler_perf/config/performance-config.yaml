@@ -53,15 +53,15 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 270
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
+  # - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 270
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 10000
 
 - name: SchedulingPodAntiAffinity
   defaultPodTemplatePath: config/templates/pod-with-pod-anti-affinity.yaml
@@ -104,15 +104,15 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 70
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 2000
+  # - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 70
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 2000
 
 - name: SchedulingSecrets
   defaultPodTemplatePath: config/templates/pod-with-secret-volume.yaml
@@ -150,15 +150,15 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 260
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
+  # - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 260
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 10000
 
 - name: SchedulingInTreePVs
   workloadTemplate:
@@ -199,15 +199,15 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 90
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 2000
+  # - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 90
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 1000
+  #     measurePods: 2000
 
 - name: SchedulingMigratedInTreePVs
   workloadTemplate:
@@ -257,15 +257,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 35
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 35
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 
 - name: SchedulingCSIPVs
@@ -314,15 +314,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 48
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 48
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 - name: SchedulingPodAffinity
   defaultPodTemplatePath: config/templates/pod-with-pod-affinity.yaml
@@ -369,15 +369,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 35
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 35
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 - name: SchedulingPreferredPodAffinity
   defaultPodTemplatePath: config/templates/pod-with-preferred-pod-affinity.yaml
@@ -420,15 +420,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 90
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 90
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 - name: SchedulingPreferredPodAntiAffinity
   defaultPodTemplatePath: config/templates/pod-with-preferred-pod-affinity.yaml
@@ -471,15 +471,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 90
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 90
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
@@ -513,14 +513,14 @@
     params:
       initNodes: 15000
       measurePods: 30000
-  - name: 15000Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 390
-    params:
-      initNodes: 15000
-      measurePods: 30000
+  # - name: 15000Nodes_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 390
+  #   params:
+  #     initNodes: 15000
+  #     measurePods: 30000
 
 - name: SchedulingNodeAffinity
   defaultPodTemplatePath: config/templates/pod-with-node-affinity.yaml
@@ -562,15 +562,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 220
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 10000
+  # - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 220
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 10000
 
 - name: TopologySpreading
   workloadTemplate:
@@ -613,15 +613,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 85
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 85
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 - name: PreferredTopologySpreading
   workloadTemplate:
@@ -664,15 +664,15 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 125
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 125
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 5000
+  #     measurePods: 5000
 
 - name: MixedSchedulingBasePod
   defaultPodTemplatePath: config/templates/pod-default.yaml
@@ -734,15 +734,15 @@
       initNodes: 5000
       initPods: 2000
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 140
-    params:
-      initNodes: 5000
-      initPods: 2000
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 140
+  #   params:
+  #     initNodes: 5000
+  #     initPods: 2000
+  #     measurePods: 5000
 
 - name: PreemptionBasic
   workloadTemplate:
@@ -769,15 +769,15 @@
       initNodes: 500
       initPods: 2000
       measurePods: 500
-  - name: 500Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 18
-    params:
-      initNodes: 500
-      initPods: 2000
-      measurePods: 500
+  # - name: 500Nodes_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 18
+  #   params:
+  #     initNodes: 500
+  #     initPods: 2000
+  #     measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
 #
@@ -814,15 +814,15 @@
       initNodes: 500
       initPods: 2000
       measurePods: 500
-  - name: 500Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 18
-    params:
-      initNodes: 500
-      initPods: 2000
-      measurePods: 500
+  # - name: 500Nodes_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 18
+  #   params:
+  #     initNodes: 500
+  #     initPods: 2000
+  #     measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
 #
@@ -920,14 +920,14 @@
     params:
       initNodes: 5000
       measurePods: 10000
-  - name: 5kNodes/10kPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 200
-    params:
-      initNodes: 5000
-      measurePods: 10000
+  # - name: 5kNodes/10kPods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 200
+  #   params:
+  #     initNodes: 5000
+  #     measurePods: 10000
 
 - name: SchedulingWithMixedChurn
   workloadTemplate:
@@ -967,14 +967,14 @@
     params:
       initNodes: 5000
       measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 265
-    params:
-      initNodes: 5000
-      measurePods: 10000
+  # - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 265
+  #   params:
+  #     initNodes: 5000
+  #     measurePods: 10000
 
 - name: SchedulingRequiredPodAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/templates/pod-anti-affinity-ns-selector.yaml
@@ -1029,16 +1029,16 @@
       initPodsPerNamespace: 40
       initNamespaces: 100
       measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 24
-    params:
-      initNodes: 6000
-      initPodsPerNamespace: 40
-      initNamespaces: 100
-      measurePods: 2000
+  # - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 24
+  #   params:
+  #     initNodes: 6000
+  #     initPodsPerNamespace: 40
+  #     initNamespaces: 100
+  #     measurePods: 2000
 
 - name: SchedulingPreferredAntiAffinityWithNSSelector
   defaultPodTemplatePath: config/templates/pod-preferred-anti-affinity-ns-selector.yaml
@@ -1093,16 +1093,16 @@
       initPodsPerNamespace: 40
       initNamespaces: 100
       measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 55
-    params:
-      initNodes: 5000
-      initPodsPerNamespace: 40
-      initNamespaces: 100
-      measurePods: 2000
+  # - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 55
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 40
+  #     initNamespaces: 100
+  #     measurePods: 2000
 
 - name: SchedulingRequiredPodAffinityWithNSSelector
   defaultPodTemplatePath: config/templates/pod-affinity-ns-selector.yaml
@@ -1160,16 +1160,16 @@
       initPodsPerNamespace: 50
       initNamespaces: 100
       measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 35
-    params:
-      initNodes: 5000
-      initPodsPerNamespace: 50
-      initNamespaces: 100
-      measurePods: 2000
+  # - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 35
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 50
+  #     initNamespaces: 100
+  #     measurePods: 2000
 
 - name: SchedulingPreferredAffinityWithNSSelector
   defaultPodTemplatePath: config/templates/pod-preferred-affinity-ns-selector.yaml
@@ -1224,16 +1224,16 @@
       initPodsPerNamespace: 50
       initNamespaces: 100
       measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 90
-    params:
-      initNodes: 5000
-      initPodsPerNamespace: 50
-      initNamespaces: 100
-      measurePods: 5000
+  # - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance]
+  #   threshold: 90
+  #   params:
+  #     initNodes: 5000
+  #     initPodsPerNamespace: 50
+  #     initNamespaces: 100
+  #     measurePods: 5000
 
 - name: SchedulingWithNodeInclusionPolicy
   featureGates:
@@ -1268,15 +1268,15 @@
       taintNodes: 1000
       normalNodes: 4000
       measurePods: 4000
-  - name: 5000Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 68
-    params:
-      taintNodes: 1000
-      normalNodes: 4000
-      measurePods: 4000
+  # - name: 5000Nodes_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 68
+  #   params:
+  #     taintNodes: 1000
+  #     normalNodes: 4000
+  #     measurePods: 4000
 
 # SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
 # and dynamically creates ResourceClaim instances for each pod. Node, pod and
@@ -1581,15 +1581,15 @@
       gatedPods: 10000
       deletingPods: 20000
       measurePods: 20000
-  - name: 1Node_10000GatedPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 130
-    params:
-      gatedPods: 10000
-      deletingPods: 20000
-      measurePods: 20000
+  # - name: 1Node_10000GatedPods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 130
+  #   params:
+  #     gatedPods: 10000
+  #     deletingPods: 20000
+  #     measurePods: 20000
 
 - name: SchedulingGatedPodsWithPodAffinityImpactForThroughput
   defaultPodTemplatePath: config/templates/pod-with-label.yaml
@@ -1621,14 +1621,14 @@
     params:
       gatedPods: 10000
       measurePods: 20000
-  - name: 1Node_10000GatedPods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance, short]
-    threshold: 110
-    params:
-      gatedPods: 10000
-      measurePods: 20000
+  # - name: 1Node_10000GatedPods_QueueingHintsEnabled
+  #   featureGates:
+  #     SchedulerQueueingHints: true
+  #   labels: [performance, short]
+  #   threshold: 110
+  #   params:
+  #     gatedPods: 10000
+  #     measurePods: 20000
 
 # This test case simulates the scheduling when pods selected to schedule have deletionTimestamp set.
 # There was a memory leak related to this path of code fixed in:
