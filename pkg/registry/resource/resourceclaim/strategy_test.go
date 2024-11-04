@@ -133,10 +133,12 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
-var testRequest = "test-request"
-var testDriver = "test-driver"
-var testPool = "test-pool"
-var testDevice = "test-device"
+const (
+	testRequest = "test-request"
+	testDriver  = "test-driver"
+	testPool    = "test-pool"
+	testDevice  = "test-device"
+)
 
 func TestStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
@@ -375,6 +377,30 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"keep-fields-devices-status-disable-feature-gate": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: false,
+			expectObj: func() *resource.ResourceClaim { // Status is still there (as the status was set in the old object)
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+		},
 		"keep-fields-devices-status": {
 			oldObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
@@ -413,6 +439,27 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 			deviceStatusFeatureGate: true,
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				return obj
+			}(),
+		},
+		"drop-status-deallocated-device-disable-feature-gate": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // device is deallocated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice)
+				return obj
+			}(),
+			deviceStatusFeatureGate: false,
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)

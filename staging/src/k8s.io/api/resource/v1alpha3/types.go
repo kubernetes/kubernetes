@@ -1067,8 +1067,8 @@ type NetworkDeviceData struct {
 	// +listType=atomic
 	Addresses []string `json:"addresses,omitempty" protobuf:"bytes,2,opt,name=addresses"`
 
-	// HWAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
 	// +optional
-	HWAddress string `json:"hwAddress,omitempty" protobuf:"bytes,3,opt,name=hwAddress"`
+	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }

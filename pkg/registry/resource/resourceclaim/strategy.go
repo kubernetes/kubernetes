@@ -237,7 +237,9 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 }
 
 func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
+	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
 		newClaim.Status.Devices = nil
 	}
 }
@@ -245,7 +247,8 @@ func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource
 // dropDeallocatedStatusDevices removes the status.devices that were allocated
 // in the oldClaim and that have been removed in the newClaim.
 func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
 		return
 	}
 
@@ -268,18 +271,19 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	}
 
 	// Remove from newClaim.Status.Devices.
-	for i := len(newClaim.Status.Devices) - 1; i >= 0; i-- {
+	n := 0
+	for _, device := range newClaim.Status.Devices {
 		deviceID := structured.DeviceID{
-			Driver: newClaim.Status.Devices[i].Driver,
-			Pool:   newClaim.Status.Devices[i].Pool,
-			Device: newClaim.Status.Devices[i].Device,
+			Driver: device.Driver,
+			Pool:   device.Pool,
+			Device: device.Device,
 		}
-		// Device was in the oldClaim.Status.Allocation.Devices but is no longer in the
-		// newClaim.Status.Allocation.Devices so it must be removed from the newClaim.Status.Devices.
-		if deallocatedDevices.Has(deviceID) {
-			newClaim.Status.Devices = append(newClaim.Status.Devices[:i], newClaim.Status.Devices[i+1:]...)
+		if !deallocatedDevices.Has(deviceID) {
+			newClaim.Status.Devices[n] = device
+			n++
 		}
 	}
+	newClaim.Status.Devices = newClaim.Status.Devices[:n]
 
 	if len(newClaim.Status.Devices) == 0 {
 		newClaim.Status.Devices = nil
