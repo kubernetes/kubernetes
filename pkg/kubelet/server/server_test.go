@@ -1641,3 +1641,19 @@ func TestFineGrainedAuthz(t *testing.T) {
 		})
 	}
 }
+
+func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
+	host := &fakeKubelet{
+		hostnameFunc: func() string {
+			return "127.0.0.1"
+		},
+	}
+	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
+
+	server1 := NewServer(host, resourceAnalyzer, nil, nil)
+	server2 := NewServer(host, resourceAnalyzer, nil, nil)
+
+	// Check if both servers registered the /metrics/slis endpoint
+	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")
+	assert.Contains(t, server2.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "Second server should register /metrics/slis")
+}
