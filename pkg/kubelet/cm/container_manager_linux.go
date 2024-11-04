@@ -571,13 +571,13 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	// Initialize CPU manager
 	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 	if err != nil {
-		return fmt.Errorf("start cpu manager error: %v", err)
+		return fmt.Errorf("start cpu manager error: %w", err)
 	}
 
 	// Initialize memory manager
 	err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 	if err != nil {
-		return fmt.Errorf("start memory manager error: %v", err)
+		return fmt.Errorf("start memory manager error: %w", err)
 	}
 
 	// cache the node Info including resource capacity and
