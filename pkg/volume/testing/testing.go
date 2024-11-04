@@ -1653,9 +1653,9 @@ func GetTestVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumeP
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1664,9 +1664,9 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *Fake
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1675,9 +1675,9 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	v.WithNode(node)
 
