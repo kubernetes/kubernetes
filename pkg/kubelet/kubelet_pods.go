@@ -1757,15 +1757,6 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kub
 	}
 
 	resizeStatus, _ := kl.statusManager.GetPodResizeStatus(string(allocatedPod.UID))
-	// If the resize was in-progress and the actual resources match the allocated resources, mark
-	// the resize as complete by clearing the resize status.
-	if resizeStatus == v1.PodResizeStatusInProgress &&
-		allocatedResourcesMatchStatus(allocatedPod, podStatus) {
-		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, ""); err != nil {
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", format.Pod(allocatedPod))
-		}
-		return ""
-	}
 	return resizeStatus
 }
 
