@@ -124,7 +124,8 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
 	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration)
+		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration,
+			data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
 	} else {
 		err = waiter.WaitForAPI()
 	}
