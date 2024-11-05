@@ -249,9 +249,12 @@ type SELinuxLabelInfo struct {
 }
 
 // GetMountSELinuxLabel returns SELinux labels that should be used to mount the given volume volumeSpec and podSecurityContext.
+// It expects effectiveSELinuxContainerLabels as returned by volumeutil.GetPodVolumeNames, i.e. with all SELinuxOptions
+// from all containers that use the volume in the pod, potentially expanded with PodSecurityContext.SELinuxOptions,
+// if container's SELinuxOptions are nil.
 // It does not evaluate the volume access mode! It's up to the caller to check SELinuxMount feature gate,
 // it may need to bump different metrics based on feature gates / access modes / label anyway.
-func GetMountSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext, volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator SELinuxLabelTranslator) (SELinuxLabelInfo, error) {
+func GetMountSELinuxLabel(volumeSpec *volume.Spec, effectiveSELinuxContainerLabels []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext, volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator SELinuxLabelTranslator) (SELinuxLabelInfo, error) {
 	info := SELinuxLabelInfo{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return info, nil
@@ -269,11 +272,12 @@ func GetMountSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v
 	info.PluginSupportsSELinuxContextMount = pluginSupportsSELinuxContextMount
 
 	// Collect all SELinux options from all containers that use this volume.
+	// A set will squash any duplicities.
 	labels := sets.New[string]()
-	for _, containerContext := range seLinuxContainerContexts {
-		lbl, err := seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
+	for _, containerLabel := range effectiveSELinuxContainerLabels {
+		lbl, err := seLinuxTranslator.SELinuxOptionsToFileLabel(containerLabel)
 		if err != nil {
-			fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %w", containerContext, err)
+			fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %w", containerLabel, err)
 			return info, fullErr
 		}
 		labels.Insert(lbl)
