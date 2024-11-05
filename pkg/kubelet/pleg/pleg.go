@@ -47,6 +47,8 @@ const (
 	PodSync PodLifeCycleEventType = "PodSync"
 	// ContainerChanged - event type when the new state of container is unknown.
 	ContainerChanged PodLifeCycleEventType = "ContainerChanged"
+	// ConditionMet - event type triggered when any number of watch conditions are met.
+	ConditionMet PodLifeCycleEventType = "ConditionMet"
 )
 
 // PodLifecycleEvent is an event that reflects the change of the pod state.

@@ -317,7 +317,10 @@ func (g *GenericPLEG) Relist() {
 				completedConditions = append(completedConditions, condition)
 			}
 		}
-		g.completeWatchConditions(pid, completedConditions)
+		if len(completedConditions) > 0 {
+			g.completeWatchConditions(pid, completedConditions)
+			events = append(events, &PodLifecycleEvent{ID: pid, Type: ConditionMet})
+		}
 
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
