@@ -1202,6 +1202,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		// with an imagefs, imagefs pressure should delete unused images
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalImageFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalImageFsInodesFree]
 		// usage of imagefs and container fs on separate disks
 		// containers gc on containerfs pressure
 		// image gc on imagefs pressure
@@ -1212,6 +1214,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		// with an split fs and imagefs, containerfs pressure should delete unused containers
 		signalToReclaimFunc[evictionapi.SignalNodeFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalNodeFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree]
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs, containerfs and nodefs share a common device, they share common reclaim functions
@@ -1219,6 +1223,8 @@ func buildSignalToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, wit
 		signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsAvailable] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 		signalToReclaimFunc[evictionapi.SignalImageFsInodesFree] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		signalToReclaimFunc[evictionapi.SignalContainerFsAvailable] = signalToReclaimFunc[evictionapi.SignalNodeFsAvailable]
+		signalToReclaimFunc[evictionapi.SignalContainerFsInodesFree] = signalToReclaimFunc[evictionapi.SignalNodeFsInodesFree]
 	}
 	return signalToReclaimFunc
 }
