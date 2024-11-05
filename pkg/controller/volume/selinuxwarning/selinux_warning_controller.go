@@ -173,7 +173,7 @@ func NewController(
 	return c, nil
 }
 
-func (c *Controller) addPod(logger klog.Logger, obj interface{}) {
+func (c *Controller) addPod(_ klog.Logger, obj interface{}) {
 	podRef, err := cache.DeletionHandlingObjectToName(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for pod %#v: %w", obj, err))
@@ -181,7 +181,7 @@ func (c *Controller) addPod(logger klog.Logger, obj interface{}) {
 	c.queue.Add(podRef)
 }
 
-func (c *Controller) deletePod(logger klog.Logger, obj interface{}) {
+func (c *Controller) deletePod(_ klog.Logger, obj interface{}) {
 	podRef, err := cache.DeletionHandlingObjectToName(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for pod %#v: %w", obj, err))
@@ -280,7 +280,7 @@ func (c *Controller) enqueueAllPodsForPVC(logger klog.Logger, namespace, name st
 	}
 }
 
-func (c *Controller) addCSIDriver(logger klog.Logger, obj interface{}) {
+func (c *Controller) addCSIDriver(_ klog.Logger, obj interface{}) {
 	csiDriver, ok := obj.(*storagev1.CSIDriver)
 	if !ok {
 		return
@@ -293,7 +293,7 @@ func (c *Controller) addCSIDriver(logger klog.Logger, obj interface{}) {
 	c.enqueueAllPodsForCSIDriver(csiDriver.Name)
 }
 
-func (c *Controller) updateCSIDriver(logger klog.Logger, oldObj, newObj interface{}) {
+func (c *Controller) updateCSIDriver(_ klog.Logger, oldObj, newObj interface{}) {
 	oldCSIDriver, ok := oldObj.(*storagev1.CSIDriver)
 	if !ok {
 		return
@@ -314,7 +314,7 @@ func (c *Controller) updateCSIDriver(logger klog.Logger, oldObj, newObj interfac
 	}
 }
 
-func (c *Controller) deleteCSIDriver(logger klog.Logger, obj interface{}) {
+func (c *Controller) deleteCSIDriver(_ klog.Logger, obj interface{}) {
 	csiDriver, ok := obj.(*storagev1.CSIDriver)
 	if !ok {
 		return
