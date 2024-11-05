@@ -64,7 +64,7 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 
 	ginkgo.JustBeforeEach(func(ctx context.Context) {
 		cleanup := mustInitCTBs(ctx, f, initCTBs)
-		ginkgo.DeferCleanup(cleanup)
+		ginkgo.JustAfterEach(cleanup)
 	})
 
 	ginkgo.It("should be able to mount a single ClusterTrustBundle by name", func(ctx context.Context) {
