@@ -512,21 +512,6 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
 }
 
-func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
-	// TODO: Consider adding a `ResourceConfigForContainer` helper in
-	// helpers_linux.go similar to what exists for pods.
-	// It would be better to pass the full container resources here instead of
-	// this patch-like partial resources.
-	return m.containerRuntime.UpdateContainerResources(
-		ctx,
-		containerID,
-		&runtimeapi.ContainerResources{
-			Linux: &runtimeapi.LinuxContainerResources{
-				CpusetCpus: cpus.String(),
-			},
-		})
-}
-
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result

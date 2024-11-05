@@ -1438,6 +1438,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+- name: WindowsCPUAndMemoryAffinity
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: WindowsHostNetwork
   versionedSpecs:
   - default: true
