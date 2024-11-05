@@ -92,9 +92,11 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 type SchedulingQueue interface {
 	framework.PodNominator
 	Add(logger klog.Logger, pod *v1.Pod)
-	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
-	// The passed-in pods are originally compiled from plugins that want to activate Pods,
-	// by injecting the pods through a reserved CycleState struct (PodsToActivate).
+	// Activate moves the given pods to activeQ.
+	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// the wildcard event is registered so that the pod will be requeued when it comes back.
+	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
@@ -590,7 +592,11 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
 	}
 }
 
-// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+// Activate moves the given pods to activeQ.
+// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+// the wildcard event is registered so that the pod will be requeued when it comes back.
+// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+// Activate would ignore the pod.
 func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -599,7 +605,11 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	for _, pod := range pods {
 		if p.activate(logger, pod) {
 			activated = true
+			continue
 		}
+
+		// If this pod is in-flight, register the activation event so that the pod will be requeued when it comes back.
+		p.activeQ.addEventsIfPodInFlight(nil, pod, []framework.ClusterEvent{framework.EventForceActivate})
 	}
 
 	if activated {
