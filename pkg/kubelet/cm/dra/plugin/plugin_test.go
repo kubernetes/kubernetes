@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -232,24 +233,41 @@ func TestNewDRAPluginClient(t *testing.T) {
 	}
 }
 
-func TestNodeUnprepareResources(t *testing.T) {
+func TestGRPCMethods(t *testing.T) {
 	for _, test := range []struct {
-		description string
-		serverSetup func(string) (string, tearDown, error)
-		service     string
-		request     *drapbv1beta1.NodeUnprepareResourcesRequest
+		description   string
+		serverSetup   func(string) (string, tearDown, error)
+		service       string
+		chosenService string
+		expectError   string
 	}{
 		{
-			description: "server supports v1alpha4",
-			serverSetup: setupFakeGRPCServer,
-			service:     drapbv1alpha4.NodeService,
-			request:     &drapbv1beta1.NodeUnprepareResourcesRequest{},
+			description:   "v1alpha4",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1alpha4.NodeService,
+			chosenService: drapbv1alpha4.NodeService,
 		},
 		{
-			description: "server supports v1beta1",
-			serverSetup: setupFakeGRPCServer,
-			service:     drapbv1beta1.DRAPluginService,
-			request:     &drapbv1beta1.NodeUnprepareResourcesRequest{},
+			description:   "v1beta1",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: drapbv1beta1.DRAPluginService,
+		},
+		{
+			// In practice, such a mismatch between plugin and kubelet should not happen.
+			description:   "mismatch",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: drapbv1alpha4.NodeService,
+			expectError:   "unknown service v1alpha3.Node",
+		},
+		{
+			// In practice, kubelet wouldn't choose an invalid service.
+			description:   "internal-error",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: "some-other-service",
+			expectError:   "unsupported chosen service",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -265,7 +283,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 				name:              pluginName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
-				chosenService:     test.service,
+				chosenService:     test.chosenService,
 				clientCallTimeout: defaultClientCallTimeout,
 			}
 
@@ -288,10 +306,23 @@ func TestNodeUnprepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = client.NodeUnprepareResources(tCtx, test.request)
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, err = client.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
+			assertError(t, test.expectError, err)
+
+			_, err = client.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
+			assertError(t, test.expectError, err)
 		})
+	}
+}
+
+func assertError(t *testing.T, expectError string, err error) {
+	t.Helper()
+	switch {
+	case err != nil && expectError == "":
+		t.Errorf("Expected no error, got: %v", err)
+	case err == nil && expectError != "":
+		t.Errorf("Expected error %q, got none", expectError)
+	case err != nil && !strings.Contains(err.Error(), expectError):
+		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
 }
