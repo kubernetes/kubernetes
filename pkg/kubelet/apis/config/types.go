@@ -510,7 +510,7 @@ type KubeletConfiguration struct {
 	// container restart behavior
 	// +featureGate=KubeletCrashLoopBackoffMax
 	// +optional
-	CrashLoopBackOff *CrashLoopBackOffConfig
+	CrashLoopBackOff CrashLoopBackOffConfig
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
