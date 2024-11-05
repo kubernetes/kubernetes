@@ -69,7 +69,7 @@ func TestCBORStorageEnablement(t *testing.T) {
 
 	func() {
 		t.Log("starting server with feature gate disabled")
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, false)
 		tearDown, apiExtensionsClientset, dynamicClient, etcdClient, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
 		if err != nil {
 			t.Fatal(err)
@@ -109,7 +109,7 @@ func TestCBORStorageEnablement(t *testing.T) {
 
 	func() {
 		t.Log("starting server with feature gate enabled")
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 		tearDown, _, dynamicClient, etcdClient, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
 		if err != nil {
 			t.Fatal(err)
@@ -159,7 +159,7 @@ func TestCBORStorageEnablement(t *testing.T) {
 
 	func() {
 		t.Log("starting server with feature gate disabled")
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, false)
 		tearDown, _, dynamicClient, _, _, err := fixtures.StartDefaultServerWithClientsAndEtcd(t, "--etcd-prefix", etcdPrefix)
 		if err != nil {
 			t.Fatal(err)
@@ -185,7 +185,7 @@ func TestCBORServingEnablement(t *testing.T) {
 		{name: "disabled", enabled: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.TestOnlyFeatureGate, features.TestOnlyCBORServingAndStorage, tc.enabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, tc.enabled)
 
 			tearDown, config, _, err := fixtures.StartDefaultServer(t)
 			if err != nil {

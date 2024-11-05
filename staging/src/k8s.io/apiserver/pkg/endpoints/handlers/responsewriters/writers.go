@@ -286,7 +286,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 	audit.LogResponseObject(req.Context(), object, gv, s)
 
 	var encoder runtime.Encoder
-	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		encoder = s.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), gv)
 	} else {
 		encoder = s.EncoderForVersion(serializer.Serializer, gv)

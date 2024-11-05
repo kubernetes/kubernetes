@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/dynamic"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -99,7 +101,8 @@ func TestApplyStatus(t *testing.T) {
 // TestApplyStatus makes sure that applying the status works for all known types.
 func TestApplyStatusWithCBOR(t *testing.T) {
 	framework.EnableCBORServingAndStorageForTest(t)
-	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 	testApplyStatus(t, func(t testing.TB, config *rest.Config) {
 		config.Wrap(framework.AssertRequestResponseAsCBOR(t))
 	})

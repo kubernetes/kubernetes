@@ -170,6 +170,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+- name: CBORServingAndStorage
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: CloudControllerManagerWebhook
   versionedSpecs:
   - default: false
@@ -1291,12 +1297,6 @@
   - default: true
     lockToDefault: false
     preRelease: Beta
-    version: "1.32"
-- name: TestOnlyCBORServingAndStorage
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
     version: "1.32"
 - name: TopologyAwareHints
   versionedSpecs:

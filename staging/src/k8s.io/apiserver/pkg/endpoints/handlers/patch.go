@@ -138,7 +138,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		case types.ApplyYAMLPatchType:
 			baseContentType = runtime.ContentTypeYAML
 		case types.ApplyCBORPatchType:
-			if !utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 				// This request should have already been rejected by the
 				// Content-Type allowlist check. Return 500 because assumptions are
 				// already broken and the feature is not GA.
@@ -673,7 +673,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		p.mechanism = newApplyPatcher(p, scope.FieldManager, yaml.Unmarshal, yaml.UnmarshalStrict)
 		p.forceAllowCreate = true
 	case types.ApplyCBORPatchType:
-		if !utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 			utilruntime.HandleErrorWithContext(context.TODO(), nil, "CBOR apply requests should be rejected before reaching this point unless the feature gate is enabled.")
 			return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 		}

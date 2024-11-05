@@ -46,6 +46,8 @@ import (
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
@@ -1057,7 +1059,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 // syntax suffix for application/apply-patch and with CBOR enabled.
 func TestPatchVeryLargeObjectCBORApply(t *testing.T) {
 	framework.EnableCBORServingAndStorageForTest(t)
-	framework.SetTestOnlyCBORClientFeatureGatesForTest(t, true, false)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
 
 	client, closeFn := setup(t)
 	defer closeFn()

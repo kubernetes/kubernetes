@@ -895,7 +895,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.StrategicMergePatchType),
 				string(types.ApplyYAMLPatchType),
 			}
-			if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 				supportedTypes = append(supportedTypes, string(types.ApplyCBORPatchType))
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))

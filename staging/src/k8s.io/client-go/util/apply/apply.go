@@ -35,7 +35,7 @@ func NewRequest(client rest.Interface, applyConfiguration interface{}) (*rest.Re
 	pt := types.ApplyYAMLPatchType
 	marshal := json.Marshal
 
-	if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) && features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientPrefersCBOR) {
+	if features.FeatureGates().Enabled(features.ClientsAllowCBOR) && features.FeatureGates().Enabled(features.ClientsPreferCBOR) {
 		pt = types.ApplyCBORPatchType
 		marshal = cbor.Marshal
 	}

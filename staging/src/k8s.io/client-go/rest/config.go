@@ -683,7 +683,7 @@ func CopyConfig(config *Config) *Config {
 // This is supported ONLY for use by clients generated with client-gen. The caller is responsible
 // for ensuring that the CodecFactory argument was constructed using the Scheme argument.
 func CodecFactoryForGeneratedClient(scheme *runtime.Scheme, codecs serializer.CodecFactory) serializer.CodecFactory {
-	if !features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) {
+	if !features.FeatureGates().Enabled(features.ClientsAllowCBOR) {
 		// NOTE: This assumes client-gen will not generate CBOR-enabled Codecs as long as
 		// the feature gate exists.
 		return codecs

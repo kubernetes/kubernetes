@@ -49,9 +49,9 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 
 	config.ContentType = "application/json"
 	config.AcceptContentTypes = "application/json"
-	if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientAllowsCBOR) {
+	if features.FeatureGates().Enabled(features.ClientsAllowCBOR) {
 		config.AcceptContentTypes = "application/json;q=0.9,application/cbor;q=1"
-		if features.TestOnlyFeatureGates.Enabled(features.TestOnlyClientPrefersCBOR) {
+		if features.FeatureGates().Enabled(features.ClientsPreferCBOR) {
 			config.ContentType = "application/cbor"
 		}
 	}

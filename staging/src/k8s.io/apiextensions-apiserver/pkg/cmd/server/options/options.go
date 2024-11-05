@@ -139,7 +139,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions, resourceTra
 	ucbor := cbor.NewSerializer(unstructuredscheme.NewUnstructuredCreator(), unstructuredscheme.NewUnstructuredObjectTyper())
 
 	encoder := unstructured.UnstructuredJSONScheme
-	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		encoder = ucbor
 	}
 

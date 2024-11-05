@@ -327,7 +327,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		string(types.MergePatchType),
 		string(types.ApplyYAMLPatchType),
 	}
-	if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		supportedTypes = append(supportedTypes, string(types.ApplyCBORPatchType))
 	}
 
@@ -913,7 +913,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			},
 		}
 
-		if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 			negotiatedSerializer.supportedMediaTypes = append(negotiatedSerializer.supportedMediaTypes, newCBORSerializerInfo(creator, typer))
 		}
 
@@ -981,7 +981,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
 		var opts []serializer.CodecFactoryOptionsMutator
-		if utilfeature.TestOnlyFeatureGate.Enabled(features.TestOnlyCBORServingAndStorage) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 			opts = append(opts, serializer.WithSerializer(newCBORSerializerInfo))
 		}
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme(), opts...)
