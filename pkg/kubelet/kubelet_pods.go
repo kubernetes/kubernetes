@@ -327,7 +327,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 				err = volumevalidation.ValidatePathNoBacksteps(subPath)
 				if err != nil {
-					return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", subPath, err)
+					return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %w", subPath, err)
 				}
 
 				volumePath := hostPath
