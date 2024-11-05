@@ -341,7 +341,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				t.Errorf("pod %s is not present in the cache", podKey)
 			}
 			expectedPodInfo := podInfo{
-				label:        tt.podToAdd.label,
+				seLinuxLabel: tt.podToAdd.label,
 				changePolicy: tt.podToAdd.changePolicy,
 			}
 			if !reflect.DeepEqual(existingInfo, expectedPodInfo) {

@@ -32,7 +32,7 @@ const (
 
 type VolumeCache interface {
 	// Add a single volume to the cache. Returns list of conflicts it caused.
-	AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeName, podKey cache.ObjectName, label string, changePolicy v1.PodSELinuxChangePolicy, csiDriver string) []Conflict
+	AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeName, podKey cache.ObjectName, seLinuxLabel string, changePolicy v1.PodSELinuxChangePolicy, csiDriver string) []Conflict
 
 	// Remove a pod from the cache. Prunes all empty structures.
 	DeletePod(logger klog.Logger, podKey cache.ObjectName)
@@ -71,17 +71,17 @@ type usedVolume struct {
 
 // Information about a Pod that uses a volume.
 type podInfo struct {
-	// SELinux label to be applied to the volume in the Pod.
+	// SELinux seLinuxLabel to be applied to the volume in the Pod.
 	// Either as mount option or recursively by the container runtime.
-	label string
+	seLinuxLabel string
 	// SELinuxChangePolicy of the Pod.
 	changePolicy v1.PodSELinuxChangePolicy
 }
 
-func newPodInfoListForPod(podKey cache.ObjectName, label string, changePolicy v1.PodSELinuxChangePolicy) map[cache.ObjectName]podInfo {
+func newPodInfoListForPod(podKey cache.ObjectName, seLinuxLabel string, changePolicy v1.PodSELinuxChangePolicy) map[cache.ObjectName]podInfo {
 	return map[cache.ObjectName]podInfo{
 		podKey: {
-			label:        label,
+			seLinuxLabel: seLinuxLabel,
 			changePolicy: changePolicy,
 		},
 	}
@@ -109,7 +109,7 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 	// The volume is already known
 	// Add the pod to the cache or update its properties
 	volume.pods[podKey] = podInfo{
-		label:        label,
+		seLinuxLabel: label,
 		changePolicy: changePolicy,
 	}
 
@@ -133,7 +133,7 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 				OtherPropertyValue: string(changePolicy),
 			})
 		}
-		if otherPodInfo.label != label {
+		if otherPodInfo.seLinuxLabel != label {
 			// Send conflict to both pods
 			conflicts = append(conflicts, Conflict{
 				PropertyName:       "SELinux label",
@@ -141,12 +141,12 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 				Pod:                podKey,
 				PropertyValue:      label,
 				OtherPod:           otherPodKey,
-				OtherPropertyValue: otherPodInfo.label,
+				OtherPropertyValue: otherPodInfo.seLinuxLabel,
 			}, Conflict{
 				PropertyName:       "SELinux label",
 				EventReason:        "SELinuxLabelConflict",
 				Pod:                otherPodKey,
-				PropertyValue:      otherPodInfo.label,
+				PropertyValue:      otherPodInfo.seLinuxLabel,
 				OtherPod:           podKey,
 				OtherPropertyValue: label,
 			})
@@ -197,7 +197,7 @@ func (c *volumeCache) dump(logger klog.Logger) {
 		})
 		for _, podKey := range podKeys {
 			podInfo := volume.pods[podKey]
-			logger.Info("  pod", "pod", podKey, "label", podInfo.label, "changePolicy", podInfo.changePolicy)
+			logger.Info("  pod", "pod", podKey, "seLinuxLabel", podInfo.seLinuxLabel, "changePolicy", podInfo.changePolicy)
 		}
 	}
 }
@@ -244,14 +244,14 @@ func (c *volumeCache) SendConflicts(logger klog.Logger, ch chan<- Conflict) {
 						OtherPropertyValue: string(otherPodInfo.changePolicy),
 					}
 				}
-				if podInfo.label != otherPodInfo.label {
+				if podInfo.seLinuxLabel != otherPodInfo.seLinuxLabel {
 					ch <- Conflict{
 						PropertyName:       "SELinux label",
 						EventReason:        "SELinuxLabelConflict",
 						Pod:                podKey,
-						PropertyValue:      podInfo.label,
+						PropertyValue:      podInfo.seLinuxLabel,
 						OtherPod:           otherPodKey,
-						OtherPropertyValue: otherPodInfo.label,
+						OtherPropertyValue: otherPodInfo.seLinuxLabel,
 					}
 				}
 			}

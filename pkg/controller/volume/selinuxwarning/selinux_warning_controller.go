@@ -447,11 +447,11 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 		}
 
 		// Ignore how the volume is going to be mounted.
-		// Report any errors when a volume is used by two pdos with different SELinux labels regardless of their
+		// Report any errors when a volume is used by two pods with different SELinux labels regardless of their
 		// SELinuxChangePolicy
-		label := mountInfo.SELinuxProcessLabel
+		seLinuxLabel := mountInfo.SELinuxProcessLabel
 
-		err = c.syncVolume(logger, pod, spec, label, mountInfo.PluginSupportsSELinuxContextMount)
+		err = c.syncVolume(logger, pod, spec, seLinuxLabel, mountInfo.PluginSupportsSELinuxContextMount)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -460,7 +460,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 	return errorutils.NewAggregate(errs)
 }
 
-func (c *Controller) syncVolume(logger klog.Logger, pod *v1.Pod, spec *volume.Spec, label string, pluginSupportsSELinuxContextMount bool) error {
+func (c *Controller) syncVolume(logger klog.Logger, pod *v1.Pod, spec *volume.Spec, seLinuxLabel string, pluginSupportsSELinuxContextMount bool) error {
 	plugin, err := c.vpm.FindPluginBySpec(spec)
 	if err != nil {
 		// The controller does not have all volume plugins, only those that affect SELinux.
@@ -486,9 +486,9 @@ func (c *Controller) syncVolume(logger klog.Logger, pod *v1.Pod, spec *volume.Sp
 		// This is likely not a CSI volume
 		csiDriver = ""
 	}
-	logger.V(4).Info("Syncing pod volume", "pod", klog.KObj(pod), "volume", spec.Name(), "label", label, "uniqueVolumeName", uniqueVolumeName, "changePolicy", changePolicy, "csiDriver", csiDriver)
+	logger.V(4).Info("Syncing pod volume", "pod", klog.KObj(pod), "volume", spec.Name(), "label", seLinuxLabel, "uniqueVolumeName", uniqueVolumeName, "changePolicy", changePolicy, "csiDriver", csiDriver)
 
-	conflicts := c.labelCache.AddVolume(logger, uniqueVolumeName, cache.MetaObjectToName(pod), label, changePolicy, csiDriver)
+	conflicts := c.labelCache.AddVolume(logger, uniqueVolumeName, cache.MetaObjectToName(pod), seLinuxLabel, changePolicy, csiDriver)
 	c.reportConflictEvents(logger, conflicts)
 
 	return nil
