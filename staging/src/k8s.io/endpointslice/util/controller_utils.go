@@ -24,11 +24,11 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -303,13 +303,7 @@ func stringPtrChanged(ptr1, ptr2 *string) bool {
 // copied from k8s.io/kubernetes/pkg/util/hash
 func deepHashObject(hasher hash.Hash, objectToWrite interface{}) {
 	hasher.Reset()
-	printer := spew.ConfigState{
-		Indent:         " ",
-		SortKeys:       true,
-		DisableMethods: true,
-		SpewKeys:       true,
-	}
-	printer.Fprintf(hasher, "%#v", objectToWrite)
+	fmt.Fprint(hasher, dump.ForHash(objectToWrite))
 }
 
 // IsPodReady returns true if Pods Ready condition is true
