@@ -56,7 +56,8 @@ const (
 	noSignerKey       = "no-signer"
 )
 
-var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjection, func() {
+// TODO: running the tests in parallel should be possible
+var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjection, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("projected-clustertrustbundle")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
