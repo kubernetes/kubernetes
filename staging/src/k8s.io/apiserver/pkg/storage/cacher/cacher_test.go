@@ -257,7 +257,7 @@ func TestListResourceVersionMatch(t *testing.T) {
 }
 
 func TestNamespaceScopedList(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
 }
@@ -355,13 +355,13 @@ func TestWatchInitializationSignal(t *testing.T) {
 }
 
 func TestClusterScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 }
 
 func TestNamespaceScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
@@ -432,7 +432,8 @@ func withClusterScopedKeyFunc(options *setupOptions) {
 	}
 }
 
-func withSpecNodeNameIndexerFuncs(options *setupOptions) {
+// mirror indexer configuration from pkg/registry/core/pod/strategy.go
+func withNodeNameAndNamespaceIndex(options *setupOptions) {
 	options.indexerFuncs = map[string]storage.IndexerFunc{
 		"spec.nodeName": func(obj runtime.Object) string {
 			pod, ok := obj.(*example.Pod)
@@ -446,6 +447,10 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
 			pod := obj.(*example.Pod)
 			return []string{pod.Spec.NodeName}, nil
+		},
+		"f:metadata.namespace": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.ObjectMeta.Namespace}, nil
 		},
 	}
 }
@@ -571,7 +576,7 @@ func BenchmarkStoreCreateList(b *testing.B) {
 						b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
 							opts := []setupOption{}
 							if useIndex {
-								opts = append(opts, withSpecNodeNameIndexerFuncs)
+								opts = append(opts, withNodeNameAndNamespaceIndex)
 							}
 							ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
 							b.Cleanup(terminate)
@@ -627,7 +632,7 @@ func BenchmarkStoreList(b *testing.B) {
 			for _, store := range storeOptions {
 				b.Run(fmt.Sprintf("Store=%s", store.name), func(b *testing.B) {
 					featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.BtreeWatchCache, store.btreeEnabled)
-					ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withSpecNodeNameIndexerFuncs)
+					ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
 					b.Cleanup(terminate)
 					var out example.Pod
 					for _, pod := range data.Pods {
