@@ -737,7 +737,7 @@
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.30"
+    version: "1.32"
 - name: NFTablesProxyMode
   versionedSpecs:
   - default: false

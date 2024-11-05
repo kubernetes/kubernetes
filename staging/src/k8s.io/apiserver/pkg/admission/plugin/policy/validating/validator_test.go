@@ -42,7 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 )
 
-var _ cel.Filter = &fakeCelFilter{}
+var _ cel.ConditionEvaluator = &fakeCelFilter{}
 
 type fakeCelFilter struct {
 	evaluations []cel.EvaluationResult
@@ -1035,8 +1035,8 @@ func TestContextCanceled(t *testing.T) {
 
 	fakeAttr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "default", "foo", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil)
 	fakeVersionedAttr, _ := admission.NewVersionedAttributes(fakeAttr, schema.GroupVersionKind{}, nil)
-	fc := cel.NewFilterCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-	f := fc.Compile([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.StoredExpressions)
+	fc := cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	f := fc.CompileCondition([]cel.ExpressionAccessor{&ValidationCondition{Expression: "[1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x*y)) == []"}}, cel.OptionalVariableDeclarations{HasParams: false, HasAuthorizer: false}, environment.StoredExpressions)
 	v := validator{
 		failPolicy:       &fail,
 		celMatcher:       &fakeCELMatcher{matches: true},

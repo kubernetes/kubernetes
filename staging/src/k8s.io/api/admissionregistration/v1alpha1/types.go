@@ -663,3 +663,346 @@ const (
 	Delete       OperationType = v1.Delete
 	Connect      OperationType = v1.Connect
 )
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
+
+// MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.
+type MutatingAdmissionPolicy struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// Specification of the desired behavior of the MutatingAdmissionPolicy.
+	Spec MutatingAdmissionPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
+
+// MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.
+type MutatingAdmissionPolicyList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// List of ValidatingAdmissionPolicy.
+	Items []MutatingAdmissionPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// MutatingAdmissionPolicySpec is the specification of the desired behavior of the admission policy.
+type MutatingAdmissionPolicySpec struct {
+	// paramKind specifies the kind of resources used to parameterize this policy.
+	// If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions.
+	// If paramKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied.
+	// If paramKind is specified but paramRef is unset in MutatingAdmissionPolicyBinding, the params variable will be null.
+	// +optional
+	ParamKind *ParamKind `json:"paramKind,omitempty" protobuf:"bytes,1,rep,name=paramKind"`
+
+	// matchConstraints specifies what resources this policy is designed to validate.
+	// The MutatingAdmissionPolicy cares about a request if it matches _all_ Constraints.
+	// However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API
+	// MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding.
+	// The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
+	// '*' matches CREATE, UPDATE and CONNECT.
+	// Required.
+	MatchConstraints *MatchResources `json:"matchConstraints,omitempty" protobuf:"bytes,2,rep,name=matchConstraints"`
+
+	// variables contain definitions of variables that can be used in composition of other expressions.
+	// Each variable is defined as a named CEL expression.
+	// The variables defined here will be available under `variables` in other expressions of the policy
+	// except matchConditions because matchConditions are evaluated before the rest of the policy.
+	//
+	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
+	// Thus, variables must be sorted by the order of first appearance and acyclic.
+	// +listType=atomic
+	// +optional
+	Variables []Variable `json:"variables,omitempty" protobuf:"bytes,3,rep,name=variables"`
+
+	// mutations contain operations to perform on matching objects.
+	// mutations may not be empty; a minimum of one mutation is required.
+	// mutations are evaluated in order, and are reinvoked according to
+	// the reinvocationPolicy.
+	// The mutations of a policy are invoked for each binding of this policy
+	// and reinvocation of mutations occurs on a per binding basis.
+	//
+	// +listType=atomic
+	// +optional
+	Mutations []Mutation `json:"mutations,omitempty" protobuf:"bytes,4,rep,name=mutations"`
+
+	// failurePolicy defines how to handle failures for the admission policy. Failures can
+	// occur from CEL expression parse errors, type check errors, runtime errors and invalid
+	// or mis-configured policy definitions or bindings.
+	//
+	// A policy is invalid if paramKind refers to a non-existent Kind.
+	// A binding is invalid if paramRef.name refers to a non-existent resource.
+	//
+	// failurePolicy does not define how validations that evaluate to false are handled.
+	//
+	// Allowed values are Ignore or Fail. Defaults to Fail.
+	// +optional
+	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,5,opt,name=failurePolicy,casttype=FailurePolicyType"`
+
+	// matchConditions is a list of conditions that must be met for a request to be validated.
+	// Match conditions filter requests that have already been matched by the matchConstraints.
+	// An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// If a parameter object is provided, it can be accessed via the `params` handle in the same
+	// manner as validation expressions.
+	//
+	// The exact matching logic is (in order):
+	//   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.
+	//   3. If any matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Fail, reject the request
+	//      - If failurePolicy=Ignore, the policy is skipped
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	MatchConditions []MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,6,rep,name=matchConditions"`
+
+	// reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding
+	// as part of a single admission evaluation.
+	// Allowed values are "Never" and "IfNeeded".
+	//
+	// Never: These mutations will not be called more than once per binding in a single admission evaluation.
+	//
+	// IfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of
+	// order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only
+	// reinvoked when mutations change the object after this mutation is invoked.
+	// Required.
+	ReinvocationPolicy ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,7,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
+}
+
+// Mutation specifies the CEL expression which is used to apply the Mutation.
+type Mutation struct {
+	// patchType indicates the patch strategy used.
+	// Allowed values are "ApplyConfiguration" and "JSONPatch".
+	// Required.
+	//
+	// +unionDiscriminator
+	PatchType PatchType `json:"patchType" protobuf:"bytes,2,opt,name=patchType,casttype=PatchType"`
+
+	// applyConfiguration defines the desired configuration values of an object.
+	// The configuration is applied to the admission object using
+	// [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff).
+	// A CEL expression is used to create apply configuration.
+	ApplyConfiguration *ApplyConfiguration `json:"applyConfiguration,omitempty" protobuf:"bytes,3,opt,name=applyConfiguration"`
+
+	// jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object.
+	// A CEL expression is used to create the JSON patch.
+	JSONPatch *JSONPatch `json:"jsonPatch,omitempty" protobuf:"bytes,4,opt,name=jsonPatch"`
+}
+
+// PatchType specifies the type of patch operation for a mutation.
+// +enum
+type PatchType string
+
+const (
+	// ApplyConfiguration indicates that the mutation is using apply configuration to mutate the object.
+	PatchTypeApplyConfiguration PatchType = "ApplyConfiguration"
+	// JSONPatch indicates that the object is mutated through JSON Patch.
+	PatchTypeJSONPatch PatchType = "JSONPatch"
+)
+
+// ApplyConfiguration defines the desired configuration values of an object.
+type ApplyConfiguration struct {
+	// expression will be evaluated by CEL to create an apply configuration.
+	// ref: https://github.com/google/cel-spec
+	//
+	// Apply configurations are declared in CEL using object initialization. For example, this CEL expression
+	// returns an apply configuration to set a single field:
+	//
+	//	Object{
+	//	  spec: Object.spec{
+	//	    serviceAccountName: "example"
+	//	  }
+	//	}
+	//
+	// Apply configurations may not modify atomic structs, maps or arrays due to the risk of accidental deletion of
+	// values not included in the apply configuration.
+	//
+	// CEL expressions have access to the object types needed to create apply configurations:
+	//
+	// - 'Object' - CEL type of the resource object.
+	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
+	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
+	//
+	// CEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:
+	//
+	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// - 'oldObject' - The existing object. The value is null for CREATE requests.
+	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
+	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
+	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
+	//
+	// The `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the
+	// object. No other metadata properties are accessible.
+	//
+	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
+	// Required.
+	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
+}
+
+// JSONPatch defines a JSON Patch.
+type JSONPatch struct {
+	// expression will be evaluated by CEL to create a [JSON patch](https://jsonpatch.com/).
+	// ref: https://github.com/google/cel-spec
+	//
+	// expression must return an array of JSONPatch values.
+	//
+	// For example, this CEL expression returns a JSON patch to conditionally modify a value:
+	//
+	//	  [
+	//	    JSONPatch{op: "test", path: "/spec/example", value: "Red"},
+	//	    JSONPatch{op: "replace", path: "/spec/example", value: "Green"}
+	//	  ]
+	//
+	// To define an object for the patch value, use Object types. For example:
+	//
+	//	  [
+	//	    JSONPatch{
+	//	      op: "add",
+	//	      path: "/spec/selector",
+	//	      value: Object.spec.selector{matchLabels: {"environment": "test"}}
+	//	    }
+	//	  ]
+	//
+	// To use strings containing '/' and '~' as JSONPatch path keys, use "jsonpatch.escapeKey". For example:
+	//
+	//	  [
+	//	    JSONPatch{
+	//	      op: "add",
+	//	      path: "/metadata/labels/" + jsonpatch.escapeKey("example.com/environment"),
+	//	      value: "test"
+	//	    },
+	//	  ]
+	//
+	// CEL expressions have access to the types needed to create JSON patches and objects:
+	//
+	// - 'JSONPatch' - CEL type of JSON Patch operations. JSONPatch has the fields 'op', 'from', 'path' and 'value'.
+	//   See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to any of: string,
+	//   integer, array, map or object.  If set, the 'path' and 'from' fields must be set to a
+	//   [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901/) string, where the 'jsonpatch.escapeKey()' CEL
+	//   function may be used to escape path keys containing '/' and '~'.
+	// - 'Object' - CEL type of the resource object.
+	// - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec')
+	// - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')
+	//
+	// CEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:
+	//
+	// - 'object' - The object from the incoming request. The value is null for DELETE requests.
+	// - 'oldObject' - The existing object. The value is null for CREATE requests.
+	// - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
+	// - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+	// - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
+	// - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+	//   For example, a variable named 'foo' can be accessed as 'variables.foo'.
+	// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+	//   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+	// - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+	//   request resource.
+	//
+	// CEL expressions have access to [Kubernetes CEL function libraries](https://kubernetes.io/docs/reference/using-api/cel/#cel-options-language-features-and-libraries)
+	// as well as:
+	//
+	// - 'jsonpatch.escapeKey' - Performs JSONPatch key escaping. '~' and  '/' are escaped as '~0' and `~1' respectively).
+	//
+	//
+	// Only property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.
+	// Required.
+	Expression string `json:"expression,omitempty" protobuf:"bytes,1,opt,name=expression"`
+}
+
+// ReinvocationPolicyType specifies what type of policy the admission mutation uses.
+// +enum
+type ReinvocationPolicyType = v1.ReinvocationPolicyType
+
+const (
+	// NeverReinvocationPolicy indicates that the mutation must not be called more than once in a
+	// single admission evaluation.
+	NeverReinvocationPolicy ReinvocationPolicyType = v1.NeverReinvocationPolicy
+	// IfNeededReinvocationPolicy indicates that the mutation may be called at least one
+	// additional time as part of the admission evaluation if the object being admitted is
+	// modified by other admission plugins after the initial mutation call.
+	IfNeededReinvocationPolicy ReinvocationPolicyType = v1.IfNeededReinvocationPolicy
+)
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
+
+// MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources.
+// MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators
+// configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+// Each evaluation is constrained by a [runtime cost budget](https://kubernetes.io/docs/reference/using-api/cel/#runtime-cost-budget).
+//
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
+type MutatingAdmissionPolicyBinding struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// Specification of the desired behavior of the MutatingAdmissionPolicyBinding.
+	Spec MutatingAdmissionPolicyBindingSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.32
+
+// MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// List of PolicyBinding.
+	Items []MutatingAdmissionPolicyBinding `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// MutatingAdmissionPolicyBindingSpec is the specification of the MutatingAdmissionPolicyBinding.
+type MutatingAdmissionPolicyBindingSpec struct {
+	// policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to.
+	// If the referenced resource does not exist, this binding is considered invalid and will be ignored
+	// Required.
+	PolicyName string `json:"policyName,omitempty" protobuf:"bytes,1,rep,name=policyName"`
+
+	// paramRef specifies the parameter resource used to configure the admission control policy.
+	// It should point to a resource of the type specified in spec.ParamKind of the bound MutatingAdmissionPolicy.
+	// If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the MutatingAdmissionPolicy applied.
+	// If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.
+	// +optional
+	ParamRef *ParamRef `json:"paramRef,omitempty" protobuf:"bytes,2,rep,name=paramRef"`
+
+	// matchResources limits what resources match this binding and may be mutated by it.
+	// Note that if matchResources matches a resource, the resource must also match a policy's matchConstraints and
+	// matchConditions before the resource may be mutated.
+	// When matchResources is unset, it does not constrain resource matching, and only the policy's matchConstraints
+	// and matchConditions must match for the resource to be mutated.
+	// Additionally, matchResources.resourceRules are optional and do not constraint matching when unset.
+	// Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required.
+	// The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched.
+	// '*' matches CREATE, UPDATE and CONNECT.
+	// +optional
+	MatchResources *MatchResources `json:"matchResources,omitempty" protobuf:"bytes,3,rep,name=matchResources"`
+}

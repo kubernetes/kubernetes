@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/cel"
@@ -274,6 +276,8 @@ type preexistingExpressions struct {
 	validationExpressions            sets.Set[string]
 	validationMessageExpressions     sets.Set[string]
 	auditAnnotationValuesExpressions sets.Set[string]
+	applyConfigurationExpressions    sets.Set[string]
+	jsonPatchExpressions             sets.Set[string]
 }
 
 func newPreexistingExpressions() preexistingExpressions {
@@ -282,6 +286,8 @@ func newPreexistingExpressions() preexistingExpressions {
 		validationExpressions:            sets.New[string](),
 		validationMessageExpressions:     sets.New[string](),
 		auditAnnotationValuesExpressions: sets.New[string](),
+		applyConfigurationExpressions:    sets.New[string](),
+		jsonPatchExpressions:             sets.New[string](),
 	}
 }
 
@@ -318,6 +324,22 @@ func findValidatingPolicyPreexistingExpressions(validatingPolicy *admissionregis
 	}
 	for _, a := range validatingPolicy.Spec.AuditAnnotations {
 		preexisting.auditAnnotationValuesExpressions.Insert(a.ValueExpression)
+	}
+	return preexisting
+}
+
+func findMutatingPolicyPreexistingExpressions(mutatingPolicy *admissionregistration.MutatingAdmissionPolicy) preexistingExpressions {
+	preexisting := newPreexistingExpressions()
+	for _, mc := range mutatingPolicy.Spec.MatchConditions {
+		preexisting.matchConditionExpressions.Insert(mc.Expression)
+	}
+	for _, v := range mutatingPolicy.Spec.Mutations {
+		if v.ApplyConfiguration != nil {
+			preexisting.applyConfigurationExpressions.Insert(v.ApplyConfiguration.Expression)
+		}
+		if v.JSONPatch != nil {
+			preexisting.jsonPatchExpressions.Insert(v.JSONPatch.Expression)
+		}
 	}
 	return preexisting
 }
@@ -495,6 +517,19 @@ var supportedValidationPolicyReason = sets.NewString(
 	string(metav1.StatusReasonRequestEntityTooLarge),
 )
 
+var supportedPatchType = sets.NewString(
+	string(admissionregistration.PatchTypeApplyConfiguration),
+	string(admissionregistration.PatchTypeJSONPatch),
+)
+
+// MutatatingAdmissionPolicy does not support DELETE
+var supportedMutatingOperations = sets.NewString(
+	string(admissionregistration.OperationAll),
+	string(admissionregistration.Create),
+	string(admissionregistration.Update),
+	string(admissionregistration.Connect),
+)
+
 func hasWildcardOperation(operations []admissionregistration.OperationType) bool {
 	for _, o := range operations {
 		if o == admissionregistration.OperationAll {
@@ -588,10 +623,21 @@ func ignoreValidatingWebhookMatchConditions(new, old []admissionregistration.Val
 
 // ignoreValidatingAdmissionPolicyMatchConditions returns true if there have been no updates that could invalidate previously-valid match conditions
 func ignoreValidatingAdmissionPolicyMatchConditions(new, old *admissionregistration.ValidatingAdmissionPolicy) bool {
-	if !reflect.DeepEqual(new.Spec.ParamKind, old.Spec.ParamKind) {
+	if !equality.Semantic.DeepEqual(new.Spec.ParamKind, old.Spec.ParamKind) {
 		return false
 	}
-	if !reflect.DeepEqual(new.Spec.MatchConditions, old.Spec.MatchConditions) {
+	if !equality.Semantic.DeepEqual(new.Spec.MatchConditions, old.Spec.MatchConditions) {
+		return false
+	}
+	return true
+}
+
+// ignoreMutatingAdmissionPolicyMatchConditions returns true if there have been no updates that could invalidate previously-valid match conditions
+func ignoreMutatingAdmissionPolicyMatchConditions(new, old *admissionregistration.MutatingAdmissionPolicy) bool {
+	if !equality.Semantic.DeepEqual(new.Spec.ParamKind, old.Spec.ParamKind) {
+		return false
+	}
+	if !equality.Semantic.DeepEqual(new.Spec.MatchConditions, old.Spec.MatchConditions) {
 		return false
 	}
 	return true
@@ -1158,7 +1204,7 @@ func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.Va
 		}
 	}
 	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
-	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResouces"))...)
+	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResources"))...)
 	allErrors = append(allErrors, validateValidationActions(spec.ValidationActions, fldPath.Child("validationActions"))...)
 
 	return allErrors
@@ -1327,4 +1373,196 @@ func isCELIdentifier(name string) bool {
 	// 	 | "loop" | "package" | "namespace" | "return"
 	// 	 | "var" | "void" | "while"
 	return celIdentRegex.MatchString(name) && !celReserved.Has(name)
+}
+
+// ValidateMutatingAdmissionPolicyUpdate validates update of mutating admission policy
+func ValidateMutatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.MutatingAdmissionPolicy) field.ErrorList {
+	return validateMutatingAdmissionPolicy(newC, validationOptions{
+		ignoreMatchConditions:  ignoreMutatingAdmissionPolicyMatchConditions(newC, oldC),
+		preexistingExpressions: findMutatingPolicyPreexistingExpressions(oldC),
+		strictCostEnforcement:  true,
+	})
+}
+
+// ValidateMutatingAdmissionPolicyBindingUpdate validates update of mutating admission policy
+func ValidateMutatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
+	return validateMutatingAdmissionPolicyBinding(newC)
+}
+
+// ValidateMutatingAdmissionPolicy validates a MutatingAdmissionPolicy before creation.
+func ValidateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy) field.ErrorList {
+	return validateMutatingAdmissionPolicy(p, validationOptions{ignoreMatchConditions: false, strictCostEnforcement: true})
+}
+
+func validateMutatingAdmissionPolicy(p *admissionregistration.MutatingAdmissionPolicy, opts validationOptions) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateMutatingAdmissionPolicySpec(p.ObjectMeta, &p.Spec, opts, field.NewPath("spec"))...)
+	return allErrors
+}
+
+func validateMutatingAdmissionPolicySpec(meta metav1.ObjectMeta, spec *admissionregistration.MutatingAdmissionPolicySpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+
+	compiler := createCompiler(true, true)
+
+	if spec.FailurePolicy == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
+	} else if !supportedFailurePolicies.Has(string(*spec.FailurePolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, supportedFailurePolicies.List()))
+	}
+	if spec.ParamKind != nil {
+		opts.allowParamsInMatchConditions = true
+		allErrors = append(allErrors, validateParamKind(*spec.ParamKind, fldPath.Child("paramKind"))...)
+	}
+	if spec.MatchConstraints == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints"), ""))
+	} else {
+		allErrors = append(allErrors, validateMatchResources(spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
+		// at least one resourceRule must be defined to provide type information
+		if len(spec.MatchConstraints.ResourceRules) == 0 {
+			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
+		}
+
+		// It is only possible to mutate create and update requests
+		for _, rule := range spec.MatchConstraints.ResourceRules {
+			for _, op := range rule.RuleWithOperations.Operations {
+				if !supportedMutatingOperations.Has(string(op)) {
+					allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchConstraints", "resourceRules", "operations"), op, supportedMutatingOperations.List()))
+				}
+			}
+		}
+	}
+	if !opts.ignoreMatchConditions {
+		allErrors = append(allErrors, validateMatchConditions(spec.MatchConditions, opts, fldPath.Child("matchConditions"))...)
+	}
+	for i, variable := range spec.Variables {
+		allErrors = append(allErrors, validateVariable(compiler, &variable, spec.ParamKind, opts, fldPath.Child("variables").Index(i))...)
+	}
+	if len(spec.Mutations) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("mutations"), "mutations must contain at least one item"))
+	} else {
+		for i, mutation := range spec.Mutations {
+			allErrors = append(allErrors, validateMutation(compiler, &mutation, spec.ParamKind, opts, fldPath.Child("mutations").Index(i))...)
+		}
+	}
+	if len(spec.ReinvocationPolicy) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("reinvocationPolicy"), ""))
+	} else if !supportedReinvocationPolicies.Has(string(spec.ReinvocationPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), spec.ReinvocationPolicy, supportedReinvocationPolicies.List()))
+	}
+	return allErrors
+}
+
+func validateMutation(compiler plugincel.Compiler, m *admissionregistration.Mutation, paramKind *admissionregistration.ParamKind, opts validationOptions, fldPath *field.Path) (allErrors field.ErrorList) {
+	if len(m.PatchType) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("patchType"), ""))
+	} else {
+		switch m.PatchType {
+		case admissionregistration.PatchTypeJSONPatch:
+			if m.JSONPatch == nil {
+				allErrors = append(allErrors, field.Required(fldPath.Child("jsonPatch"), "must be specified when patchType is JSONPatch"))
+			} else {
+				allErrors = append(allErrors, validateJSONPatch(compiler, m.JSONPatch, paramKind, opts, fldPath.Child("jsonPatch"))...)
+			}
+			if m.ApplyConfiguration != nil {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("applyConfiguration"), "{applyConfiguration}", "must not be specified when patchType is JSONPatch"))
+			}
+		case admissionregistration.PatchTypeApplyConfiguration:
+			if m.ApplyConfiguration == nil {
+				allErrors = append(allErrors, field.Required(fldPath.Child("applyConfiguration"), "must be specified when patchType is ApplyConfiguration"))
+			} else {
+				allErrors = append(allErrors, validateApplyConfiguration(compiler, m.ApplyConfiguration, paramKind, opts, fldPath.Child("applyConfiguration"))...)
+			}
+			if m.JSONPatch != nil {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("jsonPatch"), "{jsonPatch}", "must not be specified when patchType is ApplyConfiguration"))
+			}
+		default:
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("patchType"), m.PatchType, supportedPatchType.List()))
+		}
+	}
+	return allErrors
+}
+
+func validateApplyConfiguration(compiler plugincel.Compiler, applyConfig *admissionregistration.ApplyConfiguration, paramKind *admissionregistration.ParamKind, opts validationOptions, fldPath *field.Path) (allErrors field.ErrorList) {
+	trimmedExpression := strings.TrimSpace(applyConfig.Expression)
+	if len(trimmedExpression) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), ""))
+	} else {
+
+		envType := environment.NewExpressions
+		if opts.preexistingExpressions.applyConfigurationExpressions.Has(applyConfig.Expression) {
+			envType = environment.StoredExpressions
+		}
+		accessor := &patch.ApplyConfigurationCondition{
+			Expression: trimmedExpression,
+		}
+		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}
+		result := compiler.CompileCELExpression(accessor, opts, envType)
+
+		if result.Error != nil {
+			allErrors = append(allErrors, convertCELErrorToValidationError(fldPath.Child("expression"), accessor, result.Error))
+		}
+	}
+	return allErrors
+}
+
+func validateJSONPatch(compiler plugincel.Compiler, jsonPatch *admissionregistration.JSONPatch, paramKind *admissionregistration.ParamKind, opts validationOptions, fldPath *field.Path) (allErrors field.ErrorList) {
+	trimmedExpression := strings.TrimSpace(jsonPatch.Expression)
+	if len(trimmedExpression) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), ""))
+	} else {
+
+		envType := environment.NewExpressions
+		if opts.preexistingExpressions.applyConfigurationExpressions.Has(jsonPatch.Expression) {
+			envType = environment.StoredExpressions
+		}
+		accessor := &patch.JSONPatchCondition{
+			Expression: trimmedExpression,
+		}
+		opts := plugincel.OptionalVariableDeclarations{HasParams: paramKind != nil, HasAuthorizer: true, StrictCost: true, HasPatchTypes: true}
+		result := compiler.CompileCELExpression(accessor, opts, envType)
+
+		if result.Error != nil {
+			allErrors = append(allErrors, convertCELErrorToValidationError(fldPath.Child("expression"), accessor, result.Error))
+		}
+	}
+	return allErrors
+}
+
+// ValidateMutatingAdmissionPolicyBinding validates a MutatingAdmissionPolicyBinding before create.
+func ValidateMutatingAdmissionPolicyBinding(pb *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
+	return validateMutatingAdmissionPolicyBinding(pb)
+}
+
+func validateMutatingAdmissionPolicyBinding(pb *admissionregistration.MutatingAdmissionPolicyBinding) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&pb.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateMutatingAdmissionPolicyBindingSpec(&pb.Spec, field.NewPath("spec"))...)
+
+	return allErrors
+}
+
+func validateMutatingAdmissionPolicyBindingSpec(spec *admissionregistration.MutatingAdmissionPolicyBindingSpec, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(spec.PolicyName) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), ""))
+	} else {
+		for _, msg := range genericvalidation.NameIsDNSSubdomain(spec.PolicyName, false) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
+		}
+	}
+	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
+	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResources"))...)
+	if spec.MatchResources != nil {
+		// It is only possible to mutate create and update requests
+		for _, rule := range spec.MatchResources.ResourceRules {
+			for _, op := range rule.RuleWithOperations.Operations {
+				if !supportedMutatingOperations.Has(string(op)) {
+					allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchResources", "resourceRules", "operations"), op, supportedMutatingOperations.List()))
+				}
+			}
+		}
+	}
+
+	return allErrors
 }
