@@ -82,6 +82,20 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 		})
+	})
+
+	ginkgo.Context("Inject a pull image error exception, then reset it, into the CriProxy", func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector()
+			framework.ExpectNoError(err)
+		})
+
 		ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
 			expectedErr := fmt.Errorf("PullImage failed")
 			err := addCRIProxyInjector(func(apiName string) error {
@@ -107,7 +121,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 
 			// remove error so after backoff we will succeed
-			resetCRIProxyInjector()
+			_ = resetCRIProxyInjector()
 
 			podErr = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(podErr)
@@ -189,11 +203,13 @@ func getImageBackOffDurations(ctx context.Context, f *framework.Framework, podNa
 	var r *BackOffRecord
 	for _, event := range events.Items {
 		if event.InvolvedObject.Name == podName {
+
 			switch event.Reason {
 			case kubeletevents.PullingImage:
 				if !pullTime.IsZero() {
 					if event.FirstTimestamp.Time.After(pullTime) {
 						r = records[backoffCount]
+						r.podName = podName
 						r.duration = r.initialEventTime.Sub(r.backoffEventTimes[len(r.backoffEventTimes)-1])
 						backoffs = append(backoffs, r.duration)
 						backoffCount++
