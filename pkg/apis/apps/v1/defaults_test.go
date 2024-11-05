@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -199,8 +200,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 		name                       string
 		original                   *appsv1.StatefulSet
 		expected                   *appsv1.StatefulSet
-		enablePVCDeletionPolicy    bool
 		enableMaxUnavailablePolicy bool
+		disablePVCDeletionPolicy   bool
 	}{
 		{
 			name: "labels and default update strategy",
@@ -218,6 +219,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
@@ -243,9 +248,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					MinReadySeconds:     int32(0),
-					Template:            defaultTemplate,
+					Replicas:        &defaultReplicas,
+					MinReadySeconds: int32(0),
+					Template:        defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.OnDeleteStatefulSetStrategyType,
@@ -267,9 +276,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					MinReadySeconds:     int32(0),
-					Template:            defaultTemplate,
+					Replicas:        &defaultReplicas,
+					MinReadySeconds: int32(0),
+					Template:        defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.ParallelPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -298,9 +311,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					MinReadySeconds:     int32(0),
-					Template:            defaultTemplate,
+					Replicas:        &defaultReplicas,
+					MinReadySeconds: int32(0),
+					Template:        defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -313,7 +330,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "PVC delete policy enabled, no policy specified",
+			name: "no PVC policy specified",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -324,8 +341,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -333,17 +354,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 							Partition: &defaultPartition,
 						},
 					},
-					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
-						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
-					},
 					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
-			enablePVCDeletionPolicy: true,
 		},
 		{
-			name: "PVC delete policy enabled, with scaledown policy specified",
+			name: "PVC scaledown policy specified",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -373,10 +389,9 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
-			enablePVCDeletionPolicy: true,
 		},
 		{
-			name: "PVC delete policy disabled, with set deletion policy specified",
+			name: "PVC with deletion policy specified",
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -406,39 +421,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
-			enablePVCDeletionPolicy: true,
-		},
-		{
-			name: "PVC delete policy disabled, with policy specified",
-			original: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: defaultTemplate,
-					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-					},
-				},
-			},
-			expected: &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: defaultLabels,
-				},
-				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
-					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: &defaultPartition,
-						},
-					},
-					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
-						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
-					},
-					RevisionHistoryLimit: ptr.To[int32](10),
-				},
-			},
-			enablePVCDeletionPolicy: false,
 		},
 		{
 			name: "MaxUnavailable disabled, with maxUnavailable not specified",
@@ -452,8 +434,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -484,8 +470,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -517,8 +507,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -544,8 +538,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -577,8 +575,12 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: appsv1.StatefulSetSpec{
-					Replicas:            &defaultReplicas,
-					Template:            defaultTemplate,
+					Replicas: &defaultReplicas,
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+					},
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -592,12 +594,76 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 			enableMaxUnavailablePolicy: true,
 		},
+		{
+			name: "PVCDeletionPolicy disabled",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: ptr.To[int32](10),
+				},
+			},
+			disablePVCDeletionPolicy: true,
+		},
+		{
+			name: "PVCDeletionPolicy disabled, scaledown set",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:        &defaultReplicas,
+					MinReadySeconds: int32(0),
+					Template:        defaultTemplate,
+					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+					},
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: ptr.To[int32](10),
+				},
+			},
+			disablePVCDeletionPolicy: true,
+		},
 	}
 
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)
+			if test.disablePVCDeletionPolicy {
+				// TODO: this will be removed in 1.35
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
 
 			obj2 := roundTrip(t, runtime.Object(test.original))

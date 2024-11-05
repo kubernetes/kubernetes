@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -540,10 +541,9 @@ func TestStatefulPodControlClaimsMatchDeletionPolcy(t *testing.T) {
 func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 	// All the update conditions are tested exhaustively in stateful_set_utils_test. This
 	// tests the wiring from the pod control to that method.
+
 	testFn := func(t *testing.T) {
 		_, ctx := ktesting.NewTestContext(t)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
-
 		testCases := []struct {
 			name      string
 			ownerRef  []metav1.OwnerReference
@@ -589,8 +589,10 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 				WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 			}
-			if err := control.UpdatePodClaimForRetentionPolicy(ctx, set, pod0); err != nil {
-				t.Errorf("Unexpected error for UpdatePodClaimForRetentionPolicy (retain), pod0: %v", err)
+			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
+				if err := control.UpdatePodClaimForRetentionPolicy(ctx, set, pod0); err != nil {
+					t.Errorf("Unexpected error for UpdatePodClaimForRetentionPolicy (retain), pod0: %v", err)
+				}
 			}
 			expectRef := tc.expectRef && utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC)
 			for k := range claims0 {
@@ -609,6 +611,8 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 		testFn(t)
 	})
 	t.Run("StatefulSetAutoDeletePVCDisabled", func(t *testing.T) {
+		// TODO: this will be removed in 1.35
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 		testFn(t)
 	})
@@ -740,7 +744,9 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 		podLister := corelisters.NewPodLister(podIndexer)
 		claimIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		claimLister := corelisters.NewPersistentVolumeClaimLister(claimIndexer)
-		podIndexer.Add(pod)
+		if err := podIndexer.Add(pod); err != nil {
+			t.Errorf("couldn't add %s to index: %v", pod.GetName(), err)
+		}
 		claims := getPersistentVolumeClaims(set, pod)
 		if len(claims) < 1 {
 			t.Errorf("Unexpected missing PVCs")
@@ -749,7 +755,9 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 			claim := claims[k]
 			// This ownerRef should be removed in the update.
 			claim.SetOwnerReferences(addControllerRef(claim.GetOwnerReferences(), set, controllerKind))
-			claimIndexer.Add(&claim)
+			if err := claimIndexer.Add(&claim); err != nil {
+				t.Errorf("couldn't add %s to index: %v", claim.GetName(), err)
+			}
 		}
 		control := NewStatefulPodControl(fakeClient, podLister, claimLister, recorder)
 		if err := control.UpdateStatefulPod(ctx, set, pod); err != nil {
@@ -777,6 +785,8 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 		testFn(t)
 	})
 	t.Run("StatefulSetAutoDeletePVCDisabled", func(t *testing.T) {
+		// TODO: this will be removed in 1.35
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 		testFn(t)
 	})
@@ -784,8 +794,6 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 
 func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	// Only applicable when the feature gate is on; the off case is tested in TestStatefulPodControlRetainRetentionPolicyUpdate.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(1)
@@ -833,8 +841,6 @@ func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 
 func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	// Only applicable when the feature gate is on.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(1)
