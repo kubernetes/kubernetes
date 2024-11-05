@@ -47,7 +47,7 @@ type VolumeCache interface {
 // VolumeCache stores all volumes used by Pods and their properties that the controller needs to track,
 // like SELinux labels and SELinuxChangePolicies.
 type volumeCache struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	// All volumes of all existing Pods.
 	volumes map[v1.UniqueVolumeName]usedVolume
 }
@@ -204,8 +204,8 @@ func (c *volumeCache) dump(logger klog.Logger) {
 
 // GetPodsForCSIDriver returns all pods that use volumes with the given CSI driver.
 func (c *volumeCache) GetPodsForCSIDriver(driverName string) []cache.ObjectName {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
 	var pods []cache.ObjectName
 	for _, volume := range c.volumes {
@@ -221,8 +221,8 @@ func (c *volumeCache) GetPodsForCSIDriver(driverName string) []cache.ObjectName 
 
 // SendConflicts sends all current conflicts to the given channel.
 func (c *volumeCache) SendConflicts(logger klog.Logger, ch chan<- Conflict) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	logger.V(4).Info("Scraping conflicts")
 	c.dump(logger)
 
