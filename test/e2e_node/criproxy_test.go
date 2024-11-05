@@ -82,6 +82,41 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 		})
+		ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
+			expectedErr := fmt.Errorf("PullImage failed")
+			err := addCRIProxyInjector(func(apiName string) error {
+				if apiName == criproxy.PullImage {
+					return expectedErr
+				}
+				return nil
+			})
+			framework.ExpectNoError(err)
+
+			pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
+			podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
+				if len(pod.Status.ContainerStatuses) > 0 && pod.Status.Reason == images.ErrImagePullBackOff.Error() {
+					return true, nil
+				}
+				return false, nil
+			})
+			gomega.Expect(podErr).To(gomega.HaveOccurred())
+
+			eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
+			framework.ExpectNoError(err)
+			isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
+			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
+
+			// remove error so after backoff we will succeed
+			resetCRIProxyInjector()
+
+			podErr = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(podErr)
+
+			durations, err := getImageBackOffDurations(ctx, f, pod.Name)
+			framework.ExpectNoError(err)
+			gomega.Expect(durations[0]).Should(gomega.BeNumerically("~", time.Duration(10*time.Second), time.Duration(2*time.Second)))
+
+		})
 	})
 
 	ginkgo.Context("Inject a pull image timeout exception into the CriProxy", func() {
@@ -131,6 +166,48 @@ func getFailedToPullImageMsg(ctx context.Context, f *framework.Framework, podNam
 	}
 
 	return "", fmt.Errorf("failed to find FailedToPullImage event for pod: %s", podName)
+}
+
+func getImageBackOffDurations(ctx context.Context, f *framework.Framework, podName string) ([]time.Duration, error) {
+	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var backoffs []time.Duration
+
+	type BackOffRecord struct {
+		podName           string
+		initialEventTime  time.Time
+		backoffEventTimes []time.Time
+		duration          time.Duration
+	}
+
+	records := make(map[int]*BackOffRecord)
+	var backoffCount int
+	var pullTime time.Time
+	var r *BackOffRecord
+	for _, event := range events.Items {
+		if event.InvolvedObject.Name == podName {
+			switch event.Reason {
+			case kubeletevents.PullingImage:
+				if !pullTime.IsZero() {
+					if event.FirstTimestamp.Time.After(pullTime) {
+						r = records[backoffCount]
+						r.duration = r.initialEventTime.Sub(r.backoffEventTimes[len(r.backoffEventTimes)-1])
+						backoffs = append(backoffs, r.duration)
+						backoffCount++
+					}
+				}
+				pullTime = event.FirstTimestamp.Time
+				records[backoffCount].initialEventTime = pullTime
+			case kubeletevents.BackOffPullImage:
+				current := records[backoffCount].backoffEventTimes
+				current = append(current, event.FirstTimestamp.Time)
+			}
+		}
+	}
+	return backoffs, nil
 }
 
 func getPodImagePullDuration(ctx context.Context, f *framework.Framework, podName string) (time.Duration, error) {
