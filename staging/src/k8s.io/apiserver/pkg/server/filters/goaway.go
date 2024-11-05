@@ -17,6 +17,8 @@ limitations under the License.
 package filters
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/binary"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -28,11 +30,13 @@ type GoawayDecider interface {
 }
 
 var (
-	// randPool used to get a rand.Rand and generate a random number thread-safely,
-	// which improve the performance of using rand.Rand with a locker
+	// randPool uses crypto/rand to generate secure random seeds for rand.Rand instances
+	// to improve security while maintaining performance with sync.Pool.
 	randPool = &sync.Pool{
 		New: func() interface{} {
-			return rand.New(rand.NewSource(rand.Int63()))
+			var seed int64
+			binary.Read(cryptorand.Reader, binary.BigEndian, &seed)
+			return rand.New(rand.NewSource(seed))
 		},
 	}
 )
