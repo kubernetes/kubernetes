@@ -245,13 +245,6 @@ const (
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
-	// owner: @arjunrn @mwielgus @josephburnett @sanposhiho
-	// kep: https://kep.k8s.io/1610
-	//
-	// Add support for the HPA to scale based on metrics from individual containers
-	// in target pods
-	HPAContainerMetrics featuregate.Feature = "HPAContainerMetrics"
-
 	// owner: @dxist
 	//
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.

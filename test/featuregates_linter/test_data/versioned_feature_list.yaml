@@ -466,20 +466,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: HPAContainerMetrics
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.20"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.27"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.30"
 - name: HPAScaleToZero
   versionedSpecs:
   - default: false
