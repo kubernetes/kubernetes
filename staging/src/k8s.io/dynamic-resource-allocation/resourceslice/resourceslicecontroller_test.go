@@ -145,7 +145,7 @@ func TestControllerSyncPool(t *testing.T) {
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
-			syncDelay: ptr.To(time.Duration(0)),
+			syncDelay: ptr.To(time.Duration(0)), // Ensure that the initial object causes an immediate sync of the pool.
 			initialObjects: []runtime.Object{
 				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
@@ -683,6 +683,11 @@ func TestControllerSyncPool(t *testing.T) {
 			// from informer event handler).
 			actualState := queue.State()
 			actualState.Later = nil
+			// If we let the event handler schedule syncs immediately, then that also races
+			// and then Ready cannot be compared either.
+			if test.syncDelay != nil && *test.syncDelay == 0 {
+				actualState.Ready = nil
+			}
 			var expectState workqueue.MockState[string]
 			assert.Equal(t, expectState, actualState)
 		})
