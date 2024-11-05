@@ -457,11 +457,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]ShutdownGracePeriodByPodPriority, len(*in))
 		copy(*out, *in)
 	}
-	if in.CrashLoopBackOff != nil {
-		in, out := &in.CrashLoopBackOff, &out.CrashLoopBackOff
-		*out = new(CrashLoopBackOffConfig)
-		(*in).DeepCopyInto(*out)
-	}
+	in.CrashLoopBackOff.DeepCopyInto(&out.CrashLoopBackOff)
 	if in.ReservedMemory != nil {
 		in, out := &in.ReservedMemory, &out.ReservedMemory
 		*out = make([]MemoryReservation, len(*in))

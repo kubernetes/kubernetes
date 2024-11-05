@@ -79,7 +79,7 @@ var (
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
-		CrashLoopBackOff: &kubeletconfig.CrashLoopBackOffConfig{
+		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
 			MaximumBackOffPeriod: &metav1.Duration{Duration: 3 * time.Second},
 		},
 	}
@@ -384,7 +384,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		name: "CrashLoopBackOff.MaximumBackOffPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
-			conf.CrashLoopBackOff = &kubeletconfig.CrashLoopBackOffConfig{
+			conf.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{
 				MaximumBackOffPeriod: &metav1.Duration{Duration: 0 * time.Second},
 			}
 			return conf
@@ -394,7 +394,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		name: "CrashLoopBackOff.MaximumBackOffPeriod too high",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
-			conf.CrashLoopBackOff = &kubeletconfig.CrashLoopBackOffConfig{
+			conf.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{
 				MaximumBackOffPeriod: &metav1.Duration{Duration: 301 * time.Second},
 			}
 			return conf
@@ -410,7 +410,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		name: "KubeletCrashLoopBackOffMax feature gate on, no crashLoopBackOff.MaximumBackoffPeriod config, ok",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true, "CustomCPUCFSQuotaPeriod": true}
-			conf.CrashLoopBackOff = &kubeletconfig.CrashLoopBackOffConfig{}
+			conf.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{}
 			return conf
 		},
 	}, {

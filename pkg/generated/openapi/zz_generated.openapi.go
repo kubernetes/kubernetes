@@ -62917,6 +62917,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					"crashLoopBackOff": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CrashLoopBackOff contains config to modify node-level parameters for container restart behavior",
+							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig"),
 						},
 					},

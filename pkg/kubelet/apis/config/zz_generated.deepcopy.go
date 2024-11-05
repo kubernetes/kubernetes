@@ -348,11 +348,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(apiv1.TracingConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.CrashLoopBackOff != nil {
-		in, out := &in.CrashLoopBackOff, &out.CrashLoopBackOff
-		*out = new(CrashLoopBackOffConfig)
-		(*in).DeepCopyInto(*out)
-	}
+	in.CrashLoopBackOff.DeepCopyInto(&out.CrashLoopBackOff)
 	return
 }
 
