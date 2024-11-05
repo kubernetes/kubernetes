@@ -78,6 +78,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
@@ -150,7 +151,7 @@ const (
 	DefaultContainerLogsDir = "/var/log/containers"
 
 	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
-	MaxContainerBackOff = 300 * time.Second
+	MaxContainerBackOff = v1beta1.MaxContainerBackOff
 
 	// MaxImageBackOff is the max backoff period for image pulls, exported for the e2e test
 	MaxImageBackOff = 300 * time.Second
@@ -927,19 +928,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	boMax := MaxContainerBackOff
 	base := containerBackOffPeriod
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
-		if kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod != nil {
-			boMax = kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod.Duration
-			if boMax < containerBackOffPeriod {
-				base = boMax
-			}
-		} else {
-			klog.InfoS("KubeletCrashLoopBackOffMax feature gate enabled, but crashLoopBackOff.MaximumBackoffPeriod KubeletConfig not set. Using default CrashLoopBackOff maximum backoff.")
-		}
-	} else {
-		if kubeCfg.CrashLoopBackOff != nil {
-			if kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod != nil {
-				klog.InfoS("KubeletCrashLoopBackOffMax feature gate not enabled, but corresponding crashLoopBackOff.MaximumBackoffPeriod KubeletConfig configured. Ignoring crashLoopBackOff.MaximumBackoffPeriod.")
-			}
+		boMax = kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod.Duration
+		if boMax < containerBackOffPeriod {
+			base = boMax
 		}
 	}
 	klet.backOff = flowcontrol.NewBackOff(base, boMax)

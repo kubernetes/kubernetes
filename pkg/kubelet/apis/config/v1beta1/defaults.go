@@ -39,6 +39,8 @@ const (
 	DefaultPodLogsDir            = "/var/log/pods"
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.9
+	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
+	MaxContainerBackOff = 300 * time.Second
 )
 
 var (
@@ -285,5 +287,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.PodLogsDir == "" {
 		obj.PodLogsDir = DefaultPodLogsDir
+	}
+
+	if obj.CrashLoopBackOff.MaximumBackOffPeriod == nil {
+		obj.CrashLoopBackOff.MaximumBackOffPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 	}
 }
