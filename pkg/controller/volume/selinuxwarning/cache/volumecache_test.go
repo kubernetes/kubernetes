@@ -204,7 +204,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			},
 			expectedConflicts: []Conflict{
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
 					PropertyValue:      "label-new",
@@ -254,7 +254,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					OtherPropertyValue: "MountOption",
 				},
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
 					PropertyValue:      "label-new",
@@ -297,7 +297,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					OtherPropertyValue: "Recursive",
 				},
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "ns3", Name: "pod3-1"},
 					PropertyValue:      "label-new",

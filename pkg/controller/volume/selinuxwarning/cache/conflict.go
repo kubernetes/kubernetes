@@ -25,7 +25,7 @@ import (
 // A single conflict between two Pods using the same volume with different SELinux labels or policies.
 // Event should be sent to both of them.
 type Conflict struct {
-	// Human-readable name of the conflicting property, like "SELinux label"
+	// Human-readable name of the conflicting property + value of "property" label of selinux_volume_conflict metric.
 	PropertyName string
 	// Reason for the event, to be set as the Event.Reason field.
 	EventReason string

@@ -140,14 +140,14 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 		if otherPodInfo.seLinuxLabel != label {
 			// Send conflict to both pods
 			conflicts = append(conflicts, Conflict{
-				PropertyName:       "SELinux label",
+				PropertyName:       "SELinuxLabel",
 				EventReason:        "SELinuxLabelConflict",
 				Pod:                podKey,
 				PropertyValue:      label,
 				OtherPod:           otherPodKey,
 				OtherPropertyValue: otherPodInfo.seLinuxLabel,
 			}, Conflict{
-				PropertyName:       "SELinux label",
+				PropertyName:       "SELinuxLabel",
 				EventReason:        "SELinuxLabelConflict",
 				Pod:                otherPodKey,
 				PropertyValue:      otherPodInfo.seLinuxLabel,
@@ -250,7 +250,7 @@ func (c *volumeCache) SendConflicts(logger klog.Logger, ch chan<- Conflict) {
 				}
 				if podInfo.seLinuxLabel != otherPodInfo.seLinuxLabel {
 					ch <- Conflict{
-						PropertyName:       "SELinux label",
+						PropertyName:       "SELinuxLabel",
 						EventReason:        "SELinuxLabelConflict",
 						Pod:                podKey,
 						PropertyValue:      podInfo.seLinuxLabel,

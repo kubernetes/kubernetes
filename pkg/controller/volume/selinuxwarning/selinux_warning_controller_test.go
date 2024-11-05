@@ -192,7 +192,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod1"},
 					PropertyValue:      "label1",
@@ -200,7 +200,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 					OtherPropertyValue: "label2",
 				},
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod2"},
 					PropertyValue:      "label2",
@@ -218,8 +218,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				},
 			},
 			expectedEvents: []string{
-				`Normal SELinuxLabelConflict SELinux label "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinux label "label2". If both pods land on the same node, only one of them may access the volume.`,
-				`Normal SELinuxLabelConflict SELinux label "label2" conflicts with pod pod1 that uses the same volume as this pod with SELinux label "label1". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel "label2". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel "label2" conflicts with pod pod1 that uses the same volume as this pod with SELinuxLabel "label1". If both pods land on the same node, only one of them may access the volume.`,
 			},
 		},
 		{
@@ -237,7 +237,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod1"},
 					PropertyValue:      "label1",
@@ -245,7 +245,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 					OtherPropertyValue: "label2",
 				},
 				{
-					PropertyName:       "SELinux label",
+					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod2"},
 					PropertyValue:      "label2",
@@ -264,7 +264,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			},
 			expectedEvents: []string{
 				// Event for the missing pod is not sent
-				`Normal SELinuxLabelConflict SELinux label "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinux label "label2". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel "label2". If both pods land on the same node, only one of them may access the volume.`,
 			},
 		},
 		{
