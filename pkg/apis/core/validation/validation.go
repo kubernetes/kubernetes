@@ -1685,7 +1685,7 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 	}
 
 	if len(driverName) > 63 {
-		allErrs = append(allErrs, field.TooLong(fldPath, "", 63))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, 63))
 	}
 
 	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
@@ -4758,7 +4758,7 @@ func ValidateAppArmorProfileField(profile *core.AppArmorProfile, fldPath *field.
 
 			const maxLocalhostProfileLength = 4095 // PATH_MAX - 1
 			if len(*profile.LocalhostProfile) > maxLocalhostProfileLength {
-				allErrs = append(allErrs, field.TooLong(fldPath.Child("localhostProfile"), "", maxLocalhostProfileLength))
+				allErrs = append(allErrs, field.TooLong(fldPath.Child("localhostProfile"), "" /*unused*/, maxLocalhostProfileLength))
 			}
 		}
 
@@ -6546,7 +6546,7 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 		totalSize += len(value)
 	}
 	if totalSize > core.MaxSecretSize {
-		allErrs = append(allErrs, field.TooLong(dataPath, "", core.MaxSecretSize))
+		allErrs = append(allErrs, field.TooLong(dataPath, "" /*unused*/, core.MaxSecretSize))
 	}
 
 	switch secret.Type {
@@ -6661,7 +6661,7 @@ func ValidateConfigMap(cfg *core.ConfigMap) field.ErrorList {
 	}
 	if totalSize > core.MaxSecretSize {
 		// pass back "" to indicate that the error refers to the whole object.
-		allErrs = append(allErrs, field.TooLong(field.NewPath(""), "", core.MaxSecretSize))
+		allErrs = append(allErrs, field.TooLong(field.NewPath(""), "" /*unused*/, core.MaxSecretSize))
 	}
 
 	return allErrs
