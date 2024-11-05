@@ -107,7 +107,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 
 			ginkgo.By("restarting Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(getNewCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
@@ -129,16 +129,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Stop Kubelet
 			ginkgo.By("stop kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			// Pod must be in pending state
 			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Pending", framework.PodStartShortTimeout, func(pod *v1.Pod) (bool, error) {
 				return pod.Status.Phase == v1.PodPending, nil
 			})
 			framework.ExpectNoError(err)
-			// Start Kubelet
 			ginkgo.By("restart kubelet")
-			startKubelet()
+			restartKubelet(ctx)
 			// Pod should succeed
 			err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartShortTimeout)
 			framework.ExpectNoError(err)
@@ -227,12 +226,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesFailed)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			unsetNodePrepareResourcesFailureMode()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -254,12 +253,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			unsetNodeUnprepareResourcesFailureMode()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			ginkgo.By("wait for NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -313,7 +312,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
 			ginkgo.By("restart Kubelet")
-			stopKubelet()()
+			restartKubelet(ctx, true)
 
 			ginkgo.By("wait for NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
@@ -337,15 +336,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(err)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("delete pod")
 			e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
 
 			unblockNodePrepareResources()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			calls := kubeletPlugin.CountCalls("/NodePrepareResources")
 			ginkgo.By("make sure NodePrepareResources is not called again")
@@ -447,7 +446,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(err)
 
 			ginkgo.By("restart Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			unblockNodePrepareResources()
 
@@ -472,7 +471,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
 
 			ginkgo.By("restart Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			unblockNodeUnprepareResources()
 
@@ -500,10 +499,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		f.It("must be removed on kubelet startup", f.WithDisruptive(), func(ctx context.Context) {
 			ginkgo.By("stop kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 			ginkgo.DeferCleanup(func() {
-				if startKubelet != nil {
-					startKubelet()
+				if restartKubelet != nil {
+					restartKubelet(ctx)
 				}
 			})
 
@@ -518,9 +517,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchAll, "ResourceSlices without kubelet")
 
-			ginkgo.By("start kubelet")
-			startKubelet()
-			startKubelet = nil
+			ginkgo.By("restart kubelet")
+			restartKubelet(ctx)
+			restartKubelet = nil
 
 			ginkgo.By("wait for exactly the node's ResourceSlice to get deleted")
 			gomega.Eventually(ctx, listResources).Should(matchOtherNode, "ResourceSlices with kubelet")

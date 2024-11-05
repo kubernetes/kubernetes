@@ -1234,17 +1234,14 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 			podSandboxID := sandboxes[0].Id
 
 			ginkgo.By("Stopping the kubelet")
-			restartKubelet := stopKubelet()
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
 			err = rs.StopPodSandbox(ctx, podSandboxID)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Restarting the kubelet")
-			restartKubelet()
+			restartKubelet(ctx)
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet was expected to be healthy"))
@@ -1361,14 +1358,10 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 			ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
 				ginkgo.By("stopping the kubelet")
-				startKubelet := stopKubelet()
-				// wait until the kubelet health check will fail
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("restarting the kubelet")
-				startKubelet()
+				restartKubelet(ctx)
 				// wait until the kubelet health check will succeed
 				gomega.Eventually(ctx, func() bool {
 					return kubeletHealthCheck(kubeletHealthCheckURL)
@@ -1409,11 +1402,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 			ginkgo.It("should not restart any completed init container, even after the completed init container statuses have been removed and the kubelet restarted", func(ctx context.Context) {
 				ginkgo.By("stopping the kubelet")
-				startKubelet := stopKubelet()
-				// wait until the kubelet health check will fail
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
 				rs, _, err := getCRIClient()
@@ -1437,7 +1426,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				}
 
 				ginkgo.By("restarting the kubelet")
-				startKubelet()
+				restartKubelet(ctx)
 				// wait until the kubelet health check will succeed
 				gomega.Eventually(ctx, func() bool {
 					return kubeletHealthCheck(kubeletHealthCheckURL)
@@ -1544,18 +1533,10 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 			ginkgo.It("should not restart any completed init container after the kubelet restart", func(ctx context.Context) {
 				ginkgo.By("stopping the kubelet")
-				startKubelet := stopKubelet()
-				// wait until the kubelet health check will fail
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("restarting the kubelet")
-				startKubelet()
-				// wait until the kubelet health check will succeed
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be restarted"))
+				restartKubelet(ctx)
 
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
@@ -1588,11 +1569,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 
 			ginkgo.It("should not restart any completed init container, even after the completed init container statuses have been removed and the kubelet restarted", func(ctx context.Context) {
 				ginkgo.By("stopping the kubelet")
-				startKubelet := stopKubelet()
-				// wait until the kubelet health check will fail
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet should be stopped"))
+				restartKubelet := mustStopKubelet(ctx, f)
 
 				ginkgo.By("removing the completed init container statuses from the container runtime")
 				rs, _, err := getCRIClient()
@@ -1616,11 +1593,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 				}
 
 				ginkgo.By("restarting the kubelet")
-				startKubelet()
-				// wait until the kubelet health check will succeed
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be restarted"))
+				restartKubelet(ctx)
 
 				ginkgo.By("ensuring that no completed init container is restarted")
 				gomega.Consistently(ctx, func() bool {
@@ -5517,17 +5490,14 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 			podSandboxID := sandboxes[0].Id
 
 			ginkgo.By("Stopping the kubelet")
-			restartKubelet := stopKubelet()
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet would have been stopped but it is still running"))
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
 			err = rs.StopPodSandbox(ctx, podSandboxID)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Restarting the kubelet")
-			restartKubelet()
+			restartKubelet(ctx)
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet was expected to be healthy"))
@@ -5662,10 +5632,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 				podSandboxID := sandboxes[0].Id
 
 				ginkgo.By("Stopping the kubelet")
-				restartKubelet := stopKubelet()
-				gomega.Eventually(ctx, func() bool {
-					return kubeletHealthCheck(kubeletHealthCheckURL)
-				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet would have been stopped but it is still running"))
+				restartKubelet := mustStopKubelet(ctx, f)
 
 				if nodeReboot {
 					ginkgo.By("Stopping the pod sandbox to simulate the node reboot")
@@ -5674,7 +5641,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Cont
 				}
 
 				ginkgo.By("Restarting the kubelet")
-				restartKubelet()
+				restartKubelet(ctx)
 				gomega.Eventually(ctx, func() bool {
 					return kubeletHealthCheck(kubeletHealthCheckURL)
 				}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet was expected to be healthy"))

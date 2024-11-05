@@ -101,12 +101,9 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
 					ginkgo.By("Restarting the kubelet")
-					restartKubelet(true)
+					restartKubelet(ctx, true)
 
-					// wait until the kubelet health check will succeed
-					gomega.Eventually(ctx, func(ctx context.Context) bool {
-						return kubeletHealthCheck(kubeletHealthCheckURL)
-					}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+					waitForKubeletToStart(ctx, f)
 					ginkgo.By("Started the kubelet")
 				}
 			})
@@ -121,12 +118,9 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 			ginkgo.By("Restarting the kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+			waitForKubeletToStart(ctx, f)
 			ginkgo.By("Started the kubelet")
 
 			gomega.Consistently(ctx, func(ctx context.Context) bool {
@@ -243,7 +237,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		if oldCfg != nil {
 			// Update the Kubelet configuration.
 			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
@@ -252,8 +246,8 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
-			ginkgo.By("Starting the kubelet")
-			startKubelet()
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
@@ -271,12 +265,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Set the new kubelet configuration.
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
+	restartKubelet := mustStopKubelet(ctx, f)
 
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 
@@ -293,7 +282,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 	ginkgo.By("Starting the kubelet")
-	startKubelet()
+	restartKubelet(ctx)
 
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
