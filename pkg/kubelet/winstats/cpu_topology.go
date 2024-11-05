@@ -21,15 +21,17 @@ package winstats
 
 import (
 	"fmt"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog/v2"
 	"syscall"
 	"unsafe"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/klog/v2"
 )
 
 var (
 	procGetLogicalProcessorInformationEx = modkernel32.NewProc("GetLogicalProcessorInformationEx")
 	getNumaAvailableMemoryNodeEx         = modkernel32.NewProc("GetNumaAvailableMemoryNodeEx")
+	procGetNumaNodeProcessorMaskEx       = modkernel32.NewProc("GetNumaNodeProcessorMaskEx")
 )
 
 type relationType int
@@ -104,6 +106,21 @@ func CpusToGroupAffinity(cpus []int) map[int]*GroupAffinity {
 		groupAffinity.Mask |= mask
 	}
 	return groupAffinities
+}
+
+// GetCPUsForNUMANode queries the system for the CPUs that are part of the given NUMA node.
+func GetCPUsforNUMANode(nodeNumber uint16) (*GroupAffinity, error) {
+	var affinity GroupAffinity
+
+	r1, _, err := procGetNumaNodeProcessorMaskEx.Call(
+		uintptr(nodeNumber),
+		uintptr(unsafe.Pointer(&affinity)),
+	)
+	if r1 == 0 {
+		return nil, fmt.Errorf("Error getting CPU mask for NUMA node %d: %v", nodeNumber, err)
+	}
+
+	return &affinity, nil
 }
 
 type numaNodeRelationship struct {
