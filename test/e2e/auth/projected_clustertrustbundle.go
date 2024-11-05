@@ -270,11 +270,11 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 		var cleanups []func(ctx context.Context)
 		var projections []v1.VolumeProjection
 
-		defer func() {
+		ginkgo.DeferCleanup(func(ctx context.Context) {
 			for _, c := range cleanups {
 				c(ctx)
 			}
-		}()
+		})
 		for i := range numCTBs {
 			ctb := ctbForCA(fmt.Sprintf("test.test:signer-hundreds:%d", i), "test.test/signer-hundreds", mustMakeCAPEM(fmt.Sprintf("root%d", i)), nil)
 			initCTBs = append(initCTBs, ctb)
