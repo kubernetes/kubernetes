@@ -294,3 +294,15 @@ func TestRemovePods(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStaticPodToMirrorPodMap(t *testing.T) {
+	podManager := NewBasicPodManager()
+	podManager.SetPods([]*v1.Pod{mirrorPod, staticPod, normalPod})
+	m := podManager.GetStaticPodToMirrorPodMap()
+	if len(m) != 1 {
+		t.Fatalf("GetStaticPodToMirrorPodMap(): got %d static pods, wanted 1 static pod", len(m))
+	}
+	if gotMirrorPod, ok := m[staticPod]; !ok || gotMirrorPod.UID != mirrorPod.UID {
+		t.Fatalf("GetStaticPodToMirrorPodMap() did not return the correct mirror pod UID %s, wanted mirror pod UID %s", gotMirrorPod.UID, mirrorPod.UID)
+	}
+}

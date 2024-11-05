@@ -1693,6 +1693,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 		// start syncing lease
 		go kl.nodeLeaseController.Run(context.Background())
+
+		// Mirror pods for static pods may not be created immediately during node startup
+		// due to node registration or informer sync delays. They will be created eventually
+		//  when static pods are resynced (every 1-1.5 minutes).
+		// To ensure kube-scheduler is aware of static pod resource usage faster,
+		// mirror pods are created as soon as the node registers.
+		go kl.fastStaticPodsRegistration(ctx)
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
@@ -1926,37 +1933,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
-	if kubetypes.IsStaticPod(pod) {
-		deleted := false
-		if mirrorPod != nil {
-			if mirrorPod.DeletionTimestamp != nil || !kubepod.IsMirrorPodOf(mirrorPod, pod) {
-				// The mirror pod is semantically different from the static pod. Remove
-				// it. The mirror pod will get recreated later.
-				klog.InfoS("Trying to delete pod", "pod", klog.KObj(pod), "podUID", mirrorPod.ObjectMeta.UID)
-				podFullName := kubecontainer.GetPodFullName(pod)
-				var err error
-				deleted, err = kl.mirrorPodClient.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID)
-				if deleted {
-					klog.InfoS("Deleted mirror pod because it is outdated", "pod", klog.KObj(mirrorPod))
-				} else if err != nil {
-					klog.ErrorS(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
-				}
-			}
-		}
-		if mirrorPod == nil || deleted {
-			node, err := kl.GetNode()
-			if err != nil {
-				klog.V(4).ErrorS(err, "No need to create a mirror pod, since failed to get node info from the cluster", "node", klog.KRef("", string(kl.nodeName)))
-			} else if node.DeletionTimestamp != nil {
-				klog.V(4).InfoS("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
-			} else {
-				klog.V(4).InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(pod))
-				if err := kl.mirrorPodClient.CreateMirrorPod(pod); err != nil {
-					klog.ErrorS(err, "Failed creating a mirror pod for", "pod", klog.KObj(pod))
-				}
-			}
-		}
-	}
+	kl.tryReconcileMirrorPods(pod, mirrorPod)
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
@@ -3053,4 +3030,60 @@ func (kl *Kubelet) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) err
 // This method implements the RuntimeHelper interface
 func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(ctx, pod)
+}
+
+// Ensure Mirror Pod for Static Pod exists and matches the current pod definition.
+// The function logs and ignores any errors.
+func (kl *Kubelet) tryReconcileMirrorPods(staticPod, mirrorPod *v1.Pod) {
+	if !kubetypes.IsStaticPod(staticPod) {
+		return
+	}
+	deleted := false
+	if mirrorPod != nil {
+		if mirrorPod.DeletionTimestamp != nil || !kubepod.IsMirrorPodOf(mirrorPod, staticPod) {
+			// The mirror pod is semantically different from the static pod. Remove
+			// it. The mirror pod will get recreated later.
+			klog.InfoS("Trying to delete pod", "pod", klog.KObj(mirrorPod), "podUID", mirrorPod.ObjectMeta.UID)
+			podFullName := kubecontainer.GetPodFullName(staticPod)
+			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID); err != nil {
+				klog.ErrorS(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
+			} else if ok {
+				deleted = ok
+				klog.InfoS("Deleted mirror pod as it didn't match the static Pod", "pod", klog.KObj(mirrorPod))
+			}
+		}
+	}
+	if mirrorPod == nil || deleted {
+		node, err := kl.GetNode()
+		if err != nil {
+			klog.ErrorS(err, "No need to create a mirror pod, since failed to get node info from the cluster", "node", klog.KRef("", string(kl.nodeName)))
+		} else if node.DeletionTimestamp != nil {
+			klog.InfoS("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
+		} else {
+			klog.InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(staticPod))
+			if err := kl.mirrorPodClient.CreateMirrorPod(staticPod); err != nil {
+				klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(staticPod))
+			}
+		}
+	}
+}
+
+// Ensure Mirror Pod for Static Pod exists as soon as node is registered.
+func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
+	if err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		_, err := kl.GetNode()
+		if err == nil {
+			return true, nil
+		}
+
+		klog.V(4).ErrorS(err, "Unable to register mirror pod because node is not registered yet", "node", klog.KRef("", string(kl.nodeName)))
+		return false, nil
+	}); err != nil {
+		klog.V(4).ErrorS(err, "Failed to wait until node is registered", "node", klog.KRef("", string(kl.nodeName)))
+	}
+
+	staticPodToMirrorPodMap := kl.podManager.GetStaticPodToMirrorPodMap()
+	for staticPod, mirrorPod := range staticPodToMirrorPodMap {
+		kl.tryReconcileMirrorPods(staticPod, mirrorPod)
+	}
 }
