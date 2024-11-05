@@ -128,6 +128,8 @@ func NewController(
 	c.csiTranslator = csiTranslator
 	c.cmpm = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
+	// Index pods by its PVC keys. Then we don't need to iterate all pods every time to find
+	// pods which reference given PVC.
 	err = common.AddPodPVCIndexerIfNotPresent(c.podIndexer)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize SELinux warning controller: %w", err)
