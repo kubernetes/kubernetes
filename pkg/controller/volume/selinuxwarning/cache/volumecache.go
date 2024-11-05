@@ -38,6 +38,10 @@ type VolumeCache interface {
 	DeletePod(logger klog.Logger, podKey cache.ObjectName)
 
 	// GetPodsForCSIDriver returns all pods that use volumes with the given CSI driver.
+	// This is useful when a CSIDrive changes its spec.seLinuxMount and the controller
+	// needs to reevaluate all pods that use volumes with this driver.
+	// The controller doesn't need to track in-tree volume plugins, because they don't
+	// change their SELinux support dynamically.
 	GetPodsForCSIDriver(driverName string) []cache.ObjectName
 
 	// SendConflicts sends all current conflicts to the given channel.
