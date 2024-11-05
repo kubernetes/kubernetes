@@ -468,6 +468,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim without condition",
@@ -488,6 +489,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -508,6 +510,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, not-found victim error is ignored when patching",
@@ -526,6 +529,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but pod deletion failed",
@@ -563,6 +567,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim1"},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, but patch pod failed",

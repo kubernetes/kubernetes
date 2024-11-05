@@ -902,7 +902,11 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 
 // PodActivator abstracts operations in the scheduling queue.
 type PodActivator interface {
-	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+	// Activate moves the given pods to activeQ.
+	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// the wildcard event is registered so that the pod will be requeued when it comes back.
+	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }
 

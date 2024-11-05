@@ -43,6 +43,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -1549,6 +1550,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		})
 	}
 }
+
 func TestPreempt(t *testing.T) {
 	metrics.Register()
 	tests := []struct {
@@ -1829,6 +1831,7 @@ func TestPreempt(t *testing.T) {
 					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithWaitingPods(waitingPods),
 					frameworkruntime.WithLogger(logger),
+					frameworkruntime.WithPodActivator(&fakePodActivator{}),
 				)
 				if err != nil {
 					t.Fatal(err)
@@ -1941,3 +1944,8 @@ func TestPreempt(t *testing.T) {
 		}
 	}
 }
+
+type fakePodActivator struct {
+}
+
+func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}

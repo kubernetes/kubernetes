@@ -296,7 +296,7 @@ func (ce ClusterEvent) Label() string {
 
 // AllClusterEventLabels returns all possible cluster event labels given to the metrics.
 func AllClusterEventLabels() []string {
-	labels := []string{EventUnschedulableTimeout.Label()}
+	labels := []string{UnschedulableTimeout, ForceActivate}
 	for _, r := range allResources {
 		for _, a := range basicActionTypes {
 			labels = append(labels, ClusterEvent{Resource: r, ActionType: a}.Label())
