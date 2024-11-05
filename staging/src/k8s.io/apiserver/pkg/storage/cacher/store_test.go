@@ -33,7 +33,7 @@ func TestStoreSingleKey(t *testing.T) {
 		testStoreSingleKey(t, store)
 	})
 	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), 32)
+		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), btreeDegree)
 		testStoreSingleKey(t, store)
 	})
 }
@@ -65,7 +65,7 @@ func TestStoreIndexerSingleKey(t *testing.T) {
 		testStoreIndexerSingleKey(t, store)
 	})
 	t.Run("btree", func(t *testing.T) {
-		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), 32)
+		store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), btreeDegree)
 		testStoreIndexerSingleKey(t, store)
 	})
 }

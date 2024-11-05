@@ -23,7 +23,7 @@ import (
 )
 
 func TestStoreListOrdered(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, 32)
+	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
 	assert.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
 	assert.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
 	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
@@ -35,7 +35,7 @@ func TestStoreListOrdered(t *testing.T) {
 }
 
 func TestStoreListPrefix(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, 32)
+	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
 	assert.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
 	assert.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
 	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
