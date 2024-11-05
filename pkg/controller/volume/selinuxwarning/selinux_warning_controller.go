@@ -75,10 +75,9 @@ type Controller struct {
 	cmpm              csimigration.PluginManager
 	csiTranslator     csimigration.InTreeToCSITranslator
 	seLinuxTranslator volumeutil.SELinuxLabelTranslator
+	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
-
-	recorder record.EventRecorder
-	queue    workqueue.TypedRateLimitingInterface[cache.ObjectName]
+	queue             workqueue.TypedRateLimitingInterface[cache.ObjectName]
 
 	labelCache volumecache.VolumeCache
 }
@@ -95,8 +94,6 @@ func NewController(
 ) (*Controller, error) {
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "selinux_warning"})
 	c := &Controller{
 		kubeClient:        kubeClient,
@@ -112,15 +109,15 @@ func NewController(
 		vpm:               &volume.VolumePluginMgr{},
 		seLinuxTranslator: volumeutil.NewSELinuxLabelTranslator(),
 
-		recorder: recorder,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    recorder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig[cache.ObjectName](
 			workqueue.DefaultTypedControllerRateLimiter[cache.ObjectName](),
 			workqueue.TypedRateLimitingQueueConfig[cache.ObjectName]{
 				Name: "selinux_warning",
 			},
 		),
-		labelCache:    volumecache.NewVolumeLabelCache(),
-		eventRecorder: recorder,
+		labelCache: volumecache.NewVolumeLabelCache(),
 	}
 
 	err := c.vpm.InitPlugins(plugins, prober, c)
@@ -345,6 +342,9 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting SELinux warning controller")
 	defer logger.Info("Shutting down SELinux warning controller")
+
+	c.eventBroadcaster.StartStructuredLogging(3) // verbosity level 3 is used by the other KCM controllers
+	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 
 	if !cache.WaitForNamedCacheSync("selinux_warning", ctx.Done(), c.podsSynced, c.pvcsSynced, c.pvsSynced, c.csiDriversSynced) {
 		return
