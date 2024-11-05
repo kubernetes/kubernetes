@@ -30,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,6 +38,7 @@ import (
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -85,7 +87,7 @@ type stateData struct {
 	informationsForClaim []informationForClaim
 
 	// nodeAllocations caches the result of Filter for the nodes.
-	nodeAllocations map[string][]*resourceapi.AllocationResult
+	nodeAllocations map[string][]resourceapi.AllocationResult
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -106,10 +108,12 @@ type DynamicResources struct {
 	enableAdminAccess         bool
 	enableSchedulingQueueHint bool
 
-	fh          framework.Handle
-	clientset   kubernetes.Interface
-	classLister resourcelisters.DeviceClassLister
-	sliceLister resourcelisters.ResourceSliceLister
+	fh               framework.Handle
+	clientset        kubernetes.Interface
+	classLister      resourcelisters.DeviceClassLister
+	sliceLister      resourcelisters.ResourceSliceLister
+	celCache         *cel.Cache
+	allocatedDevices *allocatedDevices
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -174,6 +178,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &DynamicResources{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	pl := &DynamicResources{
 		enabled:                   true,
 		enableAdminAccess:         fts.EnableDRAAdminAccess,
@@ -184,7 +189,18 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
 		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
+
+		// This is a LRU cache for compiled CEL expressions. The most
+		// recent 10 of them get reused across different scheduling
+		// cycles.
+		celCache: cel.NewCache(10),
+
+		allocatedDevices: newAllocatedDevices(logger),
 	}
+
+	// Reacting to events is more efficient than iterating over the list
+	// repeatedly in PreFilter.
+	pl.claimAssumeCache.AddEventHandler(pl.allocatedDevices.handlers())
 
 	return pl, nil
 }
@@ -527,39 +543,41 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		// expensive, we may have to maintain and update state more
 		// persistently.
 		//
-		// Claims are treated as "allocated" if they are in the assume cache
-		// or currently their allocation is in-flight.
-		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, &claimListerForAssumeCache{assumeCache: pl.claimAssumeCache, inFlightAllocations: &pl.inFlightAllocations}, pl.classLister, pl.sliceLister)
+		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
+		// or currently their allocation is in-flight. This does not change
+		// during filtering, so we can determine that once.
+		allAllocatedDevices := pl.listAllAllocatedDevices(logger)
+		slices, err := pl.sliceLister.List(labels.Everything())
+		if err != nil {
+			return nil, statusError(logger, err)
+		}
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, allocateClaims, allAllocatedDevices, pl.classLister, slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
-		s.nodeAllocations = make(map[string][]*resourceapi.AllocationResult)
+		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
 	s.claims = claims
 	return nil, nil
 }
 
-type claimListerForAssumeCache struct {
-	assumeCache         *assumecache.AssumeCache
-	inFlightAllocations *sync.Map
-}
+func (pl *DynamicResources) listAllAllocatedDevices(logger klog.Logger) sets.Set[structured.DeviceID] {
+	// Start with a fresh set that matches the current known state of the
+	// world according to the informers.
+	allocated := pl.allocatedDevices.Get()
 
-func (cl *claimListerForAssumeCache) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	// Probably not worth adding an index for?
-	objs := cl.assumeCache.List(nil)
-	allocated := make([]*resourceapi.ResourceClaim, 0, len(objs))
-	for _, obj := range objs {
-		claim := obj.(*resourceapi.ResourceClaim)
-		if obj, ok := cl.inFlightAllocations.Load(claim.UID); ok {
-			claim = obj.(*resourceapi.ResourceClaim)
-		}
-		if claim.Status.Allocation != nil {
-			allocated = append(allocated, claim)
-		}
-	}
-	return allocated, nil
+	// Whatever is in flight also has to be checked.
+	pl.inFlightAllocations.Range(func(key, value any) bool {
+		claim := value.(*resourceapi.ResourceClaim)
+		foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
+			logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
+			allocated.Insert(deviceID)
+		})
+		return true
+	})
+	return allocated
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -615,7 +633,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	}
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
-	var allocations []*resourceapi.AllocationResult
+	var allocations []resourceapi.AllocationResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -763,7 +781,7 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			if index < 0 {
 				return statusError(logger, fmt.Errorf("internal error, claim %s with allocation not found", claim.Name))
 			}
-			allocation := allocations[i]
+			allocation := &allocations[i]
 			state.informationsForClaim[index].allocation = allocation
 
 			// Strictly speaking, we don't need to store the full modified object.
