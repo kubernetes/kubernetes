@@ -101,7 +101,7 @@ func (topo *CPUTopology) CPUNUMANodeID(cpu int) (int, error) {
 	return info.NUMANodeID, nil
 }
 
-// CPUInfo contains the NUMA, socket, unCoreCache and core IDs associated with a CPU.
+// CPUInfo contains the NUMA, socket, UncoreCache and core IDs associated with a CPU.
 type CPUInfo struct {
 	NUMANodeID    int
 	SocketID      int

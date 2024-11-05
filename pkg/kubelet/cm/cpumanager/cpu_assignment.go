@@ -561,11 +561,12 @@ func (a *cpuAccumulator) takeFullUncore() {
 func (a *cpuAccumulator) takePartialUncore(uncoreID int) {
 	numCoresNeeded := a.numCPUsNeeded / a.topo.CPUsPerCore()
 
-	// note: we need to keep the first N free cores (physical cpus) and only we we got these expand to their
-	// cpus (virtual cpus). Taking directly the first M cpus (virtual cpus) leads to suboptimal allocation
+	// determine the N number of free cores (physical cpus) within the UncoreCache, then
+	// determine the M number of free cpus (virtual cpus) that correspond with the free cores
 	freeCores := a.details.CoresNeededInUncoreCache(numCoresNeeded, uncoreID)
 	freeCPUs := a.details.CPUsInCores(freeCores.UnsortedList()...)
 
+	// claim the cpus if the free cpus within the UncoreCache can satisfy the needed cpus
 	claimed := (a.numCPUsNeeded == freeCPUs.Size())
 	klog.V(4).InfoS("takePartialUncore: trying to claim partial uncore",
 		"uncore", uncoreID,
@@ -594,6 +595,7 @@ func (a *cpuAccumulator) takeUncoreCache() {
 			return
 		}
 
+		// take partial UncoreCache if the CPUs needed is less than free UncoreCache size
 		a.takePartialUncore(uncore)
 		if a.isSatisfied() {
 			return
