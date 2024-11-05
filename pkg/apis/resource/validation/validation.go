@@ -37,6 +37,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -740,6 +741,9 @@ func truncateIfTooLong(str string, maxLen int) string {
 
 func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.DeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
 	deviceID := structured.DeviceID{Driver: device.Driver, Pool: device.Pool, Device: device.Device}
 	if !allocatedDevices.Has(deviceID) {
 		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
@@ -759,7 +763,7 @@ func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path
 	if len(rawExtension.Raw) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
 	} else if v == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if _, isObject := v.(map[string]any); !isObject {
@@ -768,16 +772,37 @@ func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path
 	return allErrs
 }
 
+const interfaceNameMaxLength int = 256
+const hardwareAddressMaxLength int = 128
+
 func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if networkDeviceData == nil {
 		return allErrs
 	}
-	allErrs = append(allErrs, validateSlice(networkDeviceData.Addresses, -1,
+
+	if len(networkDeviceData.InterfaceName) > interfaceNameMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, interfaceNameMaxLength))
+	}
+
+	if len(networkDeviceData.HardwareAddress) > hardwareAddressMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, hardwareAddressMaxLength))
+	}
+
+	allErrs = append(allErrs, validateSet(networkDeviceData.Addresses, -1,
 		func(address string, fldPath *field.Path) field.ErrorList {
-			var allErrs field.ErrorList
-			allErrs = append(allErrs, validation.IsValidCIDR(fldPath, address)...)
-			return allErrs
-		}, fldPath.Child("addresses"))...)
+			return validation.IsValidCIDR(fldPath, address)
+		},
+		func(address string) (string, string) {
+			// reformat CIDR to handle different ways IPs can be written
+			// (e.g. 2001:db8::1/64 == 2001:0db8::1/64)
+			ip, ipNet, err := netutils.ParseCIDRSloppy(address)
+			if err != nil {
+				return "", "" // will fail at IsValidCIDR
+			}
+			maskSize, _ := ipNet.Mask.Size()
+			return fmt.Sprintf("%s/%d", ip.String(), maskSize), ""
+		},
+		fldPath.Child("addresses"))...)
 	return allErrs
 }
