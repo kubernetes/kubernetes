@@ -545,6 +545,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
+// NOTE: We do not want to check status resources here, only the spec. This is equivalent to setting
+// UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodRequests.
 func podRequests(pod *api.Pod) api.ResourceList {
@@ -585,6 +587,8 @@ func podRequests(pod *api.Pod) api.ResourceList {
 
 // podLimits is a simplified version of pkg/api/v1/resource/PodLimits that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
+// NOTE: We do not want to check status resources here, only the spec. This is equivalent to setting
+// UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodLimits.
 func podLimits(pod *api.Pod) api.ResourceList {
