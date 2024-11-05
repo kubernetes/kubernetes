@@ -114,6 +114,7 @@ var (
 	CacheSize             *metrics.GaugeVec
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
+
 	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
 	SchedulerQueueIncomingPods    *metrics.CounterVec
@@ -330,6 +331,7 @@ func InitMetrics() {
 			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "extension_point", "profile"})
+
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -338,8 +340,8 @@ func InitMetrics() {
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
-	)
+		[]string{"result"})
+
 	PreemptionGoroutinesExecutionTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,

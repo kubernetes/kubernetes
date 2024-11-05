@@ -471,7 +471,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
 	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
-	// intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
+	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
 	// because this process could continue even after this scheduling cycle finishes.
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := parallelize.NewErrorChannel()
