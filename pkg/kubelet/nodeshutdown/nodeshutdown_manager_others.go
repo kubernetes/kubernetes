@@ -1,5 +1,5 @@
-//go:build !linux
-// +build !linux
+//go:build !linux && !windows
+// +build !linux,!windows
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -19,7 +19,7 @@ limitations under the License.
 
 package nodeshutdown
 
-// NewManager returns a fake node shutdown manager for non linux platforms.
+// NewManager returns a fake node shutdown manager for unsupported platforms.
 func NewManager(conf *Config) Manager {
 	m := managerStub{}
 	return m
