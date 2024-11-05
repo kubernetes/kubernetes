@@ -97,6 +97,7 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 		})
 
 		ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
+			// inject PullImage failed to trigger backoff
 			expectedErr := fmt.Errorf("PullImage failed")
 			err := addCRIProxyInjector(func(apiName string) error {
 				if apiName == criproxy.PullImage {
@@ -120,15 +121,22 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 			isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 			gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 
-			// remove error so after backoff we will succeed
+			// Wait for ~40s worth of backoffs to occur so we can confirm the backoff growth.
+			podErr = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, 40*time.Second)
+			gomega.Expect(podErr).To(gomega.HaveOccurred(), "Expected container not to start from repeadedly backing off image pulls")
+
+			// Remove error so after next backoff we will succeed.
 			_ = resetCRIProxyInjector()
 
 			podErr = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(podErr)
 
+			// Parse observed backoffs (TODO: don't use Events, but logs) and compare to expectations
 			durations, err := getImageBackOffDurations(ctx, f, pod.Name)
 			framework.ExpectNoError(err)
+			gomega.Expect(durations).Error().ShouldNot(gomega.BeNil(), "Should have observed backoffs in Pod event log")
 			gomega.Expect(durations[0]).Should(gomega.BeNumerically("~", time.Duration(10*time.Second), time.Duration(2*time.Second)))
+			// TODO: and check the next set of durations are 2x, etc
 
 		})
 	})
@@ -191,25 +199,26 @@ func getImageBackOffDurations(ctx context.Context, f *framework.Framework, podNa
 	var backoffs []time.Duration
 
 	type BackOffRecord struct {
-		podName           string
 		initialEventTime  time.Time
 		backoffEventTimes []time.Time
 		duration          time.Duration
 	}
 
 	records := make(map[int]*BackOffRecord)
+	records[0] = &BackOffRecord{}
 	var backoffCount int
 	var pullTime time.Time
 	var r *BackOffRecord
+	// I'm doing this here for events but really it needs to be off kubelet logs or some kind of synchronous watch
+	// Because the events normalize to the latest
+	// But this is the idea
 	for _, event := range events.Items {
 		if event.InvolvedObject.Name == podName {
-
 			switch event.Reason {
 			case kubeletevents.PullingImage:
 				if !pullTime.IsZero() {
 					if event.FirstTimestamp.Time.After(pullTime) {
 						r = records[backoffCount]
-						r.podName = podName
 						r.duration = r.initialEventTime.Sub(r.backoffEventTimes[len(r.backoffEventTimes)-1])
 						backoffs = append(backoffs, r.duration)
 						backoffCount++
