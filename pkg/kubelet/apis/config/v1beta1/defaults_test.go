@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -130,9 +131,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
-				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{MaxContainerBackOff},
-				},
+				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
 			},
 		},
 		{
@@ -265,7 +264,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation:   ptr.To(false),
 				PodLogsDir:                      "",
 				SingleProcessOOMKill:            ptr.To(false),
-				CrashLoopBackOff:                v1beta1.CrashLoopBackOffConfig{},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       ptr.To(false),
@@ -369,14 +367,13 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation: ptr.To(false),
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          ptr.To(false),
-				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{MaxContainerBackOff},
-				},
+				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
 			},
 		},
 		{
 			"all positive",
 			&v1beta1.KubeletConfiguration{
+				FeatureGates:       map[string]bool{"KubeletCrashLoopBackOffMax": true},
 				EnableServer:       ptr.To(true),
 				StaticPodPath:      "static/pod/path",
 				SyncFrequency:      metav1.Duration{Duration: 60 * time.Second},
@@ -527,10 +524,11 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    "/custom/path",
 				SingleProcessOOMKill:          ptr.To(true),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{55 * time.Second},
+					MaximumBackOffPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
 			},
 			&v1beta1.KubeletConfiguration{
+				FeatureGates:       map[string]bool{"KubeletCrashLoopBackOffMax": true},
 				EnableServer:       ptr.To(true),
 				StaticPodPath:      "static/pod/path",
 				SyncFrequency:      metav1.Duration{Duration: 60 * time.Second},
@@ -681,7 +679,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    "/custom/path",
 				SingleProcessOOMKill:          ptr.To(true),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{55 * time.Second},
+					MaximumBackOffPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
 			},
 		},
@@ -777,9 +775,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
-				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{MaxContainerBackOff},
-				},
+				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
 			},
 		},
 		{
@@ -874,9 +870,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
-				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{MaxContainerBackOff},
-				},
+				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
 			},
 		},
 		{
@@ -970,9 +964,104 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  ptr.To(true),
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+			},
+		},
+		{
+			"CrashLoopBackOff.MaximumBackOffPeriod defaults to internal default when feature gate enabled",
+			&v1beta1.KubeletConfiguration{
+				FeatureGates: map[string]bool{"KubeletCrashLoopBackOffMax": true},
+			},
+			&v1beta1.KubeletConfiguration{
+				FeatureGates:       map[string]bool{"KubeletCrashLoopBackOffMax": true},
+				EnableServer:       ptr.To(true),
+				SyncFrequency:      metav1.Duration{Duration: 1 * time.Minute},
+				FileCheckFrequency: metav1.Duration{Duration: 20 * time.Second},
+				HTTPCheckFrequency: metav1.Duration{Duration: 20 * time.Second},
+				Address:            "0.0.0.0",
+				Port:               ports.KubeletPort,
+				Authentication: v1beta1.KubeletAuthentication{
+					Anonymous: v1beta1.KubeletAnonymousAuthentication{Enabled: ptr.To(false)},
+					Webhook: v1beta1.KubeletWebhookAuthentication{
+						Enabled:  ptr.To(true),
+						CacheTTL: metav1.Duration{Duration: 2 * time.Minute},
+					},
+				},
+				Authorization: v1beta1.KubeletAuthorization{
+					Mode: v1beta1.KubeletAuthorizationModeWebhook,
+					Webhook: v1beta1.KubeletWebhookAuthorization{
+						CacheAuthorizedTTL:   metav1.Duration{Duration: 5 * time.Minute},
+						CacheUnauthorizedTTL: metav1.Duration{Duration: 30 * time.Second},
+					},
+				},
+				RegistryPullQPS:                           ptr.To[int32](5),
+				RegistryBurst:                             10,
+				EventRecordQPS:                            ptr.To[int32](50),
+				EventBurst:                                100,
+				EnableDebuggingHandlers:                   ptr.To(true),
+				HealthzPort:                               ptr.To[int32](10248),
+				HealthzBindAddress:                        "127.0.0.1",
+				OOMScoreAdj:                               ptr.To(int32(qos.KubeletOOMScoreAdj)),
+				StreamingConnectionIdleTimeout:            metav1.Duration{Duration: 4 * time.Hour},
+				NodeStatusUpdateFrequency:                 metav1.Duration{Duration: 10 * time.Second},
+				NodeStatusReportFrequency:                 metav1.Duration{Duration: 5 * time.Minute},
+				NodeLeaseDurationSeconds:                  40,
+				ContainerRuntimeEndpoint:                  "unix:///run/containerd/containerd.sock",
+				ImageMinimumGCAge:                         metav1.Duration{Duration: 2 * time.Minute},
+				ImageGCHighThresholdPercent:               ptr.To[int32](85),
+				ImageGCLowThresholdPercent:                ptr.To[int32](80),
+				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
+				CgroupsPerQOS:                             ptr.To(true),
+				CgroupDriver:                              "cgroupfs",
+				CPUManagerPolicy:                          "none",
+				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
+				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
+				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,
+				TopologyManagerScope:                      v1beta1.ContainerTopologyManagerScope,
+				RuntimeRequestTimeout:                     metav1.Duration{Duration: 2 * time.Minute},
+				HairpinMode:                               v1beta1.PromiscuousBridge,
+				MaxPods:                                   110,
+				PodPidsLimit:                              ptr.To[int64](-1),
+				ResolverConfig:                            ptr.To(kubetypes.ResolvConfDefault),
+				CPUCFSQuota:                               ptr.To(true),
+				CPUCFSQuotaPeriod:                         &metav1.Duration{Duration: 100 * time.Millisecond},
+				NodeStatusMaxImages:                       ptr.To[int32](50),
+				MaxOpenFiles:                              1000000,
+				ContentType:                               "application/vnd.kubernetes.protobuf",
+				KubeAPIQPS:                                ptr.To[int32](50),
+				KubeAPIBurst:                              100,
+				SerializeImagePulls:                       ptr.To(true),
+				MaxParallelImagePulls:                     nil,
+				EvictionHard:                              nil,
+				EvictionPressureTransitionPeriod:          metav1.Duration{Duration: 5 * time.Minute},
+				EnableControllerAttachDetach:              ptr.To(true),
+				MakeIPTablesUtilChains:                    ptr.To(true),
+				IPTablesMasqueradeBit:                     ptr.To[int32](DefaultIPTablesMasqueradeBit),
+				IPTablesDropBit:                           ptr.To[int32](DefaultIPTablesDropBit),
+				FailSwapOn:                                ptr.To(true),
+				ContainerLogMaxSize:                       "10Mi",
+				ContainerLogMaxFiles:                      ptr.To[int32](5),
+				ContainerLogMaxWorkers:                    ptr.To[int32](1),
+				ContainerLogMonitorInterval:               &metav1.Duration{Duration: 10 * time.Second},
+				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
+				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
+				VolumePluginDir:                           DefaultVolumePluginDir,
+				Logging: logsapi.LoggingConfiguration{
+					Format:         "text",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
+				},
+				EnableSystemLogHandler:        ptr.To(true),
+				EnableProfilingHandler:        ptr.To(true),
+				EnableDebugFlagsHandler:       ptr.To(true),
+				SeccompDefault:                ptr.To(false),
+				FailCgroupV1:                  ptr.To(false),
+				MemoryThrottlingFactor:        ptr.To(DefaultMemoryThrottlingFactor),
+				RegisterNode:                  ptr.To(true),
+				LocalStorageCapacityIsolation: ptr.To(true),
+				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{MaxContainerBackOff},
+					MaximumBackOffPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
 				},
 			},
 		},
@@ -980,7 +1069,9 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			SetDefaults_KubeletConfiguration(tc.config)
+			if err := SetDefaults_KubeletConfiguration(tc.config, utilfeature.DefaultFeatureGate); err != nil {
+				t.Errorf("Got unexpected error %s", err)
+			}
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}

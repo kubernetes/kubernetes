@@ -409,12 +409,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 	}, {
-		name: "KubeletCrashLoopBackOffMax feature gate on, no crashLoopBackOff.MaximumBackoffPeriod config, ok",
+		name: "KubeletCrashLoopBackOffMax feature gate on, but no crashLoopBackOff.MaximumBackoffPeriod config",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true, "CustomCPUCFSQuotaPeriod": true}
 			conf.CrashLoopBackOff = kubeletconfig.CrashLoopBackOffConfig{}
 			return conf
 		},
+		errMsg: "invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaximumBackOffPeriod must be set",
 	}, {
 		name: "specify SystemReservedEnforcementKey without specifying SystemReservedCgroup",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
