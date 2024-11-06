@@ -204,14 +204,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 
 	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
-		if kc.CrashLoopBackOff.MaximumBackOffPeriod == nil {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaximumBackOffPeriod must be set"))
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaxContainerRestartPeriod must be set"))
 		}
-		if kc.CrashLoopBackOff.MaximumBackOffPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaximumBackOffPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaximumBackOffPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaximumBackOffPeriod.Seconds()))
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaxContainerRestartPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaxContainerRestartPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaxContainerRestartPeriod.Seconds()))
 		}
-	} else if kc.CrashLoopBackOff.MaximumBackOffPeriod != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaximumBackOffPeriod must not be set"))
+	} else if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set"))
 	}
 
 	// Check for mutually exclusive keys before the main validation loop

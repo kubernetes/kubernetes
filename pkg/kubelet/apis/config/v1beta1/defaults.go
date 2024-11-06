@@ -299,8 +299,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 
 	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
-		if obj.CrashLoopBackOff.MaximumBackOffPeriod == nil {
-			obj.CrashLoopBackOff.MaximumBackOffPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
+		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 		}
 	}
 	return nil
