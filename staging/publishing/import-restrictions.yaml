@@ -54,6 +54,7 @@
   - "./staging/src/k8s.io/code-generator/examples"
   - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
+  - k8s.io/apimachinery
   - k8s.io/gengo/v2
   - k8s.io/code-generator
   - k8s.io/kube-openapi
