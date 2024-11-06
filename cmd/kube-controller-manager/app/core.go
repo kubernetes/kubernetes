@@ -895,9 +895,11 @@ func startStorageVersionGarbageCollectorController(ctx context.Context, controll
 func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.SELinuxWarningController,
-		aliases:             []string{"selinux-warning"},
 		initFunc:            startSELinuxWarningController,
 		isDisabledByDefault: true,
+		requiredFeatureGates: []featuregate.Feature{
+			features.SELinuxChangePolicy,
+		},
 	}
 }
 
