@@ -321,7 +321,7 @@ func (m *managerImpl) processShutdownEvent() error {
 			if err != nil {
 				m.logger.Error(err, "Failed to store graceful shutdown state")
 			}
-			metrics.GracefulShutdownStartTime.Set(timestamp(endTime))
+			metrics.GracefulShutdownEndTime.Set(timestamp(endTime))
 		}()
 	}
 
