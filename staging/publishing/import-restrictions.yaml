@@ -10,6 +10,7 @@
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
   - k8s.io/utils/pointer
+  - k8s.io/utils/ptr
   - k8s.io/utils/net
   - k8s.io/klog
 
