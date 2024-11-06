@@ -364,6 +364,7 @@
       initPods: 20000
       measurePods: 5000
   - name: 5000Nodes_AsyncPreemptionEnabled
+    threshold: 200
     labels: [performance]
     featureGates:
       SchedulerAsyncPreemption: true
