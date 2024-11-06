@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // v1PodResourcesServer implements PodResourcesListerServer

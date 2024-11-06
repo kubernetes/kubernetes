@@ -36,11 +36,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
@@ -2037,6 +2040,7 @@ func TestMergePodStatus(t *testing.T) {
 }
 
 func TestUpdatePodFromAllocation(t *testing.T) {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345",
@@ -2044,36 +2048,69 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name: "c1",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
-					},
-				},
-			}, {
-				Name: "c2",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+						},
 					},
 				},
-			}},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+						},
+					},
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name: "c1-restartable-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name: "c1-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+				},
+			},
 		},
 	}
 
 	resizedPod := pod.DeepCopy()
 	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
+	resizedPod.Spec.InitContainers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
 	tests := []struct {
 		name         string
@@ -2086,8 +2123,10 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		pod:  pod,
 		allocs: state.PodResourceAllocation{
 			string(pod.UID): map[string]v1.ResourceRequirements{
-				"c1": *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
 			},
 		},
 		expectUpdate: false,
@@ -2110,8 +2149,10 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		pod:  pod,
 		allocs: state.PodResourceAllocation{
 			string(pod.UID): map[string]v1.ResourceRequirements{
-				"c1": *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2": *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
 			},
 		},
 		expectUpdate: true,
@@ -2120,6 +2161,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			pod := test.pod.DeepCopy()
 			allocatedPod, updated := updatePodFromAllocation(pod, test.allocs)
 
