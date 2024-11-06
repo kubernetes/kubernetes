@@ -4513,14 +4513,26 @@ message PodStatus {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 
-  // The list has one entry per init container in the manifest. The most recent successful
+  // Statuses of init containers in this pod. The most recent successful non-restartable
   // init container will have ready = true, the most recently started container will have
   // startTime set.
-  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+  // Each init container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
   // +listType=atomic
   repeated ContainerStatus initContainerStatuses = 10;
 
-  // The list has one entry per container in the manifest.
+  // Statuses of containers in this pod.
+  // Each container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
   // +listType=atomic
@@ -4532,7 +4544,14 @@ message PodStatus {
   // +optional
   optional string qosClass = 9;
 
-  // Status for any ephemeral containers that have run in this pod.
+  // Statuses for any ephemeral containers that have run in this pod.
+  // Each ephemeral container in the pod should have at most one status in this list,
+  // and all statuses should be for containers in the pod.
+  // However this is not enforced.
+  // If a status for a non-existent container is present in the list, or the list has duplicate names,
+  // the behavior of various Kubernetes components is not defined and those statuses might be
+  // ignored.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
   // +listType=atomic
   repeated ContainerStatus ephemeralContainerStatuses = 13;
