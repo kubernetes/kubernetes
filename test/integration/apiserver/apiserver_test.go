@@ -63,8 +63,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	clientfeatures "k8s.io/client-go/features"
-	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/metadata"
@@ -3366,9 +3364,6 @@ func int32Ptr(i int32) *int32 {
 func TestDefaultStorageEncoding(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
-
-	// TODO: Remove this override when the codecs used for serving all built-in APIs are wired to the apiserver feature gate.
-	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, false)
 
 	protobufRecognizer := protobuf.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
 	var recognizersByGroup map[string]recognizer.RecognizingDecoder

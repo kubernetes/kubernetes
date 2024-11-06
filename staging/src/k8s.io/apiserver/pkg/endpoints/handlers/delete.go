@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/apihelpers"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
@@ -85,7 +86,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			}
 			span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(body)))
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, false, metainternalversionscheme.Codecs)
+				s, err := negotiation.NegotiateInputSerializer(req, false, apihelpers.GetMetaInternalVersionCodecs())
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -93,7 +94,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				// For backwards compatibility, we need to allow existing clients to submit per group DeleteOptions
 				// It is also allowed to pass a body with meta.k8s.io/v1.DeleteOptions
 				defaultGVK := scope.MetaGroupVersion.WithKind("DeleteOptions")
-				obj, gvk, err := metainternalversionscheme.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				obj, gvk, err := apihelpers.GetMetaInternalVersionCodecs().DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -105,7 +106,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				span.AddEvent("Decoded delete options")
 
 				objGV := gvk.GroupVersion()
-				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, metainternalversionscheme.Codecs)
+				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, apihelpers.GetMetaInternalVersionCodecs())
 				span.AddEvent("Recorded the audit event")
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
@@ -231,7 +232,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			}
 			span.AddEvent("limitedReadBody succeeded", attribute.Int("len", len(body)))
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, false, metainternalversionscheme.Codecs)
+				s, err := negotiation.NegotiateInputSerializer(req, false, apihelpers.GetMetaInternalVersionCodecs())
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -239,7 +240,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				// For backwards compatibility, we need to allow existing clients to submit per group DeleteOptions
 				// It is also allowed to pass a body with meta.k8s.io/v1.DeleteOptions
 				defaultGVK := scope.MetaGroupVersion.WithKind("DeleteOptions")
-				obj, gvk, err := metainternalversionscheme.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
+				obj, gvk, err := apihelpers.GetMetaInternalVersionCodecs().DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -250,7 +251,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 				}
 
 				objGV := gvk.GroupVersion()
-				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, metainternalversionscheme.Codecs)
+				audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, apihelpers.GetMetaInternalVersionCodecs())
 			} else {
 				if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
 					err = errors.NewBadRequest(err.Error())

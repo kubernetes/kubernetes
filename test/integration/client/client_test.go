@@ -46,6 +46,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	autoscalingv1ac "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
@@ -59,6 +61,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilversion "k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -1723,7 +1726,7 @@ func TestClientCBOREnablement(t *testing.T) {
 			// Batch test cases with their server configuration instead of starting and stopping
 			// a new apiserver for each test case.
 			if served {
-				framework.EnableCBORServingAndStorageForTest(t)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 			}
 
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -1835,7 +1838,7 @@ func TestClientCBOREnablement(t *testing.T) {
 }
 
 func TestCBORWithTypedClient(t *testing.T) {
-	framework.EnableCBORServingAndStorageForTest(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 

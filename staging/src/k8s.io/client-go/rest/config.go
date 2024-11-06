@@ -689,17 +689,5 @@ func CodecFactoryForGeneratedClient(scheme *runtime.Scheme, codecs serializer.Co
 		return codecs
 	}
 
-	return serializer.NewCodecFactory(scheme, serializer.WithSerializer(func(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
-		return runtime.SerializerInfo{
-			MediaType:        "application/cbor",
-			MediaTypeType:    "application",
-			MediaTypeSubType: "cbor",
-			Serializer:       cbor.NewSerializer(creater, typer),
-			StrictSerializer: cbor.NewSerializer(creater, typer, cbor.Strict(true)),
-			StreamSerializer: &runtime.StreamSerializerInfo{
-				Framer:     cbor.NewFramer(),
-				Serializer: cbor.NewSerializer(creater, typer, cbor.Transcode(false)),
-			},
-		}
-	}))
+	return serializer.NewCodecFactory(scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
 }

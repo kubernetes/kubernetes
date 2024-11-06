@@ -41,8 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	clientfeatures "k8s.io/client-go/features"
-	clientfeaturestesting "k8s.io/client-go/features/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -82,9 +80,6 @@ func TestEtcdStoragePath(t *testing.T) {
 
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
-
-	// TODO: Remove this override when the codecs used for serving all built-in APIs are wired to the apiserver feature gate.
-	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, false)
 
 	apiServer := StartRealAPIServerOrDie(t)
 	defer apiServer.Cleanup()
