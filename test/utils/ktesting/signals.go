@@ -29,11 +29,7 @@ import (
 
 var (
 	// defaultProgressReporter is inactive until init is called.
-	defaultProgressReporter = &progressReporter{
-		// os.Stderr gets redirected by "go test". "go test -v" has to be
-		// used to see the output while a test runs.
-		out: os.Stderr,
-	}
+	defaultProgressReporter = &progressReporter{}
 )
 
 const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
@@ -57,6 +53,7 @@ type progressReporter struct {
 	reporterCounter int64
 	reporters       map[int64]func() string
 	out             io.Writer
+	closeOut        func() error
 }
 
 var _ ginkgoReporter = &progressReporter{}
@@ -86,6 +83,24 @@ func (p *progressReporter) init(tb TB) context.Context {
 	if p.usageCount > 1 {
 		// Was already initialized.
 		return p.interruptCtx
+	}
+
+	// Might have been set for testing purposes.
+	if p.out == nil {
+		// os.Stderr gets redirected by "go test". "go test -v" has to be
+		// used to see that output while a test runs.
+		//
+		// Opening /dev/tty during init avoids the redirection.
+		// May fail, depending on the OS, in which case
+		// os.Stderr is used.
+		if console, err := os.OpenFile("/dev/tty", os.O_RDWR|os.O_APPEND, 0); err == nil {
+			p.out = console
+			p.closeOut = console.Close
+
+		} else {
+			p.out = os.Stdout
+			p.closeOut = nil
+		}
 	}
 
 	p.signalCtx, p.signalCancel = signal.NotifyContext(context.Background(), os.Interrupt)
@@ -126,6 +141,12 @@ func (p *progressReporter) finalize() {
 
 	p.signalCancel()
 	p.wg.Wait()
+
+	// Now that all goroutines are stopped, we can clean up some more.
+	if p.closeOut != nil {
+		_ = p.closeOut()
+		p.out = nil
+	}
 }
 
 // AttachProgressReporter implements Gomega's contextWithAttachProgressReporter.
