@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	codes "google.golang.org/grpc/codes"
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -407,6 +408,25 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
 		err = m.allocationManager.SetActuatedResources(pod, container)
+	}
+	return err
+}
+
+func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod) error {
+	podResourcesRequest := &runtimeapi.UpdatePodSandboxResourcesRequest{
+		PodSandboxId: sandboxID,
+		Overhead:     m.convertOverheadToLinuxResources(pod),
+		Resources:    m.calculateSandboxResources(pod),
+	}
+
+	ctx := context.Background()
+	_, err := m.runtimeService.UpdatePodSandboxResources(ctx, podResourcesRequest)
+	if err != nil {
+		stat, _ := grpcstatus.FromError(err)
+		if stat.Code() == codes.Unimplemented {
+			klog.ErrorS(err, "updatePodSandboxResources failed: method unimplemented on runtime service", "sandboxID", sandboxID)
+			return nil
+		}
 	}
 	return err
 }
