@@ -3838,6 +3838,7 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 
 // Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
 func Test_isPodWorthRequeuing(t *testing.T) {
+	metrics.Register()
 	count := 0
 	queueHintReturnQueue := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
@@ -3916,8 +3917,34 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  framework.EventUnschedulableTimeout,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Obj(),
+			newObj:                 nil,
 			expected:               queueAfterBackoff,
+			expectedExecutionCount: 0,
+			queueingHintMap:        QueueingHintMapPerProfile{},
+		},
+		{
+			name: "return Queue when the event is wildcard and the wildcard targets the pod to be requeued right now",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.EventForceActivate,
+			oldObj:                 nil,
+			newObj:                 st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+			expected:               queueAfterBackoff,
+			expectedExecutionCount: 0,
+			queueingHintMap:        QueueingHintMapPerProfile{},
+		},
+		{
+			name: "return Skip when the event is wildcard, but the wildcard targets a different pod",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.EventForceActivate,
+			oldObj:                 nil,
+			newObj:                 st.MakePod().Name("pod-different").Namespace("ns2").UID("2").Obj(),
+			expected:               queueSkip,
 			expectedExecutionCount: 0,
 			queueingHintMap:        QueueingHintMapPerProfile{},
 		},

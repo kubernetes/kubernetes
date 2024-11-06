@@ -413,6 +413,18 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	}
 
 	if event.IsWildCard() {
+		// If the wildcard event has a Pod in newObj,
+		// that indicates that the event wants to be effective for the Pod only.
+		// Specifically, EventForceActivate could have a target Pod in newObj.
+		if newObj != nil {
+			if pod, ok := newObj.(*v1.Pod); ok && pod.UID == pInfo.Pod.UID {
+				logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod))
+				return queueAfterBackoff
+			}
+			// This wildcard event is not for this Pod.
+			return queueSkip
+		}
+
 		// If the wildcard event is special one as someone wants to force all Pods to move to activeQ/backoffQ.
 		// We return queueAfterBackoff in this case, while resetting all blocked plugins.
 		logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod))
@@ -609,6 +621,8 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 		}
 
 		// If this pod is in-flight, register the activation event so that the pod will be requeued when it comes back.
+		// Specifically in the in-tree plugins, this is for the scenario with the preemption plugin
+		// where the async preemption API calls are all done or fail at some point before the Pod comes back to the queue.
 		p.activeQ.addEventsIfPodInFlight(nil, pod, []framework.ClusterEvent{framework.EventForceActivate})
 	}
 
