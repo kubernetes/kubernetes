@@ -179,8 +179,9 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	if draPlugins.add(pluginInstance) {
-		logger.V(1).Info("Already registered, previous plugin was replaced")
+
+	if oldPlugin, replaced := draPlugins.add(pluginInstance); replaced {
+		logger.V(1).Info("DRA plugin already registered, the old plugin was replaced and will be forgotten by the kubelet till the next kubelet restart", "oldEndpoint", oldPlugin.endpoint)
 	}
 
 	return nil
