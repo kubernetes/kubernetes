@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/server/healthz"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -222,6 +223,10 @@ func (cm *containerManagerImpl) GetCapacity(localStorageCapacityIsolation bool) 
 func (cm *containerManagerImpl) GetPluginRegistrationHandlers() map[string]cache.PluginHandler {
 	// DRA is not supported on Windows, only device plugin is supported
 	return map[string]cache.PluginHandler{pluginwatcherapi.DevicePlugin: cm.deviceManager.GetWatcherHandler()}
+}
+
+func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
+	return []healthz.HealthChecker{cm.deviceManager.GetHealthChecker()}
 }
 
 func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

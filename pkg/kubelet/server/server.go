@@ -114,6 +114,7 @@ type Server struct {
 	metricsBuckets       sets.Set[string]
 	metricsMethodBuckets sets.Set[string]
 	resourceAnalyzer     stats.ResourceAnalyzer
+	extendedCheckers     []healthz.HealthChecker
 }
 
 // TLSOptions holds the TLS options.
@@ -156,6 +157,7 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
@@ -164,7 +166,7 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, kubeCfg)
+	handler := NewServer(host, resourceAnalyzer, checkers, auth, kubeCfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		handler.InstallTracingFilter(tp)
@@ -198,11 +200,12 @@ func ListenAndServeKubeletServer(
 func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	address net.IP,
 	port uint,
 	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, nil, nil)
+	s := NewServer(host, resourceAnalyzer, checkers, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
@@ -278,6 +281,7 @@ type HostInterface interface {
 func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	auth AuthInterface,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
@@ -288,6 +292,7 @@ func NewServer(
 		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
 		metricsBuckets:       sets.New[string](),
 		metricsMethodBuckets: sets.New[string]("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		extendedCheckers:     checkers,
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -392,11 +397,13 @@ func (s *Server) getMetricMethodBucket(method string) string {
 // patterns with the restful Container.
 func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("healthz")
-	healthz.InstallHandler(s.restfulCont,
+	checkers := []healthz.HealthChecker{
 		healthz.PingHealthz,
 		healthz.LogHealthz,
 		healthz.NamedCheck("syncloop", s.host.SyncLoopHealthCheck),
-	)
+	}
+	checkers = append(checkers, s.extendedCheckers...)
+	healthz.InstallHandler(s.restfulCont, checkers...)
 
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
 

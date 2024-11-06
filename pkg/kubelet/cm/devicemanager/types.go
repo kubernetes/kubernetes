@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -62,6 +63,7 @@ type Manager interface {
 
 	// GetWatcherHandler returns the plugin handler for the device manager.
 	GetWatcherHandler() cache.PluginHandler
+	GetHealthChecker() healthz.HealthChecker
 
 	// GetDevices returns information about the devices assigned to pods and containers
 	GetDevices(podUID, containerName string) ResourceDeviceInstances

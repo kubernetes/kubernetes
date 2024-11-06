@@ -53,6 +53,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	// Do some initialization to decode the query parameters correctly.
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -368,6 +369,7 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 	server := NewServer(
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
+		[]healthz.HealthChecker{},
 		fw.fakeAuth,
 		kubeCfg,
 	)
@@ -1650,8 +1652,8 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	}
 	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
 
-	server1 := NewServer(host, resourceAnalyzer, nil, nil)
-	server2 := NewServer(host, resourceAnalyzer, nil, nil)
+	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
+	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
 
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")

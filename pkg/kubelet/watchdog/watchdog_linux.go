@@ -59,6 +59,12 @@ func WithWatchdogClient(watchdog WatchdogClient) Option {
 	}
 }
 
+func WithExtendedCheckers(checkers []healthz.HealthChecker) Option {
+	return func(hc *healthChecker) {
+		hc.checkers = append(hc.checkers, checkers...)
+	}
+}
+
 type healthChecker struct {
 	checkers     []healthz.HealthChecker
 	retryBackoff wait.Backoff
@@ -109,7 +115,7 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		Jitter:   0.1,
 		Steps:    2,
 	}
-	hc.checkers = checkers
+	hc.checkers = append(hc.checkers, checkers...)
 	hc.retryBackoff = retryBackoff
 	hc.interval = watchdogVal / 2
 

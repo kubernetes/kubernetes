@@ -19,12 +19,20 @@ limitations under the License.
 
 package watchdog
 
+import "k8s.io/apiserver/pkg/server/healthz"
+
 type healthCheckerUnsupported struct{}
 
 var _ HealthChecker = &healthCheckerUnsupported{}
 
+type Option func(*healthCheckerUnsupported)
+
+func WithExtendedCheckers(checkers []healthz.HealthChecker) Option {
+	return nil
+}
+
 // NewHealthChecker creates a fake one here
-func NewHealthChecker(_ syncLoopHealthChecker) (HealthChecker, error) {
+func NewHealthChecker(_ syncLoopHealthChecker, _ ...Option) (HealthChecker, error) {
 	return &healthCheckerUnsupported{}, nil
 }
 

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
@@ -323,6 +324,11 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 // GetWatcherHandler returns the plugin handler
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
+	return m.server
+}
+
+// GetHealthChecker returns the plugin handler
+func (m *ManagerImpl) GetHealthChecker() healthz.HealthChecker {
 	return m.server
 }
 

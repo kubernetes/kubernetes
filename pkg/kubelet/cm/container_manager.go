@@ -28,6 +28,7 @@ import (
 
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -121,6 +122,10 @@ type ContainerManager interface {
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.
 	GetPluginRegistrationHandlers() map[string]cache.PluginHandler
+
+	// GetHealthCheckers returns a set of health checkers for all plugins.
+	// These checkers are integrated into the systemd watchdog to monitor the service's health.
+	GetHealthCheckers() []healthz.HealthChecker
 
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
