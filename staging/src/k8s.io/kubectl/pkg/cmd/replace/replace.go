@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -66,6 +67,8 @@ var (
 		# Force replace, delete and then re-create the resource
 		kubectl replace --force -f ./pod.json`))
 )
+
+var supportedSubresources = []string{"status", "scale"}
 
 type ReplaceOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
@@ -133,7 +136,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to PUT to the server.  Uses the transport specified by the kubeconfig file.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-replace")
-	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, replace will operate on the subresource of the requested object.")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, replace will operate on the subresource of the requested object.", supportedSubresources...)
 
 	return cmd
 }
@@ -244,6 +247,10 @@ func (o *ReplaceOptions) Validate() error {
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
 			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
+	}
+
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 
 	return nil
