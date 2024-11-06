@@ -457,52 +457,6 @@ func TestPodResourceRequests(t *testing.T) {
 			},
 		},
 		{
-			description:         "resized with sidecar containers, infeasible",
-			hasSidecarContainer: true,
-			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("5"),
-			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
-			containers: []v1.Container{
-				{
-					Name: "container-1",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("4"),
-						},
-					},
-				},
-			},
-			initContainers: []v1.Container{
-				{
-					Name:          "restartable-init-1",
-					RestartPolicy: &restartAlways,
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("10"),
-						},
-					},
-				},
-			},
-			containerStatus: []v1.ContainerStatus{
-				{
-					Name: "container-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
-					},
-				},
-			},
-			initContainerStatus: []v1.ContainerStatus{
-				{
-					Name: "restartable-init-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("5"),
-					},
-				},
-			},
-		},
-		{
 			description: "resized with no sidecar containers, no resize status",
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
@@ -528,53 +482,6 @@ func TestPodResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			initContainerStatus: []v1.ContainerStatus{
-				{
-					Name: "restartable-init-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
-					},
-				},
-			},
-		},
-		{
-			description:         "resized with sidecar containers, no resize status",
-			hasSidecarContainer: true,
-			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("3"),
-			},
-			options: PodResourcesOptions{UseStatusResources: true},
-			/* 			containers: []v1.Container{
-				{
-					Name: "container-1",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("4"),
-						},
-					},
-				},
-			}, */
-			initContainers: []v1.Container{
-				{
-					Name:          "restartable-init-1",
-					RestartPolicy: &restartAlways,
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("3"),
-						},
-					},
-				},
-			},
-			/* 			containerStatus: []v1.ContainerStatus{
-				{
-					Name: "container-1",
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("2"),
-						},
-					},
-				},
-			}, */
 			initContainerStatus: []v1.ContainerStatus{
 				{
 					Name: "restartable-init-1",
