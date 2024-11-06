@@ -209,8 +209,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 	ev.mu.RLock()
 	defer ev.mu.RUnlock()
 
-	_, ok := ev.preempting[podUID]
-	return ok
+	return ev.preempting.Has(podUID)
 }
 
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
@@ -483,7 +482,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	}
 
 	ev.mu.Lock()
-	ev.preempting[pod.UID] = struct{}{}
+	ev.preempting.Insert(pod.UID)
 	ev.mu.Unlock()
 
 	logger := klog.FromContext(ctx)
@@ -494,7 +493,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer func() {
 			ev.mu.Lock()
-			delete(ev.preempting, pod.UID)
+			ev.preempting.Delete(pod.UID)
 			ev.mu.Unlock()
 			ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
 		}()

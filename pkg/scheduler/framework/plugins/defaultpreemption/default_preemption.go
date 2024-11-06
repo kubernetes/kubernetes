@@ -116,13 +116,9 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *framewo
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		// We don't need any QHint for the event
-		// because the Pod rejected by the preemption plugin is the one that is running the preemption,
-		// and the Pod won't be requeued until all the preemption API calls are completed
-		// (we block the Pod from being requeued at PreEnqueue).
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
-	}, nil
+	// The plugin moves the preemptor Pod to acviteQ/backoffQ once the preemption API calls are all done,
+	// and we don't need to move the Pod with any events.
+	return nil, nil
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates
