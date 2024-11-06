@@ -915,7 +915,6 @@ func startSELinuxWarningController(ctx context.Context, controllerContext Contro
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting SELinux warning controller: %w", err)
 	}
 
-	ctx = klog.NewContext(ctx, logger)
 	seLinuxController, err :=
 		selinuxwarning.NewController(
 			ctx,
