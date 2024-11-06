@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/resource/v1alpha3"
+	"k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -53,30 +53,30 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client1, "test-enable-dra-resourceclaim-device-status", t)
 
 	rcDisabledName := "test-enable-dra-resourceclaim-device-status-rc-disabled"
-	rcDisabled := &v1alpha3.ResourceClaim{
+	rcDisabled := &v1beta1.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcDisabledName,
 		},
-		Spec: v1alpha3.ResourceClaimSpec{
-			Devices: v1alpha3.DeviceClaim{
-				Requests: []v1alpha3.DeviceRequest{
+		Spec: v1beta1.ResourceClaimSpec{
+			Devices: v1beta1.DeviceClaim{
+				Requests: []v1beta1.DeviceRequest{
 					{
 						Name:            "foo",
 						DeviceClassName: "foo",
 						Count:           1,
-						AllocationMode:  v1alpha3.DeviceAllocationModeExactCount,
+						AllocationMode:  v1beta1.DeviceAllocationModeExactCount,
 					},
 				},
 			},
 		},
 	}
 
-	if _, err := client1.ResourceV1alpha3().ResourceClaims(ns.Name).Create(context.TODO(), rcDisabled, metav1.CreateOptions{}); err != nil {
+	if _, err := client1.ResourceV1beta1().ResourceClaims(ns.Name).Create(context.TODO(), rcDisabled, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	rcDisabled.Status = v1alpha3.ResourceClaimStatus{
-		Devices: []v1alpha3.AllocatedDeviceStatus{
+	rcDisabled.Status = v1beta1.ResourceClaimStatus{
+		Devices: []v1beta1.AllocatedDeviceStatus{
 			{
 				Driver: "foo",
 				Pool:   "foo",
@@ -84,7 +84,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Data: runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
-				NetworkData: &v1alpha3.NetworkDeviceData{
+				NetworkData: &v1beta1.NetworkDeviceData{
 					InterfaceName: "net-1",
 					IPs: []string{
 						"10.9.8.0/24",
@@ -95,11 +95,11 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 			},
 		},
 	}
-	if _, err := client1.ResourceV1alpha3().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcDisabled, metav1.UpdateOptions{}); err != nil {
+	if _, err := client1.ResourceV1beta1().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcDisabled, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	rcDisabled, err = client1.ResourceV1alpha3().ResourceClaims(ns.Name).Get(context.TODO(), rcDisabledName, metav1.GetOptions{})
+	rcDisabled, err = client1.ResourceV1beta1().ResourceClaims(ns.Name).Get(context.TODO(), rcDisabledName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,32 +123,32 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 	}
 
 	rcEnabledName := "test-enable-dra-resourceclaim-device-status-rc-enabled"
-	rcEnabled := &v1alpha3.ResourceClaim{
+	rcEnabled := &v1beta1.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: rcEnabledName,
 		},
-		Spec: v1alpha3.ResourceClaimSpec{
-			Devices: v1alpha3.DeviceClaim{
-				Requests: []v1alpha3.DeviceRequest{
+		Spec: v1beta1.ResourceClaimSpec{
+			Devices: v1beta1.DeviceClaim{
+				Requests: []v1beta1.DeviceRequest{
 					{
 						Name:            "bar",
 						DeviceClassName: "bar",
 						Count:           1,
-						AllocationMode:  v1alpha3.DeviceAllocationModeExactCount,
+						AllocationMode:  v1beta1.DeviceAllocationModeExactCount,
 					},
 				},
 			},
 		},
 	}
 
-	if _, err := client2.ResourceV1alpha3().ResourceClaims(ns.Name).Create(context.TODO(), rcEnabled, metav1.CreateOptions{}); err != nil {
+	if _, err := client2.ResourceV1beta1().ResourceClaims(ns.Name).Create(context.TODO(), rcEnabled, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Tests the validation is enabled.
 	// validation will refuse this update as the device is not allocated.
-	rcEnabled.Status = v1alpha3.ResourceClaimStatus{
-		Devices: []v1alpha3.AllocatedDeviceStatus{
+	rcEnabled.Status = v1beta1.ResourceClaimStatus{
+		Devices: []v1beta1.AllocatedDeviceStatus{
 			{
 				Driver: "bar",
 				Pool:   "bar",
@@ -156,7 +156,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Data: runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
-				NetworkData: &v1alpha3.NetworkDeviceData{
+				NetworkData: &v1beta1.NetworkDeviceData{
 					InterfaceName: "net-1",
 					IPs: []string{
 						"10.9.8.0/24",
@@ -167,14 +167,14 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 			},
 		},
 	}
-	if _, err := client2.ResourceV1alpha3().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcEnabled, metav1.UpdateOptions{}); err == nil {
+	if _, err := client2.ResourceV1beta1().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcEnabled, metav1.UpdateOptions{}); err == nil {
 		t.Fatalf("Expected error (must be an allocated device in the claim)")
 	}
 
-	rcEnabled.Status = v1alpha3.ResourceClaimStatus{
-		Allocation: &v1alpha3.AllocationResult{
-			Devices: v1alpha3.DeviceAllocationResult{
-				Results: []v1alpha3.DeviceRequestAllocationResult{
+	rcEnabled.Status = v1beta1.ResourceClaimStatus{
+		Allocation: &v1beta1.AllocationResult{
+			Devices: v1beta1.DeviceAllocationResult{
+				Results: []v1beta1.DeviceRequestAllocationResult{
 					{
 						Request: "bar",
 						Driver:  "bar",
@@ -184,7 +184,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				},
 			},
 		},
-		Devices: []v1alpha3.AllocatedDeviceStatus{
+		Devices: []v1beta1.AllocatedDeviceStatus{
 			{
 				Driver: "bar",
 				Pool:   "bar",
@@ -192,7 +192,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Data: runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
-				NetworkData: &v1alpha3.NetworkDeviceData{
+				NetworkData: &v1beta1.NetworkDeviceData{
 					InterfaceName: "net-1",
 					IPs: []string{
 						"10.9.8.0/24",
@@ -203,12 +203,12 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 			},
 		},
 	}
-	if _, err := client2.ResourceV1alpha3().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcEnabled, metav1.UpdateOptions{}); err != nil {
+	if _, err := client2.ResourceV1beta1().ResourceClaims(ns.Name).UpdateStatus(context.TODO(), rcEnabled, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Tests the field is enabled.
-	rcEnabled, err = client2.ResourceV1alpha3().ResourceClaims(ns.Name).Get(context.TODO(), rcEnabledName, metav1.GetOptions{})
+	rcEnabled, err = client2.ResourceV1beta1().ResourceClaims(ns.Name).Get(context.TODO(), rcEnabledName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
