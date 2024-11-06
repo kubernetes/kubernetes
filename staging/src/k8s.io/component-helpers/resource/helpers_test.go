@@ -463,7 +463,7 @@ func TestPodResourceRequests(t *testing.T) {
 				v1.ResourceCPU: resource.MustParse("7"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{InPlacePodVerticalScalingEnabled: true},
+			options:         PodResourcesOptions{UseStatusResources: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
