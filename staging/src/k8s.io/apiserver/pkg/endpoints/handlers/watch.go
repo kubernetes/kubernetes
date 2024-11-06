@@ -88,7 +88,17 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	}
 	// TODO: next step, get back mediaTypeOptions from negotiate and return the exact value here
 	mediaType := serializer.MediaType
-	if mediaType != runtime.ContentTypeJSON {
+	switch mediaType {
+	case runtime.ContentTypeJSON:
+		// as-is
+	case runtime.ContentTypeCBOR:
+		// If a client indicated it accepts application/cbor (exactly one data item) on a
+		// watch request, set the conformant application/cbor-seq media type the watch
+		// response. RFC 9110 allows an origin server to deviate from the indicated
+		// preference rather than send a 406 (Not Acceptable) response (see
+		// https://www.rfc-editor.org/rfc/rfc9110.html#section-12.1-5).
+		mediaType = runtime.ContentTypeCBORSequence
+	default:
 		mediaType += ";stream=watch"
 	}
 

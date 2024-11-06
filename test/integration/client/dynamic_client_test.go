@@ -408,6 +408,20 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 		return err
 	}
 
+	DoWatch := func(t *testing.T, config *rest.Config) error {
+		client, err := dynamic.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		w, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
+		if err != nil {
+			return err
+		}
+		w.Stop()
+		return nil
+	}
+
 	testCases := []struct {
 		name                    string
 		serving                 bool
@@ -539,6 +553,17 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			wantResponseStatus:      http.StatusUnsupportedMediaType,
 			wantStatusError:         true,
 			doRequest:               DoApply,
+		},
+		{
+			name:                    "watch accepts both gets cbor-seq",
+			serving:                 true,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestAccept:       "application/json;q=0.9,application/cbor;q=1",
+			wantResponseContentType: "application/cbor-seq",
+			wantResponseStatus:      http.StatusOK,
+			wantStatusError:         false,
+			doRequest:               DoWatch,
 		},
 	}
 

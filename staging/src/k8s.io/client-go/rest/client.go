@@ -129,6 +129,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 
 func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContentConfig {
 	if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
+		content.Negotiator = clientNegotiatorWithCBORSequenceStreamDecoder{content.Negotiator}
 		return content
 	}
 
@@ -293,4 +294,39 @@ func (p *requestClientContentConfigProvider) UnsupportedMediaType(requestContent
 	case runtime.ContentTypeCBOR, string(types.ApplyCBORPatchType):
 		p.sawUnsupportedMediaTypeForCBOR.Store(true)
 	}
+}
+
+// clientNegotiatorWithCBORSequenceStreamDecoder is a ClientNegotiator that delegates to another
+// ClientNegotiator to select the appropriate Encoder or Decoder for a given media type. As a
+// special case, it will resolve "application/cbor-seq" (a CBOR Sequence, the concatenation of zero
+// or more CBOR data items) as an alias for "application/cbor" (exactly one CBOR data item) when
+// selecting a stream decoder.
+type clientNegotiatorWithCBORSequenceStreamDecoder struct {
+	negotiator runtime.ClientNegotiator
+}
+
+func (n clientNegotiatorWithCBORSequenceStreamDecoder) Encoder(contentType string, params map[string]string) (runtime.Encoder, error) {
+	return n.negotiator.Encoder(contentType, params)
+}
+
+func (n clientNegotiatorWithCBORSequenceStreamDecoder) Decoder(contentType string, params map[string]string) (runtime.Decoder, error) {
+	return n.negotiator.Decoder(contentType, params)
+}
+
+func (n clientNegotiatorWithCBORSequenceStreamDecoder) StreamDecoder(contentType string, params map[string]string) (runtime.Decoder, runtime.Serializer, runtime.Framer, error) {
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
+		return n.negotiator.StreamDecoder(contentType, params)
+	}
+
+	switch contentType {
+	case runtime.ContentTypeCBORSequence:
+		return n.negotiator.StreamDecoder(runtime.ContentTypeCBOR, params)
+	case runtime.ContentTypeCBOR:
+		// This media type is only appropriate for exactly one data item, not the zero or
+		// more events of a watch stream.
+		return nil, nil, nil, runtime.NegotiateError{ContentType: contentType, Stream: true}
+	default:
+		return n.negotiator.StreamDecoder(contentType, params)
+	}
+
 }
