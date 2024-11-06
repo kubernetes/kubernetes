@@ -453,6 +453,7 @@ func TestPrepareCandidate(t *testing.T) {
 		expectedStatus *framework.Status
 		// Only compared when async preemption is enabled.
 		expectedPreemptingMap sets.Set[types.UID]
+		expectedActivatedPods map[string]*v1.Pod
 	}{
 		{
 			name: "no victims",
@@ -543,6 +544,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        framework.AsStatus(errors.New("delete pod failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim, not-found victim error is ignored when deleting",
@@ -579,6 +581,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        framework.AsStatus(errors.New("patch pod status failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "two victims without condition, one passes successfully and the second fails",
@@ -601,6 +604,7 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedDeletedPods:   []string{"victim2"},
 			expectedStatus:        framework.AsStatus(errors.New("patch pod status failed")),
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 	}
 
@@ -730,9 +734,12 @@ func TestPrepareCandidate(t *testing.T) {
 					}
 
 					if asyncPreemptionEnabled {
-						// Make sure the preemptor is activated regardless of the preemption result.
-						if !reflect.DeepEqual(map[string]*v1.Pod{tt.preemptor.Name: tt.preemptor}, fakeActivator.activatedPods) {
-							lastErrMsg = fmt.Sprintf("expected activated pods %v, got %v", map[string]*v1.Pod{tt.preemptor.Name: tt.preemptor}, fakeActivator.activatedPods)
+						if tt.expectedActivatedPods != nil && !reflect.DeepEqual(tt.expectedActivatedPods, fakeActivator.activatedPods) {
+							lastErrMsg = fmt.Sprintf("expected activated pods %v, got %v", tt.expectedActivatedPods, fakeActivator.activatedPods)
+							return false, nil
+						}
+						if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
+							lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
 							return false, nil
 						}
 					}
