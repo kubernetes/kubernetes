@@ -83,6 +83,10 @@ func (managerStub) ShutdownStatus() error {
 }
 
 const (
+	NodeShutdownNotAdmittedReason  = "NodeShutdown"
+	nodeShutdownNotAdmittedMessage = "Pod was rejected as the node is shutting down."
+	localStorageStateFile          = "graceful_node_shutdown_state"
+
 	nodeShutdownReason  = "Terminated"
 	nodeShutdownMessage = "Pod was terminated in response to imminent node shutdown."
 )

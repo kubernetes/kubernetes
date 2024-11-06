@@ -51,12 +51,6 @@ const (
 	shutdownOrderStringValue = "PreshutdownOrder"
 )
 
-const (
-	nodeShutdownNotAdmittedReason  = "NodeShutdown"
-	nodeShutdownNotAdmittedMessage = "Pod was rejected as the node is shutting down."
-	localStorageStateFile          = "graceful_node_shutdown_state"
-)
-
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
 	logger       klog.Logger
@@ -120,7 +114,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if nodeShuttingDown {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
-			Reason:  nodeShutdownNotAdmittedReason,
+			Reason:  NodeShutdownNotAdmittedReason,
 			Message: nodeShutdownNotAdmittedMessage,
 		}
 	}
