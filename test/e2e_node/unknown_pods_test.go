@@ -69,15 +69,10 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 
 		ginkgo.It("the static pod should be terminated and cleaned up due to becoming a unknown pod due to being force deleted while kubelet is not running", func(ctx context.Context) {
 			framework.Logf("Stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.Logf("Delete the static pod manifest while the kubelet is not running")
 			file := staticPodPath(podPath, staticPodName, ns)
@@ -85,13 +80,8 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 			err = os.Remove(file)
 			framework.ExpectNoError(err)
 
-			framework.Logf("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+			framework.Logf("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			framework.Logf("wait for the mirror pod %v to disappear", mirrorPodName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -140,27 +130,17 @@ var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisrup
 
 		ginkgo.It("the api pod should be terminated and cleaned up due to becoming a unknown pod due to being force deleted while kubelet is not running", func(ctx context.Context) {
 			framework.Logf("Stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.Logf("Delete the pod while the kubelet is not running")
 			// Delete pod sync by name will force delete the pod, removing it from kubelet's config
 			deletePodSyncByName(ctx, f, podName)
 
-			framework.Logf("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+			framework.Logf("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			framework.Logf("wait for the pod %v to disappear", podName)
 			gomega.Eventually(ctx, func(ctx context.Context) error {

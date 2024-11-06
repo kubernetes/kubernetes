@@ -1146,7 +1146,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					expectPodResources(ctx, 1, cli, []podDesc{desc})
 
 					ginkgo.By("Restarting Kubelet")
-					restartKubelet(true)
+					restartKubelet(ctx, true)
 
 					// we need to wait for the node to be reported ready before we can safely query
 					// the podresources endpoint again. Otherwise we will have false negatives.
