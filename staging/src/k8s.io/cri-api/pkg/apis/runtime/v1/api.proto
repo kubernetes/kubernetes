@@ -140,6 +140,13 @@ service RuntimeService {
     //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
     //   avoid updating them without a full node reboot.
     rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
+
+    // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+    // the pod-level resource configuration. This method is called _after_ the
+    // Kubelet reconfigures the pod-level cgroups.
+    // This request is treated as best effort, and failure will not block the
+    // Kubelet with proceeding with a resize.
+    rpc UpdatePodSandboxResources(UpdatePodSandboxResourcesRequest) returns (UpdatePodSandboxResourcesResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -1070,19 +1077,6 @@ message WindowsContainerResources {
     int64 memory_limit_in_bytes = 4;
     // Specifies the size of the rootfs / scratch space in bytes to be configured for this container. Default: 0 (not specified).
     int64 rootfs_size_in_bytes = 5;
-    // Optionally specifies the set of CPUs to affinitize for this container.
-    repeated WindowsCpuGroupAffinity affinity_cpus = 6;
-}
-
-// WindowsCpuGroupAffinity specifies the CPU mask and group to affinitize.
-// This is similar to the following _GROUP_AFFINITY structure:
-// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/miniport/ns-miniport-_group_affinity
-message WindowsCpuGroupAffinity {
-    // CPU mask relative to this CPU group.
-    uint64 cpu_mask = 1;
-    // Processor group the mask refers to, as returned by
-    // GetLogicalProcessorInformationEx.
-    uint32 cpu_group = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -1997,3 +1991,14 @@ enum CgroupDriver {
     CGROUPFS = 1;
 }
 
+message UpdatePodSandboxResourcesRequest {
+    // ID of the PodSandbox to update.
+    string pod_sandbox_id = 1;
+
+    // Optional overhead represents the overheads associated with this sandbox
+    LinuxContainerResources overhead = 2;
+    // Optional resources represents the sum of container resources for this sandbox
+    LinuxContainerResources resources = 3;
+}
+
+message UpdatePodSandboxResourcesResponse {}
