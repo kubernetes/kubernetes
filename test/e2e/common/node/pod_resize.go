@@ -903,8 +903,8 @@ func doPodResizeTests(f *framework.Framework) {
 
 			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, opStr string) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
-				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(context.TODO(), newPod.Name,
-					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{})
+				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
 				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
 
 				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
@@ -996,7 +996,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 
 			ginkgo.By("patching pod for resize")
 			patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-				types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{})
+				types.StrategicMergePatchType, []byte(tc.patchString), metav1.PatchOptions{}, "resize")
 			if tc.patchError == "" {
 				framework.ExpectNoError(pErr, "failed to patch pod for resize")
 			} else {

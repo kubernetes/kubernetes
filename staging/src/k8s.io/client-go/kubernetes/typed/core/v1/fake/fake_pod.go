@@ -207,3 +207,15 @@ func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string
 	}
 	return obj.(*v1.Pod), err
 }
+
+// UpdateResize takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) UpdateResize(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
+	emptyResult := &v1.Pod{}
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "resize", c.ns, pod, opts), &v1.Pod{})
+
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.Pod), err
+}

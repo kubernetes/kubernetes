@@ -101,15 +101,6 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// With support for in-place pod resizing, container resources are now mutable.
-		// If container resources are updated with new resource requests values, a pod resize is
-		// desired. The status of this request is reflected by setting Resize field to "Proposed"
-		// as a signal to the caller that the request is being considered.
-		podutil.MarkPodProposedForResize(oldPod, newPod)
-	}
-
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
@@ -256,11 +247,7 @@ var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
 // dropNonEphemeralContainerUpdates discards all changes except for pod.Spec.EphemeralContainers and certain metadata
 func dropNonEphemeralContainerUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := oldPod.DeepCopy()
-	pod.Name = newPod.Name
-	pod.Namespace = newPod.Namespace
-	pod.ResourceVersion = newPod.ResourceVersion
-	pod.UID = newPod.UID
+	pod := dropPodUpdates(newPod, oldPod)
 	pod.Spec.EphemeralContainers = newPod.Spec.EphemeralContainers
 	return pod
 }
@@ -284,6 +271,85 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 // WarningsOnUpdate returns warnings for the given update.
 func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+type podResizeStrategy struct {
+	podStrategy
+
+	resetFieldsFilter fieldpath.Filter
+}
+
+// ResizeStrategy wraps and exports the used podStrategy for the storage package.
+var ResizeStrategy = podResizeStrategy{
+	podStrategy: Strategy,
+	resetFieldsFilter: fieldpath.NewIncludeMatcherFilter(
+		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resources"),
+		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
+	),
+}
+
+// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
+func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
+	pod := dropPodUpdates(newPod, oldPod)
+
+	// Containers are not allowed to be re-ordered, but in case they were,
+	// we don't want to corrupt them here. It will get caught in validation.
+	oldCtrToIndex := make(map[string]int)
+	for idx, ctr := range pod.Spec.Containers {
+		oldCtrToIndex[ctr.Name] = idx
+	}
+	// TODO: Once we add in-place pod resize support for sidecars, we need to allow
+	// modifying sidecar resources via resize subresource too.
+	for _, ctr := range newPod.Spec.Containers {
+		idx, ok := oldCtrToIndex[ctr.Name]
+		if !ok {
+			continue
+		}
+		pod.Spec.Containers[idx].Resources = ctr.Resources
+		pod.Spec.Containers[idx].ResizePolicy = ctr.ResizePolicy
+	}
+	return pod
+}
+
+func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+
+	*newPod = *dropNonResizeUpdates(newPod, oldPod)
+	podutil.MarkPodProposedForResize(oldPod, newPod)
+	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return corevalidation.ValidatePodResize(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podResizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
+// GetResetFieldsFilter returns a set of fields filter reset by the strategy
+// and should not be modified by the user.
+func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter {
+	return map[fieldpath.APIVersion]fieldpath.Filter{
+		"v1": p.resetFieldsFilter,
+	}
+}
+
+// dropPodUpdates drops any changes in the pod.
+func dropPodUpdates(newPod, oldPod *api.Pod) *api.Pod {
+	pod := oldPod.DeepCopy()
+	pod.Name = newPod.Name
+	pod.Namespace = newPod.Namespace
+	pod.ResourceVersion = newPod.ResourceVersion
+	pod.UID = newPod.UID
+
+	return pod
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

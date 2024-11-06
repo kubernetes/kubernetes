@@ -406,8 +406,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
 				// Trigger a PodUpdate event by reducing cpu requested by pod1.
 				// It makes Pod1 schedulable.
-				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
-					return nil, fmt.Errorf("failed to update the pod: %w", err)
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateResize(testCtx.Ctx, "pod1", st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to resize the pod: %w", err)
 				}
 				return map[framework.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: framework.UpdatePodScaleDown}: 1}, nil
 			},

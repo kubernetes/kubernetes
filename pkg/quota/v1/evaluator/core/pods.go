@@ -156,13 +156,14 @@ func (p *podEvaluator) GroupResource() schema.GroupResource {
 // Handles returns true if the evaluator should handle the specified attributes.
 func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
-	if op == admission.Create {
-		return true
+	switch a.GetSubresource() {
+	case "":
+		return op == admission.Create
+	case "resize":
+		return op == admission.Update
+	default:
+		return false
 	}
-	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
-		return true
-	}
-	return false
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
