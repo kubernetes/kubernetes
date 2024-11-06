@@ -35,16 +35,25 @@ var panicOnUnknown = false
 
 // builtInFunctions is a list of functions used in cost tests that are not handled by CostEstimator.
 var knownUnhandledFunctions = map[string]bool{
-	"uint":          true,
-	"duration":      true,
-	"bytes":         true,
-	"timestamp":     true,
-	"value":         true,
-	"_==_":          true,
-	"_&&_":          true,
-	"_>_":           true,
-	"!_":            true,
-	"strings.quote": true,
+	"@not_strictly_false": true,
+	"uint":                true,
+	"duration":            true,
+	"bytes":               true,
+	"cel.@mapInsert":      true,
+	"timestamp":           true,
+	"strings.quote":       true,
+	"value":               true,
+	"_==_":                true,
+	"_&&_":                true,
+	"_||_":                true,
+	"_>_":                 true,
+	"_>=_":                true,
+	"_<_":                 true,
+	"_<=_":                true,
+	"!_":                  true,
+	"_?_:_":               true,
+	"_+_":                 true,
+	"_-_":                 true,
 }
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.

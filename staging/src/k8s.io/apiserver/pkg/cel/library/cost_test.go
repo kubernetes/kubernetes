@@ -1110,6 +1110,95 @@ func TestSetsCost(t *testing.T) {
 	}
 }
 
+func TestTwoVariableComprehensionCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "map all",
+			expr:                `{'a': 1, 'b': 2}.all(k, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 37, Max: 41},
+			expectRuntimeCost:   41,
+		},
+		{
+			name:                "map exists",
+			expr:                `{'a': 1, 'b': 2}.exists(k, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 39, Max: 43},
+			expectRuntimeCost:   40,
+		},
+		{
+			name:                "map existsOne",
+			expr:                `{'a': 1, 'b': 2}.existsOne(k, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 38, Max: 40},
+			expectRuntimeCost:   40,
+		},
+		{
+			name:                "map transformMap",
+			expr:                `{'a': 1, 'b': 2}.transformMap(k, v, v + 1)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 71, Max: 71},
+			expectRuntimeCost:   71,
+		},
+		{
+			name:                "map transformMap with filter",
+			expr:                `{'a': 1, 'b': 2}.transformMap(k, v, v < 5, v + 1)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 67, Max: 75},
+			expectRuntimeCost:   75,
+		},
+		{
+			name:                "map transformMapEntry",
+			expr:                `{'a': 1, 'b': 2}.transformMapEntry(k, v, {k: v + 1})`,
+			expectEstimatedCost: checker.CostEstimate{Min: 131, Max: 131},
+			expectRuntimeCost:   131,
+		},
+		{
+			name:                "map transformMapEntry with filter",
+			expr:                `{'a': 1, 'b': 2}.transformMapEntry(k, v, v < 5, {k: v + 1})`,
+			expectEstimatedCost: checker.CostEstimate{Min: 67, Max: 135},
+			expectRuntimeCost:   135,
+		},
+
+		{
+			name:                "list all",
+			expr:                `[1, 2].all(i, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 17, Max: 21},
+			expectRuntimeCost:   21,
+		},
+		{
+			name:                "list exists",
+			expr:                `[1, 2].exists(i, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 19, Max: 23},
+			expectRuntimeCost:   20,
+		},
+		{
+			name:                "list existsOne",
+			expr:                `[1, 2].existsOne(i, v, v > 0)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 18, Max: 20},
+			expectRuntimeCost:   20,
+		},
+		{
+			name:                "list transformList",
+			expr:                `[1, 2].transformList(i, v, v + 1)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 49, Max: 49},
+			expectRuntimeCost:   49,
+		},
+		{
+			name:                "list transformList with filter",
+			expr:                `[1, 2].transformList(i, v, v < 5, v + 1)`,
+			expectEstimatedCost: checker.CostEstimate{Min: 27, Max: 53},
+			expectRuntimeCost:   53,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
 	originalPanicOnUnknown := panicOnUnknown
 	panicOnUnknown = true
@@ -1133,6 +1222,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		// cel-go v0.17.7 introduced CostEstimatorOptions.
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
+		ext.TwoVarComprehensions(),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)

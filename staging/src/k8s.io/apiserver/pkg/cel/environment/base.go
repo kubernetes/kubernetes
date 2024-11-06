@@ -169,6 +169,13 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 			library.AuthzSelectors(),
 		},
 	},
+	// Two variable comprehensions
+	{
+		IntroducedVersion: version.MajorMinor(1, 32),
+		EnvOptions: []cel.EnvOption{
+			ext.TwoVarComprehensions(),
+		},
+	},
 }
 
 var (
