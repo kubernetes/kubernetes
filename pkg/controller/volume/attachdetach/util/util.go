@@ -33,12 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
-// specified volume. It dereference any PVC to get PV objects, if needed.
-// A volume.Spec that refers to an in-tree plugin spec is translated to refer
-// to a migrated CSI plugin spec if all conditions for CSI migration on a node
-// for the in-tree plugin is satisfied.
-func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+func createInTreeVolumeSpec(logger klog.Logger, podVolume *v1.Volume, pod *v1.Pod, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, string, error) {
 	claimName := ""
 	readOnly := false
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
@@ -47,67 +42,83 @@ func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, node
 	}
 	isEphemeral := podVolume.VolumeSource.Ephemeral != nil
 	if isEphemeral {
-		claimName = ephemeral.VolumeClaimName(pod, &podVolume)
+		claimName = ephemeral.VolumeClaimName(pod, podVolume)
 	}
-	if claimName != "" {
-		logger.V(10).Info("Found PVC", "PVC", klog.KRef(pod.Namespace, claimName))
-
-		// If podVolume is a PVC, fetch the real PV behind the claim
-		pvc, err := getPVCFromCache(pod.Namespace, claimName, pvcLister)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				pod.Namespace,
-				claimName,
-				err)
-		}
-		if isEphemeral {
-			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
-				return nil, err
-			}
-		}
-
-		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
-		logger.V(10).Info("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, claimName), "pvcUID", pvcUID, "PV", klog.KRef("", pvName))
-
-		// Fetch actual PV object
-		volumeSpec, err := getPVSpecFromCache(
-			pvName, readOnly, pvcUID, pvLister)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error processing PVC %q/%q: %v",
-				pod.Namespace,
-				claimName,
-				err)
-		}
-
-		volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error performing CSI migration checks and translation for PVC %q/%q: %v",
-				pod.Namespace,
-				claimName,
-				err)
-		}
-
-		logger.V(10).Info("Extracted volumeSpec from bound PV and PVC", "PVC", klog.KRef(pod.Namespace, claimName), "pvcUID", pvcUID, "PV", klog.KRef("", pvName), "volumeSpecName", volumeSpec.Name())
-
-		return volumeSpec, nil
+	if claimName == "" {
+		// In-line volume
+		return volume.NewSpecFromVolume(podVolume), "", nil
 	}
+	// The volume is a PVC, dereference the PVC + PV
+	logger.V(10).Info("Found PVC", "PVC", klog.KRef(pod.Namespace, claimName))
 
-	// Do not return the original volume object, since it's from the shared
-	// informer it may be mutated by another consumer.
-	clonedPodVolume := podVolume.DeepCopy()
-
-	origspec := volume.NewSpecFromVolume(clonedPodVolume)
-	spec, err := translateInTreeSpecToCSIIfNeeded(logger, origspec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
+	// If podVolume is a PVC, fetch the real PV behind the claim
+	pvc, err := getPVCFromCache(pod.Namespace, claimName, pvcLister)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"error performing CSI migration checks and translation for inline volume %q: %v",
-			podVolume.Name,
+		return nil, claimName, fmt.Errorf(
+			"error processing PVC %q/%q: %w",
+			pod.Namespace,
+			claimName,
 			err)
 	}
-	return spec, nil
+	if isEphemeral {
+		if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+			return nil, claimName, err
+		}
+	}
+
+	pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
+	logger.V(10).Info("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, claimName), "pvcUID", pvcUID, "PV", klog.KRef("", pvName))
+
+	// Fetch actual PV object
+	volumeSpec, err := getPVSpecFromCache(
+		pvName, readOnly, pvcUID, pvLister)
+	if err != nil {
+		return nil, claimName, fmt.Errorf(
+			"error processing PVC %q/%q: %w",
+			pod.Namespace,
+			claimName,
+			err)
+	}
+
+	logger.V(10).Info("Extracted volumeSpec from bound PV and PVC", "PVC", klog.KRef(pod.Namespace, claimName), "pvcUID", pvcUID, "PV", klog.KRef("", pvName), "volumeSpecName", volumeSpec.Name())
+	return volumeSpec, claimName, nil
+}
+
+func CreateVolumeSpec(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, vpm, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+	if err != nil {
+		return nil, err
+	}
+	volumeSpec, err = translateInTreeSpecToCSIIfNeeded(logger, volumeSpec, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error performing CSI migration checks and translation for PVC %q/%q: %w",
+			pod.Namespace,
+			claimName,
+			err)
+	}
+	return volumeSpec, nil
+}
+
+// CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
+// specified volume. It dereference any PVC to get PV objects, if needed.
+// A volume.Spec that refers to an in-tree plugin spec is translated to refer
+// to a migrated CSI plugin spec if all conditions for CSI migration on a node
+// for the in-tree plugin is satisfied.
+func CreateVolumeSpecWithNodeMigration(logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName, vpm *volume.VolumePluginMgr, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+	volumeSpec, claimName, err := createInTreeVolumeSpec(logger, &podVolume, pod, vpm, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+	if err != nil {
+		return nil, err
+	}
+	volumeSpec, err = translateInTreeSpecToCSIOnNodeIfNeeded(logger, volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error performing CSI migration checks and translation for PVC %q/%q: %w",
+			pod.Namespace,
+			claimName,
+			err)
+	}
+	return volumeSpec, nil
 }
 
 // getPVCFromCache fetches the PVC object with the given namespace and
@@ -144,7 +155,6 @@ func getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UI
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PV %q in PVInformer cache: %v", name, err)
 	}
-
 	if pv.Spec.ClaimRef == nil {
 		return nil, fmt.Errorf(
 			"found PV object %q but it has a nil pv.Spec.ClaimRef indicating it is not yet bound to the claim",
@@ -204,7 +214,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
-		volumeSpec, err := CreateVolumeSpec(logger, podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
+		volumeSpec, err := CreateVolumeSpecWithNodeMigration(logger, podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
 			logger.V(10).Info("Error processing volume for pod", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
@@ -240,7 +250,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 	}
 }
 
-func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
+func translateInTreeSpecToCSIOnNodeIfNeeded(logger klog.Logger, spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
 	translatedSpec := spec
 	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
 	if err != nil {
@@ -259,6 +269,22 @@ func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, nod
 		if err != nil {
 			return nil, err
 		}
+	}
+	return translatedSpec, nil
+}
+
+func translateInTreeSpecToCSIIfNeeded(logger klog.Logger, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
+	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
+	if err != nil {
+		return nil, err
+	}
+	if !migratable {
+		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
+		return spec, nil
+	}
+	translatedSpec, err := csimigration.TranslateInTreeSpecToCSI(logger, spec, podNamespace, csiTranslator)
+	if err != nil {
+		return nil, err
 	}
 	return translatedSpec, nil
 }
