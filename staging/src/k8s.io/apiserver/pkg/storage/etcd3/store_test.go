@@ -194,6 +194,28 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	}
 }
 
+type corruptedTransformer struct {
+	value.Transformer
+}
+
+func (f *corruptedTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	return nil, true, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+}
+
+type storeWithCorruptedTransformer struct {
+	*store
+}
+
+func (s *storeWithCorruptedTransformer) CorruptTransformer() func() {
+	ct := &corruptedTransformer{Transformer: s.transformer}
+	s.transformer = ct
+	s.watcher.transformer = ct
+	return func() {
+		s.transformer = ct.Transformer
+		s.watcher.transformer = ct.Transformer
+	}
+}
+
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestGuaranteedUpdate(ctx, t, &storeWithPrefixTransformer{store}, checkStorageInvariants(client.Client, store.codec))

@@ -686,16 +686,38 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
 		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}
 		// Note that this sends the *old* object with the etcd revision for the time at
 		// which it gets deleted.
 		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}
 	}
 	return curObj, oldObj, nil
+}
+
+type corruptObjectDeletedError struct {
+	err error
+}
+
+func (e *corruptObjectDeletedError) Error() string {
+	return fmt.Sprintf("saw a DELETED event, but object data is corrupt - %v", e.err)
+}
+func (e *corruptObjectDeletedError) Unwrap() error { return e.err }
+
+func (w *watcher) transformIfCorruptObjectError(e *event, err error) error {
+	var corruptObjErr *corruptObjectError
+	if !e.isDeleted || !errors.As(err, &corruptObjErr) {
+		return err
+	}
+
+	// if we are here it means we received a DELETED event but the object
+	// associated with it is corrupt because we failed to transform or
+	// decode the data associated with the object.
+	// wrap the original error so we can send a proper watch Error event.
+	return &corruptObjectDeletedError{err: corruptObjErr}
 }
 
 func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
