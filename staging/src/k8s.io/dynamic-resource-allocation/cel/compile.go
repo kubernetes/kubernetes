@@ -265,7 +265,7 @@ func mustBuildEnv() *environment.EnvSet {
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
-				library.SemverLib(),
+				environment.UnversionedLib(library.SemverLib),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
@@ -273,7 +273,7 @@ func mustBuildEnv() *environment.EnvSet {
 				// domain only needs to be given once:
 				//
 				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
-				ext.Bindings(),
+				ext.Bindings(ext.BindingsVersion(0)),
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceType,
