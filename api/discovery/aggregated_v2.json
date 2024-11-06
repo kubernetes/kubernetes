@@ -383,25 +383,6 @@
             }
           ],
           "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "selfsubjectreviews",
-              "responseKind": {
-                "group": "",
-                "kind": "SelfSubjectReview",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "selfsubjectreview",
-              "verbs": [
-                "create"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -728,32 +709,6 @@
             }
           ],
           "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "clustertrustbundles",
-              "responseKind": {
-                "group": "",
-                "kind": "ClusterTrustBundle",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "clustertrustbundle",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -1486,67 +1441,6 @@
                 "update",
                 "watch"
               ]
-            },
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicies",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicy",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicybindings",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
             }
           ],
           "version": "v1alpha1"
@@ -2065,82 +1959,6 @@
             }
           ],
           "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "flowschemas",
-              "responseKind": {
-                "group": "",
-                "kind": "FlowSchema",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "flowschema",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "FlowSchema",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "prioritylevelconfigurations",
-              "responseKind": {
-                "group": "",
-                "kind": "PriorityLevelConfiguration",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "prioritylevelconfiguration",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "PriorityLevelConfiguration",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta3"
         }
       ]
     },
