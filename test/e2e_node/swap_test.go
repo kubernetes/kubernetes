@@ -299,8 +299,7 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeSwapPressure
 	var expectedStarvedResource v1.ResourceName = "swap"
-	pressureTimeout := 10 * time.Minute
-	var twoGig resource.Quantity
+	pressureTimeout := 20 * time.Minute
 	var oneGig resource.Quantity
 	var memoryAllocSize resource.Quantity
 	var fixedRequestSize resource.Quantity
@@ -312,29 +311,33 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalSwapMemoryAvailable): "65%"}
 		})
 		oneGig = resource.MustParse("1024Mi")
-		twoGig = resource.MustParse("2048Mi")
-		memoryAllocSize = resource.MustParse("64Mi")
+		memoryAllocSize = resource.MustParse("10Mi")
 		fixedRequestSize = resource.MustParse("128Mi")
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logSwapMetrics, []podEvictSpec{
 			{
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
-				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+				pod:                    getStressPodWithRequests("one-gig", &oneGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
-				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+				pod:                    getStressPodWithRequests("one-gig", &oneGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
-				pod:                    getStressPodWithRequests(&oneGig, &memoryAllocSize, &fixedRequestSize),
+				pod:                    getStressPodWithRequests("one-gig", &oneGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
 				evictionPriority:       1,
 				ignoreEvictionPriority: true,
-				pod:                    getStressPodWithRequests(&twoGig, &memoryAllocSize, &fixedRequestSize),
+				pod:                    getStressPodWithRequests("one-gig", &oneGig, &memoryAllocSize, &fixedRequestSize),
+			},
+			{
+				evictionPriority:       1,
+				ignoreEvictionPriority: true,
+				pod:                    getStressPodWithRequests("one-gig", &oneGig, &memoryAllocSize, &fixedRequestSize),
 			},
 			{
 				evictionPriority: 0,
@@ -370,6 +373,17 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 					},
 					Limits: v1.ResourceList{
 						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod-300", "guaranteed-pod-300", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
 					},
 				}),
 			},
@@ -449,10 +463,10 @@ func getStressPod(f *framework.Framework, stressSize, memAllocSize *resource.Qua
 	}
 }
 
-func getStressPodDefaultNamespace(stressSize, memAllocSize *resource.Quantity) *v1.Pod {
+func getStressPodDefaultNamespace(name string, stressSize, memAllocSize *resource.Quantity) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "stress-pod-" + rand.String(5),
+			Name: name + rand.String(5),
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
@@ -468,8 +482,8 @@ func getStressPodDefaultNamespace(stressSize, memAllocSize *resource.Quantity) *
 	}
 }
 
-func getStressPodWithRequests(stressSize, memAllocSize, memoryRequest *resource.Quantity) *v1.Pod {
-	stressPod := getStressPodDefaultNamespace(stressSize, memAllocSize)
+func getStressPodWithRequests(name string, stressSize, memAllocSize, memoryRequest *resource.Quantity) *v1.Pod {
+	stressPod := getStressPodDefaultNamespace(name, stressSize, memAllocSize)
 	setPodMemoryResources(stressPod, memoryRequest, nil)
 	return stressPod
 }
