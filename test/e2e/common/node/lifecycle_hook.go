@@ -593,7 +593,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 		ginkgo.It("reduce GracePeriodSeconds during runtime", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 30},
+					Sleep: &v1.SleepAction{Seconds: 15},
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
@@ -601,12 +601,12 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 			podClient.CreateSync(ctx, podWithHook)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(5), e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), e2epod.DefaultPodDeletionTimeout)
 			cost := time.Since(start)
 			// cost should be
-			// longer than 5 seconds (we change gracePeriodSeconds to 5 seconds here, and it's less than sleep action)
+			// longer than 2 seconds (we change gracePeriodSeconds to 2 seconds here, and it's less than sleep action)
 			// shorter than sleep action (to make sure it doesn't take effect)
-			if !validDuration(cost, 5, 15) {
+			if !validDuration(cost, 2, 15) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
@@ -618,7 +618,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 		ginkgo.It("ignore terminated container", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 25},
+					Sleep: &v1.SleepAction{Seconds: 20},
 				},
 			}
 			name := "pod-with-prestop-sleep-hook"
@@ -635,7 +635,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", framework.WithNodeConformance(), fun
 			cost := time.Since(start)
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
-			if !validDuration(cost, 0, 25) {
+			if !validDuration(cost, 0, 15) {
 				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
 			}
 		})
