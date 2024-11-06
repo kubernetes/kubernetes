@@ -524,7 +524,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    "/custom/path",
 				SingleProcessOOMKill:          ptr.To(true),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{Duration: 55 * time.Second},
+					MaxContainerRestartPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
 			},
 			&v1beta1.KubeletConfiguration{
@@ -679,7 +679,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    "/custom/path",
 				SingleProcessOOMKill:          ptr.To(true),
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{Duration: 55 * time.Second},
+					MaxContainerRestartPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
 			},
 		},
@@ -1061,7 +1061,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
-					MaximumBackOffPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
+					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
 				},
 			},
 		},

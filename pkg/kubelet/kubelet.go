@@ -928,7 +928,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	boMax := MaxContainerBackOff
 	base := containerBackOffPeriod
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
-		boMax = kubeCfg.CrashLoopBackOff.MaximumBackOffPeriod.Duration
+		boMax = kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod.Duration
 		if boMax < containerBackOffPeriod {
 			base = boMax
 		}

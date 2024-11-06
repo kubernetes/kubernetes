@@ -694,9 +694,9 @@ type MemorySwapConfiguration struct {
 // CrashLoopBackOffConfig is used for setting configuration for this kubelet's
 // container restart behavior
 type CrashLoopBackOffConfig struct {
-	// MaximumBackOffPeriod is the maximum duration the backoff delay can accrue
+	// MaxContainerRestartPeriod is the maximum duration the backoff delay can accrue
 	// to for container restarts, minimum 1 second, maximum 300 seconds.
 	// +featureGate=KubeletCrashLoopBackOffMax
 	// +optional
-	MaximumBackOffPeriod *metav1.Duration
+	MaxContainerRestartPeriod *metav1.Duration
 }
