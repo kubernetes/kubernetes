@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -227,6 +228,7 @@ func TestValidateClass(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "config").Index(3).Child("opaque", "parameters"), "<value omitted>", "parameters must be a valid JSON object"),
 				field.Required(field.NewPath("spec", "config").Index(4).Child("opaque", "parameters"), ""),
 				field.Required(field.NewPath("spec", "config").Index(5).Child("opaque"), ""),
+				field.TooLong(field.NewPath("spec", "config").Index(7).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
@@ -271,6 +273,22 @@ func TestValidateClass(t *testing.T) {
 					},
 					{
 						DeviceConfiguration: resource.DeviceConfiguration{ /* Bad, empty. */ },
+					},
+					{
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver:     goodName,
+								Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2) + `"}`)},
+							},
+						},
+					},
+					{
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver:     goodName,
+								Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+							},
+						},
 					},
 				}
 				for i := len(class.Spec.Config); i < resource.DeviceConfigMaxSize; i++ {
@@ -320,6 +338,55 @@ func TestValidateClassUpdate(t *testing.T) {
 		"valid-no-op-update": {
 			oldClass: validClass,
 			update:   func(class *resource.DeviceClass) *resource.DeviceClass { return class },
+		},
+		"valid-config-large": {
+			oldClass: validClass,
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				class.Spec.Config = []resource.DeviceClassConfiguration{{
+					DeviceConfiguration: resource.DeviceConfiguration{
+						Opaque: &resource.OpaqueDeviceConfiguration{
+							Driver:     goodName,
+							Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2) + `"}`)},
+						},
+					},
+				}}
+				return class
+			},
+		},
+		"invalid-config-too-large": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "config").Index(0).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
+			},
+			oldClass: validClass,
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				class.Spec.Config = []resource.DeviceClassConfiguration{{
+					DeviceConfiguration: resource.DeviceConfiguration{
+						Opaque: &resource.OpaqueDeviceConfiguration{
+							Driver:     goodName,
+							Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						},
+					},
+				}}
+				return class
+			},
+		},
+		"too-large-config-valid-if-stored": {
+			oldClass: func() *resource.DeviceClass {
+				class := validClass.DeepCopy()
+				class.Spec.Config = []resource.DeviceClassConfiguration{{
+					DeviceConfiguration: resource.DeviceConfiguration{
+						Opaque: &resource.OpaqueDeviceConfiguration{
+							Driver:     goodName,
+							Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						},
+					},
+				}}
+				return class
+			}(),
+			update: func(class *resource.DeviceClass) *resource.DeviceClass {
+				// No changes -> remains valid.
+				return class
+			},
 		},
 	}
 

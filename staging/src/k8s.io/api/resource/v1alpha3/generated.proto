@@ -500,6 +500,8 @@ message OpaqueDeviceConfiguration {
   // includes self-identification and a version ("kind" + "apiVersion" for
   // Kubernetes types), with conversion between different versions.
   //
+  // The length of the raw data must be smaller or equal to 10 Ki.
+  //
   // +required
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
 }

@@ -393,12 +393,13 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
-		"invalid-config-json": {
+		"configuration": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "devices", "config").Index(0).Child("opaque", "parameters"), ""),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(1).Child("opaque", "parameters"), "<value omitted>", "error parsing data as JSON: unexpected end of JSON input"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "parameters must be a valid JSON object"),
 				field.Required(field.NewPath("spec", "devices", "config").Index(3).Child("opaque", "parameters"), ""),
+				field.TooLong(field.NewPath("spec", "devices", "config").Index(5).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
@@ -439,6 +440,26 @@ func TestValidateClaim(t *testing.T) {
 								Driver: "dra.example.com",
 								Parameters: runtime.RawExtension{
 									Raw: []byte(`null`),
+								},
+							},
+						},
+					},
+					{
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver: "dra.example.com",
+								Parameters: runtime.RawExtension{
+									Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2) + `"}`),
+								},
+							},
+						},
+					},
+					{
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver: "dra.example.com",
+								Parameters: runtime.RawExtension{
+									Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`),
 								},
 							},
 						},
@@ -534,7 +555,7 @@ func TestValidateClaimUpdate(t *testing.T) {
 			oldClaim: validClaim,
 			update:   func(claim *resource.ResourceClaim) *resource.ResourceClaim { return claim },
 		},
-		"invalid-update-class": {
+		"invalid-update": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimSpec {
 				spec := validClaim.Spec.DeepCopy()
 				spec.Devices.Requests[0].DeviceClassName += "2"
@@ -543,6 +564,24 @@ func TestValidateClaimUpdate(t *testing.T) {
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Spec.Devices.Requests[0].DeviceClassName += "2"
+				return claim
+			},
+		},
+		"too-large-config-valid-if-stored": {
+			oldClaim: func() *resource.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
+					DeviceConfiguration: resource.DeviceConfiguration{
+						Opaque: &resource.OpaqueDeviceConfiguration{
+							Driver:     goodName,
+							Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						},
+					},
+				}}
+				return claim
+			}(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				// No changes -> remains valid.
 				return claim
 			},
 		},
@@ -849,6 +888,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), ""),
 				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "parameters"), ""),
+				field.TooLong(field.NewPath("status", "allocation", "devices", "config").Index(6).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -898,8 +938,48 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 							Opaque: &resource.OpaqueDeviceConfiguration{ /* Empty! */ },
 						},
 					},
+					{
+						Source: resource.AllocationConfigSourceClaim,
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver:     goodName,
+								Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2) + `"}`)},
+							},
+						},
+					},
+					{
+						Source: resource.AllocationConfigSourceClaim,
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver:     goodName,
+								Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+							},
+						},
+					},
 					// Other invalid resource.DeviceConfiguration are covered elsewhere. */
 				}
+				return claim
+			},
+		},
+		"valid-configuration-update": {
+			oldClaim: func() *resource.ResourceClaim {
+				claim := validClaim.DeepCopy()
+				claim.Status.Allocation = validAllocatedClaim.Status.Allocation.DeepCopy()
+				claim.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{
+					{
+						Source: resource.AllocationConfigSourceClaim,
+						DeviceConfiguration: resource.DeviceConfiguration{
+							Opaque: &resource.OpaqueDeviceConfiguration{
+								Driver:     goodName,
+								Parameters: runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+							},
+						},
+					},
+				}
+				return claim
+			}(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				// No change -> remains valid.
 				return claim
 			},
 		},
