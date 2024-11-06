@@ -113,7 +113,7 @@ var _ = SIGDescribe("OOMKiller [LinuxOnly]", framework.WithNodeConformance(), fr
 		})
 	}
 	for _, tc := range testCases {
-		runOomKillerTest(f, tc, 0, "UnlimitedSwap")
+		runOomKillerTest(f, tc, 0, "NoSwap")
 	}
 })
 
