@@ -506,6 +506,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "selinux-warning-controller"},
 			Rules: []rbacv1.PolicyRule{
 				eventsRule(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
 			},
 		})
 	}
