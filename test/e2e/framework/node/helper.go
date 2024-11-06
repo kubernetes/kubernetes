@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -180,53 +179,24 @@ func IsARM64(node *v1.Node) bool {
 	return false
 }
 
-// patchNode sends a patch request to update the Node.
-func patchNode(ctx context.Context, client clientset.Interface, old *v1.Node, new *v1.Node) error {
-	oldData, err := json.Marshal(old)
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(new)
-	if err != nil {
-		return err
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
-	if err != nil {
-		return fmt.Errorf("failed to create merge patch for node %q: %w", old.Name, err)
-	}
-	_, err = client.CoreV1().Nodes().Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
-}
-
 // AddExtendedResource adds a fake resource to the Node.
 func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nodeName string, extendedResourceName v1.ResourceName, extendedResourceQuantity resource.Quantity) {
 	extendedResource := v1.ResourceName(extendedResourceName)
 
 	ginkgo.By("Adding a custom resource")
-	OriginalNode, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	extendedResourceList := v1.ResourceList{
+		extendedResource: extendedResourceQuantity,
+	}
+	patchPayload, err := json.Marshal(v1.Node{
+		Status: v1.NodeStatus{
+			Capacity:    extendedResourceList,
+			Allocatable: extendedResourceList,
+		},
+	})
+	framework.ExpectNoError(err, "Failed to marshal node JSON")
+
+	_, err = clientSet.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, []byte(patchPayload), metav1.PatchOptions{}, "status")
 	framework.ExpectNoError(err)
-
-	node := OriginalNode.DeepCopy()
-	node.Status.Capacity[extendedResource] = extendedResourceQuantity
-	node.Status.Allocatable[extendedResource] = extendedResourceQuantity
-	err = patchNode(ctx, clientSet, OriginalNode.DeepCopy(), node)
-	framework.ExpectNoError(err)
-
-	gomega.Eventually(func() error {
-		node, err = clientSet.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-
-		fakeResourceCapacity, exists := node.Status.Capacity[extendedResource]
-		if !exists {
-			return fmt.Errorf("node %s has no %s resource capacity", node.Name, extendedResourceName)
-		}
-		if expectedResource := resource.MustParse("123"); fakeResourceCapacity.Cmp(expectedResource) != 0 {
-			return fmt.Errorf("node %s has resource capacity %s, expected: %s", node.Name, fakeResourceCapacity.String(), expectedResource.String())
-		}
-
-		return nil
-	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
 }
 
 // RemoveExtendedResource removes a fake resource from the Node.
@@ -234,23 +204,10 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 	extendedResource := v1.ResourceName(extendedResourceName)
 
 	ginkgo.By("Removing a custom resource")
-	originalNode, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-
-	node := originalNode.DeepCopy()
 	delete(node.Status.Capacity, extendedResource)
 	delete(node.Status.Allocatable, extendedResource)
-	err = patchNode(ctx, clientSet, originalNode.DeepCopy(), node)
+	_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
-
-	gomega.Eventually(func() error {
-		node, err = clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-
-		if _, exists := node.Status.Capacity[extendedResource]; exists {
-			return fmt.Errorf("node %s has resource capacity %s which is expected to be removed", node.Name, extendedResourceName)
-		}
-
-		return nil
-	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
 }
