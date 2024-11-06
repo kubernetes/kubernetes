@@ -110,9 +110,9 @@ func doPodResizeAdmissionPluginsTests() {
 	}
 
 	for _, tc := range testcases {
-		ginkgo.It(tc.name, func(ctx context.Context) {
-			f := framework.NewDefaultFramework(tc.name)
+		f := framework.NewDefaultFramework(tc.name)
 
+		ginkgo.It(tc.name, func(ctx context.Context) {
 			containers := []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -369,8 +369,9 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 })
 
 var _ = SIGDescribe("Pod InPlace Resize Container", feature.InPlacePodVerticalScaling, func() {
+	f := framework.NewDefaultFramework("pod-resize-tests")
+
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		f := framework.NewDefaultFramework("pod-resize-tests")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
