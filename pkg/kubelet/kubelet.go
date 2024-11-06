@@ -243,10 +243,13 @@ var (
 		topologymanager.ErrorTopologyAffinity,
 		nodeshutdown.NodeShutdownNotAdmittedReason,
 	)
+
+	// This is exposed for unit tests.
+	goos = sysruntime.GOOS
 )
 
 func getContainerEtcHostsPath() string {
-	if sysruntime.GOOS == "windows" {
+	if goos == "windows" {
 		return windowsEtcHostsPath
 	}
 	return linuxEtcHostsPath
@@ -940,7 +943,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		opt(klet)
 	}
 
-	if sysruntime.GOOS == "linux" {
+	if goos == "linux" {
 		// AppArmor is a Linux kernel security module and it does not support other operating systems.
 		klet.appArmorValidator = apparmor.NewValidator()
 		klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
@@ -1564,7 +1567,7 @@ func (kl *Kubelet) initializeModules() error {
 		}
 	}
 
-	if sysruntime.GOOS == "windows" {
+	if goos == "windows" {
 		// On Windows we should not allow other users to read the logs directory
 		// to avoid allowing non-root containers from reading the logs of other containers.
 		if err := utilfs.Chmod(ContainerLogsDir, 0750); err != nil {
@@ -2863,6 +2866,10 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
 		// Pod allocation does not need to be updated.
+		return allocatedPod, nil
+	}
+	if goos == "windows" {
+		kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInfeasible)
 		return allocatedPod, nil
 	}
 
