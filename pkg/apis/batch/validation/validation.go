@@ -218,7 +218,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.ManagedBy != nil {
 		allErrs = append(allErrs, apimachineryvalidation.IsDomainPrefixedPath(fldPath.Child("managedBy"), *spec.ManagedBy)...)
 		if len(*spec.ManagedBy) > maxManagedByLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("managedBy"), *spec.ManagedBy, maxManagedByLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("managedBy"), "" /*unused*/, maxManagedByLength))
 		}
 	}
 	if spec.CompletionMode != nil {
@@ -435,7 +435,7 @@ func validateSuccessPolicyRule(spec *batch.JobSpec, rule *batch.SuccessPolicyRul
 	if rule.SucceededIndexes != nil {
 		succeededIndexes := rulePath.Child("succeededIndexes")
 		if len(*rule.SucceededIndexes) > maxJobSuccessPolicySucceededIndexesLimit {
-			allErrs = append(allErrs, field.TooLong(succeededIndexes, *rule.SucceededIndexes, maxJobSuccessPolicySucceededIndexesLimit))
+			allErrs = append(allErrs, field.TooLong(succeededIndexes, "" /*unused*/, maxJobSuccessPolicySucceededIndexesLimit))
 		}
 		var err error
 		if totalIndexes, err = validateIndexesFormat(*rule.SucceededIndexes, *spec.Completions); err != nil {

@@ -213,7 +213,7 @@ func ValidateFieldManager(fieldManager string, fldPath *field.Path) field.ErrorL
 	// considered as not set and is defaulted by the rest of the process
 	// (unless apply is used, in which case it is required).
 	if len(fieldManager) > FieldManagerMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath, fieldManager, FieldManagerMaxLength))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, FieldManagerMaxLength))
 	}
 	// Verify that all characters are printable.
 	for i, r := range fieldManager {
@@ -278,7 +278,7 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
 
 		if len(fields.Subresource) > MaxSubresourceNameLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), fields.Subresource, MaxSubresourceNameLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), "" /*unused*/, MaxSubresourceNameLength))
 		}
 	}
 	return allErrs
@@ -335,12 +335,12 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
 		}
 		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, maxReasonLen))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
 		}
 	}
 
 	if len(condition.Message) > maxMessageLen {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, maxMessageLen))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
 	}
 
 	return allErrs

@@ -11928,7 +11928,7 @@ func TestValidatePod(t *testing.T) {
 			),
 		},
 		"too long AppArmor localhost profile": {
-			expectedError: "Too long: may not be longer than 4095",
+			expectedError: "Too long: may not be more than 4095 bytes",
 			spec: *podtest.MakePod("123",
 				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
