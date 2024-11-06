@@ -120,7 +120,7 @@ func TestCreatePatchSet(t *testing.T) {
 		name             string
 		targetName       string
 		patchType        types.PatchType
-		expectedPatchSet *patchSet
+		expectedPatchSet *PatchSet
 		data             string
 	}{
 		{
@@ -129,7 +129,7 @@ func TestCreatePatchSet(t *testing.T) {
 			targetName: "etcd",
 			patchType:  types.StrategicMergePatchType,
 			data:       "foo: bar\n---\nfoo: baz\n",
-			expectedPatchSet: &patchSet{
+			expectedPatchSet: &PatchSet{
 				targetName: "etcd",
 				patchType:  types.StrategicMergePatchType,
 				patches:    []string{`{"foo":"bar"}`, `{"foo":"baz"}`},
@@ -140,7 +140,7 @@ func TestCreatePatchSet(t *testing.T) {
 			targetName: "etcd",
 			patchType:  types.StrategicMergePatchType,
 			data:       `{"foo":"bar"}` + "\n---\n" + `{"foo":"baz"}`,
-			expectedPatchSet: &patchSet{
+			expectedPatchSet: &PatchSet{
 				targetName: "etcd",
 				patchType:  types.StrategicMergePatchType,
 				patches:    []string{`{"foo":"bar"}`, `{"foo":"baz"}`},
@@ -151,7 +151,7 @@ func TestCreatePatchSet(t *testing.T) {
 			targetName: "etcd",
 			patchType:  types.StrategicMergePatchType,
 			data:       `{"foo":"bar"}` + "\n---\n     ---\n" + `{"foo":"baz"}`,
-			expectedPatchSet: &patchSet{
+			expectedPatchSet: &PatchSet{
 				targetName: "etcd",
 				patchType:  types.StrategicMergePatchType,
 				patches:    []string{`{"foo":"bar"}`, `{"foo":"baz"}`},
@@ -161,7 +161,7 @@ func TestCreatePatchSet(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ps, _ := createPatchSet(tc.targetName, tc.patchType, tc.data)
+			ps, _ := CreatePatchSet(tc.targetName, tc.patchType, tc.data)
 			if !reflect.DeepEqual(ps, tc.expectedPatchSet) {
 				t.Fatalf("expected patch set:\n%+v\ngot:\n%+v\n", tc.expectedPatchSet, ps)
 			}
@@ -189,7 +189,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 	tests := []struct {
 		name                 string
 		filesToWrite         []string
-		expectedPatchSets    []*patchSet
+		expectedPatchSets    []*PatchSet
 		expectedPatchFiles   []string
 		expectedIgnoredFiles []string
 		expectedError        bool
@@ -199,7 +199,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 			name:         "valid: patch files are sorted and non-patch files are ignored",
 			filesToWrite: []string{"kube-scheduler+merge.json", "kube-apiserver+json.yaml", "etcd.yaml", "foo", "bar.json"},
 			patchData:    patchData,
-			expectedPatchSets: []*patchSet{
+			expectedPatchSets: []*PatchSet{
 				{
 					targetName: "etcd",
 					patchType:  types.StrategicMergePatchType,
@@ -225,7 +225,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 			filesToWrite:         []string{"kube-scheduler.json"},
 			expectedPatchFiles:   []string{},
 			expectedIgnoredFiles: []string{"kube-scheduler.json"},
-			expectedPatchSets:    []*patchSet{},
+			expectedPatchSets:    []*PatchSet{},
 		},
 		{
 			name:          "invalid: bad patch type in filename returns and error",
