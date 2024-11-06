@@ -28,13 +28,23 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -46,8 +56,7 @@ func TestBeforeSynced(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
-	ctbInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewBetaInformerManager(tCtx, informerFactory, 256, 5*time.Minute)
 
 	_, err := ctbManager.GetTrustAnchorsByName("foo", false)
 	if err == nil {
@@ -55,38 +64,74 @@ func TestBeforeSynced(t *testing.T) {
 	}
 }
 
+type testClient[T clusterTrustBundle] interface {
+	Create(context.Context, *T, metav1.CreateOptions) (*T, error)
+	Delete(context.Context, string, metav1.DeleteOptions) error
+}
+
+// testingFunctionBundle is a API-version agnostic bundle of functions for handling CTBs in tests.
+type testingFunctionBundle[T clusterTrustBundle] struct {
+	ctbConstructor func(name, signerName string, labels map[string]string, bundle string) *T
+	ctbToObj       func(*T) runtime.Object
+	ctbTrustBundle func(*T) string
+
+	informerManagerConstructor func(ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration) (Manager, error)
+	informerGetter             func(informers.SharedInformerFactory) cache.SharedIndexInformer
+	clientGetter               func(kubernetes.Interface) testClient[T]
+}
+
+var alphaFunctionsBundle = testingFunctionBundle[certificatesv1alpha1.ClusterTrustBundle]{
+	ctbConstructor: mustMakeAlphaCTB,
+	ctbToObj:       func(ctb *certificatesv1alpha1.ClusterTrustBundle) runtime.Object { return ctb },
+	ctbTrustBundle: (&alphaClusterTrustBundleHandlers{}).GetTrustBundle,
+
+	informerManagerConstructor: NewAlphaInformerManager,
+	informerGetter: func(informerFactory informers.SharedInformerFactory) cache.SharedIndexInformer {
+		return informerFactory.Certificates().V1alpha1().ClusterTrustBundles().Informer()
+	},
+	clientGetter: func(c kubernetes.Interface) testClient[certificatesv1alpha1.ClusterTrustBundle] {
+		return c.CertificatesV1alpha1().ClusterTrustBundles()
+	},
+}
+
+var betaFunctionsBundle = testingFunctionBundle[certificatesv1beta1.ClusterTrustBundle]{
+	ctbConstructor: mustMakeBetaCTB,
+	ctbToObj:       func(ctb *certificatesv1beta1.ClusterTrustBundle) runtime.Object { return ctb },
+	ctbTrustBundle: (&betaClusterTrustBundleHandlers{}).GetTrustBundle,
+
+	informerManagerConstructor: NewBetaInformerManager,
+	informerGetter: func(informerFactory informers.SharedInformerFactory) cache.SharedIndexInformer {
+		return informerFactory.Certificates().V1beta1().ClusterTrustBundles().Informer()
+	},
+	clientGetter: func(c kubernetes.Interface) testClient[certificatesv1beta1.ClusterTrustBundle] {
+		return c.CertificatesV1beta1().ClusterTrustBundles()
+	},
+}
+
 func TestGetTrustAnchorsByName(t *testing.T) {
+	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsByName(t, alphaFunctionsBundle) })
+	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsByName(t, betaFunctionsBundle) })
+}
+
+func testGetTrustAnchorsByName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
 	defer cancel()
 
-	ctb1 := &certificatesv1beta1.ClusterTrustBundle{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "ctb1",
-		},
-		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
-			TrustBundle: mustMakeRoot(t, "root1"),
-		},
-	}
+	ctb1Bundle := mustMakeRoot(t, "root1")
+	ctb1 := b.ctbConstructor("ctb1", "", nil, ctb1Bundle)
+	ctb2Bundle := mustMakeRoot(t, "root2")
+	ctb2 := b.ctbConstructor("ctb2", "", nil, ctb2Bundle)
 
-	ctb2 := &certificatesv1beta1.ClusterTrustBundle{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "ctb2",
-		},
-		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
-			TrustBundle: mustMakeRoot(t, "root2"),
-		},
-	}
-
-	kc := fake.NewSimpleClientset(ctb1, ctb2)
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1), b.ctbToObj(ctb2))
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
-	ctbInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
 	}
 
@@ -95,7 +140,7 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 		t.Fatalf("Error while calling GetTrustAnchorsByName: %v", err)
 	}
 
-	if diff := diffBundles(gotBundle, []byte(ctb1.Spec.TrustBundle)); diff != "" {
+	if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb1))); diff != "" {
 		t.Fatalf("Got bad bundle; diff (-got +want)\n%s", diff)
 	}
 
@@ -104,7 +149,7 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 		t.Fatalf("Error while calling GetTrustAnchorsByName: %v", err)
 	}
 
-	if diff := diffBundles(gotBundle, []byte(ctb2.Spec.TrustBundle)); diff != "" {
+	if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb2))); diff != "" {
 		t.Fatalf("Got bad bundle; diff (-got +want)\n%s", diff)
 	}
 
@@ -120,37 +165,30 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 }
 
 func TestGetTrustAnchorsByNameCaching(t *testing.T) {
+	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsByNameCaching(t, alphaFunctionsBundle) })
+	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsByNameCaching(t, betaFunctionsBundle) })
+}
+
+func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
 	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 	defer cancel()
 
-	ctb1 := &certificatesv1beta1.ClusterTrustBundle{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
-			TrustBundle: mustMakeRoot(t, "root1"),
-		},
-	}
+	ctb1Bundle := mustMakeRoot(t, "root1")
+	ctb1 := b.ctbConstructor("foo", "", nil, ctb1Bundle)
 
-	ctb2 := &certificatesv1beta1.ClusterTrustBundle{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
-			TrustBundle: mustMakeRoot(t, "root2"),
-		},
-	}
+	ctb2Bundle := mustMakeRoot(t, "root2")
+	ctb2 := b.ctbConstructor("foo", "", nil, ctb2Bundle)
 
-	kc := fake.NewSimpleClientset(ctb1)
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1))
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
-	ctbInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
 	}
 
@@ -160,7 +198,7 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb1.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb1)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
@@ -173,17 +211,19 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb1.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb1)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	})
 
-	if err := kc.CertificatesV1beta1().ClusterTrustBundles().Delete(ctx, ctb1.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
+	client := b.clientGetter(kc)
+
+	if err := client.Delete(ctx, "foo", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error while deleting the old CTB: %v", err)
 	}
-	if _, err := kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, ctb2, metav1.CreateOptions{}); err != nil {
+	if _, err := client.Create(ctx, ctb2, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
@@ -198,8 +238,7 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb2.Spec.TrustBundle
-
+		wantBundle := b.ctbTrustBundle(ctb2)
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
@@ -207,25 +246,30 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 }
 
 func TestGetTrustAnchorsBySignerName(t *testing.T) {
+	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsBySignerName(t, alphaFunctionsBundle) })
+	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsBySignerName(t, betaFunctionsBundle) })
+}
+
+func testGetTrustAnchorsBySignerName[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	tCtx := ktesting.Init(t)
 	defer cancel()
 
-	ctb1 := mustMakeCTB("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
-	ctb2 := mustMakeCTB("signer-a-label-a-2", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "1"))
-	ctb2dup := mustMakeCTB("signer-a-label-2-dup", "foo.bar/a", map[string]string{"label": "a"}, ctb2.Spec.TrustBundle)
-	ctb3 := mustMakeCTB("signer-a-label-b-1", "foo.bar/a", map[string]string{"label": "b"}, mustMakeRoot(t, "2"))
-	ctb4 := mustMakeCTB("signer-b-label-a-1", "foo.bar/b", map[string]string{"label": "a"}, mustMakeRoot(t, "3"))
+	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
+	ctb2 := b.ctbConstructor("signer-a-label-a-2", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "1"))
+	ctb2dup := b.ctbConstructor("signer-a-label-2-dup", "foo.bar/a", map[string]string{"label": "a"}, b.ctbTrustBundle(ctb2))
+	ctb3 := b.ctbConstructor("signer-a-label-b-1", "foo.bar/a", map[string]string{"label": "b"}, mustMakeRoot(t, "2"))
+	ctb4 := b.ctbConstructor("signer-b-label-a-1", "foo.bar/b", map[string]string{"label": "a"}, mustMakeRoot(t, "3"))
 
-	kc := fake.NewSimpleClientset(ctb1, ctb2, ctb2dup, ctb3, ctb4)
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1), b.ctbToObj(ctb2), b.ctbToObj(ctb2dup), b.ctbToObj(ctb3), b.ctbToObj(ctb4))
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
-	ctbInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
 	}
 
@@ -251,7 +295,7 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb1.Spec.TrustBundle + ctb2.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb1) + b.ctbTrustBundle(ctb2)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
@@ -277,7 +321,7 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		if diff := diffBundles(gotBundle, []byte(ctb4.Spec.TrustBundle)); diff != "" {
+		if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb4))); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	})
@@ -288,7 +332,7 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		if diff := diffBundles(gotBundle, []byte(ctb3.Spec.TrustBundle)); diff != "" {
+		if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb3))); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	})
@@ -299,7 +343,7 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		if diff := diffBundles(gotBundle, []byte(ctb4.Spec.TrustBundle)); diff != "" {
+		if diff := diffBundles(gotBundle, []byte(b.ctbTrustBundle(ctb4))); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	})
@@ -324,22 +368,27 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 }
 
 func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
+	t.Run("v1alpha1", func(t *testing.T) { testGetTrustAnchorsBySignerNameCaching(t, alphaFunctionsBundle) })
+	t.Run("v1beta1", func(t *testing.T) { testGetTrustAnchorsBySignerNameCaching(t, betaFunctionsBundle) })
+}
+
+func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](t *testing.T, b testingFunctionBundle[T]) {
 	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 	defer cancel()
 
-	ctb1 := mustMakeCTB("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
-	ctb2 := mustMakeCTB("signer-a-label-a-2", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "1"))
+	ctb1 := b.ctbConstructor("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
+	ctb2 := b.ctbConstructor("signer-a-label-a-2", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "1"))
 
-	kc := fake.NewSimpleClientset(ctb1)
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1))
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
-	ctbInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
 	}
 
@@ -349,7 +398,7 @@ func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb1.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb1)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
@@ -362,17 +411,18 @@ func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb1.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb1)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	})
 
-	if err := kc.CertificatesV1beta1().ClusterTrustBundles().Delete(ctx, ctb1.ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
+	client := b.clientGetter(kc)
+	if err := client.Delete(ctx, "signer-a-label-a-1", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error while deleting the old CTB: %v", err)
 	}
-	if _, err := kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, ctb2, metav1.CreateOptions{}); err != nil {
+	if _, err := client.Create(ctx, ctb2, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Error while adding new CTB: %v", err)
 	}
 
@@ -387,7 +437,7 @@ func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 			t.Fatalf("Got error while calling GetTrustAnchorsBySigner: %v", err)
 		}
 
-		wantBundle := ctb2.Spec.TrustBundle
+		wantBundle := b.ctbTrustBundle(ctb2)
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
@@ -422,13 +472,26 @@ func mustMakeRoot(t *testing.T, cn string) string {
 	}))
 }
 
-func mustMakeCTB(name, signerName string, labels map[string]string, bundle string) *certificatesv1beta1.ClusterTrustBundle {
+func mustMakeBetaCTB(name, signerName string, labels map[string]string, bundle string) *certificatesv1beta1.ClusterTrustBundle {
 	return &certificatesv1beta1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
 		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+			SignerName:  signerName,
+			TrustBundle: bundle,
+		},
+	}
+}
+
+func mustMakeAlphaCTB(name, signerName string, labels map[string]string, bundle string) *certificatesv1alpha1.ClusterTrustBundle {
+	return &certificatesv1alpha1.ClusterTrustBundle{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
 			SignerName:  signerName,
 			TrustBundle: bundle,
 		},
@@ -477,4 +540,134 @@ func diffBundles(a, b []byte) string {
 	})
 
 	return cmp.Diff(aBlocks, bBlocks)
+}
+
+func TestLazyInformerManager_ensureManagerSet(t *testing.T) {
+	tests := []struct {
+		name             string
+		injectError      error
+		ctbsAvailableGVs []string
+		wantManager      string
+		wantError        bool
+	}{
+		{
+			name:        "API unavailable",
+			injectError: errors.NewNotFound(schema.GroupResource{Group: "certificates.k8s.io/v1beta1"}, ""),
+			wantManager: "noop",
+		},
+		{
+			name:        "err in discovery",
+			injectError: fmt.Errorf("unexpected discovery error"),
+			wantError:   true,
+			wantManager: "nil",
+		},
+		{
+			name:             "API available in v1alpha1",
+			ctbsAvailableGVs: []string{"v1alpha1"},
+			wantManager:      "v1alpha1",
+		},
+		{
+			name:             "API available in an unhandled version",
+			ctbsAvailableGVs: []string{"v1beta2"},
+			wantManager:      "noop",
+		},
+		{
+			name:             "API available in v1beta1",
+			ctbsAvailableGVs: []string{"v1beta1"},
+			wantManager:      "v1beta1",
+		},
+		{
+			name:             "API available in v1 - currently unhandled",
+			ctbsAvailableGVs: []string{"v1"},
+			wantManager:      "noop",
+		},
+		{
+			name:             "err in discovery but beta API shard discovered",
+			injectError:      fmt.Errorf("unexpected discovery error"),
+			ctbsAvailableGVs: []string{"v1beta1"},
+			wantManager:      "v1beta1",
+		},
+		{
+			name:             "API available in alpha and beta - prefer beta",
+			ctbsAvailableGVs: []string{"v1alpha1", "v1beta1"},
+			wantManager:      "v1beta1",
+		},
+		{
+			name:             "API available in multiple handled and unhandled versions - prefer the most-GA handled version",
+			ctbsAvailableGVs: []string{"v1alpha1", "v1", "v2", "v1beta1", "v1alpha2"},
+			wantManager:      "v1beta1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, loggerCtx := ktesting.NewTestContext(t)
+
+			fakeDisc := fakeDiscovery{
+				err:         tt.injectError,
+				gvResources: make(map[string]*metav1.APIResourceList),
+			}
+
+			for _, gv := range tt.ctbsAvailableGVs {
+				fakeDisc.gvResources["certificates.k8s.io/"+gv] = &metav1.APIResourceList{
+					APIResources: []metav1.APIResource{
+						{Name: "certificatesigningrequests"},
+						{Name: "clustertrustbundles"},
+					},
+				}
+			}
+
+			m := &LazyInformerManager{
+				managerLock:       sync.RWMutex{},
+				client:            NewFakeClientset(fakeDisc),
+				cacheSize:         128,
+				contextWithLogger: loggerCtx,
+				logger:            logger,
+			}
+			if err := m.ensureManagerSet(); tt.wantError != (err != nil) {
+				t.Errorf("expected error: %t, got %v", tt.wantError, err)
+			}
+
+			switch manager := m.manager.(type) {
+			case *InformerManager[certificatesv1alpha1.ClusterTrustBundle]:
+				require.Equal(t, tt.wantManager, "v1alpha1")
+			case *InformerManager[certificatesv1beta1.ClusterTrustBundle]:
+				require.Equal(t, tt.wantManager, "v1beta1")
+			case *NoopManager:
+				require.Equal(t, tt.wantManager, "noop")
+			case nil:
+				require.Equal(t, tt.wantManager, "nil")
+			default:
+				t.Fatalf("unknown manager type: %T", manager)
+			}
+		})
+	}
+}
+
+// fakeDiscovery inherits DiscoveryInterface(via FakeDiscovery) with some methods serving testing data.
+type fakeDiscovery struct {
+	fakediscovery.FakeDiscovery
+	gvResources map[string]*metav1.APIResourceList
+	err         error
+}
+
+func (d fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	return d.gvResources[groupVersion], d.err
+}
+
+type fakeDiscoveryClientSet struct {
+	*fake.Clientset
+	DiscoveryObj *fakeDiscovery
+}
+
+func (c *fakeDiscoveryClientSet) Discovery() discovery.DiscoveryInterface {
+	return c.DiscoveryObj
+}
+
+// Create a fake Clientset with its Discovery method overridden.
+func NewFakeClientset(fakeDiscovery fakeDiscovery) *fakeDiscoveryClientSet {
+	cs := &fakeDiscoveryClientSet{
+		Clientset:    fake.NewClientset(),
+		DiscoveryObj: &fakeDiscovery,
+	}
+	return cs
 }
