@@ -56,7 +56,7 @@ type Volume struct {
 // VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
-	// HostPath represents file or directory on the host machine that is
+	// hostPath represents file or directory on the host machine that is
 	// directly exposed to the container. This is generally used for system
 	// agents or other privileged things that are allowed to see the host
 	// machine. Most containers will NOT need this.
@@ -65,99 +65,123 @@ type VolumeSource struct {
 	// mount host directories as read/write.
 	// +optional
 	HostPath *HostPathVolumeSource
-	// EmptyDir represents a temporary directory that shares a pod's lifetime.
+	// emptyDir represents a temporary directory that shares a pod's lifetime.
 	// +optional
 	EmptyDir *EmptyDirVolumeSource
-	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
+	// gcePersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
+	// Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+	// gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
 	// +optional
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource
-	// AWSElasticBlockStore represents an AWS EBS disk that is attached to a
+	// awsElasticBlockStore represents an AWS EBS disk that is attached to a
 	// kubelet's host machine and then exposed to the pod.
+	// Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+	// awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource
-	// GitRepo represents a git repository at a particular revision.
-	// DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an
+	// gitRepo represents a git repository at a particular revision.
+	// Deprecated: GitRepo is deprecated. To provision a container with a git repo, mount an
 	// EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir
 	// into the Pod's container.
 	// +optional
 	GitRepo *GitRepoVolumeSource
-	// Secret represents a secret that should populate this volume.
+	// secret represents a secret that should populate this volume.
 	// +optional
 	Secret *SecretVolumeSource
-	// NFS represents an NFS mount on the host that shares a pod's lifetime
+	// nfs represents an NFS mount on the host that shares a pod's lifetime
 	// +optional
 	NFS *NFSVolumeSource
-	// ISCSIVolumeSource represents an ISCSI Disk resource that is attached to a
+	// iscsi represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
 	ISCSI *ISCSIVolumeSource
-	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
+	// glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
+	// Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
 	// +optional
 	Glusterfs *GlusterfsVolumeSource
-	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
+	// persistentVolumeClaim represents a reference to a PersistentVolumeClaim in the same namespace
 	// +optional
 	PersistentVolumeClaim *PersistentVolumeClaimVolumeSource
-	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	// rdb represents a Rados Block Device mount on the host that shares a pod's lifetime.
+	// Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
 	// +optional
 	RBD *RBDVolumeSource
 
-	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
 	// +optional
 	Quobyte *QuobyteVolumeSource
 
-	// FlexVolume represents a generic volume resource that is
+	// flexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin.
+	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
 	// +optional
 	FlexVolume *FlexVolumeSource
 
-	// Cinder represents a cinder volume attached and mounted on kubelet's host machine.
+	// cinder represents a cinder volume attached and mounted on kubelet's host machine.
+	// Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+	// are redirected to the cinder.csi.openstack.org CSI driver.
 	// +optional
 	Cinder *CinderVolumeSource
 
-	// CephFS represents a Cephfs mount on the host that shares a pod's lifetime
+	// cephFS represents a Cephfs mount on the host that shares a pod's lifetime.
+	// Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
 	// +optional
 	CephFS *CephFSVolumeSource
 
-	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+	// flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running.
+	// Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
 	// +optional
 	Flocker *FlockerVolumeSource
 
-	// DownwardAPI represents metadata about the pod that should populate this volume
+	// downwardAPI represents metadata about the pod that should populate this volume
 	// +optional
 	DownwardAPI *DownwardAPIVolumeSource
-	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
+	// fc represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource
-	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	// azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	// Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+	// are redirected to the file.csi.azure.com CSI driver.
 	// +optional
 	AzureFile *AzureFileVolumeSource
 	// ConfigMap represents a configMap that should populate this volume
 	// +optional
 	ConfigMap *ConfigMapVolumeSource
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelet's host machine
+	// vsphereVolume represents a vSphere volume attached and mounted on kubelet's host machine.
+	// Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+	// are redirected to the csi.vsphere.vmware.com CSI driver.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
-	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	// azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	// Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+	// are redirected to the disk.csi.azure.com CSI driver.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelet's host machine
+	// photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+	// Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// Items for all in one resources secrets, configmaps, and downward API
 	Projected *ProjectedVolumeSource
-	// PortworxVolume represents a portworx volume attached and mounted on kubelet's host machine
+	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
+	// is on.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
-	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
 	// +optional
 	ScaleIO *ScaleIOVolumeSource
-	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
+	// Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
 	// +optional
 	StorageOS *StorageOSVolumeSource
-	// CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers.
+	// csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers.
 	// +optional
 	CSI *CSIVolumeSource
-	// Ephemeral represents a volume that is handled by a cluster storage driver.
+	// ephemeral represents a volume that is handled by a cluster storage driver.
 	// The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
 	// and deleted when the pod is removed.
 	//
@@ -184,7 +208,7 @@ type VolumeSource struct {
 	//
 	// +optional
 	Ephemeral *EphemeralVolumeSource
-	// Image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
 	// The volume is resolved at pod startup depending on which PullPolicy value is provided:
 	//
 	// - Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
@@ -206,77 +230,101 @@ type VolumeSource struct {
 // PersistentVolumeSource is similar to VolumeSource but meant for the administrator who creates PVs.
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
-	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// gcePersistentDisk represents a GCE Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
+	// Deprecated: GCEPersistentDisk is deprecated. All operations for the in-tree
+	// gcePersistentDisk type are redirected to the pd.csi.storage.gke.io CSI driver.
 	// +optional
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource
-	// AWSElasticBlockStore represents an AWS EBS disk that is attached to a
+	// awsElasticBlockStore represents an AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
+	// Deprecated: AWSElasticBlockStore is deprecated. All operations for the in-tree
+	// awsElasticBlockStore type are redirected to the ebs.csi.aws.com CSI driver.
 	// +optional
 	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource
-	// HostPath represents a directory on the host.
+	// hostPath represents a directory on the host.
 	// Provisioned by a developer or tester.
 	// This is useful for single-node development and testing only!
 	// On-host storage is not supported in any way and WILL NOT WORK in a multi-node cluster.
 	// +optional
 	HostPath *HostPathVolumeSource
-	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
+	// glusterfs represents a Glusterfs volume that is attached to a host and
+	// exposed to the pod. Provisioned by an admin.
+	// Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
 	// +optional
 	Glusterfs *GlusterfsPersistentVolumeSource
-	// NFS represents an NFS mount on the host that shares a pod's lifetime
+	// nfs represents an NFS mount on the host that shares a pod's lifetime
 	// +optional
 	NFS *NFSVolumeSource
-	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	// rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
+	// Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
 	// +optional
 	RBD *RBDPersistentVolumeSource
-	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	// quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
+	// Deprecated: Quobyte is deprecated and the in-tree quobyte type is no longer supported.
 	// +optional
 	Quobyte *QuobyteVolumeSource
-	// ISCSIPersistentVolumeSource represents an ISCSI resource that is attached to a
+	// iscsi represents an ISCSI resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
 	ISCSI *ISCSIPersistentVolumeSource
-	// FlexVolume represents a generic volume resource that is
+	// flexVolume represents a generic volume resource that is
 	// provisioned/attached using an exec based plugin.
+	// Deprecated: FlexVolume is deprecated. Consider using a CSIDriver instead.
 	// +optional
 	FlexVolume *FlexPersistentVolumeSource
-	// Cinder represents a cinder volume attached and mounted on kubelet's host machine.
+	// cinder represents a cinder volume attached and mounted on kubelets host machine.
+	// Deprecated: Cinder is deprecated. All operations for the in-tree cinder type
+	// are redirected to the cinder.csi.openstack.org CSI driver.
 	// +optional
 	Cinder *CinderPersistentVolumeSource
-	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+	// cephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
+	// Deprecated: CephFS is deprecated and the in-tree cephfs type is no longer supported.
 	// +optional
 	CephFS *CephFSPersistentVolumeSource
-	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
+	// fc represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource
-	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+	// flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running.
+	// Deprecated: Flocker is deprecated and the in-tree flocker type is no longer supported.
 	// +optional
 	Flocker *FlockerVolumeSource
-	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	// azureFile represents an Azure File Service mount on the host and bind mount to the pod.
+	// Deprecated: AzureFile is deprecated. All operations for the in-tree azureFile type
+	// are redirected to the file.csi.azure.com CSI driver.
 	// +optional
 	AzureFile *AzureFilePersistentVolumeSource
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelet's host machine
+	// vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
+	// Deprecated: VsphereVolume is deprecated. All operations for the in-tree vsphereVolume type
+	// are redirected to the csi.vsphere.vmware.com CSI driver.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
-	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	// azureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	// Deprecated: AzureDisk is deprecated. All operations for the in-tree azureDisk type
+	// are redirected to the disk.csi.azure.com CSI driver.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelet's host machine
+	// photonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+	// Deprecated: PhotonPersistentDisk is deprecated and the in-tree photonPersistentDisk type is no longer supported.
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
-	// PortworxVolume represents a portworx volume attached and mounted on kubelet's host machine
+	// portworxVolume represents a portworx volume attached and mounted on kubelets host machine.
+	// Deprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type
+	// are redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate
+	// is on.
 	// +optional
 	PortworxVolume *PortworxVolumeSource
-	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
+	// Deprecated: ScaleIO is deprecated and the in-tree scaleIO type is no longer supported.
 	// +optional
 	ScaleIO *ScaleIOPersistentVolumeSource
-	// Local represents directly-attached storage with node affinity
+	// local represents directly-attached storage with node affinity
 	// +optional
 	Local *LocalVolumeSource
-	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
-	// More info: https://examples.k8s.io/volumes/storageos/README.md
+	// storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
+	// Deprecated: StorageOS is deprecated and the in-tree storageos type is no longer supported.
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
-	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver.
+	// csi represents storage that is handled by an external CSI driver.
 	// +optional
 	CSI *CSIPersistentVolumeSource
 }
@@ -1857,7 +1905,7 @@ type KeyToPath struct {
 	Mode *int32
 }
 
-// LocalVolumeSource represents directly-attached storage with node affinity (Beta feature)
+// LocalVolumeSource represents directly-attached storage with node affinity
 type LocalVolumeSource struct {
 	// The full path to the volume on the node.
 	// It can be either a directory or block device (disk, partition, ...).
