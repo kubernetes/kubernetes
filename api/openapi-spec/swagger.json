@@ -24950,7 +24950,8 @@
           "application/json-patch+json",
           "application/merge-patch+json",
           "application/strategic-merge-patch+json",
-          "application/apply-patch+yaml"
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
         ],
         "description": "partially update resize of the specified Pod",
         "operationId": "patchCoreV1NamespacedPodResize",
