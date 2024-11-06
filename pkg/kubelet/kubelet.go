@@ -114,7 +114,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -1829,7 +1828,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
-		pod, err = kl.handlePodResourcesResize(pod)
+		pod, err = kl.handlePodResourcesResize(pod, podStatus)
 		if err != nil {
 			return false, err
 		}
@@ -2794,23 +2793,28 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
 	return true, v1.PodResizeStatusInProgress
 }
 
-func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
+// handlePodResourcesResize returns the "allocated pod", which should be used for all resource
+// calculations after this function is called. It also updates the cached ResizeStatus according to
+// the allocation decision and pod status.
+func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error) {
 	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
 	if !updated {
-		// Unless a resize is in-progress, clear the resize status.
-		resizeStatus, _ := kl.statusManager.GetPodResizeStatus(string(pod.UID))
-		if resizeStatus != v1.PodResizeStatusInProgress {
-			if err := kl.statusManager.SetPodResizeStatus(pod.UID, ""); err != nil {
-				klog.ErrorS(err, "Failed to clear resize status", "pod", format.Pod(pod))
-			}
+		// Desired resources == allocated resources. Check whether a resize is in progress.
+		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
+		if resizeInProgress {
+			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
+			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
+		} else {
+			// (Desired == Allocated == Actual) => clear the resize status.
+			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
-
-		// Pod is not resizing, nothing more to do here.
+		// Pod allocation does not need to be updated.
 		return allocatedPod, nil
 	}
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
+	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
 	fit, resizeStatus := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
@@ -2820,11 +2824,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) (*v1.Pod, error) {
 		allocatedPod = pod
 	}
 	if resizeStatus != "" {
-		// Save resize decision to checkpoint
-		if err := kl.statusManager.SetPodResizeStatus(allocatedPod.UID, resizeStatus); err != nil {
-			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			klog.ErrorS(err, "SetPodResizeStatus failed", "pod", klog.KObj(allocatedPod))
-		}
+		kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus)
 	}
 	return allocatedPod, nil
 }

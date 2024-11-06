@@ -146,7 +146,6 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 				},
 			},
 		},
-		ResizeStatusEntries: map[string]v1.PodResizeStatus{},
 	}
 	checkpoint := &Checkpoint{}
 	err := checkpoint.UnmarshalCheckpoint([]byte(checkpointContent))
@@ -160,7 +159,6 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 
 	actualPodResourceAllocationInfo := &PodResourceAllocationInfo{}
 	actualPodResourceAllocationInfo.AllocationEntries = sc.cache.GetPodResourceAllocation()
-	actualPodResourceAllocationInfo.ResizeStatusEntries = sc.cache.GetResizeStatus()
 	require.NoError(t, err, "failed to get pod resource allocation info")
 	require.Equal(t, expectedPodResourceAllocationInfo, actualPodResourceAllocationInfo, "pod resource allocation info is not equal")
 }
