@@ -210,7 +210,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		if kc.CrashLoopBackOff.MaximumBackOffPeriod == nil {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaximumBackOffPeriod must be set"))
 		}
-		if kc.CrashLoopBackOff.MaximumBackOffPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaximumBackOffPeriod.Duration.Seconds()), 1, 300) != nil {
+		if kc.CrashLoopBackOff.MaximumBackOffPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaximumBackOffPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaximumBackOffPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaximumBackOffPeriod.Seconds()))
 		}
 	} else if kc.CrashLoopBackOff.MaximumBackOffPeriod != nil {
