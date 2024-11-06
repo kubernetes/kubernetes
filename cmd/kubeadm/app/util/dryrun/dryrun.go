@@ -90,7 +90,7 @@ func NewWaiter() apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error {
 	return nil
 }
 

@@ -37,34 +37,34 @@ func TestGetControlPlaneComponents(t *testing.T) {
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: []kubeadmapi.Arg{
 							{Name: "secure-port", Value: "1111"},
-							{Name: "bind-address", Value: "0.0.0.0"},
+							{Name: "advertise-address", Value: "fd00:1::"},
 						},
 					},
 				},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: []kubeadmapi.Arg{
 						{Name: "secure-port", Value: "2222"},
-						{Name: "bind-address", Value: "0.0.0.0"},
+						{Name: "bind-address", Value: "127.0.0.1"},
 					},
 				},
 				Scheduler: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: []kubeadmapi.Arg{
 						{Name: "secure-port", Value: "3333"},
-						{Name: "bind-address", Value: "0.0.0.0"},
+						{Name: "bind-address", Value: "127.0.0.1"},
 					},
 				},
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: fmt.Sprintf("https://0.0.0.0:1111/%s", endpointLivez)},
-				{name: "kube-controller-manager", url: fmt.Sprintf("https://0.0.0.0:2222/%s", endpointHealthz)},
-				{name: "kube-scheduler", url: fmt.Sprintf("https://0.0.0.0:3333/%s", endpointLivez)},
+				{name: "kube-apiserver", url: fmt.Sprintf("https://[fd00:1::]:1111/%s", endpointLivez)},
+				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:2222/%s", endpointHealthz)},
+				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:3333/%s", endpointLivez)},
 			},
 		},
 		{
 			name: "default ports and addresses",
 			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: fmt.Sprintf("https://127.0.0.1:6443/%s", endpointLivez)},
+				{name: "kube-apiserver", url: fmt.Sprintf("https://192.168.0.1:6443/%s", endpointLivez)},
 				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:10257/%s", endpointHealthz)},
 				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:10259/%s", endpointLivez)},
 			},
@@ -73,7 +73,7 @@ func TestGetControlPlaneComponents(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := getControlPlaneComponents(tc.cfg)
+			actual := getControlPlaneComponents(tc.cfg, "192.168.0.1")
 			if !reflect.DeepEqual(tc.expected, actual) {
 				t.Fatalf("expected result: %+v, got: %+v", tc.expected, actual)
 			}
