@@ -25092,91 +25092,120 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		test string
-		old  *core.Pod
-		new  *core.Pod
-		err  string
+		test                            string
+		old                             *core.Pod
+		new                             *core.Pod
+		enableInPlacePodVerticalScaling bool
+		err                             string
 	}{
 		{
-			test: "cpu limit change",
-			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", "")),
-			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err:  "",
+			test:                            "cpu limit change",
+			old:                             mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "memory limit change",
-			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
-			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
-			err:  "",
+			test:                            "memory limit change",
+			old:                             mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "storage limit change",
-			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", "")),
-			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", "")),
-			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+			test:                            "memory limit change without feature gate enabled",
+			old:                             mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			enableInPlacePodVerticalScaling: false,
+			err:                             "spec: Forbidden: Pod running on node without InPlacePodVerticalScaling feature gate enabled may not be updated",
 		}, {
-			test: "cpu request change",
-			old:  mkPod(getResources("200m", "0", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "0", "", ""), core.ResourceList{}),
-			err:  "",
+			test:                            "CPU limit change without feature gate enabled",
+			old:                             mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			enableInPlacePodVerticalScaling: false,
+			err:                             "spec: Forbidden: Pod running on node without InPlacePodVerticalScaling feature gate enabled may not be updated",
 		}, {
-			test: "memory request change",
-			old:  mkPod(getResources("0", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("0", "200Mi", "", ""), core.ResourceList{}),
-			err:  "",
+			test:                            "storage limit change",
+			old:                             mkPod(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "spec: Forbidden: only cpu and memory resources are mutable",
 		}, {
-			test: "storage request change",
-			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}),
-			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+			test:                            "cpu request change",
+			old:                             mkPod(getResources("200m", "0", "", ""), core.ResourceList{}),
+			new:                             mkPod(getResources("100m", "0", "", ""), core.ResourceList{}),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS unchanged, guaranteed -> guaranteed",
-			old:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("100m", "100Mi", "1Gi", "")),
-			new:  mkPod(getResources("200m", "400Mi", "1Gi", ""), getResources("200m", "400Mi", "1Gi", "")),
-			err:  "",
+			test:                            "memory request change",
+			old:                             mkPod(getResources("0", "100Mi", "", ""), core.ResourceList{}),
+			new:                             mkPod(getResources("0", "200Mi", "", ""), core.ResourceList{}),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable",
-			old:  mkPod(getResources("200m", "200Mi", "1Gi", ""), getResources("400m", "400Mi", "2Gi", "")),
-			new:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("200m", "200Mi", "2Gi", "")),
-			err:  "",
+			test:                            "storage request change",
+			old:                             mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}),
+			new:                             mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "spec: Forbidden: only cpu and memory resources are mutable",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, add limits",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			err:  "",
+			test:                            "Pod QoS unchanged, guaranteed -> guaranteed",
+			old:                             mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("100m", "100Mi", "1Gi", "")),
+			new:                             mkPod(getResources("200m", "400Mi", "1Gi", ""), getResources("200m", "400Mi", "1Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			err:  "",
+			test:                            "Pod QoS unchanged, burstable -> burstable",
+			old:                             mkPod(getResources("200m", "200Mi", "1Gi", ""), getResources("400m", "400Mi", "2Gi", "")),
+			new:                             mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("200m", "200Mi", "2Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, add requests",
-			old:  mkPod(core.ResourceList{}, getResources("200m", "500Mi", "1Gi", "")),
-			new:  mkPod(getResources("300m", "", "", ""), getResources("400m", "", "1Gi", "")),
-			err:  "",
+			test:                            "Pod QoS unchanged, burstable -> burstable, add limits",
+			old:                             mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
-			old:  mkPod(getResources("100m", "200Mi", "", ""), getResources("200m", "300Mi", "2Gi", "")),
-			new:  mkPod(core.ResourceList{}, getResources("400m", "500Mi", "2Gi", "")),
-			err:  "",
+			test:                            "Pod QoS unchanged, burstable -> burstable, remove limits",
+			old:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			new:                             mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS change, guaranteed -> burstable",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			err:  "Pod QOS Class may not change as a result of resizing",
+			test:                            "Pod QoS unchanged, burstable -> burstable, add requests",
+			old:                             mkPod(core.ResourceList{}, getResources("200m", "500Mi", "1Gi", "")),
+			new:                             mkPod(getResources("300m", "", "", ""), getResources("400m", "", "1Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS change, burstable -> guaranteed",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
-			err:  "Pod QOS Class may not change as a result of resizing",
+			test:                            "Pod QoS unchanged, burstable -> burstable, remove requests",
+			old:                             mkPod(getResources("100m", "200Mi", "", ""), getResources("200m", "300Mi", "2Gi", "")),
+			new:                             mkPod(core.ResourceList{}, getResources("400m", "500Mi", "2Gi", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "",
 		}, {
-			test: "Pod QoS change, besteffort -> burstable",
-			old:  mkPod(core.ResourceList{}, core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			err:  "Pod QOS Class may not change as a result of resizing",
+			test:                            "Pod QoS change, guaranteed -> burstable",
+			old:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
+			new:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "Pod QOS Class may not change as a result of resizing",
 		}, {
-			test: "Pod QoS change, burstable -> besteffort",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			new:  mkPod(core.ResourceList{}, core.ResourceList{}),
-			err:  "Pod QOS Class may not change as a result of resizing",
+			test:                            "Pod QoS change, burstable -> guaranteed",
+			old:                             mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test:                            "Pod QoS change, besteffort -> burstable",
+			old:                             mkPod(core.ResourceList{}, core.ResourceList{}),
+			new:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test:                            "Pod QoS change, burstable -> besteffort",
+			old:                             mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			new:                             mkPod(core.ResourceList{}, core.ResourceList{}),
+			enableInPlacePodVerticalScaling: true,
+			err:                             "Pod QOS Class may not change as a result of resizing",
 		}, {
 			test: "windows pod, no resource change",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
@@ -25191,6 +25220,8 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, test.enableInPlacePodVerticalScaling)
+
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
 
