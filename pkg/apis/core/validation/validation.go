@@ -5606,7 +5606,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Part 2: Validate that the changes between oldPod.Spec.Containers[].Resources and
-	// newPod.Spec.Containers[].Resources are allowed.
+	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
+	// newPod.Spec.InitContainers[].Resources are allowed.
 	specPath := field.NewPath("spec")
 	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
@@ -5639,30 +5640,10 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		}
 	}
 
-	// Ensure that only CPU and memory resources are mutable.
+	// Ensure that only CPU and memory resources are mutable for regular containers.
 	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
 	for ix, container := range originalCPUMemPodSpec.Containers {
-		dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-			if oldResourceList == nil {
-				return nil
-			}
-			var mungedResourceList core.ResourceList
-			if resourceList == nil {
-				mungedResourceList = make(core.ResourceList)
-			} else {
-				mungedResourceList = resourceList.DeepCopy()
-			}
-			delete(mungedResourceList, core.ResourceCPU)
-			delete(mungedResourceList, core.ResourceMemory)
-			if cpu, found := oldResourceList[core.ResourceCPU]; found {
-				mungedResourceList[core.ResourceCPU] = cpu
-			}
-			if mem, found := oldResourceList[core.ResourceMemory]; found {
-				mungedResourceList[core.ResourceMemory] = mem
-			}
-			return mungedResourceList
-		}
 		lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
 		req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
 		container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
@@ -5670,6 +5651,22 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		newContainers = append(newContainers, container)
 	}
 	originalCPUMemPodSpec.Containers = newContainers
+
+	// Ensure that only CPU and memory resources are mutable for restartable init containers.
+	var newInitContainers []core.Container
+	for ix, container := range originalCPUMemPodSpec.InitContainers {
+		if container.RestartPolicy != nil && *container.RestartPolicy == core.ContainerRestartPolicyAlways {
+			lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
+			req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
+			container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+			container.ResizePolicy = oldPod.Spec.InitContainers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
+			newInitContainers = append(newInitContainers, container)
+		}
+	}
+	if len(newInitContainers) > 0 {
+		originalCPUMemPodSpec.InitContainers = newInitContainers
+	}
+
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
 		// This likely means that the user has made changes to resources other than CPU and Memory.
 		specDiff := cmp.Diff(oldPod.Spec, originalCPUMemPodSpec)
@@ -5677,6 +5674,27 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
+}
+
+func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+	if oldResourceList == nil {
+		return nil
+	}
+	var mungedResourceList core.ResourceList
+	if resourceList == nil {
+		mungedResourceList = make(core.ResourceList)
+	} else {
+		mungedResourceList = resourceList.DeepCopy()
+	}
+	delete(mungedResourceList, core.ResourceCPU)
+	delete(mungedResourceList, core.ResourceMemory)
+	if cpu, found := oldResourceList[core.ResourceCPU]; found {
+		mungedResourceList[core.ResourceCPU] = cpu
+	}
+	if mem, found := oldResourceList[core.ResourceMemory]; found {
+		mungedResourceList[core.ResourceMemory] = mem
+	}
+	return mungedResourceList
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
