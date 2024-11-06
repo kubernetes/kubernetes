@@ -419,13 +419,16 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 		if newObj != nil {
 			if pod, ok := newObj.(*v1.Pod); !ok || pod.UID != pInfo.Pod.UID {
 				// This wildcard event is not for this Pod.
+				if ok {
+					logger.V(6).Info("Not worth requeuing because the event is wildcard, but for another pod", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "newObj", klog.KObj(pod))
+				}
 				return queueSkip
 			}
 		}
 
 		// If the wildcard event is special one as someone wants to force all Pods to move to activeQ/backoffQ.
 		// We return queueAfterBackoff in this case, while resetting all blocked plugins.
-		logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod))
+		logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod), "event", event.Label())
 		return queueAfterBackoff
 	}
 
