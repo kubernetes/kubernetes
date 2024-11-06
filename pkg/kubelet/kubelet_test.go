@@ -3470,31 +3470,63 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name: "c1",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
-					},
-				},
-			}, {
-				Name: "c2",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+						},
 					},
 				},
-			}},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+						},
+					},
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name: "c3-restartable-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name: "c4-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+				},
+			},
 		},
 	}
 	steadyStateC1Status := &kubecontainer.Status{
@@ -3542,6 +3574,43 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			MemoryLimit: resource.NewQuantity(800, resource.DecimalSI),
 		},
 	}
+	steadyStateC3Status := &kubecontainer.Status{
+		Name:  "c3-restartable-init",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(200, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(400, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(500, resource.DecimalSI),
+		},
+	}
+	resizeCPUReqC3Status := &kubecontainer.Status{
+		Name:  "c3-restartable-init",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(300, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(400, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(500, resource.DecimalSI),
+		},
+	}
+	resizeMemLimitC3Status := &kubecontainer.Status{
+		Name:  "c3-restartable-init",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(200, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(400, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(800, resource.DecimalSI),
+		},
+	}
+	resizeCPUReqC4Status := &kubecontainer.Status{
+		Name:  "c4-init",
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  resource.NewMilliQuantity(300, resource.DecimalSI),
+			CPULimit:    resource.NewMilliQuantity(400, resource.DecimalSI),
+			MemoryLimit: resource.NewQuantity(500, resource.DecimalSI),
+		},
+	}
+
 	mkPodStatus := func(containerStatuses ...*kubecontainer.Status) *kubecontainer.PodStatus {
 		return &kubecontainer.PodStatus{
 			ID:                pod.UID,
@@ -3556,7 +3625,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		expectResize bool
 	}{{
 		name:         "steady state",
-		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status),
+		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, steadyStateC3Status),
 		expectResize: false,
 	}, {
 		name: "terminated container",
@@ -3582,10 +3651,27 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		name:         "resizing cpu limit",
 		status:       mkPodStatus(resizeCPULimitC1Status, steadyStateC2Status),
 		expectResize: true,
-	}}
+	},
+		{
+			name:         "resizing cpu request for restartable init container",
+			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeCPUReqC3Status),
+			expectResize: true,
+		},
+		{
+			name:         "resizing memory limit for restartable init container",
+			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeMemLimitC3Status),
+			expectResize: true,
+		},
+		{
+			name:         "non-restartable init container should be ignored",
+			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, steadyStateC3Status, resizeCPUReqC4Status),
+			expectResize: false,
+		},
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			assert.Equal(t, test.expectResize, isPodResizeInProgress(pod, test.status))
 		})
 	}

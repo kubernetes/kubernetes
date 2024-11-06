@@ -1289,18 +1289,34 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 		return
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
+		return
+	}
+
 	for i, c := range newPod.Spec.Containers {
 		if c.Name != oldPod.Spec.Containers[i].Name {
 			return // Update is invalid (container mismatch): let validation handle it.
 		}
-		if c.Resources.Requests == nil {
-			continue
-		}
-		if cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
+		if c.Resources.Requests == nil || cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
 			continue
 		}
 		newPod.Status.Resize = api.PodResizeStatusProposed
 		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for i, c := range newPod.Spec.InitContainers {
+			if IsRestartableInitContainer(&c) {
+				if c.Name != oldPod.Spec.InitContainers[i].Name {
+					return // Update is invalid (container mismatch): let validation handle it.
+				}
+				if c.Resources.Requests == nil || cmp.Equal(oldPod.Spec.InitContainers[i].Resources, c.Resources) {
+					continue
+				}
+				newPod.Status.Resize = api.PodResizeStatusProposed
+				break
+			}
+		}
 	}
 }
 

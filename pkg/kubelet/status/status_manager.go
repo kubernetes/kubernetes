@@ -282,6 +282,24 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 			}
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for i, c := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&c) {
+				if cAlloc, ok := allocated[c.Name]; ok {
+					if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
+						// Allocation differs from pod spec, update
+						if !updated {
+							// If this is the first update, copy the pod
+							pod = pod.DeepCopy()
+							updated = true
+						}
+						pod.Spec.InitContainers[i].Resources = cAlloc
+					}
+				}
+			}
+		}
+	}
 	return pod, updated
 }
 
@@ -296,12 +314,25 @@ func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
 func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
+
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()
 		if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
 			return err
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, container := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&container) {
+				alloc := *container.Resources.DeepCopy()
+				if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

@@ -5289,6 +5289,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	for ix, container := range mungedPodSpec.Containers {
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		newContainers = append(newContainers, container)
+
 	}
 	mungedPodSpec.Containers = newContainers
 	// munge spec.initContainers[*].image
