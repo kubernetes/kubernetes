@@ -77,7 +77,7 @@ func newCadvisorStatsProvider(
 }
 
 // ListPodStats returns the stats of all the pod-managed containers.
-func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodStats, error) {
+func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	// Gets node root filesystem information and image filesystem stats, which
 	// will be used to populate the available and capacity bytes/inodes in
 	// container stats.
@@ -85,7 +85,7 @@ func (p *cadvisorStatsProvider) ListPodStats(_ context.Context) ([]statsapi.PodS
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
-	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
+	imageFsInfo, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
@@ -241,7 +241,7 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(_ context.Context) ([]s
 
 // ImageFsStats returns the stats of the filesystem for storing images.
 func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *statsapi.FsStats, containerFsRet *statsapi.FsStats, errCall error) {
-	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
+	imageFsInfo, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
@@ -308,7 +308,7 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return fsStats, fsStats, nil
 	}
 
-	containerFsInfo, err := p.cadvisor.ContainerFsInfo()
+	containerFsInfo, err := p.cadvisor.ContainerFsInfo(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get container fs info: %w", err)
 	}
@@ -344,8 +344,8 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 
 // ImageFsDevice returns name of the device where the image filesystem locates,
 // e.g. /dev/sda1.
-func (p *cadvisorStatsProvider) ImageFsDevice(_ context.Context) (string, error) {
-	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
+func (p *cadvisorStatsProvider) ImageFsDevice(ctx context.Context) (string, error) {
+	imageFsInfo, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
 		return "", err
 	}

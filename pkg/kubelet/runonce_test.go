@@ -59,7 +59,7 @@ func TestRunOnce(t *testing.T) {
 
 	cadvisor := cadvisortest.NewMockInterface(t)
 	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
-	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
+	cadvisor.EXPECT().ImagesFsInfo(ctx).Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,
