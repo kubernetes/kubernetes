@@ -10301,11 +10301,6 @@ func TestValidatePodSpec(t *testing.T) {
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			}),
 		),
-		"disallowed resources resize policy for init containers": *podtest.MakePod("",
-			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerResizePolicy(
-				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-			))),
-		),
 	}
 	for k, v := range failureCases {
 		opts := PodValidationOptions{

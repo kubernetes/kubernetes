@@ -166,6 +166,7 @@ func SetDefaults_Service(obj *v1.Service) {
 	}
 
 }
+
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
 	// This is done here rather than a more specific defaulting pass on v1.ResourceRequirements
@@ -182,6 +183,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
+			(obj.Spec.Containers[i].Resources.Requests != nil || obj.Spec.Containers[i].Resources.Limits != nil) {
+			// For normal containers, set resize restart policy to default value (NotRequired), if not specified..
+			setDefaultResizePolicy(&obj.Spec.Containers[i])
+		}
 	}
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {
@@ -192,6 +198,17 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				if _, exists := obj.Spec.InitContainers[i].Resources.Requests[key]; !exists {
 					obj.Spec.InitContainers[i].Resources.Requests[key] = value.DeepCopy()
 				}
+			}
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+			isRestartableInitContainer := false
+			c := obj.Spec.InitContainers[i]
+			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+				isRestartableInitContainer = true
+			}
+			if isRestartableInitContainer && (c.Resources.Requests != nil || c.Resources.Limits != nil) {
+				// For restartable init containers, set resize restart policy to default value (NotRequired), if not specified.
+				setDefaultResizePolicy(&obj.Spec.InitContainers[i])
 			}
 		}
 	}
@@ -212,6 +229,30 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultHostNetworkPorts(&obj.Spec.InitContainers)
 	}
 }
+
+// setDefaultResizePolicy set resize restart policy to default value (NotRequired), if not specified.
+func setDefaultResizePolicy(obj *v1.Container) {
+	resizePolicySpecified := make(map[v1.ResourceName]bool)
+	for _, p := range obj.ResizePolicy {
+		resizePolicySpecified[p.ResourceName] = true
+	}
+	defaultResizePolicy := func(resourceName v1.ResourceName) {
+		if _, found := resizePolicySpecified[resourceName]; !found {
+			obj.ResizePolicy = append(obj.ResizePolicy,
+				v1.ContainerResizePolicy{
+					ResourceName:  resourceName,
+					RestartPolicy: v1.NotRequired,
+				})
+		}
+	}
+	if _, exists := obj.Resources.Requests[v1.ResourceCPU]; exists {
+		defaultResizePolicy(v1.ResourceCPU)
+	}
+	if _, exists := obj.Resources.Requests[v1.ResourceMemory]; exists {
+		defaultResizePolicy(v1.ResourceMemory)
+	}
+}
+
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445

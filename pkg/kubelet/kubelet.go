@@ -2813,23 +2813,40 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 }
 
 func isPodResizeInProgress(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, c := range pod.Spec.Containers {
-		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
-			if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
-				continue
-			}
-			if c.Resources.Requests != nil {
-				if cs.Resources.CPURequest != nil && !cs.Resources.CPURequest.Equal(*c.Resources.Requests.Cpu()) {
+	for i := range pod.Spec.Containers {
+		if containerResourcesChanged(&pod.Spec.Containers[i], podStatus) {
+			return true
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for i, c := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&c) {
+				if containerResourcesChanged(&pod.Spec.InitContainers[i], podStatus) {
 					return true
 				}
 			}
-			if c.Resources.Limits != nil {
-				if cs.Resources.CPULimit != nil && !cs.Resources.CPULimit.Equal(*c.Resources.Limits.Cpu()) {
-					return true
-				}
-				if cs.Resources.MemoryLimit != nil && !cs.Resources.MemoryLimit.Equal(*c.Resources.Limits.Memory()) {
-					return true
-				}
+		}
+	}
+	return false
+}
+
+func containerResourcesChanged(c *v1.Container, podStatus *kubecontainer.PodStatus) bool {
+	if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
+		if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
+			return false
+		}
+		if c.Resources.Requests != nil {
+			if cs.Resources.CPURequest != nil && !cs.Resources.CPURequest.Equal(*c.Resources.Requests.Cpu()) {
+				return true
+			}
+		}
+		if c.Resources.Limits != nil {
+			if cs.Resources.CPULimit != nil && !cs.Resources.CPULimit.Equal(*c.Resources.Limits.Cpu()) {
+				return true
+			}
+			if cs.Resources.MemoryLimit != nil && !cs.Resources.MemoryLimit.Equal(*c.Resources.Limits.Memory()) {
+				return true
 			}
 		}
 	}

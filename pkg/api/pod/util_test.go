@@ -2955,11 +2955,13 @@ func TestDropSidecarContainers(t *testing.T) {
 }
 
 func TestMarkPodProposedForResize(t *testing.T) {
+	containerRestartPolicyAlways := api.ContainerRestartPolicyAlways
 	testCases := []struct {
 		desc                 string
 		newPodSpec           api.PodSpec
 		oldPodSpec           api.PodSpec
 		expectProposedResize bool
+		hasSidecarContainer  bool
 	}{
 		{
 			desc: "nil requests",
@@ -3213,9 +3215,321 @@ func TestMarkPodProposedForResize(t *testing.T) {
 			},
 			expectProposedResize: false,
 		},
+		{
+			desc:                "resources unchanged with sidecar containers",
+			hasSidecarContainer: true,
+			newPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: false,
+		},
+		{
+			desc:                "requests resized with sidecar containers",
+			hasSidecarContainer: true,
+			newPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: true,
+		},
+		{
+			desc:                "limits resized with sidecar containers",
+			hasSidecarContainer: true,
+			newPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("500m")},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("500m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: true,
+		},
+		{
+			desc: "the number of sidecar containers in the pod has increased; no action should be taken.",
+			newPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  "i2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: false,
+		},
+		{
+			desc: "the number of sidecar containers in the pod has decreased; no action should be taken.",
+			newPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  "i2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: false,
+		},
+		{
+			desc: "sidecar containers reordered",
+			newPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  "i2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			oldPodSpec: api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "i2",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  "i1",
+						Image: "image",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("400m")},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+			},
+			expectProposedResize: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, tc.hasSidecarContainer)
 			newPod := &api.Pod{Spec: tc.newPodSpec}
 			newPodUnchanged := newPod.DeepCopy()
 			oldPod := &api.Pod{Spec: tc.oldPodSpec}

@@ -51,6 +51,7 @@ import (
 	remote "k8s.io/cri-client/pkg"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -1073,11 +1074,13 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			// found, it means its last status is removed for some reason.
 			// Restart it if it is a restartable init container.
 			if isPreviouslyInitialized && podutil.IsRestartableInitContainer(container) {
+			if isPreviouslyInitialized && podutil.IsRestartableInitContainer(container) {
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			}
 			continue
 		}
 
+		if isPreviouslyInitialized && !podutil.IsRestartableInitContainer(container) {
 		if isPreviouslyInitialized && !podutil.IsRestartableInitContainer(container) {
 			// after initialization, only restartable init containers need to be kept
 			// running
@@ -1095,80 +1098,83 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
+			if !podutil.IsRestartableInitContainer(container) {
 				break
 			}
 
-			if podutil.IsRestartableInitContainer(container) {
-				if container.StartupProbe != nil {
-					startup, found := m.startupManager.Get(status.ID)
-					if !found {
-						// If the startup probe has not been run, wait for it.
-						break
-					}
-					if startup != proberesults.Success {
-						if startup == proberesults.Failure {
-							// If the restartable init container failed the startup probe,
-							// restart it.
-							changes.ContainersToKill[status.ID] = containerToKillInfo{
-								name:      container.Name,
-								container: container,
-								message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
-								reason:    reasonStartupProbe,
-							}
-							changes.InitContainersToStart = append(changes.InitContainersToStart, i)
-						}
-						break
-					}
-				}
-
-				klog.V(4).InfoS("Init container has been initialized", "pod", klog.KObj(pod), "container", container.Name)
-				if i == (len(pod.Spec.InitContainers) - 1) {
-					podHasInitialized = true
-				} else if !isPreviouslyInitialized {
-					// this init container is initialized for the first time, start the next one
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
-				}
-
-				// Restart running sidecar containers which have had their definition changed.
-				if _, _, changed := containerChanged(container, status); changed {
-					changes.ContainersToKill[status.ID] = containerToKillInfo{
-						name:      container.Name,
-						container: container,
-						message:   fmt.Sprintf("Init container %s definition changed", container.Name),
-						reason:    "",
-					}
-					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+			if container.StartupProbe != nil {
+				startup, found := m.startupManager.Get(status.ID)
+				if !found {
+					// If the startup probe has not been run, wait for it.
 					break
 				}
-
-				// A restartable init container does not have to take into account its
-				// liveness probe when it determines to start the next init container.
-				if container.LivenessProbe != nil {
-					liveness, found := m.livenessManager.Get(status.ID)
-					if !found {
-						// If the liveness probe has not been run, wait for it.
-						break
-					}
-					if liveness == proberesults.Failure {
-						// If the restartable init container failed the liveness probe,
+				if startup != proberesults.Success {
+					if startup == proberesults.Failure {
+						// If the restartable init container failed the startup probe,
 						// restart it.
 						changes.ContainersToKill[status.ID] = containerToKillInfo{
 							name:      container.Name,
 							container: container,
-							message:   fmt.Sprintf("Init container %s failed liveness probe", container.Name),
-							reason:    reasonLivenessProbe,
+							message:   fmt.Sprintf("Init container %s failed startup probe", container.Name),
+							reason:    reasonStartupProbe,
 						}
 						changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 					}
+					break
 				}
-			} else { // init container
-				// nothing do to but wait for it to finish
+			}
+
+			klog.V(4).InfoS("Init container has been initialized", "pod", klog.KObj(pod), "container", container.Name)
+			if i == (len(pod.Spec.InitContainers) - 1) {
+				podHasInitialized = true
+			} else if !isPreviouslyInitialized {
+				// this init container is initialized for the first time, start the next one
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
+			}
+
+			// Restart running sidecar containers which have had their definition changed.
+			if _, _, changed := containerChanged(container, status); changed {
+				changes.ContainersToKill[status.ID] = containerToKillInfo{
+					name:      container.Name,
+					container: container,
+					message:   fmt.Sprintf("Init container %s definition changed", container.Name),
+					reason:    "",
+				}
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+				break
+			}
+
+			// A restartable init container does not have to take into account its
+			// liveness probe when it determines to start the next init container.
+			if container.LivenessProbe != nil {
+				liveness, found := m.livenessManager.Get(status.ID)
+				if !found {
+					// If the liveness probe has not been run, wait for it.
+					break
+				}
+				if liveness == proberesults.Failure {
+					// If the restartable init container failed the liveness probe,
+					// restart it.
+					changes.ContainersToKill[status.ID] = containerToKillInfo{
+						name:      container.Name,
+						container: container,
+						message:   fmt.Sprintf("Init container %s failed liveness probe", container.Name),
+						reason:    reasonLivenessProbe,
+					}
+					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+					break
+				}
+			}
+
+			if IsInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, i, true, status, changes) {
+				// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 				break
 			}
 
 		// If the init container failed and the restart policy is Never, the pod is terminal.
 		// Otherwise, restart the init container.
 		case kubecontainer.ContainerStateExited:
+			if podutil.IsRestartableInitContainer(container) {
 			if podutil.IsRestartableInitContainer(container) {
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			} else { // init container
@@ -1192,6 +1198,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			}
 
 		default: // kubecontainer.ContainerStatusUnknown or other unknown states
+			if podutil.IsRestartableInitContainer(container) {
 			if podutil.IsRestartableInitContainer(container) {
 				// If the restartable init container is in unknown state, restart it.
 				changes.ContainersToKill[status.ID] = containerToKillInfo{

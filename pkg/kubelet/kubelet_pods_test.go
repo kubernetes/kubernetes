@@ -3830,6 +3830,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	CPU1AndMem1GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
 	CPU1AndMem1GAndStorage2GAndCustomResource := CPU1AndMem1GAndStorage2G.DeepCopy()
 	CPU1AndMem1GAndStorage2GAndCustomResource["unknown-resource"] = resource.MustParse("1")
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	testKubecontainerPodStatus := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
@@ -3847,9 +3848,10 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		pod       *v1.Pod
-		oldStatus *v1.PodStatus
+		name                string
+		pod                 *v1.Pod
+		hasSidecarContainer bool
+		oldStatus           *v1.PodStatus
 	}{
 		{
 			name: "custom resource in ResourcesAllocated, resize should be null",
@@ -3913,9 +3915,76 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                "custom resource in ResourcesAllocated in case of restartable init containers, resize should be null",
+			hasSidecarContainer: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "1234560",
+					Name:      "foo0",
+					Namespace: "bar0",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					InitContainers: []v1.Container{
+						{
+							Name:          testContainerName,
+							Image:         "img",
+							Resources:     v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2GAndCustomResource, Requests: CPU1AndMem1GAndStorage2GAndCustomResource},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               testContainerName,
+							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+							AllocatedResources: CPU1AndMem1GAndStorage2GAndCustomResource,
+						},
+					},
+					Resize: "InProgress",
+				},
+			},
+		},
+		{
+			name:                "cpu/memory resource in ResourcesAllocated in case of restartable init containers, resize should be null",
+			hasSidecarContainer: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "1234560",
+					Name:      "foo0",
+					Namespace: "bar0",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					InitContainers: []v1.Container{
+						{
+							Name:          testContainerName,
+							Image:         "img",
+							Resources:     v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               testContainerName,
+							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+							AllocatedResources: CPU1AndMem1GAndStorage2G,
+						},
+					},
+					Resize: "InProgress",
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, test.hasSidecarContainer)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet

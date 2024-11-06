@@ -98,11 +98,12 @@ func (cr *ContainerResources) ResourceRequirements() *v1.ResourceRequirements {
 }
 
 type ResizableContainerInfo struct {
-	Name         string
-	Resources    *ContainerResources
-	CPUPolicy    *v1.ResourceResizeRestartPolicy
-	MemPolicy    *v1.ResourceResizeRestartPolicy
-	RestartCount int32
+	Name                 string
+	Resources            *ContainerResources
+	CPUPolicy            *v1.ResourceResizeRestartPolicy
+	MemPolicy            *v1.ResourceResizeRestartPolicy
+	RestartCount         int32
+	IsRestartableInitCtr bool
 }
 
 type containerPatch struct {
@@ -123,7 +124,8 @@ type containerPatch struct {
 
 type patchSpec struct {
 	Spec struct {
-		Containers []containerPatch `json:"containers"`
+		Containers     []containerPatch `json:"containers"`
+		InitContainers []containerPatch `json:"initcontainers"`
 	} `json:"spec"`
 }
 
@@ -160,10 +162,15 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
 	var testContainers []v1.Container
+	var testInitContainers []v1.Container
 
 	for _, ci := range tcInfo {
-		tc := makeResizableContainer(ci)
-		testContainers = append(testContainers, tc)
+		tc, _ := makeResizableContainer(ci)
+		if ci.IsRestartableInitCtr {
+			testInitContainers = append(testInitContainers, tc)
+		} else {
+			testContainers = append(testContainers, tc)
+		}
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -179,15 +186,36 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
+
+	if len(testInitContainers) > 0 {
+		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+		pod.Spec.InitContainers = testInitContainers
+	}
+
 	return pod
 }
 
 func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
-	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-	for i, wantCtr := range wantCtrs {
-		gotCtr := &gotPod.Spec.Containers[i]
-		ctr := makeResizableContainer(wantCtr)
+	containers := gotPod.Spec.Containers
+	for _, c := range gotPod.Spec.InitContainers {
+		containers = append(containers, c)
+	}
+
+	gomega.Expect(containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
+
+	idx, initIdx := 0, 0
+	var gotCtr *v1.Container
+
+	for _, wantCtr := range wantCtrs {
+		if wantCtr.IsRestartableInitCtr {
+			gotCtr = &gotPod.Spec.InitContainers[initIdx]
+			initIdx += 1
+		} else {
+			gotCtr = &gotPod.Spec.Containers[idx]
+			idx += 1
+		}
+		ctr, _ := makeResizableContainer(wantCtr)
 		gomega.Expect(gotCtr.Name).To(gomega.Equal(ctr.Name))
 		gomega.Expect(gotCtr.ResizePolicy).To(gomega.Equal(ctr.ResizePolicy))
 	}
@@ -195,10 +223,24 @@ func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 
 func VerifyPodResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
-	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-	for i, wantCtr := range wantCtrs {
-		gotCtr := &gotPod.Spec.Containers[i]
-		ctr := makeResizableContainer(wantCtr)
+	containers := gotPod.Spec.Containers
+	for _, c := range gotPod.Spec.InitContainers {
+		containers = append(containers, c)
+	}
+	gomega.Expect(containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
+
+	idx, initIdx := 0, 0
+	var gotCtr *v1.Container
+
+	for _, wantCtr := range wantCtrs {
+		if wantCtr.IsRestartableInitCtr {
+			gotCtr = &gotPod.Spec.InitContainers[initIdx]
+			initIdx += 1
+		} else {
+			gotCtr = &gotPod.Spec.Containers[idx]
+			idx += 1
+		}
+		ctr, _ := makeResizableContainer(wantCtr)
 		gomega.Expect(gotCtr.Name).To(gomega.Equal(ctr.Name))
 		gomega.Expect(gotCtr.Resources).To(gomega.Equal(ctr.Resources))
 	}
@@ -208,13 +250,25 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo)
 	ginkgo.GinkgoHelper()
 
 	var errs []error
-
-	if len(gotPod.Status.ContainerStatuses) != len(wantCtrs) {
-		return fmt.Errorf("expectation length mismatch: got %d statuses, want %d",
-			len(gotPod.Status.ContainerStatuses), len(wantCtrs))
+	containerStatuses := gotPod.Status.ContainerStatuses
+	for _, cs := range gotPod.Status.InitContainerStatuses {
+		containerStatuses = append(containerStatuses, cs)
 	}
+	if len(containerStatuses) != len(wantCtrs) {
+		return fmt.Errorf("expectation length mismatch: got %d statuses, want %d",
+			len(containerStatuses), len(wantCtrs))
+	}
+
+	idx, initIdx := 0, 0
+	var gotCtrStatus *v1.ContainerStatus
 	for i, wantCtr := range wantCtrs {
-		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
+		if wantCtr.IsRestartableInitCtr {
+			gotCtrStatus = &gotPod.Status.InitContainerStatuses[initIdx]
+			initIdx += 1
+		} else {
+			gotCtrStatus = &gotPod.Status.ContainerStatuses[idx]
+			idx += 1
+		}
 		ctr := makeResizableContainer(wantCtr)
 		if gotCtrStatus.Name != ctr.Name {
 			errs = append(errs, fmt.Errorf("container status %d name %q != expected name %q", i, gotCtrStatus.Name, ctr.Name))
@@ -297,7 +351,11 @@ func verifyContainerRestarts(pod *v1.Pod, expectedContainers []ResizableContaine
 	}
 
 	errs := []error{}
-	for _, cs := range pod.Status.ContainerStatuses {
+	containerStatuses := pod.Status.ContainerStatuses
+	for _, cs := range pod.Status.InitContainerStatuses {
+		containerStatuses = append(containerStatuses, cs)
+	}
+	for _, cs := range containerStatuses {
 		expectedRestarts := expectContainerRestarts[cs.Name]
 		if cs.RestartCount != expectedRestarts {
 			errs = append(errs, fmt.Errorf("unexpected number of restarts for container %s: got %d, want %d", cs.Name, cs.RestartCount, expectedRestarts))
@@ -369,8 +427,11 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 		cPatch.Resources.Requests.Memory = container.Resources.MemReq
 		cPatch.Resources.Limits.CPU = container.Resources.CPULim
 		cPatch.Resources.Limits.Memory = container.Resources.MemLim
-
-		patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
+		if container.IsRestartableInitCtr {
+			patch.Spec.InitContainers = append(patch.Spec.InitContainers, cPatch)
+		} else {
+			patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
+		}
 	}
 
 	patchBytes, err := json.Marshal(patch)
