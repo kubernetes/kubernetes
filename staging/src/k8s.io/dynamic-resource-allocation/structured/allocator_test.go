@@ -17,7 +17,6 @@ limitations under the License.
 package structured
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"slices"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1402,10 +1400,7 @@ type informerLister[T any] struct {
 	err  error
 }
 
-func (l informerLister[T]) List(selector labels.Selector) (ret []*T, err error) {
-	if selector.String() != labels.Everything().String() {
-		return nil, errors.New("labels selector not implemented")
-	}
+func (l informerLister[T]) List() (ret []*T, err error) {
 	return l.objs, l.err
 }
 

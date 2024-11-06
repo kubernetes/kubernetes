@@ -916,13 +916,13 @@ func TestPlugin(t *testing.T) {
 }
 
 type testContext struct {
-	ctx              context.Context
-	client           *fake.Clientset
-	informerFactory  informers.SharedInformerFactory
-	claimAssumeCache *assumecache.AssumeCache
-	p                *DynamicResources
-	nodeInfos        []*framework.NodeInfo
-	state            *framework.CycleState
+	ctx             context.Context
+	client          *fake.Clientset
+	informerFactory informers.SharedInformerFactory
+	draManager      *DefaultDRAManager
+	p               *DynamicResources
+	nodeInfos       []*framework.NodeInfo
+	state           *framework.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
@@ -984,14 +984,11 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 }
 
 func (tc *testContext) listAssumedClaims() []metav1.Object {
-	if tc.p.claimAssumeCache == nil {
-		return nil
-	}
 	var assumedClaims []metav1.Object
-	for _, obj := range tc.p.claimAssumeCache.List(nil) {
+	for _, obj := range tc.draManager.resourceClaimTracker.cache.List(nil) {
 		claim := obj.(*resourceapi.ResourceClaim)
-		obj, _ := tc.p.claimAssumeCache.Get(claim.Namespace + "/" + claim.Name)
-		apiObj, _ := tc.p.claimAssumeCache.GetAPIObj(claim.Namespace + "/" + claim.Name)
+		obj, _ := tc.draManager.resourceClaimTracker.cache.Get(claim.Namespace + "/" + claim.Name)
+		apiObj, _ := tc.draManager.resourceClaimTracker.cache.GetAPIObj(claim.Namespace + "/" + claim.Name)
 		if obj != apiObj {
 			assumedClaims = append(assumedClaims, claim)
 		}
@@ -1002,7 +999,7 @@ func (tc *testContext) listAssumedClaims() []metav1.Object {
 
 func (tc *testContext) listInFlightClaims() []metav1.Object {
 	var inFlightClaims []metav1.Object
-	tc.p.inFlightAllocations.Range(func(key, value any) bool {
+	tc.draManager.resourceClaimTracker.inFlightAllocations.Range(func(key, value any) bool {
 		inFlightClaims = append(inFlightClaims, value.(*resourceapi.ResourceClaim))
 		return true
 	})
@@ -1072,11 +1069,11 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	tc.client.PrependReactor("*", "*", reactor)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil)
+	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil), tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
-		runtime.WithResourceClaimCache(tc.claimAssumeCache),
+		runtime.WithSharedDRAManager(tc.draManager),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	if err != nil {
@@ -1290,7 +1287,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					}
 					claim = storedClaim
 				} else {
-					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
 					if err != nil {
 						t.Fatalf("retrieve old claim: expected no error, got: %v", err)
 					}
@@ -1308,7 +1305,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 
 				// Eventually the assume cache will have it, too.
 				require.EventuallyWithT(t, func(t *assert.CollectT) {
-					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
 					require.NoError(t, err, "retrieve claim")
 					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
 						t.Errorf("cached claim not updated yet")
