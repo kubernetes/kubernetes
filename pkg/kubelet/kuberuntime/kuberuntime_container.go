@@ -413,10 +413,9 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod) error {
-	podResourcesRequest := &runtimeapi.UpdatePodSandboxResourcesRequest{
-		PodSandboxId: sandboxID,
-		Overhead:     m.convertOverheadToLinuxResources(pod),
-		Resources:    m.calculateSandboxResources(pod),
+	podResourcesRequest := m.generateUpdatePodSandboxResourcesRequest(sandboxID, pod)
+	if podResourcesRequest == nil {
+		return fmt.Errorf("sandboxID %q updatePodSandboxResources failed: cannot generate resources config", sandboxID)
 	}
 
 	ctx := context.Background()
