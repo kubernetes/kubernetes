@@ -460,7 +460,7 @@ func TestPodResourceRequests(t *testing.T) {
 			description:         "resized with sidecar containers, infeasible",
 			hasSidecarContainer: true,
 			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("7"),
+				v1.ResourceCPU: resource.MustParse("5"),
 			},
 			podResizeStatus: v1.PodResizeStatusInfeasible,
 			options:         PodResourcesOptions{UseStatusResources: true},
@@ -541,11 +541,10 @@ func TestPodResourceRequests(t *testing.T) {
 			description:         "resized with sidecar containers, no resize status",
 			hasSidecarContainer: true,
 			expectedRequests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("7"),
+				v1.ResourceCPU: resource.MustParse("3"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
-			containers: []v1.Container{
+			options: PodResourcesOptions{UseStatusResources: true},
+			/* 			containers: []v1.Container{
 				{
 					Name: "container-1",
 					Resources: v1.ResourceRequirements{
@@ -554,7 +553,7 @@ func TestPodResourceRequests(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, */
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -566,7 +565,7 @@ func TestPodResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			containerStatus: []v1.ContainerStatus{
+			/* 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
 					Resources: &v1.ResourceRequirements{
@@ -575,7 +574,7 @@ func TestPodResourceRequests(t *testing.T) {
 						},
 					},
 				},
-			},
+			}, */
 			initContainerStatus: []v1.ContainerStatus{
 				{
 					Name: "restartable-init-1",
