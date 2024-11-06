@@ -1238,6 +1238,19 @@ func getKillMapWithInitContainers(pod *v1.Pod, status *kubecontainer.PodStatus, 
 	return m
 }
 
+func modifyKillMapContainerImage(containersToKill map[kubecontainer.ContainerID]containerToKillInfo, status *kubecontainer.PodStatus, cIndexes []int, imageNames []string) map[kubecontainer.ContainerID]containerToKillInfo {
+	for idx, i := range cIndexes {
+		containerKillInfo := containersToKill[status.ContainerStatuses[i].ID]
+		updatedContainer := containerKillInfo.container.DeepCopy()
+		updatedContainer.Image = imageNames[idx]
+		containersToKill[status.ContainerStatuses[i].ID] = containerToKillInfo{
+			container: updatedContainer,
+			name:      containerKillInfo.name,
+		}
+	}
+	return containersToKill
+}
+
 func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 	if actual.ContainersToKill != nil {
 		// Clear the message and reason fields since we don't need to verify them.
@@ -1524,12 +1537,12 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid2"},
 			Name: "init2", State: kubecontainer.ContainerStateExited,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[1]),
 		},
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid3"},
 			Name: "init3", State: kubecontainer.ContainerStateExited,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[2]),
 		},
 	}
 	return pod, status
@@ -1700,6 +1713,18 @@ func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
 			},
 			resetStatusFn: func(status *kubecontainer.PodStatus) {
 				m.startupManager.Remove(status.ContainerStatuses[2].ID)
+			},
+		},
+		"kill and recreate the restartable init container if the container definition changes": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+				pod.Spec.InitContainers[2].Image = "foo-image"
+			},
+			actions: podActions{
+				SandboxID:             baseStatus.SandboxStatuses[0].Id,
+				InitContainersToStart: []int{2},
+				ContainersToKill:      modifyKillMapContainerImage(getKillMapWithInitContainers(basePod, baseStatus, []int{2}), baseStatus, []int{2}, []string{"foo-image"}),
+				ContainersToStart:     []int{0, 1, 2},
 			},
 		},
 		"restart terminated restartable init container and next init container": {
@@ -1928,12 +1953,12 @@ func makeBasePodAndStatusWithRestartableInitContainers() (*v1.Pod, *kubecontaine
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid2"},
 			Name: "restartable-init-2", State: kubecontainer.ContainerStateRunning,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[1]),
 		},
 		{
 			ID:   kubecontainer.ContainerID{ID: "initid3"},
 			Name: "restartable-init-3", State: kubecontainer.ContainerStateRunning,
-			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[0]),
+			Hash: kubecontainer.HashContainer(&pod.Spec.InitContainers[2]),
 		},
 	}
 	return pod, status
