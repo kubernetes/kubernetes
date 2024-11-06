@@ -320,11 +320,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		// Create pods in the cluster.
 		for i, node := range nodeList.Items {
 			// Update each node to advertise 3 available extended resources
-			nodeCopy := node.DeepCopy()
-			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("10")
-			nodeCopy.Status.Allocatable[testExtendedResource] = resource.MustParse("10")
-			err := patchNode(ctx, cs, &node, nodeCopy)
-			framework.ExpectNoError(err)
+			e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("10"))
 
 			// Create 10 low priority pods on each node, which will use up 10/10 of the node's resources.
 			for j := 0; j < 10; j++ {
