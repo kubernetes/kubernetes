@@ -256,6 +256,15 @@ func (l *baseList) IsZeroValue() bool {
 	return l.size == 0
 }
 
+// Fold calls the FoldEntry method for each (index, value) pair in the list.
+func (l *baseList) Fold(f traits.Folder) {
+	for i := 0; i < l.size; i++ {
+		if !f.FoldEntry(i, l.get(i)) {
+			break
+		}
+	}
+}
+
 // Iterator implements the traits.Iterable interface method.
 func (l *baseList) Iterator() traits.Iterator {
 	return newListIterator(l)
@@ -433,6 +442,15 @@ func (l *concatList) IsZeroValue() bool {
 	return l.Size().(Int) == 0
 }
 
+// Fold calls the FoldEntry method for each (index, value) pair in the list.
+func (l *concatList) Fold(f traits.Folder) {
+	for i := Int(0); i < l.Size().(Int); i++ {
+		if !f.FoldEntry(i, l.Get(i)) {
+			break
+		}
+	}
+}
+
 // Iterator implements the traits.Iterable interface method.
 func (l *concatList) Iterator() traits.Iterator {
 	return newListIterator(l)
@@ -525,5 +543,32 @@ func IndexOrError(index ref.Val) (int, error) {
 		return -1, fmt.Errorf("unsupported index value %v in list", index)
 	default:
 		return -1, fmt.Errorf("unsupported index type '%s' in list", index.Type())
+	}
+}
+
+// ToFoldableList will create a Foldable version of a list suitable for key-value pair iteration.
+//
+// For values which are already Foldable, this call is a no-op. For all other values, the fold is
+// driven via the Size() and Get() calls which means that the folding will function, but take a
+// performance hit.
+func ToFoldableList(l traits.Lister) traits.Foldable {
+	if f, ok := l.(traits.Foldable); ok {
+		return f
+	}
+	return interopFoldableList{Lister: l}
+}
+
+type interopFoldableList struct {
+	traits.Lister
+}
+
+// Fold implements the traits.Foldable interface method and performs an iteration over the
+// range of elements of the list.
+func (l interopFoldableList) Fold(f traits.Folder) {
+	sz := l.Size().(Int)
+	for i := Int(0); i < sz; i++ {
+		if !f.FoldEntry(i, l.Get(i)) {
+			break
+		}
 	}
 }

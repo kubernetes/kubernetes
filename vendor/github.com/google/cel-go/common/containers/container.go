@@ -19,6 +19,7 @@ package containers
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/google/cel-go/common/ast"
 )
@@ -212,6 +213,13 @@ type ContainerOption func(*Container) (*Container, error)
 func Abbrevs(qualifiedNames ...string) ContainerOption {
 	return func(c *Container) (*Container, error) {
 		for _, qn := range qualifiedNames {
+			qn = strings.TrimSpace(qn)
+			for _, r := range qn {
+				if !isIdentifierChar(r) {
+					return nil, fmt.Errorf(
+						"invalid qualified name: %s, wanted name of the form 'qualified.name'", qn)
+				}
+			}
 			ind := strings.LastIndex(qn, ".")
 			if ind <= 0 || ind >= len(qn)-1 {
 				return nil, fmt.Errorf(
@@ -276,6 +284,10 @@ func aliasAs(kind, qualifiedName, alias string) ContainerOption {
 		c.aliases[alias] = qualifiedName
 		return c, nil
 	}
+}
+
+func isIdentifierChar(r rune) bool {
+	return r <= unicode.MaxASCII && (r == '.' || r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r))
 }
 
 // Name sets the fully-qualified name of the Container.

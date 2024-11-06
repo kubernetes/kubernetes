@@ -35,6 +35,8 @@ var (
 
 	// golang reflect type for Null values.
 	nullReflectType = reflect.TypeOf(NullValue)
+
+	protoIfaceType = reflect.TypeOf((*proto.Message)(nil)).Elem()
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
@@ -61,8 +63,14 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 			return structpb.NewNullValue(), nil
 		case boolWrapperType, byteWrapperType, doubleWrapperType, floatWrapperType,
 			int32WrapperType, int64WrapperType, stringWrapperType, uint32WrapperType,
-			uint64WrapperType:
+			uint64WrapperType, durationValueType, timestampValueType, protoIfaceType:
 			return nil, nil
+		case jsonListValueType, jsonStructType:
+			// skip handling
+		default:
+			if typeDesc.Implements(protoIfaceType) {
+				return nil, nil
+			}
 		}
 	case reflect.Interface:
 		nv := n.Value()

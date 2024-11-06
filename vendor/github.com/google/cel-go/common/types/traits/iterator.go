@@ -34,3 +34,16 @@ type Iterator interface {
 	// Next returns the next element.
 	Next() ref.Val
 }
+
+// Foldable aggregate types support iteration over (key, value) or (index, value) pairs.
+type Foldable interface {
+	// Fold invokes the Folder.FoldEntry for all entries in the type
+	Fold(Folder)
+}
+
+// Folder performs a fold on a given entry and indicates whether to continue folding.
+type Folder interface {
+	// FoldEntry indicates the key, value pair associated with the entry.
+	// If the output is true, continue folding. Otherwise, terminate the fold.
+	FoldEntry(key, val any) bool
+}
