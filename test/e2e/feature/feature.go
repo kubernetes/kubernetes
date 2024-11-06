@@ -394,10 +394,6 @@ var (
 	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
 	// Owner: sig-node
-	// Marks tests that require a cluster with Swap enabled.
-	Swap = framework.WithFeature(framework.ValidFeatures.Add("Swap"))
-
-	// Owner: sig-node
 	// Tests marked with this feature MUST run with the CRI Proxy configured so errors can be injected into the kubelet's CRI calls.
 	// This is useful for testing how the kubelet handles various error conditions in its CRI interactions.
 	// test-infra jobs:
