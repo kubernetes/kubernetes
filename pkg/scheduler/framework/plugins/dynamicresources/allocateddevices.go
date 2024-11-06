@@ -19,7 +19,7 @@ package dynamicresources
 import (
 	"sync"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/structured"

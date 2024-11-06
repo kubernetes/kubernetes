@@ -22,28 +22,26 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-const (
-	v1alpha4Version = "v1alpha4"
-)
-
-type fakeV1alpha4GRPCServer struct {
-	drapb.UnimplementedNodeServer
+type fakeGRPCServer struct {
+	drapbv1beta1.UnimplementedDRAPluginServer
 }
 
-var _ drapb.NodeServer = &fakeV1alpha4GRPCServer{}
+var _ drapbv1beta1.DRAPluginServer = &fakeGRPCServer{}
 
-func (f *fakeV1alpha4GRPCServer) NodePrepareResources(ctx context.Context, in *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
-	return &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"claim-uid": {
-		Devices: []*drapb.Device{
+func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1beta1.NodePrepareResourcesRequest) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
+	return &drapbv1beta1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodePrepareResourceResponse{"claim-uid": {
+		Devices: []*drapbv1beta1.Device{
 			{
 				RequestNames: []string{"test-request"},
 				CDIDeviceIDs: []string{"test-cdi-id"},
@@ -52,14 +50,14 @@ func (f *fakeV1alpha4GRPCServer) NodePrepareResources(ctx context.Context, in *d
 	}}}, nil
 }
 
-func (f *fakeV1alpha4GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
 
-	return &drapb.NodeUnprepareResourcesResponse{}, nil
+	return &drapbv1beta1.NodeUnprepareResourcesResponse{}, nil
 }
 
 type tearDown func()
 
-func setupFakeGRPCServer(version string) (string, tearDown, error) {
+func setupFakeGRPCServer(service string) (string, tearDown, error) {
 	p, err := os.MkdirTemp("", "dra_plugin")
 	if err != nil {
 		return "", nil, err
@@ -81,12 +79,14 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 	}
 
 	s := grpc.NewServer()
-	switch version {
-	case v1alpha4Version:
-		fakeGRPCServer := &fakeV1alpha4GRPCServer{}
-		drapb.RegisterNodeServer(s, fakeGRPCServer)
+	fakeGRPCServer := &fakeGRPCServer{}
+	switch service {
+	case drapbv1beta1.DRAPluginService:
+		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
+	case drapbv1alpha4.NodeService:
+		drapbv1alpha4.RegisterNodeServer(s, fakeGRPCServer)
 	default:
-		return "", nil, fmt.Errorf("unsupported version: %s", version)
+		return "", nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
 
 	go func() {
@@ -104,7 +104,8 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	addr, teardown, err := setupFakeGRPCServer(v1alpha4Version)
+	service := drapbv1beta1.DRAPluginService
+	addr, teardown, err := setupFakeGRPCServer(service)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,6 +120,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 		name:              pluginName,
 		backgroundCtx:     tCtx,
 		endpoint:          addr,
+		chosenService:     service,
 		clientCallTimeout: defaultClientCallTimeout,
 	}
 
@@ -148,8 +150,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 				return
 			}
 
-			req := &drapb.NodePrepareResourcesRequest{
-				Claims: []*drapb.Claim{
+			req := &drapbv1beta1.NodePrepareResourcesRequest{
+				Claims: []*drapbv1beta1.Claim{
 					{
 						Namespace: "dummy-namespace",
 						UID:       "dummy-uid",
@@ -231,23 +233,46 @@ func TestNewDRAPluginClient(t *testing.T) {
 	}
 }
 
-func TestNodeUnprepareResources(t *testing.T) {
+func TestGRPCMethods(t *testing.T) {
 	for _, test := range []struct {
 		description   string
 		serverSetup   func(string) (string, tearDown, error)
-		serverVersion string
-		request       *drapb.NodeUnprepareResourcesRequest
+		service       string
+		chosenService string
+		expectError   string
 	}{
 		{
-			description:   "server supports v1alpha4",
+			description:   "v1alpha4",
 			serverSetup:   setupFakeGRPCServer,
-			serverVersion: v1alpha4Version,
-			request:       &drapb.NodeUnprepareResourcesRequest{},
+			service:       drapbv1alpha4.NodeService,
+			chosenService: drapbv1alpha4.NodeService,
+		},
+		{
+			description:   "v1beta1",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: drapbv1beta1.DRAPluginService,
+		},
+		{
+			// In practice, such a mismatch between plugin and kubelet should not happen.
+			description:   "mismatch",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: drapbv1alpha4.NodeService,
+			expectError:   "unknown service v1alpha3.Node",
+		},
+		{
+			// In practice, kubelet wouldn't choose an invalid service.
+			description:   "internal-error",
+			serverSetup:   setupFakeGRPCServer,
+			service:       drapbv1beta1.DRAPluginService,
+			chosenService: "some-other-service",
+			expectError:   "unsupported chosen service",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
+			addr, teardown, err := setupFakeGRPCServer(test.service)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -258,6 +283,7 @@ func TestNodeUnprepareResources(t *testing.T) {
 				name:              pluginName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
+				chosenService:     test.chosenService,
 				clientCallTimeout: defaultClientCallTimeout,
 			}
 
@@ -280,10 +306,23 @@ func TestNodeUnprepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = client.NodeUnprepareResources(tCtx, test.request)
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, err = client.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
+			assertError(t, test.expectError, err)
+
+			_, err = client.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
+			assertError(t, test.expectError, err)
 		})
+	}
+}
+
+func assertError(t *testing.T, expectError string, err error) {
+	t.Helper()
+	switch {
+	case err != nil && expectError == "":
+		t.Errorf("Expected no error, got: %v", err)
+	case err == nil && expectError != "":
+		t.Errorf("Expected error %q, got none", expectError)
+	case err != nil && !strings.Contains(err.Error(), expectError):
+		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
 }

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -31,7 +31,7 @@ var testcases = map[string]struct {
 	expression         string
 	driver             string
 	attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	capacity           map[resourceapi.QualifiedName]resource.Quantity
+	capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 	expectCompileError string
 	expectMatchError   string
 	expectMatch        bool
@@ -149,14 +149,14 @@ var testcases = map[string]struct {
 	},
 	"quantity": {
 		expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  6,
 	},
 	"check-positive": {
 		expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-		capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
+		capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Value: resource.MustParse("1Mi")}},
 		driver:      "dra.example.com",
 		expectMatch: true,
 		expectCost:  10,
@@ -185,8 +185,8 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			"string":  {StringValue: ptr.To("fish")},
 			"version": {VersionValue: ptr.To("1.0.0")},
 		},
-		capacity: map[resourceapi.QualifiedName]resource.Quantity{
-			"quantity": resource.MustParse("1Mi"),
+		capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+			"quantity": {Value: resource.MustParse("1Mi")},
 		},
 		driver:      "dra.example.com",
 		expectMatch: true,

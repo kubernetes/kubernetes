@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -589,7 +589,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			slice.Spec.Devices = pool.Slices[i].Devices
 
 			logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
-			slice, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+			slice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("update resource slice: %w", err)
 			}
@@ -645,7 +645,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
 			// avoids that.
 			logger.V(5).Info("Creating new resource slice")
-			slice, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+			slice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 			if err != nil {
 				return fmt.Errorf("create resource slice: %w", err)
 			}
@@ -681,7 +681,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// changes on the server. The only downside is the extra API
 		// call. This isn't as bad as extra creates.
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
-		err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, options)
+		err := c.kubeClient.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, options)
 		switch {
 		case err == nil:
 			atomic.AddInt64(&c.numDeletes, 1)

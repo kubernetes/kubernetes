@@ -37,7 +37,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
-	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
@@ -65,8 +65,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
+	NodePrepareResourcesMethod   = "/v1beta1.DRAPlugin/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1beta1.DRAPlugin/NodeUnprepareResources"
 )
 
 type Nodes struct {
@@ -191,10 +191,12 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() R
 // be started explicitly with Run. May be used inside ginkgo.It.
 func NewDriverInstance(f *framework.Framework) *Driver {
 	d := &Driver{
-		f:            f,
-		fail:         map[MethodInstance]bool{},
-		callCounts:   map[MethodInstance]int64{},
-		NodeV1alpha3: true,
+		f:          f,
+		fail:       map[MethodInstance]bool{},
+		callCounts: map[MethodInstance]int64{},
+		// By default, test only with the latest gRPC API.
+		NodeV1alpha4: false,
+		NodeV1beta1:  true,
 	}
 	d.initName()
 	return d
@@ -231,7 +233,8 @@ type Driver struct {
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
 
-	NodeV1alpha3 bool
+	NodeV1alpha4 bool
+	NodeV1beta1  bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -295,10 +298,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			})
 		}
 
-		_, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+		_, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			framework.ExpectNoError(d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(d.f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
 		})
 	}
 
@@ -425,7 +428,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1alpha3(d.NodeV1alpha3),
+			kubeletplugin.NodeV1alpha4(d.NodeV1alpha4),
+			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
@@ -569,7 +573,7 @@ func (d *Driver) TearDown() {
 
 func (d *Driver) IsGone(ctx context.Context) {
 	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+		slices, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 		if err != nil {
 			return nil, err
 		}

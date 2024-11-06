@@ -412,6 +412,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.32"
 - name: EfficientWatchResumption
   versionedSpecs:
   - default: false

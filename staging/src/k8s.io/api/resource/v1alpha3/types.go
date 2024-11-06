@@ -37,6 +37,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceSlice
 
 // ResourceSlice represents one or more resources in a pool of similar resources,
 // managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many
@@ -220,7 +221,7 @@ type BasicDevice struct {
 	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
 }
 
-// Limit for the sum of the number of entries in both ResourceSlices.
+// Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
@@ -243,6 +244,9 @@ type QualifiedName string
 
 // FullyQualifiedName is a QualifiedName where the domain is set.
 type FullyQualifiedName string
+
+// DeviceMaxDomainLength is the maximum length of the domain prefix in a fully-qualified name.
+const DeviceMaxDomainLength = 63
 
 // DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
 const DeviceMaxIDLength = 32
@@ -284,6 +288,7 @@ const DeviceAttributeMaxValueLength = 64
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceSliceList
 
 // ResourceSliceList is a collection of ResourceSlices.
 type ResourceSliceList struct {
@@ -299,6 +304,7 @@ type ResourceSliceList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaim
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -835,6 +841,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimList
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
@@ -851,6 +858,7 @@ type ResourceClaimList struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,DeviceClass
 
 // DeviceClass is a vendor- or admin-provided resource that contains
 // device configuration and selectors. It can be referenced in
@@ -908,6 +916,7 @@ type DeviceClassConfiguration struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,DeviceClassList
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
@@ -923,6 +932,7 @@ type DeviceClassList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimTemplate
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 //
@@ -958,6 +968,7 @@ type ResourceClaimTemplateSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
+// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimTemplateList
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {

@@ -26,11 +26,12 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -172,11 +173,20 @@ func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 	}
 }
 
-// NodeV1alpha3 explicitly chooses whether the DRA gRPC API v1alpha3
+// NodeV1alpha4 explicitly chooses whether the DRA gRPC API v1alpha4
 // gets enabled.
-func NodeV1alpha3(enabled bool) Option {
+func NodeV1alpha4(enabled bool) Option {
 	return func(o *options) error {
-		o.nodeV1alpha3 = enabled
+		o.nodeV1alpha4 = enabled
+		return nil
+	}
+}
+
+// NodeV1beta1 explicitly chooses whether the DRA gRPC API v1beta1
+// gets enabled.
+func NodeV1beta1(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1beta1 = enabled
 		return nil
 	}
 }
@@ -226,7 +236,8 @@ type options struct {
 	streamInterceptors         []grpc.StreamServerInterceptor
 	kubeClient                 kubernetes.Interface
 
-	nodeV1alpha3 bool
+	nodeV1alpha4 bool
+	nodeV1beta1  bool
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -260,12 +271,19 @@ type draPlugin struct {
 //
 // If the plugin will be used to publish resources, [KubeClient] and [NodeName]
 // options are mandatory.
+//
+// By default, the DRA driver gets registered so that the plugin is compatible
+// with Kubernetes >= 1.32. To be compatible with Kubernetes >= 1.31, a driver
+// has to ask specifically to register only the alpha gRPC API, i.e. use:
+//
+//	Start(..., NodeV1beta1(false))
 func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
-		nodeV1alpha3:  true,
+		nodeV1alpha4:  true,
+		nodeV1beta1:   true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -318,24 +336,38 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	}()
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	implemented := false
+	var supportedServices []string
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
-		if nodeServer, ok := nodeServer.(drapb.NodeServer); ok && o.nodeV1alpha3 {
-			logger.V(5).Info("registering drapbv1alpha3.NodeServer")
-			drapb.RegisterNodeServer(grpcServer, nodeServer)
-			implemented = true
+		if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
+			logger.V(5).Info("registering v1alpha4.Node gGRPC service")
+			drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
+			supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
+		}
+		if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
+			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+			drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
+			supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start node client: %v", err)
 	}
 	d.plugin = plugin
-	if !implemented {
+	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
 	}
 
+	// Backwards compatibility hack: if only the alpha gRPC service is enabled,
+	// then we can support registration against a 1.31 kubelet by reporting "1.0.0"
+	// as version. That also works with 1.32 because 1.32 supports that legacy
+	// behavior and 1.31 works because it doesn't fail while parsing "v1alpha3.Node"
+	// as version.
+	if len(supportedServices) == 1 && supportedServices[0] == drapbv1alpha4.NodeService {
+		supportedServices = []string{"1.0.0"}
+	}
+
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

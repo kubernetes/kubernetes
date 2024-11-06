@@ -430,18 +430,41 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("resource.k8s.io", "v1alpha3", "deviceclasses"): {
 			Stub:             `{"metadata": {"name": "class1name"}}`,
 			ExpectedEtcdPath: "/registry/deviceclasses/class1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1beta1", "DeviceClass"),
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceclaims"): {
 			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1beta1", "ResourceClaim"),
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"): {
 			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1beta1", "ResourceClaimTemplate"),
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceslices"): {
 			Stub:             `{"metadata": {"name": "node1slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
 			ExpectedEtcdPath: "/registry/resourceslices/node1slice",
+			ExpectedGVK:      gvkP("resource.k8s.io", "v1beta1", "ResourceSlice"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/resource/v1beta1
+		gvr("resource.k8s.io", "v1beta1", "deviceclasses"): {
+			Stub:             `{"metadata": {"name": "class2name"}}`,
+			ExpectedEtcdPath: "/registry/deviceclasses/class2name",
+		},
+		gvr("resource.k8s.io", "v1beta1", "resourceclaims"): {
+			Stub:             `{"metadata": {"name": "claim2name"}, "spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}`,
+			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim2name",
+		},
+		gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"): {
+			Stub:             `{"metadata": {"name": "claimtemplate2name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}}`,
+			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate2name",
+		},
+		gvr("resource.k8s.io", "v1beta1", "resourceslices"): {
+			Stub:             `{"metadata": {"name": "node2slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
+			ExpectedEtcdPath: "/registry/resourceslices/node2slice",
 		},
 		// --
 

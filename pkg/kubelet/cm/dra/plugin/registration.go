@@ -20,17 +20,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -111,7 +113,7 @@ func (h *RegistrationHandler) wipeResourceSlices(driver string) {
 			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = h.kubeClient.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = h.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
@@ -130,7 +132,13 @@ func (h *RegistrationHandler) wipeResourceSlices(driver string) {
 }
 
 // RegisterPlugin is called when a plugin can be registered.
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+//
+// DRA uses the version array in the registration API to enumerate all gRPC
+// services that the plugin provides, using the "<gRPC package name>.<service
+// name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
+// in advance which version to use resp. which optional services the plugin
+// supports.
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
 	// Prepare a context with its own logger for the plugin.
 	//
 	// The lifecycle of the plugin's background activities is tied to our
@@ -145,7 +153,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	logger.V(3).Info("Register new DRA plugin", "endpoint", endpoint)
 
-	highestSupportedVersion, err := h.validateVersions(pluginName, versions)
+	chosenService, err := h.validateSupportedServices(pluginName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("version check of plugin %s failed: %w", pluginName, err)
 	}
@@ -160,13 +168,13 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
-		name:                    pluginName,
-		backgroundCtx:           ctx,
-		cancel:                  cancel,
-		conn:                    nil,
-		endpoint:                endpoint,
-		highestSupportedVersion: highestSupportedVersion,
-		clientCallTimeout:       timeout,
+		name:              pluginName,
+		backgroundCtx:     ctx,
+		cancel:            cancel,
+		conn:              nil,
+		endpoint:          endpoint,
+		chosenService:     chosenService,
+		clientCallTimeout: timeout,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
@@ -178,30 +186,35 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	return nil
 }
 
-func (h *RegistrationHandler) validateVersions(
-	pluginName string,
-	versions []string,
-) (*utilversion.Version, error) {
-	if len(versions) == 0 {
-		return nil, errors.New("empty list for supported versions")
+// validateSupportedServices identifies the highest supported gRPC service for
+// NodePrepareResources and NodeUnprepareResources and returns its name
+// (e.g. [drapbv1beta1.DRAPluginService]). An error is returned if the plugin
+// is unusable.
+func (h *RegistrationHandler) validateSupportedServices(pluginName string, supportedServices []string) (string, error) {
+	if len(supportedServices) == 0 {
+		return "", errors.New("empty list of supported gRPC services (aka supported versions)")
 	}
 
-	// Validate version
-	newPluginHighestVersion, err := utilversion.HighestSupportedVersion(versions)
-	if err != nil {
-		// HighestSupportedVersion includes the list of versions in its error
-		// if relevant, no need to repeat it here.
-		return nil, fmt.Errorf("none of the versions are supported: %w", err)
+	// Pick most recent version if available.
+	chosenService := ""
+	for _, service := range []string{
+		// Sorted by most recent first, oldest last.
+		drapbv1beta1.DRAPluginService,
+		drapbv1alpha4.NodeService,
+	} {
+		if slices.Contains(supportedServices, service) {
+			chosenService = service
+			break
+		}
 	}
 
-	existingPlugin := draPlugins.get(pluginName)
-	if existingPlugin == nil {
-		return newPluginHighestVersion, nil
+	// Fall back to alpha if necessary because
+	// plugins at that time didn't advertise gRPC services.
+	if chosenService == "" {
+		chosenService = drapbv1alpha4.NodeService
 	}
-	if existingPlugin.highestSupportedVersion.LessThan(newPluginHighestVersion) {
-		return newPluginHighestVersion, nil
-	}
-	return nil, fmt.Errorf("another plugin instance is already registered with a higher supported version: %q < %q", newPluginHighestVersion, existingPlugin.highestSupportedVersion)
+
+	return chosenService, nil
 }
 
 // DeRegisterPlugin is called when a plugin has removed its socket,
@@ -225,8 +238,8 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by DRA plugin.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	_, err := h.validateVersions(pluginName, versions)
+func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, supportedServices []string) error {
+	_, err := h.validateSupportedServices(pluginName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid versions of plugin %s: %w", pluginName, err)
 	}

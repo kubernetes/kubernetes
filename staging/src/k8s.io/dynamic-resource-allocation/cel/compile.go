@@ -31,8 +31,7 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/api/resource"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -82,7 +81,7 @@ type Device struct {
 	// string attribute.
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resource.Quantity
+	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -211,12 +210,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	}
 
 	capacity := make(map[string]any)
-	for name, quantity := range input.Capacity {
+	for name, cap := range input.Capacity {
 		domain, id := parseQualifiedName(name, input.Driver)
 		if capacity[domain] == nil {
 			capacity[domain] = make(map[string]apiservercel.Quantity)
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 	}
 
 	variables := map[string]any{
@@ -262,12 +261,7 @@ func mustBuildEnv() *environment.EnvSet {
 
 	versioned := []environment.VersionedOptions{
 		{
-			// Feature epoch was actually 1.31, but we artificially set it to 1.0 because these
-			// options should always be present.
-			//
-			// TODO (https://github.com/kubernetes/kubernetes/issues/123687): set this
-			// version properly before going to beta.
-			IntroducedVersion: version.MajorMinor(1, 0),
+			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 

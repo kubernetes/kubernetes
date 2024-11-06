@@ -351,6 +351,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*resource.DeviceCapacity)(nil), (*apiresource.Quantity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceCapacity_To_resource_Quantity(a.(*resource.DeviceCapacity), b.(*apiresource.Quantity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apiresource.Quantity)(nil), (*resource.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_Quantity_To_resource_DeviceCapacity(a.(*apiresource.Quantity), b.(*resource.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -382,7 +392,19 @@ func Convert_resource_AllocationResult_To_v1alpha3_AllocationResult(in *resource
 
 func autoConvert_v1alpha3_BasicDevice_To_resource_BasicDevice(in *resourcev1alpha3.BasicDevice, out *resource.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resource.QualifiedName]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacity = *(*map[resource.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Capacity))
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(map[resource.QualifiedName]resource.DeviceCapacity, len(*in))
+		for key, val := range *in {
+			newVal := new(resource.DeviceCapacity)
+			if err := Convert_resource_Quantity_To_resource_DeviceCapacity(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[resource.QualifiedName(key)] = *newVal
+		}
+	} else {
+		out.Capacity = nil
+	}
 	return nil
 }
 
@@ -393,7 +415,19 @@ func Convert_v1alpha3_BasicDevice_To_resource_BasicDevice(in *resourcev1alpha3.B
 
 func autoConvert_resource_BasicDevice_To_v1alpha3_BasicDevice(in *resource.BasicDevice, out *resourcev1alpha3.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacity = *(*map[resourcev1alpha3.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Capacity))
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(map[resourcev1alpha3.QualifiedName]apiresource.Quantity, len(*in))
+		for key, val := range *in {
+			newVal := new(apiresource.Quantity)
+			if err := Convert_resource_DeviceCapacity_To_resource_Quantity(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[resourcev1alpha3.QualifiedName(key)] = *newVal
+		}
+	} else {
+		out.Capacity = nil
+	}
 	return nil
 }
 
@@ -424,7 +458,15 @@ func Convert_resource_CELDeviceSelector_To_v1alpha3_CELDeviceSelector(in *resour
 
 func autoConvert_v1alpha3_Device_To_resource_Device(in *resourcev1alpha3.Device, out *resource.Device, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Basic = (*resource.BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(resource.BasicDevice)
+		if err := Convert_v1alpha3_BasicDevice_To_resource_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -435,7 +477,15 @@ func Convert_v1alpha3_Device_To_resource_Device(in *resourcev1alpha3.Device, out
 
 func autoConvert_resource_Device_To_v1alpha3_Device(in *resource.Device, out *resourcev1alpha3.Device, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Basic = (*resourcev1alpha3.BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(resourcev1alpha3.BasicDevice)
+		if err := Convert_resource_BasicDevice_To_v1alpha3_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -1058,7 +1108,17 @@ func Convert_resource_ResourceSlice_To_v1alpha3_ResourceSlice(in *resource.Resou
 
 func autoConvert_v1alpha3_ResourceSliceList_To_resource_ResourceSliceList(in *resourcev1alpha3.ResourceSliceList, out *resource.ResourceSliceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resource.ResourceSlice)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceSlice, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_ResourceSlice_To_resource_ResourceSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1069,7 +1129,17 @@ func Convert_v1alpha3_ResourceSliceList_To_resource_ResourceSliceList(in *resour
 
 func autoConvert_resource_ResourceSliceList_To_v1alpha3_ResourceSliceList(in *resource.ResourceSliceList, out *resourcev1alpha3.ResourceSliceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resourcev1alpha3.ResourceSlice)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resourcev1alpha3.ResourceSlice, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceSlice_To_v1alpha3_ResourceSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1086,7 +1156,17 @@ func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *re
 	out.NodeName = in.NodeName
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
-	out.Devices = *(*[]resource.Device)(unsafe.Pointer(&in.Devices))
+	if in.Devices != nil {
+		in, out := &in.Devices, &out.Devices
+		*out = make([]resource.Device, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_Device_To_resource_Device(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Devices = nil
+	}
 	return nil
 }
 
@@ -1103,7 +1183,17 @@ func autoConvert_resource_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *re
 	out.NodeName = in.NodeName
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
-	out.Devices = *(*[]resourcev1alpha3.Device)(unsafe.Pointer(&in.Devices))
+	if in.Devices != nil {
+		in, out := &in.Devices, &out.Devices
+		*out = make([]resourcev1alpha3.Device, len(*in))
+		for i := range *in {
+			if err := Convert_resource_Device_To_v1alpha3_Device(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Devices = nil
+	}
 	return nil
 }
 

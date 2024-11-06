@@ -19,7 +19,7 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha3"]
+      apiVersions: ["v1alpha3", "v1beta1"]
       operations:  ["CREATE", "UPDATE"]
       resources:   ["resourceclaims"]
   validations:
@@ -49,7 +49,7 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha3"]
+      apiVersions: ["v1alpha3", "v1beta1"]
       operations:  ["CREATE", "UPDATE"]
       resources:   ["resourceclaimtemplates"]
   validations:

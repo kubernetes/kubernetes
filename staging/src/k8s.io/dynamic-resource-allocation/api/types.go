@@ -49,7 +49,7 @@ type Device struct {
 
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]resource.Quantity
+	Capacity   map[QualifiedName]DeviceCapacity
 }
 
 type QualifiedName string
@@ -61,4 +61,8 @@ type DeviceAttribute struct {
 	BoolValue    *bool
 	StringValue  *string
 	VersionValue *string
+}
+
+type DeviceCapacity struct {
+	Value resource.Quantity
 }

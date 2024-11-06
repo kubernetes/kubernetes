@@ -299,7 +299,7 @@ func New(ctx context.Context,
 	var resourceClaimCache *assumecache.AssumeCache
 	var draManager framework.SharedDRAManager
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
+		resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, informerFactory)
 	}

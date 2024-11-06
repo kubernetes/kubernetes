@@ -32,14 +32,14 @@ import (
 	"google.golang.org/grpc"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -52,7 +52,7 @@ const (
 )
 
 type fakeDRADriverGRPCServer struct {
-	drapb.UnimplementedNodeServer
+	drapb.UnimplementedDRAPluginServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
@@ -161,7 +161,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
+	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
 	go func(ctx context.Context) {
 		go func() {
@@ -560,11 +560,11 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			if test.claim != nil {
-				if _, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
+				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create ResourceClaim %s: %+v", test.claim.Name, err)
 				}
 				defer func() {
-					require.NoError(t, fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
+					require.NoError(t, fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
 				}()
 			}
 
@@ -581,7 +581,7 @@ func TestPrepareResources(t *testing.T) {
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -718,7 +718,7 @@ func TestUnprepareResources(t *testing.T) {
 			defer draServerInfo.teardownFn()
 
 			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{"1.27"}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
@@ -888,7 +888,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	defer draServerInfo.teardownFn()
 
 	plg := plugin.NewRegistrationHandler(nil, getFakeNode)
-	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{"1.27"}, nil); err != nil {
+	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
 	defer plg.DeRegisterPlugin(driverName)
@@ -948,7 +948,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 			}
 			claim := genTestClaim(claimName, driverName, deviceName, string(podUID))
 
-			if _, err = fakeKubeClient.ResourceV1alpha3().ResourceClaims(pod.Namespace).Create(tCtx, claim, metav1.CreateOptions{}); err != nil {
+			if _, err = fakeKubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Create(tCtx, claim, metav1.CreateOptions{}); err != nil {
 				t.Errorf("failed to create ResourceClaim %s: %+v", claim.Name, err)
 				return
 			}

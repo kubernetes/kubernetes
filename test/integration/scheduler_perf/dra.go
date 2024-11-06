@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -102,7 +102,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 	var mutex sync.Mutex
 	create := func(i int) {
 		err := func() error {
-			if _, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
+			if _, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create claim: %v", err)
 			}
 			return nil
@@ -191,11 +191,11 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 
 	for _, nodeName := range driverNodes {
 		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-		_, err := tCtx.Client().ResourceV1alpha3().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create node resource slice")
 	}
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		err := tCtx.Client().ResourceV1alpha3().ResourceSlices().DeleteCollection(tCtx,
+		err := tCtx.Client().ResourceV1beta1().ResourceSlices().DeleteCollection(tCtx,
 			metav1.DeleteOptions{},
 			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
 		)
@@ -230,8 +230,8 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 						"driverVersion":        {VersionValue: ptr.To("1.2.3")},
 						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
 					},
-					Capacity: map[resourceapi.QualifiedName]resource.Quantity{
-						"memory": resource.MustParse("1Gi"),
+					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						"memory": {Value: resource.MustParse("1Gi")},
 					},
 				},
 			},
@@ -267,7 +267,7 @@ func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
 func (op *allocResourceClaimsOp) requiredNamespaces() []string { return nil }
 
 func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
-	claims, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+	claims, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list claims")
 	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
 	tCtx = ktesting.WithCancel(tCtx)
@@ -275,7 +275,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 
 	// Track cluster state.
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
-	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
+	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), informerFactory)
 	informerFactory.Start(tCtx.Done())
@@ -333,7 +333,7 @@ claims:
 			if result != nil {
 				claim = claim.DeepCopy()
 				claim.Status.Allocation = &result[0]
-				claim, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+				claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "update claim status with allocation")
 				tCtx.ExpectNoError(draManager.ResourceClaims().AssumeClaimAfterAPICall(claim), "assume claim")
 				continue claims
