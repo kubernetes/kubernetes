@@ -668,20 +668,24 @@ func TestCPUManagerGenerate(t *testing.T) {
 			{
 				Cores: []cadvisorapi.Core{
 					{
-						Id:      0,
-						Threads: []int{0},
+						Id:           0,
+						Threads:      []int{0},
+						UncoreCaches: []cadvisorapi.Cache{{Id: 1}},
 					},
 					{
-						Id:      1,
-						Threads: []int{1},
+						Id:           1,
+						Threads:      []int{1},
+						UncoreCaches: []cadvisorapi.Cache{{Id: 1}},
 					},
 					{
-						Id:      2,
-						Threads: []int{2},
+						Id:           2,
+						Threads:      []int{2},
+						UncoreCaches: []cadvisorapi.Cache{{Id: 1}},
 					},
 					{
-						Id:      3,
-						Threads: []int{3},
+						Id:           3,
+						Threads:      []int{3},
+						UncoreCaches: []cadvisorapi.Cache{{Id: 1}},
 					},
 				},
 			},
