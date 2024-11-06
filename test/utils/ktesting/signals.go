@@ -19,6 +19,7 @@ package ktesting
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -30,6 +31,13 @@ import (
 var (
 	// defaultProgressReporter is inactive until init is called.
 	defaultProgressReporter = &progressReporter{}
+
+	// interruptCtx tracks whether the process got interrupted via SIGINT.
+	// In that case, interrupted gets called to cancel interruptCtx with
+	// a suitable message.
+	//
+	// This gets set up once per process and never gets reset.
+	interruptCtx, interrupted = context.WithCancelCause(context.Background())
 )
 
 const ginkgoSpecContextKey = "GINKGO_SPEC_CONTEXT"
@@ -42,11 +50,11 @@ type progressReporter struct {
 	// initMutex protects initialization and finalization of the reporter.
 	initMutex sync.Mutex
 
-	usageCount              int64
-	wg                      sync.WaitGroup
-	signalCtx, interruptCtx context.Context
-	signalChannel           chan os.Signal
-	progressChannel         chan os.Signal
+	usageCount      int64
+	wg              sync.WaitGroup
+	testCtx         context.Context
+	signalChannel   chan os.Signal
+	progressChannel chan os.Signal
 
 	// reportMutex protects report creation and settings.
 	reportMutex     sync.Mutex
@@ -75,6 +83,16 @@ func (p *progressReporter) init(tb TB) context.Context {
 		return context.Background()
 	}
 
+	tb.Helper()
+
+	// If already interrupted, then don't start the new test.
+	// This is necessary because normally CTRL-C would exit
+	// the entire process immediately. Now we keep running
+	// to clean up.
+	if interruptCtx.Err() != nil {
+		tb.Fatalf("testing has been interrupted: %v", context.Cause(interruptCtx))
+	}
+
 	p.initMutex.Lock()
 	defer p.initMutex.Unlock()
 
@@ -82,7 +100,7 @@ func (p *progressReporter) init(tb TB) context.Context {
 	tb.Cleanup(p.finalize)
 	if p.usageCount > 1 {
 		// Was already initialized.
-		return p.interruptCtx
+		return p.testCtx
 	}
 
 	// Might have been set for testing purposes.
@@ -108,6 +126,7 @@ func (p *progressReporter) init(tb TB) context.Context {
 	p.wg.Go(func() {
 		_, ok := <-p.signalChannel
 		if ok {
+			_, _ = fmt.Fprint(p.out, "\n\nINFO: canceling test context: received interrupt signal\n\n")
 			interrupted(errors.New("received interrupt signal"))
 		}
 	})
@@ -118,7 +137,7 @@ func (p *progressReporter) init(tb TB) context.Context {
 	// nolint:staticcheck // It complains about using a plain string. This can only be fixed
 	// by Ginkgo and Gomega formalizing this interface and define a type (somewhere...
 	// probably cannot be in either Ginkgo or Gomega).
-	p.interruptCtx = context.WithValue(cancelCtx, ginkgoSpecContextKey, defaultProgressReporter)
+	p.testCtx = context.WithValue(interruptCtx, ginkgoSpecContextKey, defaultProgressReporter)
 
 	p.progressChannel = make(chan os.Signal, 1)
 	// progressSignals will be empty on Windows.
@@ -128,7 +147,7 @@ func (p *progressReporter) init(tb TB) context.Context {
 
 	p.wg.Go(p.run)
 
-	return p.interruptCtx
+	return p.testCtx
 }
 
 func (p *progressReporter) finalize() {
