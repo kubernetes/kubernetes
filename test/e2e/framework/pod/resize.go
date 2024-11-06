@@ -162,15 +162,10 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
 	var testContainers []v1.Container
-	var testInitContainers []v1.Container
 
 	for _, ci := range tcInfo {
 		tc := makeResizableContainer(ci)
-		if ci.IsRestartableInitCtr {
-			testInitContainers = append(testInitContainers, tc)
-		} else {
-			testContainers = append(testContainers, tc)
-		}
+		testContainers = append(testContainers, tc)
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -186,12 +181,6 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
-
-	if len(testInitContainers) > 0 {
-		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
-		pod.Spec.InitContainers = testInitContainers
-	}
-
 	return pod
 }
 
