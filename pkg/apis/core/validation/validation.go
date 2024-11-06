@@ -5654,13 +5654,15 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
 	var newInitContainers []core.Container
-	for ix, container := range originalCPUMemPodSpec.InitContainers {
-		if container.RestartPolicy != nil && *container.RestartPolicy == core.ContainerRestartPolicyAlways {
-			lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
-			req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
-			container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
-			container.ResizePolicy = oldPod.Spec.InitContainers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
-			newInitContainers = append(newInitContainers, container)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for ix, container := range originalCPUMemPodSpec.InitContainers {
+			if container.RestartPolicy != nil && *container.RestartPolicy == core.ContainerRestartPolicyAlways { // restartable init container
+				lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
+				req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
+				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+				container.ResizePolicy = oldPod.Spec.InitContainers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
+				newInitContainers = append(newInitContainers, container)
+			}
 		}
 	}
 	if len(newInitContainers) > 0 {
