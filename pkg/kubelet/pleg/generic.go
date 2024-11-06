@@ -314,11 +314,15 @@ func (g *GenericPLEG) Relist() {
 		var completedConditions []versionedWatchCondition
 		for _, condition := range watchConditions {
 			if condition.condition(status) {
+				// condition was met: add it to the list of completed conditions.
 				completedConditions = append(completedConditions, condition)
 			}
 		}
 		if len(completedConditions) > 0 {
 			g.completeWatchConditions(pid, completedConditions)
+			// If at least 1 condition completed, emit a ConditionMet event to trigger a pod sync.
+			// We only emit 1 event even if multiple conditions are met, since SyncPod reevaluates
+			// all containers in the pod with the latest status.
 			events = append(events, &PodLifecycleEvent{ID: pid, Type: ConditionMet})
 		}
 
@@ -484,24 +488,25 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 	return status, g.cache.Set(pod.ID, status, err, timestamp), err
 }
 
+// SetPodWatchCondition flags the pod for reinspection on every Relist iteration until the watch
+// condition is met. The condition is keyed so it can be updated before the condition
+// is met.
 func (g *GenericPLEG) SetPodWatchCondition(podUID types.UID, conditionKey string, condition WatchCondition) {
 	g.watchConditionsLock.Lock()
 	defer g.watchConditionsLock.Unlock()
 
 	conditions, ok := g.watchConditions[podUID]
 	if !ok {
-		if condition == nil {
-			return // Condition isn't set, nothing to do.
-		}
 		conditions = make(map[string]versionedWatchCondition)
 	}
 
 	versioned, found := conditions[conditionKey]
 	if found {
+		// Watch condition was already set. Increment its version & update the condition function.
 		versioned.version++
 		versioned.condition = condition
 		conditions[conditionKey] = versioned
-	} else if condition != nil {
+	} else {
 		conditions[conditionKey] = versionedWatchCondition{
 			key:       conditionKey,
 			condition: condition,
@@ -516,19 +521,22 @@ func (g *GenericPLEG) getPodWatchConditions(podUID types.UID) []versionedWatchCo
 	g.watchConditionsLock.Lock()
 	defer g.watchConditionsLock.Unlock()
 
-	conditions, ok := g.watchConditions[podUID]
+	podConditions, ok := g.watchConditions[podUID]
 	if !ok {
 		return nil
 	}
 
-	filtered := make([]versionedWatchCondition, 0, len(conditions))
-	for _, condition := range conditions {
-		filtered = append(filtered, condition)
+	// Flatten the map into a list of conditions. This also serves to create a copy, so the lock can
+	// be released.
+	conditions := make([]versionedWatchCondition, 0, len(podConditions))
+	for _, condition := range podConditions {
+		conditions = append(conditions, condition)
 	}
-	return filtered
+	return conditions
 }
 
-// completeWatchConditions clears the completed watch conditions.
+// completeWatchConditions removes the completed watch conditions, unless they have been updated
+// since the condition was checked.
 func (g *GenericPLEG) completeWatchConditions(podUID types.UID, completedConditions []versionedWatchCondition) {
 	g.watchConditionsLock.Lock()
 	defer g.watchConditionsLock.Unlock()
@@ -549,6 +557,8 @@ func (g *GenericPLEG) completeWatchConditions(podUID types.UID, completedConditi
 	g.watchConditions[podUID] = conditions
 }
 
+// cleanupOrphanedWatchConditions purges the watchConditions map of any pods that were removed from
+// the pod records. Events are not emitted for removed pods.
 func (g *GenericPLEG) cleanupOrphanedWatchConditions() {
 	g.watchConditionsLock.Lock()
 	defer g.watchConditionsLock.Unlock()
