@@ -86,7 +86,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				},
 				NetworkData: &v1alpha3.NetworkDeviceData{
 					InterfaceName: "net-1",
-					Addresses: []string{
+					IPs: []string{
 						"10.9.8.0/24",
 						"2001:db8::/64",
 					},
@@ -158,7 +158,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				},
 				NetworkData: &v1alpha3.NetworkDeviceData{
 					InterfaceName: "net-1",
-					Addresses: []string{
+					IPs: []string{
 						"10.9.8.0/24",
 						"2001:db8::/64",
 					},
@@ -194,7 +194,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				},
 				NetworkData: &v1alpha3.NetworkDeviceData{
 					InterfaceName: "net-1",
-					Addresses: []string{
+					IPs: []string{
 						"10.9.8.0/24",
 						"2001:db8::/64",
 					},

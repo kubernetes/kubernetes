@@ -789,7 +789,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, hardwareAddressMaxLength))
 	}
 
-	allErrs = append(allErrs, validateSet(networkDeviceData.Addresses, -1,
+	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, -1,
 		func(address string, fldPath *field.Path) field.ErrorList {
 			return validation.IsValidCIDR(fldPath, address)
 		},
@@ -803,6 +803,6 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 			maskSize, _ := ipNet.Mask.Size()
 			return fmt.Sprintf("%s/%d", ip.String(), maskSize), ""
 		},
-		fldPath.Child("addresses"))...)
+		fldPath.Child("ips"))...)
 	return allErrs
 }

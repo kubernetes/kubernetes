@@ -441,7 +441,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					Data:       runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)},
 					NetworkData: &resourceapi.NetworkDeviceData{
 						InterfaceName:   "inf1",
-						Addresses:       []string{"10.9.8.0/24", "2001:db8::/64"},
+						IPs:             []string{"10.9.8.0/24", "2001:db8::/64"},
 						HardwareAddress: "bc:1c:b6:3e:b8:25",
 					},
 				})
@@ -460,7 +460,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				Data:       runtime.RawExtension{Raw: []byte(`{"bar":"foo"}`)},
 				NetworkData: &resourceapi.NetworkDeviceData{
 					InterfaceName:   "inf2",
-					Addresses:       []string{"10.9.8.1/24", "2001:db8::1/64"},
+					IPs:             []string{"10.9.8.1/24", "2001:db8::1/64"},
 					HardwareAddress: "bc:1c:b6:3e:b8:26",
 				},
 			}
