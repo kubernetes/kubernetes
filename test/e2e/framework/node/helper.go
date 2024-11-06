@@ -18,13 +18,16 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -174,4 +177,37 @@ func IsARM64(node *v1.Node) bool {
 	}
 
 	return false
+}
+
+// AddExtendedResource adds a fake resource to the Node.
+func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nodeName string, extendedResourceName v1.ResourceName, extendedResourceQuantity resource.Quantity) {
+	extendedResource := v1.ResourceName(extendedResourceName)
+
+	ginkgo.By("Adding a custom resource")
+	extendedResourceList := v1.ResourceList{
+		extendedResource: extendedResourceQuantity,
+	}
+	patchPayload, err := json.Marshal(v1.Node{
+		Status: v1.NodeStatus{
+			Capacity:    extendedResourceList,
+			Allocatable: extendedResourceList,
+		},
+	})
+	framework.ExpectNoError(err, "Failed to marshal node JSON")
+
+	_, err = clientSet.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, []byte(patchPayload), metav1.PatchOptions{}, "status")
+	framework.ExpectNoError(err)
+}
+
+// RemoveExtendedResource removes a fake resource from the Node.
+func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, nodeName string, extendedResourceName v1.ResourceName) {
+	extendedResource := v1.ResourceName(extendedResourceName)
+
+	ginkgo.By("Removing a custom resource")
+	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	delete(node.Status.Capacity, extendedResource)
+	delete(node.Status.Allocatable, extendedResource)
+	_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+	framework.ExpectNoError(err)
 }
