@@ -257,7 +257,7 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	if oldClaim.Status.Allocation != nil {
 		// Get all devices in the oldClaim.
 		for _, result := range oldClaim.Status.Allocation.Devices.Results {
-			deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
 			deallocatedDevices.Insert(deviceID)
 		}
 	}
@@ -265,7 +265,7 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	// Remove devices from deallocatedDevices that are still in newClaim.
 	if newClaim.Status.Allocation != nil {
 		for _, result := range newClaim.Status.Allocation.Devices.Results {
-			deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
 			deallocatedDevices.Delete(deviceID)
 		}
 	}
@@ -273,11 +273,7 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	// Remove from newClaim.Status.Devices.
 	n := 0
 	for _, device := range newClaim.Status.Devices {
-		deviceID := structured.DeviceID{
-			Driver: device.Driver,
-			Pool:   device.Pool,
-			Device: device.Device,
-		}
+		deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 		if !deallocatedDevices.Has(deviceID) {
 			newClaim.Status.Devices[n] = device
 			n++

@@ -130,7 +130,7 @@ func gatherRequestNames(deviceClaim *resource.DeviceClaim) sets.Set[string] {
 func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.DeviceID] {
 	allocatedDevices := sets.New[structured.DeviceID]()
 	for _, result := range allocationResult.Results {
-		deviceID := structured.DeviceID{Driver: result.Driver, Pool: result.Pool, Device: result.Device}
+		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
 		allocatedDevices.Insert(deviceID)
 	}
 	return allocatedDevices
@@ -276,7 +276,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 			return validateDeviceStatus(device, fldPath, allocatedDevices)
 		},
 		func(device resource.AllocatedDeviceStatus) (structured.DeviceID, string) {
-			return structured.DeviceID{Driver: device.Driver, Pool: device.Pool, Device: device.Device}, "deviceID"
+			return structured.MakeDeviceID(device.Driver, device.Pool, device.Device), "deviceID"
 		},
 		fldPath.Child("devices"))...)
 
@@ -744,7 +744,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
-	deviceID := structured.DeviceID{Driver: device.Driver, Pool: device.Pool, Device: device.Device}
+	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 	if !allocatedDevices.Has(deviceID) {
 		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
 	}
