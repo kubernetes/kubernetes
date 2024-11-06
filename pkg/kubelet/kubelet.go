@@ -148,6 +148,9 @@ const (
 	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
 	MaxContainerBackOff = v1beta1.MaxContainerBackOff
 
+	ReducedMaxContainerBackOff  = 60 * time.Second
+	ReducedContainerBackoffBase = 1 * time.Second
+
 	// MaxImageBackOff is the max backoff period for image pulls, exported for the e2e test
 	MaxImageBackOff = 300 * time.Second
 
