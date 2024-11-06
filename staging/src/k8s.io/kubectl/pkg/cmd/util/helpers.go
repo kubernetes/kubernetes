@@ -537,10 +537,11 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	}
 }
 
-func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is beta and may change in the future.", usage, allowedSubresources))
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s This flag is beta and may change in the future.", usage))
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+		var commonSubresources = []string{"status", "scale", "resize"}
+		return commonSubresources, cobra.ShellCompDirectiveNoFileComp
 	}))
 }
 
