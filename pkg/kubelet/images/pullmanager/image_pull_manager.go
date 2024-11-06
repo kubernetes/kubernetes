@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package images
+package pullmanager
 
 import (
 	"context"
@@ -366,19 +366,6 @@ func (f *PullManager) getIntentCounterForImage(image string) int32 {
 	}
 	return intentNum
 }
-
-var _ ImagePullManager = &NoopImagePullManager{}
-
-type NoopImagePullManager struct{}
-
-func (m *NoopImagePullManager) RecordPullIntent(_ string) error { return nil }
-func (m *NoopImagePullManager) RecordImagePulled(_, _ string, _ *kubeletconfiginternal.ImagePullCredentials) {
-}
-func (m *NoopImagePullManager) RecordImagePullFailed(image string) {}
-func (m *NoopImagePullManager) MustAttemptImagePull(_, _ string, _ []kubeletconfiginternal.ImagePullSecret) bool {
-	return false
-}
-func (m *NoopImagePullManager) PruneUnknownRecords(_ []string, _ time.Time) {}
 
 // searchForExistingTagDigest loops through the `image` RepoDigests and RepoTags
 // and tries to find all image digests/tags in `inFlightPulls`, which is a map of
