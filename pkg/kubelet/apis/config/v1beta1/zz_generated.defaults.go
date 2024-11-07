@@ -38,6 +38,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_KubeletConfiguration(in *configv1beta1.KubeletConfiguration) {
+	SetDefaults_KubeletConfiguration(in)
 	for i := range in.ReservedMemory {
 		a := &in.ReservedMemory[i]
 		v1.SetDefaults_ResourceList(&a.Limits)
