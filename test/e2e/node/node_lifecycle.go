@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Node Lifecycle", func() {
+var _ = SIGDescribe("Node Lifecycle", framework.WithSerial(), func() {
 
 	f := framework.NewDefaultFramework("fake-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

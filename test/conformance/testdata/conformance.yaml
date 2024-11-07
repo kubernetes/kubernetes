@@ -2293,8 +2293,8 @@
   release: v1.16
   file: test/e2e/node/taints.go
 - testname: Node, resource lifecycle
-  codename: '[sig-node] Node Lifecycle should run through the lifecycle of a node
-    [Conformance]'
+  codename: '[sig-node] Node Lifecycle [Serial] should run through the lifecycle of
+    a node [Conformance]'
   description: Creating and Reading a Node MUST succeed with required name retrieved.
     Patching a Node MUST succeed with its new label found. Listing Nodes with a labelSelector
     MUST succeed with only a single node found. Updating a Node MUST succeed with
