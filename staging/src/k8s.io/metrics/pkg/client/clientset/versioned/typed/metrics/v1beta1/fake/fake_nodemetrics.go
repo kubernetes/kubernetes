@@ -33,7 +33,7 @@ type FakeNodeMetricses struct {
 	Fake *FakeMetricsV1beta1
 }
 
-var nodemetricsesResource = v1beta1.SchemeGroupVersion.WithResource("nodes")
+var nodemetricsesResource = v1beta1.SchemeGroupVersion.WithResource("nodemetricses")
 
 var nodemetricsesKind = v1beta1.SchemeGroupVersion.WithKind("NodeMetrics")
 

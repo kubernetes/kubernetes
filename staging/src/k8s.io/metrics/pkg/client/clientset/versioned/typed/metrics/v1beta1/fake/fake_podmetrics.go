@@ -34,7 +34,7 @@ type FakePodMetricses struct {
 	ns   string
 }
 
-var podmetricsesResource = v1beta1.SchemeGroupVersion.WithResource("pods")
+var podmetricsesResource = v1beta1.SchemeGroupVersion.WithResource("podmetricses")
 
 var podmetricsesKind = v1beta1.SchemeGroupVersion.WithKind("PodMetrics")
 
