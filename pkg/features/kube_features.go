@@ -472,12 +472,6 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
-	// owner: @wzshiming
-	// kep: http://kep.k8s.io/2681
-	//
-	// Adds pod.status.hostIPs and downward API
-	PodHostIPs featuregate.Feature = "PodHostIPs"
-
 	// owner: @AxeZhan
 	// kep: http://kep.k8s.io/3960
 	//

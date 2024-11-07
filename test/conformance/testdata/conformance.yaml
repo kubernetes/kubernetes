@@ -2152,6 +2152,14 @@
     in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: DownwardAPI, environment for hostIPs
+  codename: '[sig-node] Downward API should provide hostIPs as an env var [NodeConformance]
+    [Conformance]'
+  description: Downward API MUST expose Pod and Container fields as environment variables.
+    Specify hostIPs as environment variable in the Pod Spec are visible at runtime
+    in the container.
+  release: v1.32
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for Pod UID
   codename: '[sig-node] Downward API should provide pod UID as env vars [NodeConformance]
     [Conformance]'
