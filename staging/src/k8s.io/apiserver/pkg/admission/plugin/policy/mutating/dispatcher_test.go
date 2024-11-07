@@ -122,6 +122,9 @@ func TestDispatcher(t *testing.T) {
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
 					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
 				}},
 		},
 		{
@@ -143,6 +146,9 @@ func TestDispatcher(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
+					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
 					},
 				}},
 			params: []runtime.Object{
@@ -212,6 +218,9 @@ func TestDispatcher(t *testing.T) {
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
 					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
 				}},
 		},
 		{
@@ -232,6 +241,9 @@ func TestDispatcher(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
+					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
 					},
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
@@ -317,6 +329,9 @@ func TestDispatcher(t *testing.T) {
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
 					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
 				}},
 		},
 		{
@@ -337,6 +352,9 @@ func TestDispatcher(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
+					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
 					},
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
@@ -444,6 +462,9 @@ func TestDispatcher(t *testing.T) {
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
 					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
 				}},
 		},
 		{
@@ -465,6 +486,9 @@ func TestDispatcher(t *testing.T) {
 						Spec: corev1.PodSpec{
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
+					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
 					},
 				}},
 			policyHooks: []generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]{
@@ -571,6 +595,9 @@ func TestDispatcher(t *testing.T) {
 							Volumes: []corev1.Volume{{Name: "x"}},
 						},
 					},
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
 				}},
 		},
 	}
@@ -596,6 +623,11 @@ func TestDispatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Register a fake defaulter since registering the full defaulter adds noise
+	// and creates dep cycles.
+	scheme.AddTypeDefaultingFunc(&appsv1.Deployment{},
+		func(obj interface{}) { fakeSetDefaultForDeployment(obj.(*appsv1.Deployment)) })
 
 	objectInterfaces := admission.NewObjectInterfacesFromScheme(scheme)
 
@@ -673,3 +705,11 @@ func (t testParamScope) Name() meta.RESTScopeName {
 }
 
 var _ meta.RESTScope = testParamScope{}
+
+func fakeSetDefaultForDeployment(obj *appsv1.Deployment) {
+	// Just default strategy type so the tests have a defaulted field to observe
+	strategy := &obj.Spec.Strategy
+	if strategy.Type == "" {
+		strategy.Type = appsv1.RollingUpdateDeploymentStrategyType
+	}
+}
