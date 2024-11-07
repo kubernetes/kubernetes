@@ -981,7 +981,7 @@ type MemorySwapConfiguration struct {
 }
 
 type CrashLoopBackOffConfig struct {
-	// maximumBackOffPeriod is the maximum duration the backoff delay can accrue
+	// maxContainerRestartPeriod is the maximum duration the backoff delay can accrue
 	// to for container restarts, minimum 1 second, maximum 300 seconds. If not set,
 	// defaults to the internal crashloopbackoff maximum (300s).
 	// +featureGate=KubeletCrashLoopBackOffMax
