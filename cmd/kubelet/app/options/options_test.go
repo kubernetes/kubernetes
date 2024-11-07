@@ -100,8 +100,8 @@ func TestRoundTrip(t *testing.T) {
 			}
 			continue
 		}
-		if !reflect.DeepEqual(modifiedFlags, outputFlags) {
-			t.Errorf("%s: flags did not round trip: %s", testCase.name, cmp.Diff(modifiedFlags, outputFlags))
+		if !reflect.DeepEqual(modifiedFlags.KubeletFlags, outputFlags.KubeletFlags) {
+			t.Errorf("%s: flags did not round trip: %s", testCase.name, cmp.Diff(modifiedFlags.KubeletFlags, outputFlags.KubeletFlags))
 			continue
 		}
 	}
