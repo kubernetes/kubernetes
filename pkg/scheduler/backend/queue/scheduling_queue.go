@@ -92,9 +92,11 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 type SchedulingQueue interface {
 	framework.PodNominator
 	Add(logger klog.Logger, pod *v1.Pod)
-	// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
-	// The passed-in pods are originally compiled from plugins that want to activate Pods,
-	// by injecting the pods through a reserved CycleState struct (PodsToActivate).
+	// Activate moves the given pods to activeQ.
+	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// the wildcard event is registered so that the pod will be requeued when it comes back.
+	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
@@ -411,9 +413,22 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	}
 
 	if event.IsWildCard() {
+		// If the wildcard event has a Pod in newObj,
+		// that indicates that the event wants to be effective for the Pod only.
+		// Specifically, EventForceActivate could have a target Pod in newObj.
+		if newObj != nil {
+			if pod, ok := newObj.(*v1.Pod); !ok || pod.UID != pInfo.Pod.UID {
+				// This wildcard event is not for this Pod.
+				if ok {
+					logger.V(6).Info("Not worth requeuing because the event is wildcard, but for another pod", "pod", klog.KObj(pInfo.Pod), "event", event.Label(), "newObj", klog.KObj(pod))
+				}
+				return queueSkip
+			}
+		}
+
 		// If the wildcard event is special one as someone wants to force all Pods to move to activeQ/backoffQ.
 		// We return queueAfterBackoff in this case, while resetting all blocked plugins.
-		logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod))
+		logger.V(6).Info("Worth requeuing because the event is wildcard", "pod", klog.KObj(pInfo.Pod), "event", event.Label())
 		return queueAfterBackoff
 	}
 
@@ -590,7 +605,11 @@ func (p *PriorityQueue) Add(logger klog.Logger, pod *v1.Pod) {
 	}
 }
 
-// Activate moves the given pods to activeQ iff they're in unschedulablePods or backoffQ.
+// Activate moves the given pods to activeQ.
+// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+// the wildcard event is registered so that the pod will be requeued when it comes back.
+// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+// Activate would ignore the pod.
 func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -599,7 +618,15 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	for _, pod := range pods {
 		if p.activate(logger, pod) {
 			activated = true
+			continue
 		}
+
+		// If this pod is in-flight, register the activation event (for when QHint is enabled) or update moveRequestCycle (for when QHints is disabled)
+		// so that the pod will be requeued when it comes back.
+		// Specifically in the in-tree plugins, this is for the scenario with the preemption plugin
+		// where the async preemption API calls are all done or fail at some point before the Pod comes back to the queue.
+		p.activeQ.addEventsIfPodInFlight(nil, pod, []framework.ClusterEvent{framework.EventForceActivate})
+		p.moveRequestCycle = p.activeQ.schedulingCycle()
 	}
 
 	if activated {

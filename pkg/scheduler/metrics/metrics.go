@@ -40,6 +40,11 @@ const (
 	Binding = "binding"
 )
 
+const (
+	GoroutineResultSuccess = "success"
+	GoroutineResultError   = "error"
+)
+
 // ExtentionPoints is a list of possible values for the extension_point label.
 var ExtentionPoints = []string{
 	PreFilter,
@@ -105,14 +110,21 @@ var (
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
-	// This is only available when the QHint feature gate is enabled.
+	PermitWaitDuration    *metrics.HistogramVec
+	CacheSize             *metrics.GaugeVec
+	unschedulableReasons  *metrics.GaugeVec
+	PluginEvaluationTotal *metrics.CounterVec
+
+	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
 	SchedulerQueueIncomingPods    *metrics.CounterVec
-	PermitWaitDuration            *metrics.HistogramVec
-	CacheSize                     *metrics.GaugeVec
-	unschedulableReasons          *metrics.GaugeVec
-	PluginEvaluationTotal         *metrics.CounterVec
-	metricsList                   []metrics.Registerable
+
+	// The below two are only available when the async-preemption feature gate is enabled.
+	PreemptionGoroutinesDuration       *metrics.HistogramVec
+	PreemptionGoroutinesExecutionTotal *metrics.CounterVec
+
+	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
+	metricsList []metrics.Registerable
 )
 
 var registerMetrics sync.Once
@@ -123,11 +135,14 @@ func Register() {
 	registerMetrics.Do(func() {
 		InitMetrics()
 		RegisterMetrics(metricsList...)
-		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			RegisterMetrics(queueingHintExecutionDuration)
-			RegisterMetrics(InFlightEvents)
-		}
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			RegisterMetrics(queueingHintExecutionDuration, InFlightEvents)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
+			RegisterMetrics(PreemptionGoroutinesDuration, PreemptionGoroutinesExecutionTotal)
+		}
 	})
 }
 
@@ -316,6 +331,25 @@ func InitMetrics() {
 			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"plugin", "extension_point", "profile"})
+
+	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "preemption_goroutines_duration_seconds",
+			Help:           "Duration in seconds for running goroutines for the preemption.",
+			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"})
+
+	PreemptionGoroutinesExecutionTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "preemption_goroutines_execution_total",
+			Help:           "Number of preemption goroutines executed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,

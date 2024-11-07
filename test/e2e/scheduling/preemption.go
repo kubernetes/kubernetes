@@ -43,6 +43,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -303,6 +304,157 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		if !podPreempted {
 			framework.Failf("expected pod to be preempted, instead got pod %+v and error %v", preemptedPod, err)
 		}
+	})
+
+	/*
+		Release: v1.32
+		Testname: Scheduler runs the preemption with various priority classes expectedly
+		Description: When there are Pods with various priority classes running the preemption,
+		the scheduler must prioritize the Pods with the higher priority class.
+	*/
+	framework.It("validates various priority Pods preempt expectedly with the async preemption", feature.SchedulerAsyncPreemption, func(ctx context.Context) {
+		var podRes v1.ResourceList
+		// Create 10 pods per node that will eat up all the node's resources.
+		ginkgo.By("Create 10 low-priority pods on each node.")
+		lowPriorityPods := make([]*v1.Pod, 0, 10*len(nodeList.Items))
+		// Create pods in the cluster.
+		for i, node := range nodeList.Items {
+			// Update each node to advertise 3 available extended resources
+			e2enode.AddExtendedResource(ctx, cs, node.Name, testExtendedResource, resource.MustParse("10"))
+
+			// Create 10 low priority pods on each node, which will use up 10/10 of the node's resources.
+			for j := 0; j < 10; j++ {
+				// Request 1 of the available resources for the victim pods
+				podRes = v1.ResourceList{}
+				podRes[testExtendedResource] = resource.MustParse("1")
+				pausePod := createPausePod(ctx, f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, lowPriorityClassName),
+					PriorityClassName: lowPriorityClassName,
+					// This victim pod will be preempted by the high priority pod.
+					// But, the deletion will be blocked by the finalizer.
+					//
+					// The finalizer is needed to prevent the medium Pods from being scheduled instead of the high Pods,
+					// depending on when the scheduler notices the existence of all the high Pods we create.
+					Finalizers: []string{testFinalizer},
+					Resources: &v1.ResourceRequirements{
+						Requests: podRes,
+						Limits:   podRes,
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+				lowPriorityPods = append(lowPriorityPods, pausePod)
+				framework.Logf("Created pod: %v", pausePod.Name)
+			}
+		}
+
+		ginkgo.By("Wait for lower priority pods to be scheduled.")
+		for _, pod := range lowPriorityPods {
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod))
+		}
+
+		highPriorityPods := make([]*v1.Pod, 0, 5*len(nodeList.Items))
+		mediumPriorityPods := make([]*v1.Pod, 0, 10*len(nodeList.Items))
+
+		ginkgo.By("Run high/medium priority pods that have same requirements as that of lower priority pod")
+		for i := range nodeList.Items {
+			// Create medium priority pods first
+			// to confirm the scheduler finally prioritize the high priority pods, ignoring the medium priority pods.
+			for j := 0; j < 10; j++ {
+				// 5 pods per node will be unschedulable
+				// because the node only has 10 resource, and high priority pods will use 5 resource.
+				p := createPausePod(ctx, f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, mediumPriorityClassName),
+					PriorityClassName: mediumPriorityClassName,
+					Resources: &v1.ResourceRequirements{
+						// Set the pod request to the low priority pod's resources
+						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+					},
+				})
+				mediumPriorityPods = append(mediumPriorityPods, p)
+			}
+
+			for j := 0; j < 5; j++ {
+				p := createPausePod(ctx, f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, highPriorityClassName),
+					PriorityClassName: highPriorityClassName,
+					Resources: &v1.ResourceRequirements{
+						// Set the pod request to the low priority pod's resources
+						Requests: lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+						Limits:   lowPriorityPods[0].Spec.Containers[0].Resources.Requests,
+					},
+				})
+				highPriorityPods = append(highPriorityPods, p)
+			}
+		}
+
+		// All low priority Pods should be the target of preemption.
+		// Those Pods have a finalizer and hence should not be deleted yet at this point.
+		ginkgo.By("Check all low priority pods to be about to preempted.")
+		for _, pod := range lowPriorityPods {
+			framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+				preemptedPod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return preemptedPod.DeletionTimestamp != nil, nil
+			}))
+		}
+
+		// All high priority Pods should be schedulable by removing the low priority Pods.
+		ginkgo.By("Wait for high priority pods to be ready for the preemption.")
+		for _, pod := range highPriorityPods {
+			framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+				highPod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return highPod.Status.NominatedNodeName != "", nil
+			}))
+		}
+
+		ginkgo.By("Remove the finalizer from all low priority pods to proceed the preemption.")
+		for _, pod := range lowPriorityPods {
+			// Remove the finalizer so that the pod can be deleted by GC
+			e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod.Name, testFinalizer)
+		}
+
+		ginkgo.By("Wait for high priority pods to be scheduled.")
+		for _, pod := range highPriorityPods {
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod))
+		}
+
+		ginkgo.By("Wait for 5 medium priority pods to be scheduled.")
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+			scheduled := 0
+			for _, pod := range mediumPriorityPods {
+				medPod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+
+				if medPod.Spec.NodeName != "" {
+					scheduled++
+				}
+			}
+			if scheduled > 5 {
+				return false, fmt.Errorf("expected 5 medium priority pods to be scheduled, but got %d", scheduled)
+			}
+
+			return scheduled == 5, nil
+		}))
 	})
 
 	/*

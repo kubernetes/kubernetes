@@ -355,6 +355,7 @@ func New(ctx context.Context,
 
 	for _, fwk := range profiles {
 		fwk.SetPodNominator(podQueue)
+		fwk.SetPodActivator(podQueue)
 	}
 
 	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)

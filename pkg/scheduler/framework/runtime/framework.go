@@ -84,6 +84,7 @@ type frameworkImpl struct {
 
 	extenders []framework.Extender
 	framework.PodNominator
+	framework.PodActivator
 
 	parallelizer parallelize.Parallelizer
 }
@@ -131,6 +132,7 @@ type frameworkOptions struct {
 	snapshotSharedLister   framework.SharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           framework.PodNominator
+	podActivator           framework.PodActivator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
@@ -197,6 +199,12 @@ func WithSnapshotSharedLister(snapshotSharedLister framework.SharedLister) Optio
 func WithPodNominator(nominator framework.PodNominator) Option {
 	return func(o *frameworkOptions) {
 		o.podNominator = nominator
+	}
+}
+
+func WithPodActivator(activator framework.PodActivator) Option {
+	return func(o *frameworkOptions) {
+		o.podActivator = activator
 	}
 }
 
@@ -279,6 +287,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		metricsRecorder:      options.metricsRecorder,
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
+		PodActivator:         options.podActivator,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -425,6 +434,10 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 
 func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 	f.PodNominator = n
+}
+
+func (f *frameworkImpl) SetPodActivator(a framework.PodActivator) {
+	f.PodActivator = a
 }
 
 // Close closes each plugin, when they implement io.Closer interface.

@@ -1294,13 +1294,17 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func TestPriorityQueue_Activate(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name                        string
 		qPodInfoInUnschedulablePods []*framework.QueuedPodInfo
 		qPodInfoInPodBackoffQ       []*framework.QueuedPodInfo
 		qPodInActiveQ               []*v1.Pod
 		qPodInfoToActivate          *framework.QueuedPodInfo
+		qPodInInFlightPod           *v1.Pod
+		expectedInFlightEvent       *clusterEvent
 		want                        []*framework.QueuedPodInfo
+		qHintEnabled                bool
 	}{
 		{
 			name:               "pod already in activeQ",
@@ -1312,6 +1316,21 @@ func TestPriorityQueue_Activate(t *testing.T) {
 			name:               "pod not in unschedulablePods/podBackoffQ",
 			qPodInfoToActivate: &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
 			want:               []*framework.QueuedPodInfo{},
+		},
+		{
+			name:                  "[QHint] pod not in unschedulablePods/podBackoffQ but in-flight",
+			qPodInfoToActivate:    &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			qPodInInFlightPod:     highPriNominatedPodInfo.Pod,
+			expectedInFlightEvent: &clusterEvent{oldObj: (*v1.Pod)(nil), newObj: highPriNominatedPodInfo.Pod, event: framework.EventForceActivate},
+			want:                  []*framework.QueuedPodInfo{},
+			qHintEnabled:          true,
+		},
+		{
+			name:               "[QHint] pod not in unschedulablePods/podBackoffQ and not in-flight",
+			qPodInfoToActivate: &framework.QueuedPodInfo{PodInfo: highPriNominatedPodInfo},
+			qPodInInFlightPod:  medPriorityPodInfo.Pod, // different pod is in-flight
+			want:               []*framework.QueuedPodInfo{},
+			qHintEnabled:       true,
 		},
 		{
 			name:                        "pod in unschedulablePods",
@@ -1329,11 +1348,29 @@ func TestPriorityQueue_Activate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.qHintEnabled)
 			var objs []runtime.Object
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
+
+			if tt.qPodInInFlightPod != nil {
+				// Put -> Pop the Pod to make it registered in inFlightPods.
+				q.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
+					unlockedActiveQ.AddOrUpdate(newQueuedPodInfoForLookup(tt.qPodInInFlightPod))
+				})
+				p, err := q.activeQ.pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				if p.Pod.Name != tt.qPodInInFlightPod.Name {
+					t.Errorf("Unexpected popped pod: %v", p.Pod.Name)
+				}
+				if len(q.activeQ.listInFlightEvents()) != 1 {
+					t.Fatal("Expected the pod to be recorded in in-flight events, but it doesn't")
+				}
+			}
 
 			// Prepare activeQ/unschedulablePods/podBackoffQ according to the table
 			for _, qPod := range tt.qPodInActiveQ {
@@ -1353,7 +1390,29 @@ func TestPriorityQueue_Activate(t *testing.T) {
 
 			// Check the result after activation by the length of activeQ
 			if wantLen := len(tt.want); q.activeQ.len() != wantLen {
-				t.Errorf("length compare: want %v, got %v", wantLen, q.activeQ.len())
+				t.Fatalf("length compare: want %v, got %v", wantLen, q.activeQ.len())
+			}
+
+			if tt.expectedInFlightEvent != nil {
+				if len(q.activeQ.listInFlightEvents()) != 2 {
+					t.Fatalf("Expected two in-flight event to be recorded, but got %v events", len(q.activeQ.listInFlightEvents()))
+				}
+				found := false
+				for _, e := range q.activeQ.listInFlightEvents() {
+					event, ok := e.(*clusterEvent)
+					if !ok {
+						continue
+					}
+
+					if d := cmp.Diff(tt.expectedInFlightEvent, event, cmpopts.EquateComparable(clusterEvent{})); d != "" {
+						t.Fatalf("Unexpected in-flight event (-want, +got):\n%s", d)
+					}
+					found = true
+				}
+
+				if !found {
+					t.Fatalf("Expected in-flight event to be recorded, but it wasn't.")
+				}
 			}
 
 			// Check if the specific pod exists in activeQ
@@ -3779,6 +3838,7 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 
 // Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
 func Test_isPodWorthRequeuing(t *testing.T) {
+	metrics.Register()
 	count := 0
 	queueHintReturnQueue := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
@@ -3857,8 +3917,34 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 			},
 			event:                  framework.EventUnschedulableTimeout,
 			oldObj:                 nil,
-			newObj:                 st.MakeNode().Obj(),
+			newObj:                 nil,
 			expected:               queueAfterBackoff,
+			expectedExecutionCount: 0,
+			queueingHintMap:        QueueingHintMapPerProfile{},
+		},
+		{
+			name: "return Queue when the event is wildcard and the wildcard targets the pod to be requeued right now",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.EventForceActivate,
+			oldObj:                 nil,
+			newObj:                 st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+			expected:               queueAfterBackoff,
+			expectedExecutionCount: 0,
+			queueingHintMap:        QueueingHintMapPerProfile{},
+		},
+		{
+			name: "return Skip when the event is wildcard, but the wildcard targets a different pod",
+			podInfo: &framework.QueuedPodInfo{
+				UnschedulablePlugins: sets.New("fooPlugin1"),
+				PodInfo:              mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()),
+			},
+			event:                  framework.EventForceActivate,
+			oldObj:                 nil,
+			newObj:                 st.MakePod().Name("pod-different").Namespace("ns2").UID("2").Obj(),
+			expected:               queueSkip,
 			expectedExecutionCount: 0,
 			queueingHintMap:        QueueingHintMapPerProfile{},
 		},

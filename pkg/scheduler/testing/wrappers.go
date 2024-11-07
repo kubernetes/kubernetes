@@ -310,6 +310,12 @@ func (p *PodWrapper) Name(s string) *PodWrapper {
 	return p
 }
 
+// Name sets `s` as the name of the inner pod.
+func (p *PodWrapper) GenerateName(s string) *PodWrapper {
+	p.SetGenerateName(s)
+	return p
+}
+
 // UID sets `s` as the UID of the inner pod.
 func (p *PodWrapper) UID(s string) *PodWrapper {
 	p.SetUID(types.UID(s))

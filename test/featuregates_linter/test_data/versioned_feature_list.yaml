@@ -1058,6 +1058,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.29"
+- name: SchedulerAsyncPreemption
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: SchedulerQueueingHints
   versionedSpecs:
   - default: false
