@@ -300,6 +300,6 @@ var hasPatchTypes = environment.VersionedOptions{
 	IntroducedVersion: version.MajorMinor(1, 0),
 	EnvOptions: []cel.EnvOption{
 		common.ResolverEnvOption(&mutation.DynamicTypeResolver{}),
-		library.JSONPatch(), // for jsonPatch.escape() function
+		environment.UnversionedLib(library.JSONPatch), // for jsonPatch.escape() function
 	},
 }

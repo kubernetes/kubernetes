@@ -253,8 +253,13 @@ type ResourceDescriptor struct {
 	History ResourceDescriptor_History `protobuf:"varint,4,opt,name=history,proto3,enum=google.api.ResourceDescriptor_History" json:"history,omitempty"`
 	// The plural name used in the resource name and permission names, such as
 	// 'projects' for the resource name of 'projects/{project}' and the permission
-	// name of 'cloudresourcemanager.googleapis.com/projects.get'. It is the same
-	// concept of the `plural` field in k8s CRD spec
+	// name of 'cloudresourcemanager.googleapis.com/projects.get'. One exception
+	// to this is for Nested Collections that have stuttering names, as defined
+	// in [AIP-122](https://google.aip.dev/122#nested-collections), where the
+	// collection ID in the resource name pattern does not necessarily directly
+	// match the `plural` value.
+	//
+	// It is the same concept of the `plural` field in k8s CRD spec
 	// https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/
 	//
 	// Note: The plural form is required even for singleton resources. See

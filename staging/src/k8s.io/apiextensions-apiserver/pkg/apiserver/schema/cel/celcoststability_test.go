@@ -381,6 +381,15 @@ func TestCelCostStability(t *testing.T) {
 				"!self.val.exists_one(k, self.val[k] > 0)":       17,
 				"size(self.val) == 2":                            4,
 				"size(self.val.filter(k, self.val[k] > 1)) == 1": 26,
+
+				// two variable comprehensions
+				"self.val.all(k, v, v > 0)":                                             13,
+				"self.val.exists(k, v, v == 2)":                                         15,
+				"self.val.existsOne(k, v, v == 2)":                                      10,
+				"self.val.transformMap(k, v, v > 1, v + 1).size() == 1":                 14,
+				"self.val.transformMap(k, v, v + 1).size() == 2":                        15,
+				"self.val.transformMapEntry(k, v, v > 1, {k + '2': v + 1}).size() == 1": 45,
+				"self.val.transformMapEntry(k, v, {k + '2': v + 1}).size() == 2":        77,
 			},
 		},
 		{name: "listMap access",
@@ -426,6 +435,13 @@ func TestCelCostStability(t *testing.T) {
 				// all() and exists() macros ignore errors from predicates so long as the condition holds for at least one element
 				"self.listMap.exists(m, m.v2 == 'z')": 24,
 				"!self.listMap.all(m, m.v2 != 'z')":   22,
+
+				// two variable comprehensions
+				"!self.listMap.all(i, m, has(m.v2) && m.v2 != 'z')":                            10,
+				"self.listMap.exists(i, m, has(m.v2) && m.v2 == 'z')":                          21,
+				"self.listMap.existsOne(i, m, has(m.v2) && m.v2 == 'z')":                       12,
+				"self.listMap.transformList(i, m, has(m.v2) && m.v2 == 'z', m.v2).size() == 1": 25,
+				"self.listMap.transformList(i, m, m.v).size() == 3":                            47,
 			},
 		},
 		{name: "list access",
@@ -447,6 +463,13 @@ func TestCelCostStability(t *testing.T) {
 				"size(self.array.filter(e, e%2 == 0)) == 3":                      68,
 				"self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)": 194,
 				"size(self.array) == 8":                                          4,
+
+				// two variable comprehensions
+				"self.array.all(i, e, e > 0)":                             43,
+				"self.array.exists(i, e, e > 2)":                          36,
+				"self.array.existsOne(i, e, e > 4)":                       22,
+				"self.array.transformList(i, e, e > 2, e * 2).size() > 0": 77,
+				"self.array.transformList(i, e, e * 2).size() > 0":        117,
 			},
 		},
 		{name: "listSet access",
