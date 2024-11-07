@@ -2830,6 +2830,10 @@ func isPodResizeInProgress(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed.
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus) {
+	if goos == "windows" {
+		return false, v1.PodResizeStatusInfeasible
+	}
+
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
 			if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
@@ -2889,10 +2893,6 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
 		// Pod allocation does not need to be updated.
-		return allocatedPod, nil
-	}
-	if goos == "windows" {
-		kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInfeasible)
 		return allocatedPod, nil
 	}
 
