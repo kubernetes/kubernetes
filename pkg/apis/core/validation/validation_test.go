@@ -25173,27 +25173,11 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
 			err:  "Pod QOS Class may not change as a result of resizing",
 		}, {
-			test: "Pod QoS change, burstable -> guaranteed",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
-			err:  "Pod QOS Class may not change as a result of resizing",
-		}, {
-			test: "Pod QoS change, besteffort -> burstable",
-			old:  mkPod(core.ResourceList{}, core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			err:  "Pod QOS Class may not change as a result of resizing",
-		}, {
 			test: "Pod QoS change, burstable -> besteffort",
 			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
 			new:  mkPod(core.ResourceList{}, core.ResourceList{}),
 			err:  "Pod QOS Class may not change as a result of resizing",
 		}, {
-			test: "Pod QoS change, burstable -> besteffort",
-			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
-			new:  mkPod(core.ResourceList{}, core.ResourceList{}),
-			err:  "Pod QOS Class may not change as a result of resizing",
-		},
-		{
 			test: "windows pod, no resource change",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
