@@ -25,10 +25,10 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
 )
 
@@ -56,7 +56,7 @@ func newKeyCache(client externaljwtv1alpha1.ExternalJWTSignerClient) *keyCache {
 // InitialFill can be used to perform an initial fetch for keys get the
 // refresh interval as recommended by external signer.
 func (p *keyCache) initialFill(ctx context.Context) error {
-	if _, err := p.syncKeys(ctx); err != nil {
+	if err := p.syncKeys(ctx); err != nil {
 		return fmt.Errorf("while performing initial cache fill: %w", err)
 	}
 	return nil
@@ -66,7 +66,6 @@ func (p *keyCache) scheduleSync(ctx context.Context, keySyncTimeout time.Duratio
 	timer := time.NewTimer(p.verificationKeys.Load().NextRefreshHint.Sub(time.Now()))
 	defer timer.Stop()
 
-	var lastDataTimestamp time.Time
 	for {
 		select {
 		case <-ctx.Done():
@@ -76,16 +75,11 @@ func (p *keyCache) scheduleSync(ctx context.Context, keySyncTimeout time.Duratio
 		}
 
 		timedCtx, cancel := context.WithTimeout(ctx, keySyncTimeout)
-		dataTimestamp, err := p.syncKeys(timedCtx)
-		if err != nil {
+		if err := p.syncKeys(timedCtx); err != nil {
 			klog.Errorf("when syncing supported public keys(Stale set of keys will be supported): %v", err)
 			timer.Reset(fallbackRefreshDuration)
 		} else {
 			timer.Reset(p.verificationKeys.Load().NextRefreshHint.Sub(time.Now()))
-			if lastDataTimestamp.IsZero() || !dataTimestamp.Equal(lastDataTimestamp) {
-				lastDataTimestamp = dataTimestamp
-				p.broadcastUpdate()
-			}
 		}
 		cancel()
 	}
@@ -115,7 +109,7 @@ func (p *keyCache) GetPublicKeys(ctx context.Context, keyID string) []serviceacc
 	}
 
 	// If we didn't find it, trigger a sync.
-	if _, err := p.syncKeys(ctx); err != nil {
+	if err := p.syncKeys(ctx); err != nil {
 		klog.ErrorS(err, "Error while syncing keys")
 		return []serviceaccount.PublicKey{}
 	}
@@ -152,8 +146,9 @@ func (p *keyCache) findKeyForKeyID(keyID string) ([]serviceaccount.PublicKey, bo
 
 // sync supported external keys.
 // completely re-writes the set of supported keys.
-func (p *keyCache) syncKeys(ctx context.Context) (time.Time, error) {
-	val, err, _ := p.syncGroup.Do("", func() (any, error) {
+func (p *keyCache) syncKeys(ctx context.Context) error {
+	_, err, _ := p.syncGroup.Do("", func() (any, error) {
+		oldPublicKeys := p.verificationKeys.Load()
 		newPublicKeys, err := p.getTokenVerificationKeys(ctx)
 		externaljwtmetrics.RecordFetchKeysAttempt(err)
 		if err != nil {
@@ -161,18 +156,38 @@ func (p *keyCache) syncKeys(ctx context.Context) (time.Time, error) {
 		}
 
 		p.verificationKeys.Store(newPublicKeys)
-
 		externaljwtmetrics.RecordKeyDataTimeStamp(newPublicKeys.DataTimestamp.Unix())
 
-		return newPublicKeys, nil
+		if keysChanged(oldPublicKeys, newPublicKeys) {
+			p.broadcastUpdate()
+		}
+
+		return nil, nil
 	})
-	if err != nil {
-		return time.Time{}, err
+	return err
+}
+
+// keysChanged returns true if the data timestamp, key count, order of key ids or excludeFromOIDCDiscovery indicators
+func keysChanged(oldPublicKeys, newPublicKeys *VerificationKeys) bool {
+	// If the timestamp changed, we changed
+	if !oldPublicKeys.DataTimestamp.Equal(newPublicKeys.DataTimestamp) {
+		return true
 	}
-
-	vk := val.(*VerificationKeys)
-
-	return vk.DataTimestamp, nil
+	// Avoid deepequal checks on key content itself.
+	// If the number of keys changed, we changed
+	if len(oldPublicKeys.Keys) != len(newPublicKeys.Keys) {
+		return true
+	}
+	// If the order, key id, or oidc discovery flag changed, we changed.
+	for i := range oldPublicKeys.Keys {
+		if oldPublicKeys.Keys[i].KeyID != newPublicKeys.Keys[i].KeyID {
+			return true
+		}
+		if oldPublicKeys.Keys[i].ExcludeFromOIDCDiscovery != newPublicKeys.Keys[i].ExcludeFromOIDCDiscovery {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *keyCache) broadcastUpdate() {
@@ -180,7 +195,8 @@ func (p *keyCache) broadcastUpdate() {
 	defer p.listenersLock.Unlock()
 
 	for _, l := range p.listeners {
-		l.Enqueue()
+		// don't block on a slow listener
+		go l.Enqueue()
 	}
 }
 

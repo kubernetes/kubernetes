@@ -59,7 +59,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	defer cancel()
 
 	// create and start mock signer.
-	socketPath := "@mock-external-jwt-signer.sock"
+	socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
 	defer mockSigner.CleanUp()
@@ -227,7 +227,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			}
 
 			if !tokenReviewResult.Status.Authenticated && tc.shouldPassAuth {
-				t.Fatal("Expected Authentication to succeed")
+				t.Fatalf("Expected Authentication to succeed, got %v", tokenReviewResult.Status.Error)
 			} else if tokenReviewResult.Status.Authenticated && !tc.shouldPassAuth {
 				t.Fatal("Expected Authentication to fail")
 			}
