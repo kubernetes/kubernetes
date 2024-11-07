@@ -2037,44 +2037,60 @@ func TestUnsupportedMediaTypeCircuitBreaker(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 
-	config := rest.CopyConfig(server.ClientConfig)
-	config.ContentType = "application/cbor"
-	config.AcceptContentTypes = "application/json"
+	for _, tc := range []struct {
+		name        string
+		contentType string
+	}{
+		{
+			name:        "default content type",
+			contentType: "",
+		},
+		{
+			name:        "explicit content type",
+			contentType: "application/cbor",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := rest.CopyConfig(server.ClientConfig)
+			config.ContentType = tc.contentType
+			config.AcceptContentTypes = "application/json"
 
-	client, err := corev1client.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+			client, err := corev1client.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if _, err := client.Namespaces().Create(
-		context.TODO(),
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
-		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	); !apierrors.IsUnsupportedMediaType(err) {
-		t.Errorf("expected to receive unsupported media type on first cbor request, got: %v", err)
-	}
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); !apierrors.IsUnsupportedMediaType(err) {
+				t.Errorf("expected to receive unsupported media type on first cbor request, got: %v", err)
+			}
 
-	// Requests from this client should fall back from application/cbor to application/json.
-	if _, err := client.Namespaces().Create(
-		context.TODO(),
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
-		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	); err != nil {
-		t.Errorf("expected to receive nil error on subsequent cbor request, got: %v", err)
-	}
+			// Requests from this client should fall back from application/cbor to application/json.
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); err != nil {
+				t.Errorf("expected to receive nil error on subsequent cbor request, got: %v", err)
+			}
 
-	// The circuit breaker trips on a per-client basis, so it should not begin tripped for a
-	// fresh client with identical config.
-	client, err = corev1client.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// The circuit breaker trips on a per-client basis, so it should not begin tripped for a
+			// fresh client with identical config.
+			client, err = corev1client.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if _, err := client.Namespaces().Create(
-		context.TODO(),
-		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
-		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	); !apierrors.IsUnsupportedMediaType(err) {
-		t.Errorf("expected to receive unsupported media type on cbor request with fresh client, got: %v", err)
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); !apierrors.IsUnsupportedMediaType(err) {
+				t.Errorf("expected to receive unsupported media type on cbor request with fresh client, got: %v", err)
+			}
+		})
 	}
 }

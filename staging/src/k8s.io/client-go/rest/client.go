@@ -238,7 +238,8 @@ func (c *RESTClient) Delete() *Request {
 
 // APIVersion returns the APIVersion this RESTClient is expected to use.
 func (c *RESTClient) APIVersion() schema.GroupVersion {
-	return c.content.GetClientContentConfig().GroupVersion
+	config, _ := c.content.GetClientContentConfig()
+	return config.GroupVersion
 }
 
 // requestClientContentConfigProvider observes HTTP 415 (Unsupported Media Type) responses to detect
@@ -257,25 +258,35 @@ type requestClientContentConfigProvider struct {
 }
 
 // GetClientContentConfig returns the ClientContentConfig that should be used for new requests by
-// this client.
-func (p *requestClientContentConfigProvider) GetClientContentConfig() ClientContentConfig {
+// this client and true if the request ContentType was selected by default.
+func (p *requestClientContentConfigProvider) GetClientContentConfig() (ClientContentConfig, bool) {
+	config := p.base
+
+	defaulted := config.ContentType == ""
+	if defaulted {
+		config.ContentType = "application/json"
+	}
+
 	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
-		return p.base
+		return config, defaulted
+	}
+
+	if defaulted && clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsPreferCBOR) {
+		config.ContentType = "application/cbor"
 	}
 
 	if sawUnsupportedMediaTypeForCBOR := p.sawUnsupportedMediaTypeForCBOR.Load(); !sawUnsupportedMediaTypeForCBOR {
-		return p.base
+		return config, defaulted
 	}
 
-	if mediaType, _, _ := mime.ParseMediaType(p.base.ContentType); mediaType != runtime.ContentTypeCBOR {
-		return p.base
+	if mediaType, _, _ := mime.ParseMediaType(config.ContentType); mediaType != runtime.ContentTypeCBOR {
+		return config, defaulted
 	}
 
-	config := p.base
-	// The default ClientContentConfig sets ContentType to CBOR and the client has previously
-	// received an HTTP 415 in response to a CBOR request. Override ContentType to JSON.
+	// The effective ContentType is CBOR and the client has previously received an HTTP 415 in
+	// response to a CBOR request. Override ContentType to JSON.
 	config.ContentType = runtime.ContentTypeJSON
-	return config
+	return config, defaulted
 }
 
 // UnsupportedMediaType reports that the server has responded to a request with HTTP 415 Unsupported
