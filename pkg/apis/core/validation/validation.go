@@ -5661,11 +5661,9 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 				req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
 				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 				container.ResizePolicy = oldPod.Spec.InitContainers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
-				newInitContainers = append(newInitContainers, container)
 			}
+			newInitContainers = append(newInitContainers, container)
 		}
-	}
-	if len(newInitContainers) > 0 {
 		originalCPUMemPodSpec.InitContainers = newInitContainers
 	}
 
