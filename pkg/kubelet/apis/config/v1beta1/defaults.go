@@ -24,7 +24,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
-	"k8s.io/component-base/featuregate"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
@@ -56,13 +56,7 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
-	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
-	// This allows us to validate the config against the set of gates it will actually run against.
-	localFeatureGate := featureGate.DeepCopy()
-	if err := localFeatureGate.SetFromMap(obj.FeatureGates); err != nil {
-		return err
-	}
+func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) error {
 
 	if obj.EnableServer == nil {
 		obj.EnableServer = ptr.To(true)
@@ -298,7 +292,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.PodLogsDir = DefaultPodLogsDir
 	}
 
-	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
 		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 		}
