@@ -28,7 +28,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -48,9 +47,11 @@ type MockSigner struct {
 	SigningKeyID              string
 	SigningAlg                string
 	TokenType                 string
-	SupportedKeys             atomic.Pointer[map[string]KeyT]
-	AckKeyFetch               chan bool
 	MaxTokenExpirationSeconds int64
+
+	supportedKeys        map[string]KeyT
+	supportedKeysLock    sync.RWMutex
+	supportedKeysFetched *sync.Cond
 
 	FetchError    error
 	MetadataError error
@@ -70,9 +71,9 @@ func NewMockSigner(t *testing.T, socketPath string) *MockSigner {
 	m := &MockSigner{
 		socketPath:                socketPath,
 		server:                    server,
-		AckKeyFetch:               make(chan bool),
 		MaxTokenExpirationSeconds: 10 * 60, // 10m
 	}
+	m.supportedKeysFetched = sync.NewCond(&m.supportedKeysLock)
 
 	if err := m.Reset(); err != nil {
 		t.Fatalf("failed to load keys for mock signer: %v", err)
@@ -89,6 +90,22 @@ func NewMockSigner(t *testing.T, socketPath string) *MockSigner {
 	}
 
 	return m
+}
+
+func (m *MockSigner) GetSupportedKeys() map[string]KeyT {
+	m.supportedKeysLock.RLock()
+	defer m.supportedKeysLock.RUnlock()
+	return m.supportedKeys
+}
+func (m *MockSigner) SetSupportedKeys(keys map[string]KeyT) {
+	m.supportedKeysLock.Lock()
+	defer m.supportedKeysLock.Unlock()
+	m.supportedKeys = keys
+}
+func (m *MockSigner) WaitForSupportedKeysFetch() {
+	m.supportedKeysLock.Lock()
+	defer m.supportedKeysLock.Unlock()
+	m.supportedKeysFetched.Wait()
 }
 
 func (m *MockSigner) Sign(ctx context.Context, req *v1alpha1.SignJWTRequest) (*v1alpha1.SignJWTResponse, error) {
@@ -132,18 +149,16 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 
 	keys := []*v1alpha1.Key{}
 
-	for id, k := range *m.SupportedKeys.Load() {
+	m.supportedKeysLock.RLock()
+	for id, k := range m.supportedKeys {
 		keys = append(keys, &v1alpha1.Key{
 			KeyId:                    id,
 			Key:                      k.Key,
 			ExcludeFromOidcDiscovery: k.ExcludeFromOidcDiscovery,
 		})
 	}
-
-	select {
-	case <-m.AckKeyFetch:
-	default:
-	}
+	m.supportedKeysFetched.Broadcast()
+	m.supportedKeysLock.RUnlock()
 
 	return &v1alpha1.FetchKeysResponse{
 		RefreshHintSeconds: 5,
@@ -185,7 +200,7 @@ func (m *MockSigner) Reset() error {
 	m.SigningKeyID = "kid-1"
 	m.SigningAlg = "RS256"
 	m.TokenType = "JWT"
-	m.SupportedKeys.Store(&map[string]KeyT{
+	m.SetSupportedKeys(map[string]KeyT{
 		"kid-1": {Key: pub1},
 		"kid-2": {Key: pub2},
 		"kid-3": {Key: pub3},
