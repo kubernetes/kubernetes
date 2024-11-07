@@ -1227,8 +1227,9 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	return false
 }
 
-// IsRestartableInitContainer returns true if the initContainer has
-// ContainerRestartPolicyAlways.
+// IsRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
+// This function is not checking if the container passed to it is indeed an init container.
+// It is just checking if the container restart policy has been set to always.
 func IsRestartableInitContainer(initContainer *api.Container) bool {
 	if initContainer == nil || initContainer.RestartPolicy == nil {
 		return false

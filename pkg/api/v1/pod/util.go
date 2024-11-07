@@ -407,8 +407,9 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	return !isEqual
 }
 
-// IsRestartableInitContainer returns true if the initContainer has
-// ContainerRestartPolicyAlways.
+// IsRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
+// This function is not checking if the container passed to it is indeed an init container.
+// It is just checking if the container restart policy has been set to always.
 func IsRestartableInitContainer(initContainer *v1.Container) bool {
 	if initContainer == nil || initContainer.RestartPolicy == nil {
 		return false
