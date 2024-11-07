@@ -25,9 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -1071,12 +1068,6 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if len(tc.config.FeatureGates) > 0 {
-				for k, v := range tc.config.FeatureGates {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(k), v)
-				}
-			}
-			t.Logf("feature gate now is: %s", utilfeature.DefaultFeatureGate)
 			SetDefaults_KubeletConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)

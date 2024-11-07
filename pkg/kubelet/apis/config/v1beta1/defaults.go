@@ -58,6 +58,9 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 
+	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	_ = localFeatureGate.SetFromMap(obj.FeatureGates)
+
 	if obj.EnableServer == nil {
 		obj.EnableServer = ptr.To(true)
 	}
@@ -292,7 +295,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.PodLogsDir = DefaultPodLogsDir
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
 		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 		}
