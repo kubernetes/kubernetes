@@ -12,6 +12,7 @@
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
+      "github.com/davecgh/go-spew": "refer to #103942",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -91,6 +92,42 @@
       ],
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
+      ],
+      "github.com/davecgh/go-spew": [
+        "github.com/cyphar/filepath-securejoin",
+        "github.com/go-logr/zapr",
+        "github.com/go-openapi/jsonpointer",
+        "github.com/go-openapi/swag",
+        "github.com/go-task/slim-sprig/v3",
+        "github.com/google/cadvisor",
+        "github.com/json-iterator/go",
+        "github.com/prometheus/client_golang",
+        "github.com/prometheus/common",
+        "github.com/sirupsen/logrus",
+        "github.com/stretchr/objx",
+        "github.com/stretchr/testify",
+        "go.etcd.io/bbolt",
+        "go.etcd.io/etcd/client/pkg/v3",
+        "go.etcd.io/etcd/pkg/v3",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "go.opentelemetry.io/otel/trace",
+        "go.uber.org/goleak",
+        "go.uber.org/multierr",
+        "go.uber.org/zap",
+        "k8s.io/apimachinery",
+        "k8s.io/kube-openapi",
+        "k8s.io/utils",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v5",
+        "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -207,6 +244,7 @@
       ]
     },
     "unwantedVendored": [
+      "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/groupcache",
       "github.com/google/gofuzz",
