@@ -5515,10 +5515,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
-	isPodResizeRequestValid := isPodResizeRequestSupported(*oldPod)
-
-	if !isPodResizeRequestValid {
-		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without InPlacePodVerticalScaling feature gate enabled may not be updated"))
+	if !isPodResizeRequestSupported(*oldPod) {
+		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
 	}
 
 	// Ensure that only CPU and memory resources are mutable.
