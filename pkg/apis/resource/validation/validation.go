@@ -256,7 +256,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
-	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"))...)
+	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"), stored)...)
 	return allErrs
 }
 
@@ -750,18 +750,24 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	}
 	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
 	if len(device.Data.Raw) > 0 { // Data is an optional field.
-		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"))...)
+		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"), false)...)
 	}
 	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
 	return allErrs
 }
 
 // validateRawExtension validates RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
-func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path) field.ErrorList {
+func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	var v any
 	if len(rawExtension.Raw) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else if !stored && len(rawExtension.Raw) > resource.OpaqueParametersMaxLength {
+		// Don't even bother with parsing when too large.
+		// Only applies on create. Existing parameters are grand-fathered in
+		// because the limit was introduced in 1.32. This also means that it
+		// can be changed in the future.
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /* unused */, resource.OpaqueParametersMaxLength))
 	} else if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
 	} else if v == nil {

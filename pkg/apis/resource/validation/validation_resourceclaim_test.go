@@ -1096,6 +1096,24 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			deviceStatusFeatureGate: true,
 		},
+		"invalid-data-device-status-too-long": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
 		"invalid-device-status-no-device": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID("b", "a", "r"), "must be an allocated device in the claim"),
@@ -1182,6 +1200,24 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Data: runtime.RawExtension{
 							Raw: []byte(`foo`),
 						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
+		"invalid-data-device-status-too-long-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
 					},
 				}
 				return claim
