@@ -319,11 +319,8 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 			if !ok {
 				continue
 			}
-			// Changes are only allowed for restartable init containers.
-			if podutil.IsRestartableInitContainer(&ctr) {
-				pod.Spec.InitContainers[idx].Resources = ctr.Resources
-				pod.Spec.InitContainers[idx].ResizePolicy = ctr.ResizePolicy
-			}
+			pod.Spec.InitContainers[idx].Resources = ctr.Resources
+			pod.Spec.InitContainers[idx].ResizePolicy = ctr.ResizePolicy
 		}
 	}
 
