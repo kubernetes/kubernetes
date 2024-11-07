@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"k8s.io/kubernetes/pkg/kubelet/types"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // terminationOrdering is used to enforce a termination ordering for sidecar containers.  It sets up
@@ -80,7 +80,7 @@ func newTerminationOrdering(pod *v1.Pod, runningContainerNames []string) *termin
 			close(channel)
 		}
 
-		if types.IsRestartableInitContainer(&ic) {
+		if podutil.IsRestartableInitContainer(&ic) {
 			// sidecars need to wait for all main containers to exit
 			to.prereqs[ic.Name] = append(to.prereqs[ic.Name], mainContainerChannels...)
 

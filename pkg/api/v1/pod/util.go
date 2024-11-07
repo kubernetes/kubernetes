@@ -406,3 +406,12 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 	// Return true if one of the fields have changed.
 	return !isEqual
 }
+
+// IsRestartableInitContainer returns true if the initContainer has
+// ContainerRestartPolicyAlways.
+func IsRestartableInitContainer(initContainer *v1.Container) bool {
+	if initContainer == nil || initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
+}

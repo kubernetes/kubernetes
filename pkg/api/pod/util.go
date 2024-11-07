@@ -1227,6 +1227,15 @@ func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// IsRestartableInitContainer returns true if the initContainer has
+// ContainerRestartPolicyAlways.
+func IsRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer == nil || initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
+}
+
 func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
 		// Update is invalid: ignore changes and let validation handle it

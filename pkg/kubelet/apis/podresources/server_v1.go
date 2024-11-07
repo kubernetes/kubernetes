@@ -22,9 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
@@ -70,7 +70,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 			pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 
 			for _, container := range pod.Spec.InitContainers {
-				if !types.IsRestartableInitContainer(&container) {
+				if !podutil.IsRestartableInitContainer(&container) {
 					continue
 				}
 
@@ -130,7 +130,7 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 		podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 
 		for _, container := range pod.Spec.InitContainers {
-			if !types.IsRestartableInitContainer(&container) {
+			if !podutil.IsRestartableInitContainer(&container) {
 				continue
 			}
 
