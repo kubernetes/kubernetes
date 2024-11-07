@@ -59,7 +59,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	defer cancel()
 
 	// create and start mock signer.
-	socketPath := "@mock-external-jwt-signer.sock"
+	socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
 	defer mockSigner.CleanUp()
@@ -121,14 +121,14 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKeyID = "updated-kid-1"
 
 				cpy := make(map[string]v1alpha1testing.KeyT)
-				for key, value := range *mockSigner.SupportedKeys.Load() {
+				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
 				cpy["updated-kid-1"] = v1alpha1testing.KeyT{
 					Key:                      pubKey1Bytes,
 					ExcludeFromOidcDiscovery: true,
 				}
-				mockSigner.SupportedKeys.Store(&cpy)
+				mockSigner.SetSupportedKeys(cpy)
 			},
 			preValidationSignerUpdate: func() { /*no-op*/ },
 			wantTokenReqErr:           fmt.Errorf("failed to generate token: while validating header: key used for signing JWT (kid: updated-kid-1) is excluded from OIDC discovery docs"),
@@ -163,7 +163,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
 			preValidationSignerUpdate: func() {
-				mockSigner.SupportedKeys.Store(&map[string]v1alpha1testing.KeyT{})
+				mockSigner.SetSupportedKeys(map[string]v1alpha1testing.KeyT{})
 			},
 			shouldPassAuth: false,
 		},
@@ -174,12 +174,12 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			},
 			preValidationSignerUpdate: func() {
 				cpy := make(map[string]v1alpha1testing.KeyT)
-				for key, value := range *mockSigner.SupportedKeys.Load() {
+				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
 				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
-				mockSigner.SupportedKeys.Store(&cpy)
-				mockSigner.AckKeyFetch <- true
+				mockSigner.SetSupportedKeys(cpy)
+				mockSigner.WaitForSupportedKeysFetch()
 			},
 			shouldPassAuth: true,
 		},
@@ -192,7 +192,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to reset signer for the test %q: %v", tc.desc, err)
 			}
-			mockSigner.AckKeyFetch <- true
+			mockSigner.WaitForSupportedKeysFetch()
 
 			// Adjust parameters on mock signer for the test.
 			tc.preTestSignerUpdate()
@@ -227,7 +227,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			}
 
 			if !tokenReviewResult.Status.Authenticated && tc.shouldPassAuth {
-				t.Fatal("Expected Authentication to succeed")
+				t.Fatalf("Expected Authentication to succeed, got %v", tokenReviewResult.Status.Error)
 			} else if tokenReviewResult.Status.Authenticated && !tc.shouldPassAuth {
 				t.Fatal("Expected Authentication to fail")
 			}

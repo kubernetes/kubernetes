@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -167,7 +169,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			sockname := fmt.Sprintf("@test-external-public-key-getter-%d.sock", i)
+			sockname := fmt.Sprintf("@test-external-public-key-getter-%d-%d.sock", time.Now().Nanosecond(), i)
 			t.Cleanup(func() { _ = os.Remove(sockname) })
 
 			addr := &net.UnixAddr{Name: sockname, Net: "unix"}
@@ -238,7 +240,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 func TestInitialFill(t *testing.T) {
 	ctx := context.Background()
 
-	sockname := "@test-initial-fill.sock"
+	sockname := fmt.Sprintf("@test-initial-fill-%d.sock", time.Now().Nanosecond())
 	t.Cleanup(func() { _ = os.Remove(sockname) })
 
 	addr := &net.UnixAddr{Name: sockname, Net: "unix"}
@@ -304,7 +306,7 @@ func TestInitialFill(t *testing.T) {
 func TestReflectChanges(t *testing.T) {
 	ctx := context.Background()
 
-	sockname := "@test-reflect-changes.sock"
+	sockname := fmt.Sprintf("@test-reflect-changes-%d.sock", time.Now().Nanosecond())
 	t.Cleanup(func() { _ = os.Remove(sockname) })
 
 	addr := &net.UnixAddr{Name: sockname, Net: "unix"}
@@ -357,18 +359,25 @@ func TestReflectChanges(t *testing.T) {
 
 	plugin := newPlugin("iss", clientConn, true)
 
+	dummyListener := &dummyListener{}
+	plugin.keyCache.AddListener(dummyListener)
+
+	dummyListener.waitForCount(t, 0)
 	if err := plugin.keyCache.initialFill(ctx); err != nil {
 		t.Fatalf("Error during InitialFill: %v", err)
 	}
+	dummyListener.waitForCount(t, 1)
 
 	gotPubKeysT1 := plugin.keyCache.GetPublicKeys(ctx, "")
 	if diff := cmp.Diff(gotPubKeysT1, wantPubKeysT1, cmpopts.SortSlices(sortPublicKeySlice)); diff != "" {
 		t.Fatalf("Bad public keys; diff (-got +want)\n%s", diff)
 	}
 
-	if _, err := plugin.keyCache.syncKeys(ctx); err != nil {
+	dummyListener.waitForCount(t, 1)
+	if err := plugin.keyCache.syncKeys(ctx); err != nil {
 		t.Fatalf("Error while calling syncKeys: %v", err)
 	}
+	dummyListener.waitForCount(t, 1)
 
 	supportedKeysT2 := map[string]supportedKeyT{
 		"key-1": {
@@ -396,12 +405,108 @@ func TestReflectChanges(t *testing.T) {
 	backend.supportedKeys = supportedKeysT2
 	backend.keyLock.Unlock()
 
-	if _, err := plugin.keyCache.syncKeys(ctx); err != nil {
+	dummyListener.waitForCount(t, 1)
+	if err := plugin.keyCache.syncKeys(ctx); err != nil {
 		t.Fatalf("Error while calling syncKeys: %v", err)
 	}
+	dummyListener.waitForCount(t, 2)
 
 	gotPubKeysT2 := plugin.keyCache.GetPublicKeys(ctx, "")
 	if diff := cmp.Diff(gotPubKeysT2, wantPubKeysT2, cmpopts.SortSlices(sortPublicKeySlice)); diff != "" {
 		t.Fatalf("Bad public keys; diff (-got +want)\n%s", diff)
+	}
+	dummyListener.waitForCount(t, 2)
+}
+
+type dummyListener struct {
+	count atomic.Int64
+}
+
+func (d *dummyListener) waitForCount(t *testing.T, expect int) {
+	t.Helper()
+	err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 10*time.Second, true, func(_ context.Context) (bool, error) {
+		actual := int(d.count.Load())
+		switch {
+		case actual > expect:
+			return false, fmt.Errorf("expected %d broadcasts, got %d broadcasts", expect, actual)
+		case actual == expect:
+			return true, nil
+		default:
+			t.Logf("expected %d broadcasts, got %d broadcasts, waiting...", expect, actual)
+			return false, nil
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (d *dummyListener) Enqueue() {
+	d.count.Add(1)
+}
+
+func TestKeysChanged(t *testing.T) {
+	testcases := []struct {
+		name    string
+		oldKeys VerificationKeys
+		newKeys VerificationKeys
+		expect  bool
+	}{
+		{
+			name:    "empty",
+			oldKeys: VerificationKeys{},
+			newKeys: VerificationKeys{},
+			expect:  false,
+		},
+		{
+			name:    "identical",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			expect:  false,
+		},
+		{
+			name:    "changed datatimestamp",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1001, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			expect:  true,
+		},
+		{
+			name:    "reordered keyid",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "b"}, {KeyID: "a"}}},
+			expect:  true,
+		},
+		{
+			name:    "changed keyid",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "b"}}},
+			expect:  true,
+		},
+		{
+			name:    "added key",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			expect:  true,
+		},
+		{
+			name:    "removed key",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}, {KeyID: "b"}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a"}}},
+			expect:  true,
+		},
+		{
+			name:    "changed oidc",
+			oldKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a", ExcludeFromOIDCDiscovery: false}}},
+			newKeys: VerificationKeys{DataTimestamp: time.Unix(1000, 0), Keys: []serviceaccount.PublicKey{{KeyID: "a", ExcludeFromOIDCDiscovery: true}}},
+			expect:  true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := keysChanged(&tc.oldKeys, &tc.newKeys)
+			if result != tc.expect {
+				t.Errorf("got %v, expected %v", result, tc.expect)
+			}
+		})
 	}
 }

@@ -258,7 +258,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			sockname := fmt.Sprintf("@test-external-token-generator-%d.sock", i)
+			sockname := fmt.Sprintf("@test-external-token-generator-%d-%d.sock", time.Now().Nanosecond(), i)
 			t.Cleanup(func() { _ = os.Remove(sockname) })
 
 			addr := &net.UnixAddr{Name: sockname, Net: "unix"}
