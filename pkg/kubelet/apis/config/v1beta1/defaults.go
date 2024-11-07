@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,8 +59,17 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 
+	// TODO(lauralorenz): Reasses conditional feature gating on defaults. Here
+	// we 1) copy the gates to a local var, unilaterally merge it with the gate
+	// config while being defaulted. Alternatively we could unilaterally set the
+	// default value, later check the gate and wipe it if needed, like API
+	// strategy does for gate-disabled fields. Meanwhile, KubeletConfiguration
+	// is increasingly dynamic and the configured gates may change depending on
+	// when this is called. See also validation.go.
 	localFeatureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
-	_ = localFeatureGate.SetFromMap(obj.FeatureGates)
+	if err := localFeatureGate.SetFromMap(obj.FeatureGates); err != nil {
+		panic(fmt.Sprintf("failed to merge global and in-flight KubeletConfiguration while setting defaults, error: %v", err))
+	}
 
 	if obj.EnableServer == nil {
 		obj.EnableServer = ptr.To(true)

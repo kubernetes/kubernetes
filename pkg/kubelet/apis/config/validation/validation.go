@@ -46,6 +46,12 @@ var (
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
+	// TODO(lauralorenz): Reasses / confirm interpretation of feature gates
+	// depending on where we are in merging dynamic KubeletConfiguration when
+	// this is called. Here we copy the gates to a local var, and unilaterally
+	// merge it with the current gate config to test. See also defaults.go which
+	// intersects with this assumption.
+
 	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
 	localFeatureGate := featureGate.DeepCopy()
