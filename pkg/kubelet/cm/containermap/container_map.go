@@ -20,23 +20,35 @@ import (
 	"fmt"
 )
 
-// ContainerMap maps (containerID)->(*v1.Pod, *v1.Container)
-type ContainerMap map[string]struct {
+// cmItem (ContainerMap ITEM) is a pair podUID, containerName
+type cmItem struct {
 	podUID        string
 	containerName string
 }
+
+// ContainerMap maps (containerID)->(podUID, containerName)
+type ContainerMap map[string]cmItem
 
 // NewContainerMap creates a new ContainerMap struct
 func NewContainerMap() ContainerMap {
 	return make(ContainerMap)
 }
 
+// Clone creates a deep copy of the ContainerMap
+func (cm ContainerMap) Clone() ContainerMap {
+	ret := make(ContainerMap, len(cm))
+	for key, val := range cm {
+		ret[key] = val
+	}
+	return ret
+}
+
 // Add adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
 func (cm ContainerMap) Add(podUID, containerName, containerID string) {
-	cm[containerID] = struct {
-		podUID        string
-		containerName string
-	}{podUID, containerName}
+	cm[containerID] = cmItem{
+		podUID:        podUID,
+		containerName: containerName,
+	}
 }
 
 // RemoveByContainerID removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
