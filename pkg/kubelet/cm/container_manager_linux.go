@@ -575,13 +575,13 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Initialize CPU manager
-	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 	if err != nil {
 		return fmt.Errorf("start cpu manager error: %w", err)
 	}
 
 	// Initialize memory manager
-	err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+	err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 	if err != nil {
 		return fmt.Errorf("start memory manager error: %w", err)
 	}
@@ -643,7 +643,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap, containerRunningSet); err != nil {
+	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
 		return err
 	}
 
