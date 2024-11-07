@@ -660,9 +660,15 @@ type OpaqueDeviceConfiguration struct {
 	// includes self-identification and a version ("kind" + "apiVersion" for
 	// Kubernetes types), with conversion between different versions.
 	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
+	//
 	// +required
 	Parameters runtime.RawExtension `json:"parameters" protobuf:"bytes,2,name=parameters"`
 }
+
+// OpaqueParametersMaxLength is the maximum length of the raw data in an
+// [OpaqueDeviceConfiguration.Parameters] field.
+const OpaqueParametersMaxLength = 10 * 1024
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
 // the result of that was.

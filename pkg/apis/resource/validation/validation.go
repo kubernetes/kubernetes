@@ -110,7 +110,7 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		}, fldPath.Child("constraints"))...)
 	allErrs = append(allErrs, validateSlice(deviceClaim.Config, resource.DeviceConfigMaxSize,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
-			return validateDeviceClaimConfiguration(config, fldPath, requestNames)
+			return validateDeviceClaimConfiguration(config, fldPath, requestNames, stored)
 		}, fldPath.Child("config"))...)
 	return allErrs
 }
@@ -212,13 +212,13 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 	return allErrs
 }
 
-func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+func validateDeviceClaimConfiguration(config resource.DeviceClaimConfiguration, fldPath *field.Path, requestNames sets.Set[string], stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
 		}, stringKey, fldPath.Child("requests"))...)
-	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath)...)
+	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
 
@@ -230,23 +230,29 @@ func validateRequestNameRef(name string, fldPath *field.Path, requestNames sets.
 	return allErrs
 }
 
-func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *field.Path) field.ErrorList {
+func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	if config.Opaque == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("opaque"), ""))
 	} else {
-		allErrs = append(allErrs, validateOpaqueConfiguration(*config.Opaque, fldPath.Child("opaque"))...)
+		allErrs = append(allErrs, validateOpaqueConfiguration(*config.Opaque, fldPath.Child("opaque"), stored)...)
 	}
 	return allErrs
 }
 
-func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path) field.ErrorList {
+func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
 	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
 	var v any
 	if len(config.Parameters.Raw) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
+	} else if !stored && len(config.Parameters.Raw) > resource.OpaqueParametersMaxLength {
+		// Don't even bother with parsing when too large.
+		// Only applies on create. Existing parameters are grand-fathered in
+		// because the limit was introduced in 1.32. This also means that it
+		// can be changed in the future.
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("parameters"), "" /* unused */, resource.OpaqueParametersMaxLength))
 	} else if err := json.Unmarshal(config.Parameters.Raw, &v); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
 	} else if v == nil {
@@ -290,7 +296,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 	if oldStatus.Allocation != nil && status.Allocation != nil {
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(status.Allocation, oldStatus.Allocation, fldPath.Child("allocation"))...)
 	} else if status.Allocation != nil {
-		allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames)...)
+		allErrs = append(allErrs, validateAllocationResult(status.Allocation, fldPath.Child("allocation"), requestNames, false)...)
 	}
 
 	return allErrs
@@ -313,16 +319,16 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 // validateAllocationResult enforces constraints for *new* results, which in at
 // least one case (admin access) are more strict than before. Therefore it
 // may not be called to re-validate results which were stored earlier.
-func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+func validateAllocationResult(allocation *resource.AllocationResult, fldPath *field.Path, requestNames sets.Set[string], stored bool) field.ErrorList {
 	var allErrs field.ErrorList
-	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames)...)
+	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames, stored)...)
 	if allocation.NodeSelector != nil {
 		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, fldPath.Child("nodeSelector"))...)
 	}
 	return allErrs
 }
 
-func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, fldPath *field.Path, requestNames sets.Set[string], stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSlice(allocation.Results, resource.AllocationResultsMaxSize,
 		func(result resource.DeviceRequestAllocationResult, fldPath *field.Path) field.ErrorList {
@@ -330,7 +336,7 @@ func validateDeviceAllocationResult(allocation resource.DeviceAllocationResult, 
 		}, fldPath.Child("results"))...)
 	allErrs = append(allErrs, validateSlice(allocation.Config, 2*resource.DeviceConfigMaxSize, /* class + claim */
 		func(config resource.DeviceAllocationConfiguration, fldPath *field.Path) field.ErrorList {
-			return validateDeviceAllocationConfiguration(config, fldPath, requestNames)
+			return validateDeviceAllocationConfiguration(config, fldPath, requestNames, stored)
 		}, fldPath.Child("config"))...)
 
 	return allErrs
@@ -345,14 +351,14 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	return allErrs
 }
 
-func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfiguration, fldPath *field.Path, requestNames sets.Set[string]) field.ErrorList {
+func validateDeviceAllocationConfiguration(config resource.DeviceAllocationConfiguration, fldPath *field.Path, requestNames sets.Set[string], stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateAllocationConfigSource(config.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateSet(config.Requests, resource.DeviceRequestsMaxSize,
 		func(name string, fldPath *field.Path) field.ErrorList {
 			return validateRequestNameRef(name, fldPath, requestNames)
 		}, stringKey, fldPath.Child("requests"))...)
-	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath)...)
+	allErrs = append(allErrs, validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)...)
 	return allErrs
 }
 
@@ -396,12 +402,20 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 			return validateSelector(selector, fldPath, stored)
 		},
 		fldPath.Child("selectors"))...)
-	allErrs = append(allErrs, validateSlice(spec.Config, resource.DeviceConfigMaxSize, validateDeviceClassConfiguration, fldPath.Child("config"))...)
+	// Same logic as above for configs.
+	if oldSpec != nil {
+		stored = apiequality.Semantic.DeepEqual(spec.Config, oldSpec.Config)
+	}
+	allErrs = append(allErrs, validateSlice(spec.Config, resource.DeviceConfigMaxSize,
+		func(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
+			return validateDeviceClassConfiguration(config, fldPath, stored)
+		},
+		fldPath.Child("config"))...)
 	return allErrs
 }
 
-func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path) field.ErrorList {
-	return validateDeviceConfiguration(config.DeviceConfiguration, fldPath)
+func validateDeviceClassConfiguration(config resource.DeviceClassConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
+	return validateDeviceConfiguration(config.DeviceConfiguration, fldPath, stored)
 }
 
 // ValidateResourceClaimTemplate validates a ResourceClaimTemplate.
