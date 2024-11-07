@@ -116,11 +116,39 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 		allContainers = append(allContainers, pod.Spec.InitContainers...)
 		for _, container := range allContainers {
 			// process requests
-			processResourceList(requests, container.Resources.Requests)
+			for name, quantity := range container.Resources.Requests {
+				if !isSupportedQoSComputeResource(name) {
+					continue
+				}
+				if quantity.Cmp(zeroQuantity) == 1 {
+					delta := quantity.DeepCopy()
+					if _, exists := requests[name]; !exists {
+						requests[name] = delta
+					} else {
+						delta.Add(requests[name])
+						requests[name] = delta
+					}
+				}
+			}
 			// process limits
-			processResourceList(limits, container.Resources.Limits)
-			qosLimitResources := getQOSResources(container.Resources.Limits)
-			if !qosLimitResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
+			qosLimitsFound := sets.NewString()
+			for name, quantity := range container.Resources.Limits {
+				if !isSupportedQoSComputeResource(name) {
+					continue
+				}
+				if quantity.Cmp(zeroQuantity) == 1 {
+					qosLimitsFound.Insert(string(name))
+					delta := quantity.DeepCopy()
+					if _, exists := limits[name]; !exists {
+						limits[name] = delta
+					} else {
+						delta.Add(limits[name])
+						limits[name] = delta
+					}
+				}
+			}
+
+			if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
 				isGuaranteed = false
 			}
 		}
