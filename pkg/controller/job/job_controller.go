@@ -902,20 +902,31 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 
 	var manageJobErr error
 
+	// This is the starting point for evaluating the end state of the Job.
+	// Note that we need to order evaluations since a Job could satisfy multiple criteria at the same time in some cases:
+	// 1. Evaluate the pre-existing SuccessCriteriaMet and FailureTarget to respect the previous reconcile results, then transform FailureTarget to Failed.
+	// 2. Evaluate failure scenarios.
+	// 3. Evaluate success scenarios.
+	// 4. Evaluate jobCtx.finishedCondition (see trackJobStatusAndRemoveFinalizers), then transform FailureTarget to Failed and SuccessCriteriaMet to Complete once the job is finished.
+
 	exceedsBackoffLimit := jobCtx.failed > *job.Spec.BackoffLimit
+	// Evaluate the pre-existing SuccessCriteriaMet.
 	jobCtx.finishedCondition = hasSuccessCriteriaMetCondition(&job)
 
 	// Given that the Job already has the SuccessCriteriaMet condition, the termination condition already had confirmed in another cycle.
 	// So, the job-controller evaluates the podFailurePolicy only when the Job doesn't have the SuccessCriteriaMet condition.
 	if jobCtx.finishedCondition == nil {
+		// Evaluate the pre-existing FailureTarget.
 		failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget)
 		if failureTargetCondition != nil && failureTargetCondition.Status == v1.ConditionTrue {
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
+			// Evaluate failure scenarios for PodFailurePolicy.
 		} else if failJobMessage := getFailJobMessage(&job, pods); failJobMessage != nil {
 			// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
 			jobCtx.finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, batch.JobReasonPodFailurePolicy, *failJobMessage, jm.clock.Now())
 		}
 	}
+	// Evaluate failure scenarios for BackoffLimit and ActiveDeadlineSeconds.
 	if jobCtx.finishedCondition == nil {
 		if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
 			// check if the number of pod restart exceeds backoff (for restart OnFailure only)
@@ -933,6 +944,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	if isIndexedJob(&job) {
 		jobCtx.prevSucceededIndexes, jobCtx.succeededIndexes = calculateSucceededIndexes(logger, &job, pods)
 		jobCtx.succeeded = int32(jobCtx.succeededIndexes.total())
+		// Evaluate failure scenarios for BackoffLimitPerIndex.
 		if hasBackoffLimitPerIndex(&job) {
 			jobCtx.failedIndexes = calculateFailedIndexes(logger, &job, pods)
 			if jobCtx.finishedCondition == nil {
@@ -944,6 +956,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			}
 			jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
 		}
+		// Evaluate success scenarios for SuccessPolicy.
 		if jobCtx.finishedCondition == nil {
 			if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
 				jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
@@ -971,6 +984,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			active, action, manageJobErr = jm.manageJob(ctx, &job, jobCtx)
 			manageJobCalled = true
 		}
+		// Evaluate success scenarios for Completions.
 		complete := false
 		if job.Spec.Completions == nil {
 			// This type of job is complete when any pod exits with success.
@@ -1253,6 +1267,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			needsFlush = true
 		}
 	}
+	// Evaluate jobCtx.finishedCondition and transform FailureTarget to Failed.
 	if jobCtx.finishedCondition != nil && jobCtx.finishedCondition.Type == batch.JobFailureTarget {
 
 		// Append the interim FailureTarget condition to update the job status with before finalizers are removed.
@@ -1263,6 +1278,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		// It is also used in the enactJobFinished function for reporting.
 		jobCtx.finishedCondition = newFailedConditionForFailureTarget(jobCtx.finishedCondition, jm.clock.Now())
 	}
+	// Evaluate jobCtx.finishedCondition and transform SuccessCriteriaMet to Complete.
 	if isSuccessCriteriaMetCondition(jobCtx.finishedCondition) {
 		// Append the interim SuccessCriteriaMet condition to update the job status with before finalizers are removed.
 		if hasSuccessCriteriaMetCondition(jobCtx.job) == nil {
