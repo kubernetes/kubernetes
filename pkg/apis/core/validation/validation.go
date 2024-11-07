@@ -5559,7 +5559,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
-// isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled. 
+// isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
 func isPodResizeRequestSupported(pod core.Pod) bool {
 	// TODO: Remove this after GA+3 releases of InPlacePodVerticalScaling
 	// This code handles the version skew as described in the KEP.
