@@ -199,14 +199,16 @@ func Test_pulledRecordMergeNewCreds(t *testing.T) {
 
 func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 	tests := []struct {
-		name            string
-		imagePullPolicy ImagePullPolicyEnforcer
-		podSecrets      []kubeletconfiginternal.ImagePullSecret
-		image           string
-		imageRef        string
-		pulledFiles     []string
-		pullingFiles    []string
-		want            bool
+		name               string
+		imagePullPolicy    ImagePullPolicyEnforcer
+		podSecrets         []kubeletconfiginternal.ImagePullSecret
+		image              string
+		imageRef           string
+		pulledFiles        []string
+		pullingFiles       []string
+		expectedPullRecord *kubeletconfiginternal.ImagePulledRecord
+		want               bool
+		expectedCacheWrite bool
 	}{
 		{
 			name:            "image exists and is recorded with pod's exact secret",
@@ -240,7 +242,18 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			image:       "docker.io/testing/test:latest",
 			imageRef:    "testimageref",
 			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        false,
+			expectedPullRecord: &kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"docker.io/testing/test": {
+						KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+							{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "differenthash"},
+						},
+					},
+				},
+			},
+			want:               false,
+			expectedCacheWrite: true,
 		},
 		{
 			name:            "image exists and is recorded with a different secret with a different UID",
@@ -279,7 +292,19 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			image:       "docker.io/testing/test:latest",
 			imageRef:    "testimageref",
 			pulledFiles: []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
-			want:        false,
+			expectedPullRecord: &kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"docker.io/testing/test": {
+						KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{
+							{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+							{UID: "testsecretuid", Namespace: "differentns", Name: "pull-secret", CredentialHash: "testsecrethash"},
+						},
+					},
+				},
+			},
+			want:               false,
+			expectedCacheWrite: true,
 		},
 		{
 			name:            "image exists but the pull is recorded with a different image name but with the exact same secret",
@@ -409,11 +434,13 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			copyTestData(t, pullingDir, "pulling", tt.pullingFiles)
 			copyTestData(t, pulledDir, "pulled", tt.pulledFiles)
 
-			fsRecordAccessor := &fsPullRecordsAccessor{
-				pullingDir: pullingDir,
-				pulledDir:  pulledDir,
-				encoder:    encoder,
-				decoder:    decoder,
+			fsRecordAccessor := &testWriteCountingFSPullRecordsAccessor{
+				fsPullRecordsAccessor: fsPullRecordsAccessor{
+					pullingDir: pullingDir,
+					pulledDir:  pulledDir,
+					encoder:    encoder,
+					decoder:    decoder,
+				},
 			}
 
 			f := &PullManager{
@@ -426,8 +453,35 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			if got := f.MustAttemptImagePull(tt.image, tt.imageRef, tt.podSecrets); got != tt.want {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() = %v, want %v", got, tt.want)
 			}
+
+			if tt.expectedCacheWrite != (fsRecordAccessor.imagePulledRecordsWrites != 0) {
+				t.Errorf("expected zero cache writes, got: %v", fsRecordAccessor.imagePulledRecordsWrites)
+			}
+
+			if tt.expectedPullRecord != nil {
+				got, found, err := fsRecordAccessor.GetImagePulledRecord(tt.imageRef)
+				if err != nil && !found {
+					t.Fatalf("failed to get an expected ImagePulledRecord")
+				}
+				got.LastUpdatedTime = tt.expectedPullRecord.LastUpdatedTime
+
+				if !reflect.DeepEqual(got, tt.expectedPullRecord) {
+					t.Errorf("expected ImagePulledRecord != got; diff: %s", cmp.Diff(tt.expectedPullRecord, got))
+				}
+			}
 		})
 	}
+}
+
+type testWriteCountingFSPullRecordsAccessor struct {
+	imagePulledRecordsWrites int
+
+	fsPullRecordsAccessor
+}
+
+func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
+	a.imagePulledRecordsWrites += 1
+	return a.fsPullRecordsAccessor.WriteImagePulledRecord(pulledRecord)
 }
 
 func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
