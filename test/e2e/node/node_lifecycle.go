@@ -61,7 +61,7 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 				Phase: v1.NodeRunning,
 				Conditions: []v1.NodeCondition{
 					{
-						Status:  v1.ConditionTrue,
+						Status:  v1.ConditionFalse,
 						Message: "Set from e2e test",
 						Reason:  "E2E",
 						Type:    v1.NodeReady,
