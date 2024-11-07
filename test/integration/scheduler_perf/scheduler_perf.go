@@ -1953,12 +1953,19 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 				}, metav1.ListOptions{})
 				// Ignore errors when the time is up. errors.Is(context.Canceled) would
 				// be more precise, but doesn't work because client-go doesn't reliably
-				// propagate it. Instead, this was seen:
-				//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+				// propagate it.
 				if tCtx.Err() != nil {
 					continue
 				}
 				if err != nil {
+					// Worse, sometimes rate limiting gives up *before* the context deadline is reached.
+					// Then we get here with this error:
+					//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+					//
+					// This also can be ignored. We'll retry if the test is not done yet.
+					if strings.Contains(err.Error(), "would exceed context deadline") {
+						continue
+					}
 					return fmt.Errorf("delete scheduled pods: %w", err)
 				}
 				err = strategy(tCtx, tCtx.Client(), namespace, cpo.Count)
