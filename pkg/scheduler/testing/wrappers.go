@@ -985,6 +985,12 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// PersistentVolumeSource sets `src` as the pv source of the inner
+func (p *PersistentVolumeWrapper) PersistentVolumeSource(src v1.PersistentVolumeSource) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.PersistentVolumeSource = src
+	return p
+}
+
 // NodeAffinityIn creates a HARD node affinity (with MatchExpressions and the operator In)
 // and injects into the pv.
 func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
