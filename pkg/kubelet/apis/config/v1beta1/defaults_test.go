@@ -970,7 +970,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 			},
 		},
 		{
-			"CrashLoopBackOff.MaximumBackOffPeriod defaults to internal default when feature gate enabled",
+			"CrashLoopBackOff.MaxContainerRestartPeriod defaults to internal default when feature gate enabled",
 			&v1beta1.KubeletConfiguration{
 				FeatureGates: map[string]bool{"KubeletCrashLoopBackOffMax": true},
 			},
