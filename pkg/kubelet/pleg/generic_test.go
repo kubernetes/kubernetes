@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -82,9 +83,10 @@ func getEventsFromChannel(ch <-chan *PodLifecycleEvent) []*PodLifecycleEvent {
 	return events
 }
 
-func createTestContainer(ID string, state kubecontainer.State) *kubecontainer.Container {
+func createTestContainer(id string, state kubecontainer.State) *kubecontainer.Container {
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: ID},
+		ID:    kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: id},
+		Name:  id,
 		State: state,
 	}
 }
@@ -317,14 +319,14 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 }
 
 func newTestGenericPLEGWithRuntimeMock(runtimeMock kubecontainer.Runtime) *GenericPLEG {
-	pleg := &GenericPLEG{
-		relistDuration: &RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 2 * time.Hour},
-		runtime:        runtimeMock,
-		eventChannel:   make(chan *PodLifecycleEvent, 1000),
-		podRecords:     make(podRecords),
-		cache:          kubecontainer.NewCache(),
-		clock:          clock.RealClock{},
-	}
+	pleg := NewGenericPLEG(
+		klog.Logger{},
+		runtimeMock,
+		make(chan *PodLifecycleEvent, 1000),
+		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 2 * time.Hour},
+		kubecontainer.NewCache(),
+		clock.RealClock{},
+	).(*GenericPLEG)
 	return pleg
 }
 
@@ -738,42 +740,46 @@ kubelet_running_pods 2
 }
 
 func TestWatchConditions(t *testing.T) {
-	pods := []*containertest.FakePod{{
-		Pod: &kubecontainer.Pod{
-			Name: "running-pod",
-			ID:   "running",
-			Sandboxes: []*kubecontainer.Container{
-				createTestContainer("s", kubecontainer.ContainerStateRunning),
-			},
-			Containers: []*kubecontainer.Container{
-				createTestContainer("c", kubecontainer.ContainerStateRunning),
-			},
+	pods := []*kubecontainer.Pod{{
+		Name: "running-pod",
+		ID:   "running",
+		Sandboxes: []*kubecontainer.Container{
+			createTestContainer("s", kubecontainer.ContainerStateRunning),
+		},
+		Containers: []*kubecontainer.Container{
+			createTestContainer("c", kubecontainer.ContainerStateRunning),
 		},
 	}, {
-		Pod: &kubecontainer.Pod{
-			Name: "terminating-pod",
-			ID:   "terminating",
-			Sandboxes: []*kubecontainer.Container{
-				createTestContainer("s", kubecontainer.ContainerStateExited),
-			},
+		Name: "running-pod-2",
+		ID:   "running-2",
+		Sandboxes: []*kubecontainer.Container{
+			createTestContainer("s", kubecontainer.ContainerStateRunning),
+		},
+		Containers: []*kubecontainer.Container{
+			createTestContainer("c-exited", kubecontainer.ContainerStateExited),
+			createTestContainer("c-running", kubecontainer.ContainerStateRunning),
 		},
 	}, {
-		Pod: &kubecontainer.Pod{
-			Name: "reinspect-pod",
-			ID:   "reinspect",
-			Sandboxes: []*kubecontainer.Container{
-				createTestContainer("s", kubecontainer.ContainerStateRunning),
-			},
+		Name: "terminating-pod",
+		ID:   "terminating",
+		Sandboxes: []*kubecontainer.Container{
+			createTestContainer("s", kubecontainer.ContainerStateExited),
+		},
+	}, {
+		Name: "reinspect-pod",
+		ID:   "reinspect",
+		Sandboxes: []*kubecontainer.Container{
+			createTestContainer("s", kubecontainer.ContainerStateRunning),
 		},
 	}}
 	initialPods := pods
-	initialPods = append(initialPods, &containertest.FakePod{Pod: &kubecontainer.Pod{
+	initialPods = append(initialPods, &kubecontainer.Pod{
 		Name: "terminated-pod",
 		ID:   "terminated",
 		Sandboxes: []*kubecontainer.Container{
 			createTestContainer("s", kubecontainer.ContainerStateExited),
 		},
-	}})
+	})
 
 	alwaysComplete := func(_ *kubecontainer.PodStatus) bool {
 		return true
@@ -790,13 +796,32 @@ func TestWatchConditions(t *testing.T) {
 		return true
 	}
 
+	// resettingCond decrements the version before it completes.
+	var resettingCond = func(_ *kubecontainer.PodStatus) bool {
+		versioned := pleg.watchConditions["running"]["resetting"]
+		versioned.version = 0
+		pleg.watchConditions["running"]["resetting"] = versioned
+		return true
+	}
+
+	// makeContainerCond returns a RunningContainerWatchCondition that asserts the expected container status
+	makeContainerCond := func(expectedContainerName string, complete bool) WatchCondition {
+		return RunningContainerWatchCondition(expectedContainerName, func(status *kubecontainer.Status) bool {
+			if status.Name != expectedContainerName {
+				panic(fmt.Sprintf("unexpected container name: got %q, want %q", status.Name, expectedContainerName))
+			}
+			return complete
+		})
+	}
+
 	testCases := []struct {
-		name                  string
-		podUID                types.UID
-		watchConditions       map[string]WatchCondition
-		expectEvaluated       bool                               // Whether the watch conditions should be evaluated
-		expectRemoved         bool                               // Whether podUID should be present in the watch conditions map
-		expectWatchConditions map[string]versionedWatchCondition // The expected watch conditions for the podUIDa (only key & version checked)
+		name                    string
+		podUID                  types.UID
+		watchConditions         map[string]WatchCondition
+		incrementInitialVersion bool                               // Whether to call SetPodWatchCondition multiple times to increment the version
+		expectEvaluated         bool                               // Whether the watch conditions should be evaluated
+		expectRemoved           bool                               // Whether podUID should be present in the watch conditions map
+		expectWatchConditions   map[string]versionedWatchCondition // The expected watch conditions for the podUID (only key & version checked)
 	}{{
 		name:   "no watch conditions",
 		podUID: "running",
@@ -812,6 +837,31 @@ func TestWatchConditions(t *testing.T) {
 		expectWatchConditions: map[string]versionedWatchCondition{
 			"watching": {version: 0},
 			"updating": {version: 1},
+		},
+	}, {
+		name:                    "conditions with incremented versions",
+		podUID:                  "running",
+		incrementInitialVersion: true,
+		watchConditions: map[string]WatchCondition{
+			"completing": alwaysComplete,
+			"watching":   neverComplete,
+			"updating":   updatingCond,
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"watching": {version: 1},
+			"updating": {version: 2},
+		},
+	}, {
+		name:                    "completed watch condition with older version",
+		podUID:                  "running",
+		incrementInitialVersion: true,
+		watchConditions: map[string]WatchCondition{
+			"resetting": resettingCond,
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"resetting": {version: 0},
 		},
 	}, {
 		name:   "non-existent pod",
@@ -839,22 +889,75 @@ func TestWatchConditions(t *testing.T) {
 		expectWatchConditions: map[string]versionedWatchCondition{
 			"watching": {version: 0},
 		},
+	}, {
+		name:   "single container conditions",
+		podUID: "running",
+		watchConditions: map[string]WatchCondition{
+			"completing": makeContainerCond("c", true),
+			"watching":   makeContainerCond("c", false),
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"watching": {version: 0},
+		},
+	}, {
+		name:   "multi-container conditions",
+		podUID: "running-2",
+		watchConditions: map[string]WatchCondition{
+			"completing:exited":  makeContainerCond("c-exited", true),
+			"watching:exited":    makeContainerCond("c-exited", false),
+			"completing:running": makeContainerCond("c-running", true),
+			"watching:running":   makeContainerCond("c-running", false),
+			"completing:dne":     makeContainerCond("c-dne", true),
+			"watching:dne":       makeContainerCond("c-dne", false),
+		},
+		expectEvaluated: true,
+		expectWatchConditions: map[string]versionedWatchCondition{
+			"watching:running": {version: 0},
+		},
 	}}
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			testPleg := newTestGenericPLEG()
-			pleg = testPleg.pleg
-			runtime := testPleg.runtime
-			runtime.AllPodList = initialPods
-			pleg.Relist() // Setup initial pod records.
+			runtimeMock := containertest.NewMockRuntime(t)
+			pleg = newTestGenericPLEGWithRuntimeMock(runtimeMock)
 
-			runtime.AllPodList = pods // Doesn't have "terminated" pod.
+			// Mock pod statuses
+			for _, pod := range initialPods {
+				podStatus := &kubecontainer.PodStatus{
+					ID:        pod.ID,
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+				}
+				for _, c := range pod.Containers {
+					podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, &kubecontainer.Status{
+						ID:    c.ID,
+						Name:  c.Name,
+						State: c.State,
+					})
+				}
+				runtimeMock.EXPECT().
+					GetPodStatus(mock.Anything, pod.ID, pod.Name, pod.Namespace).
+					Return(podStatus, nil).Maybe()
+			}
+
+			// Setup initial pod records.
+			runtimeMock.EXPECT().GetPods(mock.Anything, true).Return(initialPods, nil).Once()
+			pleg.Relist()
 			pleg.podsToReinspect["reinspect"] = nil
+
+			// Remove "terminated" pod.
+			runtimeMock.EXPECT().GetPods(mock.Anything, true).Return(pods, nil).Once()
 
 			var evaluatedConditions []string
 			for key, condition := range test.watchConditions {
 				wrappedCondition := func(status *kubecontainer.PodStatus) bool {
+					defer func() {
+						if r := recover(); r != nil {
+							require.Fail(t, "condition error", r)
+						}
+					}()
+					assert.Equal(t, test.podUID, status.ID, "podUID")
 					if !test.expectEvaluated {
 						assert.Fail(t, "conditions should not be evaluated")
 					} else {
@@ -863,6 +966,10 @@ func TestWatchConditions(t *testing.T) {
 					return condition(status)
 				}
 				pleg.SetPodWatchCondition(test.podUID, key, wrappedCondition)
+				if test.incrementInitialVersion {
+					// Set the watch condition a second time to increment the version.
+					pleg.SetPodWatchCondition(test.podUID, key, wrappedCondition)
+				}
 			}
 			pleg.Relist()
 
