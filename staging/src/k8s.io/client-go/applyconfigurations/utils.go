@@ -1582,6 +1582,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsrbacv1beta1.SubjectApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
+	case v1alpha3.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
+		return &resourcev1alpha3.AllocatedDeviceStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("BasicDevice"):
@@ -1616,6 +1618,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceRequestAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("NetworkDeviceData"):
+		return &resourcev1alpha3.NetworkDeviceDataApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1638,6 +1642,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
+	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
+		return &applyconfigurationsresourcev1beta1.AllocatedDeviceStatusApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &applyconfigurationsresourcev1beta1.AllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("BasicDevice"):
@@ -1674,6 +1680,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceRequestAllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &applyconfigurationsresourcev1beta1.DeviceSelectorApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
+		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):
