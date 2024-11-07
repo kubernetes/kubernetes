@@ -136,11 +136,6 @@ func (a *hostAssignment) Admit(ctx context.Context, attributes admission.Attribu
 			return errors.NewInvalid(attributes.GetKind().GroupKind(), attributes.GetName(), errs)
 		}
 
-		errs = hostassignment.ValidateHostExternalCertificate(ctx, r, old, a.sarClient, a.validationOpts)
-		if len(errs) > 0 {
-			return errors.NewInvalid(attributes.GetKind().GroupKind(), attributes.GetName(), errs)
-		}
-
 		errs = hostassignment.ValidateHostUpdate(ctx, r, old, a.sarClient, a.validationOpts)
 		if len(errs) > 0 {
 			return errors.NewInvalid(attributes.GetKind().GroupKind(), attributes.GetName(), errs)
