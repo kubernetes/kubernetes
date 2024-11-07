@@ -125,6 +125,12 @@
       type: unsched
   - opcode: stopCollectingMetrics
   workloads:
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 2
+      blockerPods: 15 # Must be slightly below initNodes * 10 to be stable
+      measurePods: 20 # Must be initNodes * 10
   - name: 50Nodes_500Pods
     labels: [performance, short]
     params:
@@ -254,6 +260,11 @@
       type: unsched
   - opcode: stopCollectingMetrics
   workloads:
+  - name: 1Node_10Pods
+    labels: [integration-test, short]
+    params:
+      blockerPods: 10
+      measurePods: 10
   - name: 1Node_1000Pods
     labels: [performance, short]
     params:
@@ -351,7 +362,12 @@
   - opcode: barrier
   - opcode: stopCollectingMetrics
   workloads:
-  - name: 100Nodes_500Pods
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      nodes: 2
+      measurePods: 20 # Must be initNodes * 10
+  - name: 100Nodes_1000Pods
     labels: [performance, short]
     params:
       nodes: 100
@@ -424,6 +440,10 @@
       type: unsched
   - opcode: stopCollectingMetrics
   workloads:
+  - name: 10Pods
+    labels: [integration-test, short]
+    params:
+      measurePods: 10
   - name: 1000Pods
     labels: [performance, short]
     params:
@@ -538,6 +558,11 @@
   - opcode: barrier
   - opcode: stopCollectingMetrics
   workloads:
+  - name: 2Nodes_20Pods
+    labels: [integration-test, short]
+    params:
+      nodes: 2
+      measurePods: 20 # Must be initNodes * 10
   - name: 100Nodes_1000Pods
     labels: [performance, short]
     params:
