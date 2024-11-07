@@ -1020,11 +1020,16 @@ type AllocatedDeviceStatus struct {
 	// If the device has been configured according to the class and claim
 	// config references, the `Ready` condition should be True.
 	//
+	// Must not contain more than 8 entries.
+	//
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition
 
 	// Data contains arbitrary driver-specific data.
+	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
 	//
 	// +optional
 	Data runtime.RawExtension
@@ -1041,7 +1046,9 @@ type AllocatedDeviceStatus struct {
 type NetworkDeviceData struct {
 	// InterfaceName specifies the name of the network interface associated with
 	// the allocated device. This might be the name of a physical or virtual
-	// network interface.
+	// network interface being configured in the pod.
+	//
+	// Must not be longer than 256 characters.
 	//
 	// +optional
 	InterfaceName string
@@ -1052,11 +1059,15 @@ type NetworkDeviceData struct {
 	// associated subnet mask.
 	// e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
 	//
+	// Must not contain more than 16 entries.
+	//
 	// +optional
 	// +listType=atomic
 	IPs []string
 
 	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+	//
+	// Must not be longer than 128 characters.
 	//
 	// +optional
 	HardwareAddress string

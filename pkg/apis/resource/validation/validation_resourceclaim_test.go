@@ -994,13 +994,14 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Pool:   goodName,
 						Device: goodName,
 						Conditions: []metav1.Condition{
-							{
-								Type:               "test",
-								Status:             metav1.ConditionTrue,
-								Reason:             "test_reason",
-								LastTransitionTime: metav1.Now(),
-								ObservedGeneration: 0,
-							},
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
 						},
 						Data: runtime.RawExtension{
 							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
@@ -1013,6 +1014,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 								"2001:db8::/64",
 								"10.9.8.1/24",
 								"2001:db8::1/64",
+								"10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24",
+								"10.9.8.8/24", "10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24",
 							},
 						},
 					},
@@ -1096,9 +1099,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			deviceStatusFeatureGate: true,
 		},
-		"invalid-data-device-status-too-long": {
+		"invalid-data-device-status-limits": {
 			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
 				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1108,6 +1113,23 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Pool:   goodName,
 						Device: goodName,
 						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-8", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"10.9.8.0/24", "10.9.8.1/24", "10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24", "10.9.8.8/24",
+								"10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24", "10.9.8.14/24", "10.9.8.15/24", "10.9.8.16/24",
+							},
+						},
 					},
 				}
 				return claim
@@ -1206,9 +1228,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			deviceStatusFeatureGate: false,
 		},
-		"invalid-data-device-status-too-long-feature-gate": {
+		"invalid-data-device-status-limits-feature-gate": {
 			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
 				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1218,6 +1242,23 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Pool:   goodName,
 						Device: goodName,
 						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-8", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"10.9.8.0/24", "10.9.8.1/24", "10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24", "10.9.8.8/24",
+								"10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24", "10.9.8.14/24", "10.9.8.15/24", "10.9.8.16/24",
+							},
+						},
 					},
 				}
 				return claim
@@ -1250,6 +1291,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
+
+			if name == "invalid-data-device-status-limits-feature-gate" {
+				fmt.Println(errs)
+				fmt.Println(scenario.wantFailures)
+			}
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}

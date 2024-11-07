@@ -748,6 +748,9 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	if !allocatedDevices.Has(deviceID) {
 		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
 	}
+	if len(device.Conditions) > maxConditions {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), maxConditions))
+	}
 	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
 	if len(device.Data.Raw) > 0 { // Data is an optional field.
 		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"), false)...)
@@ -778,6 +781,8 @@ func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path
 	return allErrs
 }
 
+const maxConditions int = 8
+const maxIPs int = 16
 const interfaceNameMaxLength int = 256
 const hardwareAddressMaxLength int = 128
 
@@ -795,7 +800,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, hardwareAddressMaxLength))
 	}
 
-	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, -1,
+	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, maxIPs,
 		func(address string, fldPath *field.Path) field.ErrorList {
 			return validation.IsValidCIDR(fldPath, address)
 		},

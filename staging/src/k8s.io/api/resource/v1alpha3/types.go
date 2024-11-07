@@ -1032,10 +1032,13 @@ type AllocatedDeviceStatus struct {
 	// config references, the `Ready` condition should be True.
 	//
 	// +optional
-	// +listType=atomic
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.
+	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
 	//
 	// +optional
 	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,5,opt,name=data"`
@@ -1052,7 +1055,9 @@ type AllocatedDeviceStatus struct {
 type NetworkDeviceData struct {
 	// InterfaceName specifies the name of the network interface associated with
 	// the allocated device. This might be the name of a physical or virtual
-	// network interface.
+	// network interface being configured in the pod.
+	//
+	// Must not be longer than 256 characters.
 	//
 	// +optional
 	InterfaceName string `json:"interfaceName,omitempty" protobuf:"bytes,1,opt,name=interfaceName"`
@@ -1068,6 +1073,8 @@ type NetworkDeviceData struct {
 	IPs []string `json:"ips,omitempty" protobuf:"bytes,2,opt,name=ips"`
 
 	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+	//
+	// Must not be longer than 128 characters.
 	//
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
