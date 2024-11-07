@@ -104,6 +104,10 @@ var (
 	}
 )
 
+func init() {
+	metrics.Register()
+}
+
 func setQueuedPodInfoGated(queuedPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
 	queuedPodInfo.Gated = true
 	return queuedPodInfo
@@ -129,7 +133,6 @@ func TestPriorityQueue_Add(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	metrics.Register()
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -994,7 +997,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		err := q.AddUnschedulableIfNotPresent(logger, newQueuedPodInfoForLookup(unschedulablePod, "plugin"), oldCycle)
+		err := q.AddUnschedulableIfNotPresent(logger, attemptQueuedPodInfo(newQueuedPodInfoForLookup(unschedulablePod, "plugin")), oldCycle)
 		if err != nil {
 			t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
 		}
@@ -1031,7 +1034,6 @@ func TestPriorityQueue_Pop(t *testing.T) {
 }
 
 func TestPriorityQueue_Update(t *testing.T) {
-	metrics.Register()
 	c := testingclock.NewFakeClock(time.Now())
 
 	queuePlugin := "queuePlugin"
@@ -2054,7 +2056,6 @@ func TestPriorityQueue_AssignedPodAdded_(t *testing.T) {
 }
 
 func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name               string
 		unschedPod         *v1.Pod
@@ -3068,7 +3069,6 @@ func TestPendingPodsMetric(t *testing.T) {
 			pInfosWithDelay[i].Attempts = 0
 		}
 	}
-	metrics.Register()
 
 	tests := []struct {
 		name                       string
@@ -3445,7 +3445,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 	timestamp := time.Now()
 	unschedulablePlg := "unschedulable_plugin"
 	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
-	metrics.Register()
+
 	for i := 1; i <= 3; i++ {
 		p := &framework.QueuedPodInfo{
 			PodInfo: mustNewTestPodInfo(t,

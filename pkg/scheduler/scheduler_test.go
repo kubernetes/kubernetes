@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -247,6 +248,7 @@ func TestSchedulerCreation(t *testing.T) {
 }
 
 func TestFailureHandler(t *testing.T) {
+	metrics.Register()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	testPodUpdated := testPod.DeepCopy()
 	testPodUpdated.Labels = map[string]string{"foo": ""}
@@ -285,7 +287,8 @@ func TestFailureHandler(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
+			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder))
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 			queue.Add(logger, testPod)
