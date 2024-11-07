@@ -3836,7 +3836,8 @@ message PodLogOptions {
   optional bool timestamps = 6;
 
   // If set, the number of lines from the end of the logs to show. If not specified,
-  // logs are shown from the creation of the container or sinceSeconds or sinceTime
+  // logs are shown from the creation of the container or sinceSeconds or sinceTime.
+  // Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
   // +optional
   optional int64 tailLines = 7;
 
@@ -3854,6 +3855,14 @@ message PodLogOptions {
   // the actual log data coming from the real kubelet).
   // +optional
   optional bool insecureSkipTLSVerifyBackend = 9;
+
+  // Specify which container log stream to return to the client.
+  // Acceptable values are "All", "Stdout" and "Stderr". If not specified, "All" is used, and both stdout and stderr
+  // are returned interleaved.
+  // Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
+  // +featureGate=PodLogsQuerySplitStreams
+  // +optional
+  optional string stream = 10;
 }
 
 // PodOS defines the OS parameters of a pod.

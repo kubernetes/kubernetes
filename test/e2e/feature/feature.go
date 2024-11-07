@@ -275,6 +275,11 @@ var (
 	// Marks a single test that tests Pod Lifecycle Sleep action with zero duration. Requires feature gate PodLifecycleSleepActionAllowZero to be enabled.
 	PodLifecycleSleepActionAllowZero = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepActionAllowZero"))
 
+	// Owner: sig-node
+	// Marks tests that require a cluster with PodLogsQuerySplitStreams
+	// (used for testing specific log stream <https://kep.k8s.io/3288>)
+	PodLogsQuerySplitStreams = framework.WithFeature(framework.ValidFeatures.Add("PodLogsQuerySplitStreams"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodPriority = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))
 

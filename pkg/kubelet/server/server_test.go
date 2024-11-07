@@ -37,6 +37,8 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +52,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/ptr"
 
 	// Do some initialization to decode the query parameters correctly.
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -820,29 +821,41 @@ func TestContainerLogs(t *testing.T) {
 	}
 
 	for desc, test := range tests {
-		t.Run(desc, func(t *testing.T) {
-			output := "foo bar"
-			podNamespace := "other"
-			podName := "foo"
-			expectedPodName := getPodName(podName, podNamespace)
-			expectedContainerName := "baz"
-			setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-			setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, test.podLogOption, output)
-			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + test.query)
-			if err != nil {
-				t.Errorf("Got error GETing: %v", err)
-			}
-			defer resp.Body.Close()
+		// To make sure the original behavior doesn't change no matter the feature PodLogsQuerySplitStreams is enabled or not.
+		for _, enablePodLogsQuerySplitStreams := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (enablePodLogsQuerySplitStreams=%v)", desc, enablePodLogsQuerySplitStreams), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLogsQuerySplitStreams, enablePodLogsQuerySplitStreams)
+				expectedLogOptions := test.podLogOption.DeepCopy()
+				if enablePodLogsQuerySplitStreams && expectedLogOptions.Stream == nil {
+					// The HTTP handler will internally set the default stream value.
+					expectedLogOptions.Stream = ptr.To(v1.LogStreamAll)
+				}
 
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("Error reading container logs: %v", err)
-			}
-			result := string(body)
-			if result != output {
-				t.Errorf("Expected: '%v', got: '%v'", output, result)
-			}
-		})
+				output := "foo bar"
+				podNamespace := "other"
+				podName := "foo"
+				expectedPodName := getPodName(podName, podNamespace)
+				expectedContainerName := "baz"
+				setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+				setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, expectedLogOptions, output)
+				resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + test.query)
+				if err != nil {
+					t.Errorf("Got error GETing: %v", err)
+				}
+				defer func() {
+					_ = resp.Body.Close()
+				}()
+
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Errorf("Error reading container logs: %v", err)
+				}
+				result := string(body)
+				if result != output {
+					t.Errorf("Expected: '%v', got: '%v'", output, result)
+				}
+			})
+		}
 	}
 }
 
@@ -863,6 +876,220 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Errorf("Unexpected non-error reading container logs: %#v", resp)
+	}
+}
+
+func TestContainerLogsWithSeparateStream(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLogsQuerySplitStreams, true)
+
+	type logEntry struct {
+		stream string
+		msg    string
+	}
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	var (
+		streamStdout = v1.LogStreamStdout
+		streamStderr = v1.LogStreamStderr
+		streamAll    = v1.LogStreamAll
+	)
+
+	testCases := []struct {
+		name               string
+		query              string
+		logs               []logEntry
+		expectedOutput     string
+		expectedLogOptions *v1.PodLogOptions
+	}{
+		{
+			// Defaulters don't work if the query is empty.
+			// See also https://github.com/kubernetes/kubernetes/issues/128589
+			name: "empty query should return all logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "foo\n"},
+				{stream: v1.LogStreamStderr, msg: "bar\n"},
+			},
+			query: "",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamAll,
+			},
+			expectedOutput: "foo\nbar\n",
+		},
+		{
+			name: "missing stream param should return all logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "foo\n"},
+				{stream: v1.LogStreamStderr, msg: "bar\n"},
+			},
+			query: "?limitBytes=100",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:     &streamAll,
+				LimitBytes: ptr.To[int64](100),
+			},
+			expectedOutput: "foo\nbar\n",
+		},
+		{
+			name: "only stdout logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out2\n"},
+			},
+			query: "?stream=Stdout",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamStdout,
+			},
+			expectedOutput: "out1\nout2\n",
+		},
+		{
+			name: "only stderr logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStderr, msg: "err2\n"},
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+			},
+			query: "?stream=Stderr",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamStderr,
+			},
+			expectedOutput: "err1\nerr2\n",
+		},
+		{
+			name: "return all logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out2\n"},
+			},
+			query: "?stream=All",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream: &streamAll,
+			},
+			expectedOutput: "out1\nerr1\nout2\n",
+		},
+		{
+			name: "stdout logs with legacy tail",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out2\n"},
+			},
+			query: "?stream=All&tail=1",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamAll,
+				TailLines: ptr.To[int64](1),
+			},
+			expectedOutput: "out2\n",
+		},
+		{
+			name: "return the last 2 lines of logs",
+			logs: []logEntry{
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out2\n"},
+			},
+			query: "?stream=All&tailLines=2",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:    &streamAll,
+				TailLines: ptr.To[int64](2),
+			},
+			expectedOutput: "err1\nout2\n",
+		},
+		{
+			name: "return the first 6 bytes of the stdout log stream",
+			logs: []logEntry{
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+				{stream: v1.LogStreamStderr, msg: "err2\n"},
+				{stream: v1.LogStreamStdout, msg: "out2\n"},
+			},
+			query: "?stream=Stdout&limitBytes=6",
+			expectedLogOptions: &v1.PodLogOptions{
+				Stream:     &streamStdout,
+				LimitBytes: ptr.To[int64](6),
+			},
+			expectedOutput: "out1\no",
+		},
+		{
+			name: "invalid stream",
+			logs: []logEntry{
+				{stream: v1.LogStreamStderr, msg: "err1\n"},
+				{stream: v1.LogStreamStdout, msg: "out1\n"},
+			},
+			query:              "?stream=invalid",
+			expectedLogOptions: nil,
+			expectedOutput:     `{"message": "Invalid request."}`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podNamespace := "other"
+			podName := "foo"
+			expectedContainerName := "baz"
+			setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+			fw.fakeKubelet.containerLogsFunc = func(_ context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+				if !reflect.DeepEqual(tc.expectedLogOptions, logOptions) {
+					t.Errorf("expected %#v, got %#v", tc.expectedLogOptions, logOptions)
+				}
+
+				var dst io.Writer
+				tailLines := len(tc.logs)
+				if logOptions.TailLines != nil {
+					tailLines = int(*logOptions.TailLines)
+				}
+
+				remain := 0
+				if logOptions.LimitBytes != nil {
+					remain = int(*logOptions.LimitBytes)
+				} else {
+					for _, log := range tc.logs {
+						remain += len(log.msg)
+					}
+				}
+
+				logs := tc.logs[len(tc.logs)-tailLines:]
+				for _, log := range logs {
+					switch log.stream {
+					case v1.LogStreamStdout:
+						dst = stdout
+					case v1.LogStreamStderr:
+						dst = stderr
+					}
+					// Skip if the stream is not requested
+					if dst == nil {
+						continue
+					}
+					line := log.msg
+					if len(line) > remain {
+						line = line[:remain]
+					}
+					_, _ = io.WriteString(dst, line)
+					remain -= len(line)
+					if remain <= 0 {
+						return nil
+					}
+				}
+				return nil
+			}
+			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + tc.query)
+			if err != nil {
+				t.Errorf("Got error GETing: %v", err)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("Error reading container logs: %v", err)
+			}
+			result := string(body)
+			if result != tc.expectedOutput {
+				t.Errorf("Expected: %q, got: %q", tc.expectedOutput, result)
+			}
+		})
 	}
 }
 

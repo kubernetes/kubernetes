@@ -28,12 +28,15 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -46,7 +49,6 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -144,7 +146,7 @@ func createPodUsingNfs(ctx context.Context, f *framework.Framework, c clientset.
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever, //don't restart pod
+			RestartPolicy: v1.RestartPolicyNever, // don't restart pod
 			Volumes: []v1.Volume{
 				{
 					Name: "nfs-vol",
@@ -640,6 +642,76 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 })
 
+var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, func() {
+	var (
+		c  clientset.Interface
+		ns string
+	)
+	f := framework.NewDefaultFramework("pod-log-stream")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.BeforeEach(func() {
+		c = f.ClientSet
+		ns = f.Namespace.Name
+	})
+
+	ginkgo.It("kubectl get --raw /api/v1/namespaces/default/pods/<pod-name>/log?stream", func(ctx context.Context) {
+		ginkgo.By("create pod")
+
+		pod := &v1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "log-stream-",
+				Namespace:    ns,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "log-stream",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", "echo out1; echo err1 >&2; tail -f /dev/null"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever, // don't restart pod
+			},
+		}
+		rtnPod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, rtnPod.Name, f.Namespace.Name, framework.PodStartTimeout) // running & ready
+		framework.ExpectNoError(err)
+
+		rtnPod, err = c.CoreV1().Pods(ns).Get(ctx, rtnPod.Name, metav1.GetOptions{}) // return fresh pod
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Starting the command")
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+
+		queryCommand := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log?stream=All", rtnPod.Namespace, rtnPod.Name)
+		cmd := tk.KubectlCmd("get", "--raw", queryCommand)
+		result := runKubectlCommand(cmd)
+		// the order of the logs is indeterminate
+		assertContains("out1", result)
+		assertContains("err1", result)
+
+		queryCommand = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log?stream=Stdout", rtnPod.Namespace, rtnPod.Name)
+		cmd = tk.KubectlCmd("get", "--raw", queryCommand)
+		result = runKubectlCommand(cmd)
+		assertContains("out1", result)
+		assertNotContains("err1", result)
+
+		queryCommand = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log?stream=Stderr", rtnPod.Namespace, rtnPod.Name)
+		cmd = tk.KubectlCmd("get", "--raw", queryCommand)
+		result = runKubectlCommand(cmd)
+		assertContains("err1", result)
+		assertNotContains("out1", result)
+	})
+})
+
 func getLinuxNodes(nodes *v1.NodeList) *v1.NodeList {
 	filteredNodes := nodes
 	e2enode.Filter(filteredNodes, func(node v1.Node) bool {
@@ -694,6 +766,13 @@ func assertContains(expectedString string, result string) {
 		return
 	}
 	framework.Failf("Failed to find \"%s\"", expectedString)
+}
+
+func assertNotContains(expectedString string, result string) {
+	if !strings.Contains(result, expectedString) {
+		return
+	}
+	framework.Failf("Found unexpected \"%s\"", expectedString)
 }
 
 func commandOnNode(nodeName string, cmd string) string {
