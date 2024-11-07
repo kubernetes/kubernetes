@@ -2588,6 +2588,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
+	cpu1m := resource.MustParse("1m")
+	cpu2m := resource.MustParse("2m")
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
 	cpu1500m := resource.MustParse("1500m")
@@ -2671,7 +2673,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		pod                  *v1.Pod
+		originalRequests     v1.ResourceList
 		newRequests          v1.ResourceList
 		newRequestsAllocated bool // Whether the new requests have already been allocated (but not actuated)
 		expectedAllocations  v1.ResourceList
@@ -2681,7 +2683,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	}{
 		{
 			name:                "Request CPU and memory decrease - expect InProgress",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
@@ -2689,7 +2691,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		},
 		{
 			name:                "Request CPU increase, memory decrease - expect InProgress",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
@@ -2697,7 +2699,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		},
 		{
 			name:                "Request CPU decrease, memory increase - expect InProgress",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
@@ -2705,35 +2707,35 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		},
 		{
 			name:                "Request CPU and memory increase beyond current capacity - expect Deferred",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2500m, v1.ResourceMemory: mem2500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusDeferred,
 		},
 		{
 			name:                "Request CPU decrease and memory increase beyond current capacity - expect Deferred",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem2500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusDeferred,
 		},
 		{
 			name:                "Request memory increase beyond node capacity - expect Infeasible",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem4500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 		},
 		{
 			name:                "Request CPU increase beyond node capacity - expect Infeasible",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu5000m, v1.ResourceMemory: mem1000M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 		},
 		{
 			name:                 "CPU increase in progress - expect InProgress",
-			pod:                  testPod2,
+			originalRequests:     v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
 			newRequestsAllocated: true,
 			expectedAllocations:  v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
@@ -2741,18 +2743,52 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		},
 		{
 			name:                "No resize",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      "",
 		},
 		{
 			name:                "windows node, expect Infeasible",
-			pod:                 testPod2,
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:      v1.PodResizeStatusInfeasible,
 			goos:                "windows",
+		},
+		{
+			name:                "Increase CPU from min shares",
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu2m},
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			expectedResize:      v1.PodResizeStatusInProgress,
+			expectBackoffReset:  true,
+		},
+		{
+			name:                "Decrease CPU to min shares",
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1000m},
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2m},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu2m},
+			expectedResize:      v1.PodResizeStatusInProgress,
+			expectBackoffReset:  true,
+		},
+		{
+			name:                "Equivalent min CPU shares",
+			originalRequests:    v1.ResourceList{v1.ResourceCPU: cpu1m},
+			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu2m},
+			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu2m},
+			expectedResize:      "",
+			// Even though the resize isn't being actuated, we still clear the container backoff
+			// since the allocation is changing.
+			expectBackoffReset: true,
+		},
+		{
+			name:                 "Equivalent min CPU shares - already allocated",
+			originalRequests:     v1.ResourceList{v1.ResourceCPU: cpu2m},
+			newRequests:          v1.ResourceList{v1.ResourceCPU: cpu1m},
+			newRequestsAllocated: true,
+			expectedAllocations:  v1.ResourceList{v1.ResourceCPU: cpu1m},
+			expectedResize:       "",
 		},
 	}
 
@@ -2765,22 +2801,26 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			}
 			kubelet.statusManager = status.NewFakeManager()
 
-			newPod := tt.pod.DeepCopy()
+			originalPod := testPod1.DeepCopy()
+			originalPod.Spec.Containers[0].Resources.Requests = tt.originalRequests
+			kubelet.podManager.UpdatePod(originalPod)
+
+			newPod := originalPod.DeepCopy()
 			newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
 
 			if !tt.newRequestsAllocated {
-				require.NoError(t, kubelet.statusManager.SetPodAllocation(tt.pod))
+				require.NoError(t, kubelet.statusManager.SetPodAllocation(originalPod))
 			} else {
 				require.NoError(t, kubelet.statusManager.SetPodAllocation(newPod))
 			}
 
 			podStatus := &kubecontainer.PodStatus{
-				ID:                tt.pod.UID,
-				Name:              tt.pod.Name,
-				Namespace:         tt.pod.Namespace,
-				ContainerStatuses: make([]*kubecontainer.Status, len(tt.pod.Spec.Containers)),
+				ID:                originalPod.UID,
+				Name:              originalPod.Name,
+				Namespace:         originalPod.Namespace,
+				ContainerStatuses: make([]*kubecontainer.Status, len(originalPod.Spec.Containers)),
 			}
-			for i, c := range tt.pod.Spec.Containers {
+			for i, c := range originalPod.Spec.Containers {
 				podStatus.ContainerStatuses[i] = &kubecontainer.Status{
 					Name:  c.Name,
 					State: kubecontainer.ContainerStateRunning,
@@ -2794,7 +2834,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 			now := kubelet.clock.Now()
 			// Put the container in backoff so we can confirm backoff is reset.
-			backoffKey := kuberuntime.GetStableKey(tt.pod, &tt.pod.Spec.Containers[0])
+			backoffKey := kuberuntime.GetStableKey(originalPod, &originalPod.Spec.Containers[0])
 			kubelet.backOff.Next(backoffKey, now)
 
 			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
