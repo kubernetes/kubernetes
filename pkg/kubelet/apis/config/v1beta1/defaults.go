@@ -58,7 +58,7 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
 
-	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	localFeatureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	_ = localFeatureGate.SetFromMap(obj.FeatureGates)
 
 	if obj.EnableServer == nil {
