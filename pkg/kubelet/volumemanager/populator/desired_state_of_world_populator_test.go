@@ -406,7 +406,7 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 		PodUID:              pod.UID,
 		VolumeName:          expectedVolumeName,
 		OuterVolumeSpecName: "dswp-test-volume-name",
-		VolumeGidVolume:     "",
+		VolumeGIDVolume:     "",
 		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
 		VolumeMountState:    operationexecutor.VolumeMountUncertain,
 	}
@@ -1392,7 +1392,7 @@ func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,
 			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    operationexecutor.VolumeMounted,
 		}

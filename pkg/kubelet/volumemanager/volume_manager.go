@@ -334,14 +334,14 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	supplementalGroups := sets.New[string]()
 
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		if mountedVolume.VolumeGidValue != "" {
-			supplementalGroups.Insert(mountedVolume.VolumeGidValue)
+		if mountedVolume.VolumeGIDValue != "" {
+			supplementalGroups.Insert(mountedVolume.VolumeGIDValue)
 		}
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
 	for _, group := range supplementalGroups.UnsortedList() {
-		iGroup, extra := getExtraSupplementalGid(group, pod)
+		iGroup, extra := getExtraSupplementalGID(group, pod)
 		if !extra {
 			continue
 		}
@@ -585,22 +585,22 @@ func getExpectedVolumes(pod *v1.Pod) []string {
 	return mounts.Union(devices).UnsortedList()
 }
 
-// getExtraSupplementalGid returns the value of an extra supplemental GID as
+// getExtraSupplementalGID returns the value of an extra supplemental GID as
 // defined by an annotation on a volume and a boolean indicating whether the
 // volume defined a GID that the pod doesn't already request.
-func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
-	if volumeGidValue == "" {
+func getExtraSupplementalGID(volumeGIDValue string, pod *v1.Pod) (int64, bool) {
+	if volumeGIDValue == "" {
 		return 0, false
 	}
 
-	gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
+	gid, err := strconv.ParseInt(volumeGIDValue, 10, 64)
 	if err != nil {
 		return 0, false
 	}
 
 	if pod.Spec.SecurityContext != nil {
-		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == int64(existingGid) {
+		for _, existingGID := range pod.Spec.SecurityContext.SupplementalGroups {
+			if gid == int64(existingGID) {
 				return 0, false
 			}
 		}

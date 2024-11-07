@@ -170,7 +170,7 @@ type MarkVolumeOpts struct {
 	Mounter             volume.Mounter
 	BlockVolumeMapper   volume.BlockVolumeMapper
 	OuterVolumeSpecName string
-	VolumeGidVolume     string
+	VolumeGIDVolume     string
 	VolumeSpec          *volume.Spec
 	VolumeMountState    VolumeMountState
 	SELinuxMountContext string
@@ -438,8 +438,8 @@ type VolumeToMount struct {
 	// the volume.DeviceMounter interface
 	PluginIsDeviceMountable bool
 
-	// VolumeGidValue contains the value of the GID annotation, if present.
-	VolumeGidValue string
+	// VolumeGIDValue contains the value of the GID annotation, if present.
+	VolumeGIDValue string
 
 	// DevicePath contains the path on the node where the volume is attached.
 	// For non-attachable volumes this is empty.
@@ -739,8 +739,8 @@ type MountedVolume struct {
 	// BlockVolumeMapper is only required for block volumes and not required for file system volumes.
 	BlockVolumeMapper volume.BlockVolumeMapper
 
-	// VolumeGidValue contains the value of the GID annotation, if present.
-	VolumeGidValue string
+	// VolumeGIDValue contains the value of the GID annotation, if present.
+	VolumeGIDValue string
 
 	// VolumeSpec is a volume spec containing the specification for the volume
 	// that should be mounted.
