@@ -272,12 +272,12 @@ type draPlugin struct {
 // If the plugin will be used to publish resources, [KubeClient] and [NodeName]
 // options are mandatory.
 //
-// By default, the DRA driver gets registered so that the plugin is compatible
-// with Kubernetes >= 1.32. To be compatible with Kubernetes >= 1.31, a driver
-// has to ask specifically to register only the alpha gRPC API, i.e. use:
-//
-//	Start(..., NodeV1beta1(false))
-func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
+// The DRA driver decides which gRPC interfaces it implements. At least one
+// implementation of [drapbv1alpha4.NodeServer] or [drapbv1beta1.DRAPluginServer]
+// is required. Implementing drapbv1beta1.DRAPluginServer is recommended for
+// DRA driver targeting Kubernetes >= 1.32. To be compatible with Kubernetes 1.31,
+// DRA drivers must implement only [drapbv1alpha4.NodeServer].
+func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
@@ -338,15 +338,17 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	var supportedServices []string
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
-		if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
-			logger.V(5).Info("registering v1alpha4.Node gGRPC service")
-			drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
-			supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
-		}
-		if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
-			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-			drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
-			supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
+		for _, nodeServer := range nodeServers {
+			if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
+				logger.V(5).Info("registering v1alpha4.Node gGRPC service")
+				drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
+				supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
+			}
+			if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
+				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+				drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
+				supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
+			}
 		}
 	})
 	if err != nil {

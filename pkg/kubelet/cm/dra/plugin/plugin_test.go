@@ -34,7 +34,6 @@ import (
 )
 
 type fakeGRPCServer struct {
-	drapbv1beta1.UnimplementedDRAPluginServer
 }
 
 var _ drapbv1beta1.DRAPluginServer = &fakeGRPCServer{}
@@ -84,7 +83,7 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 	case drapbv1beta1.DRAPluginService:
 		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
 	case drapbv1alpha4.NodeService:
-		drapbv1alpha4.RegisterNodeServer(s, fakeGRPCServer)
+		drapbv1alpha4.RegisterNodeServer(s, drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 	default:
 		return "", nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}

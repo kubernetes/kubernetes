@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
@@ -165,7 +166,15 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+	// Both APIs get provided, the legacy one via wrapping. The options
+	// determine which one(s) really get served (by default, both).
+	// The options are a bit redundant now because a single instance cannot
+	// implement both, but that might be different in the future.
+	nodeServers := []any{
+		drapb.DRAPluginServer(ex), // Casting is done only for clarity here, it's not needed.
+		drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: ex},
+	}
+	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}

@@ -14,11 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
-
-const (
-	// DRAPluginService needs to be listed in the "supported versions"
-	// array during plugin registration by a DRA plugin which provides
-	// an implementation of the v1beta1 DRAPlugin service.
-	DRAPluginService = "v1beta1.DRAPlugin"
-)
+// Package v1alpha4 contains a legacy implementation of the DRA gRPC
+// interface. Support for it in kubelet is provided via conversion.
+//
+// +k8s:conversion-gen=k8s.io/kubelet/pkg/apis/dra/v1beta1
+package v1alpha4
