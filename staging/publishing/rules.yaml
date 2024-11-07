@@ -2441,6 +2441,13 @@ rules:
       branch: release-1.31
       dirs:
       - staging/src/k8s.io/endpointslice
+- destination: externaljwt
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/externaljwt
 recursive-delete-patterns:
 - '*/.gitattributes'
 default-go-version: 1.23.2

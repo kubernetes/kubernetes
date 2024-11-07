@@ -57,6 +57,7 @@ type GenericConfig struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
 	ExtendExpiration            bool
+	IsTokenSignerExternal       bool
 
 	APIAudiences authenticator.Audiences
 
@@ -102,9 +103,9 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), c.ExtendExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), c.ExtendExpiration, c.IsTokenSignerExternal)
 	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false, c.IsTokenSignerExternal)
 	}
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err

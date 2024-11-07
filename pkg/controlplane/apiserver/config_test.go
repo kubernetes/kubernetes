@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestBuildGenericConfig(t *testing.T) {
 	s.BindPort = ln.Addr().(*net.TCPAddr).Port
 	opts.SecureServing = s
 
-	completedOptions, err := opts.Complete(nil, nil)
+	completedOptions, err := opts.Complete(context.TODO(), nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to complete apiserver options: %v", err)
 	}

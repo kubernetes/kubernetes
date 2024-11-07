@@ -819,6 +819,13 @@ const (
 	// instead of changing each file on the volumes recursively.
 	// Enables the SELinuxChangePolicy field in PodSecurityContext before SELinuxMount featgure gate is enabled.
 	SELinuxChangePolicy featuregate.Feature = "SELinuxChangePolicy"
+
+	// owner: @HarshalNeelkamal
+	// alpha: v1.32
+	//
+	// Enables external service account JWT signing and key management.
+	// If enabled, it allows passing --service-account-signing-endpoint flag to configure external signer.
+	ExternalServiceAccountTokenSigner featuregate.Feature = "ExternalServiceAccountTokenSigner"
 )
 
 func init() {

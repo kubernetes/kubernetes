@@ -83,7 +83,9 @@ APIs.`,
 			}
 			cliflag.PrintFlags(fs)
 
-			completedOptions, err := s.Complete([]string{}, []net.IP{})
+			ctx := genericapiserver.SetupSignalContext()
+
+			completedOptions, err := s.Complete(ctx, []string{}, []net.IP{})
 			if err != nil {
 				return err
 			}
@@ -94,7 +96,7 @@ APIs.`,
 
 			// add feature enablement metrics
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
-			ctx := genericapiserver.SetupSignalContext()
+
 			return Run(ctx, completedOptions)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {

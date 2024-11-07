@@ -92,6 +92,7 @@ type Extra struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
 	ExtendExpiration            bool
+	IsTokenSignerExternal       bool
 
 	// ServiceAccountIssuerDiscovery
 	ServiceAccountIssuerURL        string
@@ -300,6 +301,7 @@ func CreateConfig(
 			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
 			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
+			IsTokenSignerExternal:       opts.Authentication.ServiceAccounts.IsTokenSignerExternal,
 
 			VersionedInformers: versionedInformers,
 		},
