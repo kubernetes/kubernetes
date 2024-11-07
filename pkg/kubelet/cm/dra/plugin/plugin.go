@@ -128,7 +128,7 @@ func (p *Plugin) NodePrepareResources(
 		response, err = nodeClient.NodePrepareResources(ctx, req)
 	case drapbv1alpha4.NodeService:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
-		response, err = nodeClient.NodePrepareResources(ctx, req)
+		response, err = drapbv1alpha4.V1Alpha4ClientWrapper{NodeClient: nodeClient}.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -161,7 +161,7 @@ func (p *Plugin) NodeUnprepareResources(
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
 	case drapbv1alpha4.NodeService:
 		nodeClient := drapbv1alpha4.NewNodeClient(conn)
-		response, err = nodeClient.NodeUnprepareResources(ctx, req)
+		response, err = drapbv1alpha4.V1Alpha4ClientWrapper{NodeClient: nodeClient}.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
