@@ -254,6 +254,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SingleProcessOOMKill != nil {
+		in, out := &in.SingleProcessOOMKill, &out.SingleProcessOOMKill
+		*out = new(bool)
+		**out = **in
+	}
 	if in.CPUManagerPolicyOptions != nil {
 		in, out := &in.CPUManagerPolicyOptions, &out.CPUManagerPolicyOptions
 		*out = make(map[string]string, len(*in))

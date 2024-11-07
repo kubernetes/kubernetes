@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	cgroups "k8s.io/kubernetes/third_party/forked/cgroups"
+	"k8s.io/utils/ptr"
 )
 
 var defaultPageSize = int64(os.Getpagesize())
@@ -247,7 +249,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	}
 
 	// runc requires cgroupv2 for unified mode
-	if isCgroup2UnifiedMode() {
+	if isCgroup2UnifiedMode() && !ptr.Deref(m.singleProcessOOMKill, true) {
 		resources.Unified = map[string]string{
 			// Ask the kernel to kill all processes in the container cgroup in case of OOM.
 			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for
