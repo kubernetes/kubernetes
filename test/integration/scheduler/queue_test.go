@@ -2041,6 +2041,177 @@ func TestCoreResourceEnqueue(t *testing.T) {
 			wantRequeuedPods:          sets.Set[string]{},
 			enableSchedulingQueueHint: []bool{true},
 		},
+		{
+			name:         "Pod rejected the CSI plugin is requeued when the CSINode is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle"}}).
+					Obj()},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			initialCSIDrivers: []*storagev1.CSIDriver{
+				st.MakeCSIDriver().Name("csidriver").StorageCapacity(ptr.To(true)).Obj(),
+			},
+			initialCSINodes: []*storagev1.CSINode{
+				st.MakeCSINode().Name("fake-node").Driver(storagev1.CSINodeDriver{Name: "csidriver", NodeID: "fake-node", Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(0)),
+				}}).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				csinode1 := st.MakeCSINode().Name("csinode").Obj()
+				if _, err := testCtx.ClientSet.StorageV1().CSINodes().Create(testCtx.Ctx, csinode1, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to create CSINode: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{{Resource: framework.CSINode, ActionType: framework.Add}: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{true},
+		},
+		{
+			name:         "Pod rejected with PVC by the CSI plugin is requeued when the pod having related PVC is deleted",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle1"}}).
+					Obj(),
+				st.MakePersistentVolume().Name("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle2"}}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+				st.MakePersistentVolumeClaim().
+					Name("pvc2").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			initialCSIDrivers: []*storagev1.CSIDriver{
+				st.MakeCSIDriver().Name("csidriver").StorageCapacity(ptr.To(true)).Obj(),
+			},
+			initialCSINodes: []*storagev1.CSINode{
+				st.MakeCSINode().Name("fake-node").Driver(storagev1.CSINodeDriver{Name: "csidriver", NodeID: "fake-node", Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				}}).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+					return nil, fmt.Errorf("failed to delete Pod: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
+			},
+			wantRequeuedPods: sets.New("pod2"),
+		},
+		{
+			name:         "Pod rejected with PVC by the CSI plugin is requeued when the related PVC is added",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+			initialPVs: []*v1.PersistentVolume{
+				st.MakePersistentVolume().Name("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle1"}}).
+					Obj(),
+				st.MakePersistentVolume().Name("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle2"}}).
+					Obj(),
+				st.MakePersistentVolume().Name("pv3").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
+					Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
+					PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle3"}}).
+					Obj(),
+			},
+			initialPVCs: []*v1.PersistentVolumeClaim{
+				st.MakePersistentVolumeClaim().
+					Name("pvc1").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv1").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+				// If we don't have pvc2, it's filtered by the VolumeBinding pluging, so we should create it first and recreate it in a triggerFn.
+				st.MakePersistentVolumeClaim().
+					Name("pvc2").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+				st.MakePersistentVolumeClaim().
+					Name("pvc3").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv3").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj(),
+			},
+			initialCSIDrivers: []*storagev1.CSIDriver{
+				st.MakeCSIDriver().Name("csidriver").StorageCapacity(ptr.To(true)).Obj(),
+			},
+			initialCSINodes: []*storagev1.CSINode{
+				st.MakeCSINode().Name("fake-node").Driver(storagev1.CSINodeDriver{Name: "csidriver", NodeID: "fake-node", Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				}}).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Container("image").PVC("pvc1").Node("fake-node").Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
+				st.MakePod().Name("pod3").Container("image").PVC("pvc3").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
+				if err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Delete(testCtx.Ctx, "pvc2", metav1.DeleteOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to delete pvc2: %w", err)
+				}
+
+				pvc := st.MakePersistentVolumeClaim().
+					Name("pvc2").
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName("pv2").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
+					Obj()
+				if _, err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Create(testCtx.Ctx, pvc, metav1.CreateOptions{}); err != nil {
+					return nil, fmt.Errorf("failed to add pvc2: %w", err)
+				}
+				return map[framework.ClusterEvent]uint64{{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}: 1}, nil
+			},
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{true},
+		},
 	}
 
 	for _, tt := range tests {
