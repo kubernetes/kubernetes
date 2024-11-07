@@ -567,6 +567,24 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
+			name: "Burstable QoS pod, one container with cpu requests - resize with equivalent request",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "2m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"1m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "1m"},
+				},
+			},
+		},
+		{
 			name:         "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
 			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
@@ -782,6 +800,22 @@ func doPodResizeTests(f *framework.Framework) {
 				},
 			},
 			addExtendedResource: true,
+		},
+		{
+			name: "BestEffort QoS pod - empty resize",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{},
+				},
+			},
+			patchString: `{}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{},
+				},
+			},
 		},
 	}
 
