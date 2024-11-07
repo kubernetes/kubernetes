@@ -27,6 +27,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
@@ -249,9 +250,20 @@ func (d *dispatcher) dispatchOne(
 		return err
 	}
 
+	switch versionedAttributes.VersionedObject.(type) {
+	case *unstructured.Unstructured:
+		// No conversion needed before defaulting for the patch object if the admitted object is unstructured.
+	default:
+		// Before defaulting, if the admitted object is a typed object, convert unstructured patch result back to a typed object.
+		newVersionedObject, err = o.GetObjectConvertor().ConvertToVersion(newVersionedObject, versionedAttributes.GetKind().GroupVersion())
+		if err != nil {
+			return err
+		}
+	}
+	o.GetObjectDefaulter().Default(newVersionedObject)
+
 	versionedAttributes.Dirty = true
 	versionedAttributes.VersionedObject = newVersionedObject
-	o.GetObjectDefaulter().Default(newVersionedObject)
 	return nil
 }
 
