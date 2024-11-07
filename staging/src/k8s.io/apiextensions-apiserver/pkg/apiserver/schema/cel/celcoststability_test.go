@@ -372,19 +372,24 @@ func TestCelCostStability(t *testing.T) {
 				"!('c' in self.val)": 4,
 				"'d' in self.val":    3,
 				// field selection also possible if map key is a valid CEL identifier
-				"!has(self.val.a)":                               3,
-				"has(self.val.b)":                                2,
-				"!has(self.val.c)":                               3,
-				"has(self.val.d)":                                2,
-				"self.val.all(k, self.val[k] > 0)":               17,
+				"!has(self.val.a)":                 3,
+				"has(self.val.b)":                  2,
+				"!has(self.val.c)":                 3,
+				"has(self.val.d)":                  2,
+				"self.val.all(k, self.val[k] > 0)": 17,
+				// It is important that the condition does not match in this exists test
+				// since the map iteration order is non-deterministic, and exists short circuits when it matches.
+				"!self.val.exists(k, self.val[k] == 3)":          20,
 				"self.val.exists_one(k, self.val[k] == 2)":       14,
 				"!self.val.exists_one(k, self.val[k] > 0)":       17,
 				"size(self.val) == 2":                            4,
 				"size(self.val.filter(k, self.val[k] > 1)) == 1": 26,
 
 				// two variable comprehensions
-				"self.val.all(k, v, v > 0)":                                             13,
-				"self.val.exists(k, v, v == 2)":                                         15,
+				"self.val.all(k, v, v > 0)": 13,
+				// It is important that the condition does not match in this exists test
+				// since the map iteration order is non-deterministic, and exists short circuits when it matches.
+				"!self.val.exists(k, v, v == 3)":                                        16,
 				"self.val.existsOne(k, v, v == 2)":                                      10,
 				"self.val.transformMap(k, v, v > 1, v + 1).size() == 1":                 14,
 				"self.val.transformMap(k, v, v + 1).size() == 2":                        15,
