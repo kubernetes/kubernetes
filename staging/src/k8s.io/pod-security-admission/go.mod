@@ -58,7 +58,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/gomega v1.33.1 // indirect
-	github.com/openshift/library-go v0.0.0-20241001171606-756adf2188fc // indirect
+	github.com/openshift/library-go v0.0.0-20241107160307-0064ad7bd060 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect

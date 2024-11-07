@@ -161,8 +161,8 @@ github.com/opencontainers/selinux v1.11.0/go.mod h1:E5dMC3VPuVvVHDYmi78qvhJp8+M5
 github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f/go.mod h1:Shkl4HanLwDiiBzakv+con/aMGnVE2MAGvoKp5oyYUo=
 github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f/go.mod h1:KiZi2mJRH1TOJ3FtBDYS6YvUL30s/iIXaGSUrSa36mo=
-github.com/openshift/library-go v0.0.0-20241001171606-756adf2188fc h1:QXYkFJn7wLTHAI56l+9DJnLrNynGtXjyOZLgiIglTnE=
-github.com/openshift/library-go v0.0.0-20241001171606-756adf2188fc/go.mod h1:9B1MYPoLtP9tqjWxcbUNVpwxy68zOH/3EIP6c31dAM0=
+github.com/openshift/library-go v0.0.0-20241107160307-0064ad7bd060 h1:jiDC7d8d+jmjv2WfiMY0+Uf55q11MGyYkGGqXnfqWTU=
+github.com/openshift/library-go v0.0.0-20241107160307-0064ad7bd060/go.mod h1:9B1MYPoLtP9tqjWxcbUNVpwxy68zOH/3EIP6c31dAM0=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240806135314-3946b2b7b2a8 h1:HJvLw9nNfoqCs16h505eP8E1kVmq6KNdzGm5csPlYsQ=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240806135314-3946b2b7b2a8/go.mod h1:rlwLi9PilAFJ8jCg9UE1QP6VBpd6/xj3SRC0d6TU0To=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
