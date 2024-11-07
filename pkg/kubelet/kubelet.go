@@ -50,6 +50,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -2888,6 +2889,12 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
 			return nil, err
+		}
+		for i, container := range pod.Spec.Containers {
+			if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.Containers[i].Resources) {
+				key := kuberuntime.GetStableKey(pod, &container)
+				kl.backOff.Reset(key)
+			}
 		}
 		allocatedPod = pod
 	}
