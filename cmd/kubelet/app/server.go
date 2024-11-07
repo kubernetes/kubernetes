@@ -366,9 +366,8 @@ func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConf
 		return fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
 	}
 	// apply defaulting after decoding
-	if err := kubeletconfigv1beta1conversion.SetDefaults_KubeletConfiguration(versionedConfig, utilfeature.DefaultFeatureGate); err != nil {
-		return fmt.Errorf("failed to apply defaulting to kubelet configuration: %w", err)
-	}
+	kubeletconfigv1beta1conversion.SetDefaults_KubeletConfiguration(versionedConfig)
+
 	// convert back to internal config
 	if err := kubeletconfigv1beta1conversion.Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(versionedConfig, kubeletConfig, nil); err != nil {
 		return fmt.Errorf("failed to convert merged config to internal kubelet configuration: %w", err)
