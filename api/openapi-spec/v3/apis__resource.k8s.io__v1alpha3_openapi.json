@@ -100,7 +100,10 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-map-keys": [
+              "type"
+            ],
+            "x-kubernetes-list-type": "map"
           },
           "data": {
             "allOf": [
@@ -108,7 +111,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
               }
             ],
-            "description": "Data contains arbitrary driver-specific data."
+            "description": "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
           },
           "device": {
             "default": "",
@@ -631,11 +634,11 @@
         "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
         "properties": {
           "hardwareAddress": {
-            "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.",
+            "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
             "type": "string"
           },
           "interfaceName": {
-            "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface.",
+            "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
             "type": "string"
           },
           "ips": {

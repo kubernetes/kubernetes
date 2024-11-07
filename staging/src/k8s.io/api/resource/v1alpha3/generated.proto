@@ -63,10 +63,13 @@ message AllocatedDeviceStatus {
   // config references, the `Ready` condition should be True.
   //
   // +optional
-  // +listType=atomic
+  // +listType=map
+  // +listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
 
   // Data contains arbitrary driver-specific data.
+  //
+  // The length of the raw data must be smaller or equal to 10 Ki.
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 5;
@@ -533,7 +536,9 @@ message DeviceSelector {
 message NetworkDeviceData {
   // InterfaceName specifies the name of the network interface associated with
   // the allocated device. This might be the name of a physical or virtual
-  // network interface.
+  // network interface being configured in the pod.
+  //
+  // Must not be longer than 256 characters.
   //
   // +optional
   optional string interfaceName = 1;
@@ -549,6 +554,8 @@ message NetworkDeviceData {
   repeated string ips = 2;
 
   // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+  //
+  // Must not be longer than 128 characters.
   //
   // +optional
   optional string hardwareAddress = 3;

@@ -12361,7 +12361,9 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
+          elementRelationship: associative
+          keys:
+          - type
     - name: data
       type:
         namedType: __untyped_atomic_
@@ -12792,7 +12794,9 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
+          elementRelationship: associative
+          keys:
+          - type
     - name: data
       type:
         namedType: __untyped_atomic_
