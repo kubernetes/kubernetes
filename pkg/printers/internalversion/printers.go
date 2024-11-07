@@ -54,7 +54,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 
 	podutil "k8s.io/kubernetes/pkg/api/pod"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -994,7 +994,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
 		reason = "Unknown"
-	} else if pod.DeletionTimestamp != nil && !podutil.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
+	} else if pod.DeletionTimestamp != nil && !podutilv1.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
 		reason = "Terminating"
 	}
 
