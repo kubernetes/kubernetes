@@ -5665,6 +5665,13 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 			newInitContainers = append(newInitContainers, container)
 		}
 		originalCPUMemPodSpec.InitContainers = newInitContainers
+		if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec.InitContainers, oldPod.Spec.InitContainers) {
+			// This likely means that the user has modified non-sidecar container resources.
+			specDiff := cmp.Diff(oldPod.Spec.InitContainers, originalCPUMemPodSpec.InitContainers)
+			errs := field.Forbidden(specPath, fmt.Sprintf("cpu and memory resources for only sidecar containers are mutable\n%v", specDiff))
+			allErrs = append(allErrs, errs)
+			return allErrs
+		}
 	}
 
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
