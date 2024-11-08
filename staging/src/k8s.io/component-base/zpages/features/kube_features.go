@@ -23,6 +23,10 @@ import (
 
 const (
 	// owner: @richabanker
+	// kep: https://kep.k8s.io/4828
+	ComponentFlagz featuregate.Feature = "ComponentFlagz"
+
+	// owner: @richabanker
 	// kep: https://kep.k8s.io/4827
 	// alpha: v1.32
 	//
@@ -33,6 +37,9 @@ const (
 
 func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 	return map[featuregate.Feature]featuregate.VersionedSpecs{
+		ComponentFlagz: {
+			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		},
 		ComponentStatusz: {
 			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		},

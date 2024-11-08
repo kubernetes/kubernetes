@@ -34,6 +34,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 
@@ -47,6 +48,7 @@ import (
 // Options define the flags and validation for a generic controlplane. If the
 // structs are nil, the options are not added to the command line and not validated.
 type Options struct {
+	Flagz                   flagz.Reader
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
@@ -201,7 +203,7 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
 }
 
-func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
+func (o *Options) Complete(ctx context.Context, fss cliflag.NamedFlagSets, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
 	if o == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
@@ -256,6 +258,8 @@ func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternate
 			delete(completed.APIEnablement.RuntimeConfig, key)
 		}
 	}
+
+	completed.Flagz = flagz.NamedFlagSetsReader{FlagSets: fss}
 
 	return CompletedOptions{
 		completedOptions: &completed,

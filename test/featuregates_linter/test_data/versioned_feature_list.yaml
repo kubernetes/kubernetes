@@ -200,6 +200,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.29"
+- name: ComponentFlagz
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: ComponentSLIs
   versionedSpecs:
   - default: false
