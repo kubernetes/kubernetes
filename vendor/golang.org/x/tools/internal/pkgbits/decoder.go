@@ -23,9 +23,6 @@ type PkgDecoder struct {
 	// version is the file format version.
 	version uint32
 
-	// aliases determines whether types.Aliases should be created
-	aliases bool
-
 	// sync indicates whether the file uses sync markers.
 	sync bool
 
@@ -76,7 +73,6 @@ func (pr *PkgDecoder) SyncMarkers() bool { return pr.sync }
 func NewPkgDecoder(pkgPath, input string) PkgDecoder {
 	pr := PkgDecoder{
 		pkgPath: pkgPath,
-		//aliases: aliases.Enabled(),
 	}
 
 	// TODO(mdempsky): Implement direct indexing of input string to

@@ -265,9 +265,7 @@ func (r *ModuleResolver) initAllMods() error {
 			return err
 		}
 		if mod.Dir == "" {
-			if r.env.Logf != nil {
-				r.env.Logf("module %v has not been downloaded and will be ignored", mod.Path)
-			}
+			r.env.logf("module %v has not been downloaded and will be ignored", mod.Path)
 			// Can't do anything with a module that's not downloaded.
 			continue
 		}
@@ -766,9 +764,7 @@ func (r *ModuleResolver) scanDirForPackage(root gopathwalk.Root, dir string) dir
 		}
 		modPath, err := module.UnescapePath(filepath.ToSlash(matches[1]))
 		if err != nil {
-			if r.env.Logf != nil {
-				r.env.Logf("decoding module cache path %q: %v", subdir, err)
-			}
+			r.env.logf("decoding module cache path %q: %v", subdir, err)
 			return directoryPackageInfo{
 				status: directoryScanned,
 				err:    fmt.Errorf("decoding module cache path %q: %v", subdir, err),

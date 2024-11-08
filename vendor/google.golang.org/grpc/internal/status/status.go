@@ -138,11 +138,11 @@ func (s *Status) WithDetails(details ...protoadapt.MessageV1) (*Status, error) {
 	// s.Code() != OK implies that s.Proto() != nil.
 	p := s.Proto()
 	for _, detail := range details {
-		any, err := anypb.New(protoadapt.MessageV2Of(detail))
+		m, err := anypb.New(protoadapt.MessageV2Of(detail))
 		if err != nil {
 			return nil, err
 		}
-		p.Details = append(p.Details, any)
+		p.Details = append(p.Details, m)
 	}
 	return &Status{s: p}, nil
 }
