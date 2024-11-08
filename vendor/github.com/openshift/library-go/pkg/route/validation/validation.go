@@ -313,9 +313,7 @@ func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path,
 // using externalCertificate. Called by validateTLS.
 func validateTLSExternalCertificate(ctx context.Context, route *routev1.Route, fldPath *field.Path, sarc routecommon.SubjectAccessReviewCreator, secretsGetter corev1client.SecretsGetter) field.ErrorList {
 	tls := route.Spec.TLS
-
-	// user must have create and update permission on the custom-host sub-resource.
-	errs := routecommon.CheckRouteCustomHostSAR(ctx, fldPath, sarc)
+	var errs field.ErrorList
 
 	// The router serviceaccount must have permission to get/list/watch the referenced secret.
 	// The role and rolebinding to provide this access must be provided by the user.
