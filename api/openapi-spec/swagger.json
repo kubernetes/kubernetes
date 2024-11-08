@@ -14521,6 +14521,48 @@
       "type": "object",
       "x-kubernetes-map-type": "atomic"
     },
+    "io.k8s.api.resource.v1alpha3.AllocatedDeviceStatus": {
+      "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
+        "device": {
+          "description": "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+          "type": "string"
+        },
+        "driver": {
+          "description": "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+          "type": "string"
+        },
+        "networkData": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NetworkDeviceData",
+          "description": "NetworkData contains network-related information specific to the device."
+        },
+        "pool": {
+          "description": "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "driver",
+        "pool",
+        "device"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha3.AllocationResult": {
       "description": "AllocationResult contains attributes of an allocated resource.",
       "properties": {
@@ -14901,6 +14943,28 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha3.NetworkDeviceData": {
+      "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
+      "properties": {
+        "hardwareAddress": {
+          "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
+          "type": "string"
+        },
+        "interfaceName": {
+          "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
+          "type": "string"
+        },
+        "ips": {
+          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha3.OpaqueDeviceConfiguration": {
       "description": "OpaqueDeviceConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
       "properties": {
@@ -15033,6 +15097,19 @@
         "allocation": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.AllocationResult",
           "description": "Allocation is set once the claim has been allocated successfully."
+        },
+        "devices": {
+          "description": "Devices contains the status of each device allocated for this claim, as reported by the driver. This can include driver-specific information. Entries are owned by their respective drivers.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.AllocatedDeviceStatus"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "driver",
+            "device",
+            "pool"
+          ],
+          "x-kubernetes-list-type": "map"
         },
         "reservedFor": {
           "description": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
@@ -15261,6 +15338,48 @@
       "required": [
         "driver",
         "pool"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta1.AllocatedDeviceStatus": {
+      "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
+        "device": {
+          "description": "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+          "type": "string"
+        },
+        "driver": {
+          "description": "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+          "type": "string"
+        },
+        "networkData": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta1.NetworkDeviceData",
+          "description": "NetworkData contains network-related information specific to the device."
+        },
+        "pool": {
+          "description": "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "driver",
+        "pool",
+        "device"
       ],
       "type": "object"
     },
@@ -15657,6 +15776,28 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1beta1.NetworkDeviceData": {
+      "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
+      "properties": {
+        "hardwareAddress": {
+          "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
+          "type": "string"
+        },
+        "interfaceName": {
+          "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
+          "type": "string"
+        },
+        "ips": {
+          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.resource.v1beta1.OpaqueDeviceConfiguration": {
       "description": "OpaqueDeviceConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
       "properties": {
@@ -15789,6 +15930,19 @@
         "allocation": {
           "$ref": "#/definitions/io.k8s.api.resource.v1beta1.AllocationResult",
           "description": "Allocation is set once the claim has been allocated successfully."
+        },
+        "devices": {
+          "description": "Devices contains the status of each device allocated for this claim, as reported by the driver. This can include driver-specific information. Entries are owned by their respective drivers.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.AllocatedDeviceStatus"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "driver",
+            "device",
+            "pool"
+          ],
+          "x-kubernetes-list-type": "map"
         },
         "reservedFor": {
           "description": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",

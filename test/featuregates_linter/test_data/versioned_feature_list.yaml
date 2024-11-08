@@ -418,6 +418,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: DRAResourceClaimDeviceStatus
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false

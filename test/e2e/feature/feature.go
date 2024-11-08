@@ -96,6 +96,15 @@ var (
 	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
 
 	// owning-sig: sig-node
+	// kep: https://kep.k8s.io/4817
+	// test-infra jobs:
+	// - "dra-alpha" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	//
+	// This label is used for tests which need:
+	// - the DynamicResourceAllocation *and* DRAResourceClaimDeviceStatus feature gates
+	DRAResourceClaimDeviceStatus = framework.WithFeature(framework.ValidFeatures.Add("DRAResourceClaimDeviceStatus"))
+
+	// owning-sig: sig-node
 	// kep: https://kep.k8s.io/4381
 	// test-infra jobs:
 	// - "dra-alpha" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation

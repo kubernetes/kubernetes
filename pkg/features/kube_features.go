@@ -224,6 +224,14 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @LionelJouin
+	// kep: http://kep.k8s.io/4817
+	// alpha: v1.32
+	//
+	// Enables support the ResourceClaim.status.devices field and for setting this
+	// status from DRA drivers.
+	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
+
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	//

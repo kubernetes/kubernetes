@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -615,10 +616,11 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 	validAllocatedClaimOld.Status.Allocation.Devices.Results[0].AdminAccess = nil // Not required in 1.31.
 
 	scenarios := map[string]struct {
-		adminAccess  bool
-		oldClaim     *resource.ResourceClaim
-		update       func(claim *resource.ResourceClaim) *resource.ResourceClaim
-		wantFailures field.ErrorList
+		adminAccess             bool
+		deviceStatusFeatureGate bool
+		oldClaim                *resource.ResourceClaim
+		update                  func(claim *resource.ResourceClaim) *resource.ResourceClaim
+		wantFailures            field.ErrorList
 	}{
 		"valid-no-op-update": {
 			oldClaim: validClaim,
@@ -983,13 +985,317 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 		},
+		"valid-network-device-status": {
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						Data: runtime.RawExtension{
+							Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName:   strings.Repeat("x", 256),
+							HardwareAddress: strings.Repeat("x", 128),
+							IPs: []string{
+								"10.9.8.0/24",
+								"2001:db8::/64",
+								"10.9.8.1/24",
+								"2001:db8::1/64",
+								"10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24",
+								"10.9.8.8/24", "10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-device-status-duplicate": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeDeviceID(goodName, goodName, goodName)),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"2001:db8::1/64",
+								"2001:0db8::1/64",
+							},
+						},
+					},
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-network-device-status": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", interfaceNameMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", hardwareAddressMaxLength),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(0), "300.9.8.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName:   strings.Repeat("x", interfaceNameMaxLength+1),
+							HardwareAddress: strings.Repeat("x", hardwareAddressMaxLength+1),
+							IPs: []string{
+								"300.9.8.0/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-data-device-status": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("data"), "<value omitted>", "error parsing data as JSON: invalid character 'o' in literal false (expecting 'a')"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data: runtime.RawExtension{
+							Raw: []byte(`foo`),
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-data-device-status-limits": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-8", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"10.9.8.0/24", "10.9.8.1/24", "10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24", "10.9.8.8/24",
+								"10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24", "10.9.8.14/24", "10.9.8.15/24", "10.9.8.16/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-device-status-no-device": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID("b", "a", "r"), "must be an allocated device in the claim"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: "b",
+						Pool:   "a",
+						Device: "r",
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: true,
+		},
+		"invalid-device-status-duplicate-disabled-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(1), "2001:db8::1/64"),
+				field.Duplicate(field.NewPath("status", "devices").Index(1).Child("deviceID"), structured.MakeDeviceID(goodName, goodName, goodName)),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"2001:db8::1/64",
+								"2001:0db8::1/64",
+							},
+						},
+					},
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
+		"invalid-network-device-status-disabled-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", interfaceNameMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", hardwareAddressMaxLength),
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(0), "300.9.8.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						NetworkData: &resource.NetworkDeviceData{
+							InterfaceName:   strings.Repeat("x", interfaceNameMaxLength+1),
+							HardwareAddress: strings.Repeat("x", hardwareAddressMaxLength+1),
+							IPs: []string{
+								"300.9.8.0/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
+		"invalid-data-device-status-disabled-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0).Child("data"), "<value omitted>", "error parsing data as JSON: invalid character 'o' in literal false (expecting 'a')"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data: runtime.RawExtension{
+							Raw: []byte(`foo`),
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
+		"invalid-data-device-status-limits-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Conditions: []metav1.Condition{
+							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-2", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-3", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-4", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-5", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-6", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-7", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+							{Type: "test-8", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
+						},
+						NetworkData: &resource.NetworkDeviceData{
+							IPs: []string{
+								"10.9.8.0/24", "10.9.8.1/24", "10.9.8.2/24", "10.9.8.3/24", "10.9.8.4/24", "10.9.8.5/24", "10.9.8.6/24", "10.9.8.7/24", "10.9.8.8/24",
+								"10.9.8.9/24", "10.9.8.10/24", "10.9.8.11/24", "10.9.8.12/24", "10.9.8.13/24", "10.9.8.14/24", "10.9.8.15/24", "10.9.8.16/24",
+							},
+						},
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
+		"invalid-device-status-no-device-disabled-feature-gate": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID("b", "a", "r"), "must be an allocated device in the claim"),
+			},
+			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: "b",
+						Pool:   "a",
+						Device: "r",
+					},
+				}
+				return claim
+			},
+			deviceStatusFeatureGate: false,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, scenario.adminAccess)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, scenario.deviceStatusFeatureGate)
+
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
+
+			if name == "invalid-data-device-status-limits-feature-gate" {
+				fmt.Println(errs)
+				fmt.Println(scenario.wantFailures)
+			}
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}

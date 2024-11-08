@@ -23,6 +23,7 @@ package v1beta1
 type ResourceClaimStatusApplyConfiguration struct {
 	Allocation  *AllocationResultApplyConfiguration                `json:"allocation,omitempty"`
 	ReservedFor []ResourceClaimConsumerReferenceApplyConfiguration `json:"reservedFor,omitempty"`
+	Devices     []AllocatedDeviceStatusApplyConfiguration          `json:"devices,omitempty"`
 }
 
 // ResourceClaimStatusApplyConfiguration constructs a declarative configuration of the ResourceClaimStatus type for use with
@@ -48,6 +49,19 @@ func (b *ResourceClaimStatusApplyConfiguration) WithReservedFor(values ...*Resou
 			panic("nil value passed to WithReservedFor")
 		}
 		b.ReservedFor = append(b.ReservedFor, *values[i])
+	}
+	return b
+}
+
+// WithDevices adds the given value to the Devices field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Devices field.
+func (b *ResourceClaimStatusApplyConfiguration) WithDevices(values ...*AllocatedDeviceStatusApplyConfiguration) *ResourceClaimStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithDevices")
+		}
+		b.Devices = append(b.Devices, *values[i])
 	}
 	return b
 }

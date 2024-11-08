@@ -25,6 +25,8 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -32,8 +34,10 @@ import (
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -121,6 +125,15 @@ func gatherRequestNames(deviceClaim *resource.DeviceClaim) sets.Set[string] {
 		requestNames.Insert(request.Name)
 	}
 	return requestNames
+}
+
+func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.DeviceID] {
+	allocatedDevices := sets.New[structured.DeviceID]()
+	for _, result := range allocationResult.Results {
+		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		allocatedDevices.Insert(deviceID)
+	}
+	return allocatedDevices
 }
 
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
@@ -243,24 +256,7 @@ func validateDeviceConfiguration(config resource.DeviceConfiguration, fldPath *f
 func validateOpaqueConfiguration(config resource.OpaqueDeviceConfiguration, fldPath *field.Path, stored bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(config.Driver, fldPath.Child("driver"))...)
-	// Validation of RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
-	var v any
-	if len(config.Parameters.Raw) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
-	} else if !stored && len(config.Parameters.Raw) > resource.OpaqueParametersMaxLength {
-		// Don't even bother with parsing when too large.
-		// Only applies on create. Existing parameters are grand-fathered in
-		// because the limit was introduced in 1.32. This also means that it
-		// can be changed in the future.
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("parameters"), "" /* unused */, resource.OpaqueParametersMaxLength))
-	} else if err := json.Unmarshal(config.Parameters.Raw, &v); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
-	} else if v == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parameters"), ""))
-	} else if _, isObject := v.(map[string]any); !isObject {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("parameters"), "<value omitted>", "parameters must be a valid JSON object"))
-	}
-
+	allErrs = append(allErrs, validateRawExtension(config.Parameters, fldPath.Child("parameters"), stored)...)
 	return allErrs
 }
 
@@ -270,6 +266,19 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		validateResourceClaimUserReference,
 		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
 		fldPath.Child("reservedFor"))...)
+
+	var allocatedDevices sets.Set[structured.DeviceID]
+	if status.Allocation != nil {
+		allocatedDevices = gatherAllocatedDevices(&status.Allocation.Devices)
+	}
+	allErrs = append(allErrs, validateSet(status.Devices, -1,
+		func(device resource.AllocatedDeviceStatus, fldPath *field.Path) field.ErrorList {
+			return validateDeviceStatus(device, fldPath, allocatedDevices)
+		},
+		func(device resource.AllocatedDeviceStatus) (structured.DeviceID, string) {
+			return structured.MakeDeviceID(device.Driver, device.Pool, device.Device), "deviceID"
+		},
+		fldPath.Child("devices"))...)
 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(status.ReservedFor) > 0 {
@@ -728,4 +737,83 @@ func truncateIfTooLong(str string, maxLen int) string {
 	ellipsis := "..."
 	remaining := maxLen - len(ellipsis)
 	return str[0:(remaining+1)/2] + ellipsis + str[len(str)-remaining/2:]
+}
+
+func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.DeviceID]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
+	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
+	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
+	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
+	if !allocatedDevices.Has(deviceID) {
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
+	}
+	if len(device.Conditions) > maxConditions {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), maxConditions))
+	}
+	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
+	if len(device.Data.Raw) > 0 { // Data is an optional field.
+		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"), false)...)
+	}
+	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
+	return allErrs
+}
+
+// validateRawExtension validates RawExtension as in https://github.com/kubernetes/kubernetes/pull/125549/
+func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	var v any
+	if len(rawExtension.Raw) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else if !stored && len(rawExtension.Raw) > resource.OpaqueParametersMaxLength {
+		// Don't even bother with parsing when too large.
+		// Only applies on create. Existing parameters are grand-fathered in
+		// because the limit was introduced in 1.32. This also means that it
+		// can be changed in the future.
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /* unused */, resource.OpaqueParametersMaxLength))
+	} else if err := json.Unmarshal(rawExtension.Raw, &v); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", fmt.Sprintf("error parsing data as JSON: %v", err.Error())))
+	} else if v == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else if _, isObject := v.(map[string]any); !isObject {
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "parameters must be a valid JSON object"))
+	}
+	return allErrs
+}
+
+const maxConditions int = 8
+const maxIPs int = 16
+const interfaceNameMaxLength int = 256
+const hardwareAddressMaxLength int = 128
+
+func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if networkDeviceData == nil {
+		return allErrs
+	}
+
+	if len(networkDeviceData.InterfaceName) > interfaceNameMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("interfaceName"), "" /* unused */, interfaceNameMaxLength))
+	}
+
+	if len(networkDeviceData.HardwareAddress) > hardwareAddressMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("hardwareAddress"), "" /* unused */, hardwareAddressMaxLength))
+	}
+
+	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, maxIPs,
+		func(address string, fldPath *field.Path) field.ErrorList {
+			return validation.IsValidCIDR(fldPath, address)
+		},
+		func(address string) (string, string) {
+			// reformat CIDR to handle different ways IPs can be written
+			// (e.g. 2001:db8::1/64 == 2001:0db8::1/64)
+			ip, ipNet, err := netutils.ParseCIDRSloppy(address)
+			if err != nil {
+				return "", "" // will fail at IsValidCIDR
+			}
+			maskSize, _ := ipNet.Mask.Size()
+			return fmt.Sprintf("%s/%d", ip.String(), maskSize), ""
+		},
+		fldPath.Child("ips"))...)
+	return allErrs
 }
