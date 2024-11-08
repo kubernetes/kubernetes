@@ -658,13 +658,14 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	return true
 }
 
-func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions, result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions) (result kubecontainer.PodSyncResult) {
+	updatePodResult := kubecontainer.NewSyncResult(kubecontainer.UpdatePodSandbox, pod.UID)
+	result.AddSyncResult(updatePodResult)
 	pcm := m.containerManager.NewPodContainerManager()
 	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	podResources := cm.ResourceConfigForPod(pod, m.cpuCFSQuota, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
 	if podResources == nil {
-		klog.ErrorS(nil, "Unable to get resource configuration", "pod", pod.Name)
-		result.Fail(fmt.Errorf("Unable to get resource configuration processing resize for pod %s", pod.Name))
+		result.Fail(fmt.Errorf("unable to get resource configuration processing resize for pod %s", format.Pod(pod)))
 		return
 	}
 	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
@@ -682,10 +683,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		case v1.ResourceMemory:
 			err = pcm.SetPodCgroupConfig(pod, podResources)
 		}
-		if err != nil {
-			klog.ErrorS(err, "Failed to set cgroup config", "resource", rName, "pod", pod.Name)
-		}
-		return err
+		return fmt.Errorf("failed to set cgroup config for %s of pod %s: %w", rName, format.Pod(pod), err)
 	}
 	// Memory and CPU are updated separately because memory resizes may be ordered differently than CPU resizes.
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
@@ -705,9 +703,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			}
 		}
 		if len(podContainerChanges.ContainersToUpdate[rName]) > 0 {
-			if err = m.updatePodContainerResources(pod, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
-				klog.ErrorS(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", rName)
-				return err
+			updateContainerResults, errUpdate := m.updatePodContainerResources(ctx, pod, rName, podContainerChanges.ContainersToUpdate[rName])
+			for _, containerResult := range updateContainerResults {
+				result.AddSyncResult(containerResult)
+			}
+			if errUpdate != nil {
+				return errUpdate
 			}
 		}
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
@@ -725,25 +726,21 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.Memory == nil {
-			klog.ErrorS(nil, "podResources.Memory is nil", "pod", pod.Name)
-			result.Fail(fmt.Errorf("podResources.Memory is nil for pod %s", pod.Name))
+			result.Fail(fmt.Errorf("podResources.Memory is nil for pod %s", format.Pod(pod)))
 			return
 		}
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
-			klog.ErrorS(err, "GetPodCgroupConfig for memory failed", "pod", pod.Name)
-			result.Fail(err)
+			result.Fail(fmt.Errorf("GetPodCgroupConfig for memory failed for pod %s: %w", format.Pod(pod), err))
 			return
 		}
 		currentPodMemoryUsage, err := pcm.GetPodCgroupMemoryUsage(pod)
 		if err != nil {
-			klog.ErrorS(err, "GetPodCgroupMemoryUsage failed", "pod", pod.Name)
-			result.Fail(err)
+			result.Fail(fmt.Errorf("GetPodCgroupMemoryUsage failed for pod %s", format.Pod(pod)))
 			return
 		}
 		if currentPodMemoryUsage >= uint64(*podResources.Memory) {
-			klog.ErrorS(nil, "Aborting attempt to set pod memory limit less than current memory usage", "pod", pod.Name)
-			result.Fail(fmt.Errorf("Aborting attempt to set pod memory limit less than current memory usage for pod %s", pod.Name))
+			result.Fail(fmt.Errorf("aborting attempt to set pod memory limit less than current memory usage for pod %s", format.Pod(pod)))
 			return
 		}
 		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
@@ -753,14 +750,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.CPUQuota == nil || podResources.CPUShares == nil {
-			klog.ErrorS(nil, "podResources.CPUQuota or podResources.CPUShares is nil", "pod", pod.Name)
-			result.Fail(fmt.Errorf("podResources.CPUQuota or podResources.CPUShares is nil for pod %s", pod.Name))
+			result.Fail(fmt.Errorf("podResources.CPUQuota or podResources.CPUShares is nil for pod %s", format.Pod(pod)))
 			return
 		}
 		currentPodCpuConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
 		if err != nil {
-			klog.ErrorS(err, "GetPodCgroupConfig for CPU failed", "pod", pod.Name)
-			result.Fail(err)
+			result.Fail(fmt.Errorf("GetPodCgroupConfig for CPU failed for pod %s", format.Pod(pod)))
 			return
 		}
 		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCpuConfig.CPUQuota, *podResources.CPUQuota,
@@ -769,17 +764,20 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			return
 		}
 	}
+	return
 }
 
-func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
+func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) (updateResults []*kubecontainer.SyncResult, err error) {
 	klog.V(5).InfoS("Updating container resources", "pod", klog.KObj(pod))
 
 	for _, cInfo := range containersToUpdate {
+		var updateContainerResult *kubecontainer.SyncResult
 		container := pod.Spec.Containers[cInfo.apiContainerIdx].DeepCopy()
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
 		switch resourceName {
 		case v1.ResourceMemory:
+			updateContainerResult = kubecontainer.NewSyncResult(kubecontainer.UpdateContainerMemory, container.Name)
 			container.Resources.Limits = v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryLimit, resource.BinarySI),
@@ -789,6 +787,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryRequest, resource.BinarySI),
 			}
 		case v1.ResourceCPU:
+			updateContainerResult = kubecontainer.NewSyncResult(kubecontainer.UpdateContainerCPU, container.Name)
 			container.Resources.Limits = v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuLimit, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
@@ -798,12 +797,19 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
 		}
-		if err := m.updateContainerResources(pod, container, cInfo.kubeContainerID); err != nil {
+		updateResults = append(updateResults, updateContainerResult)
+		if err = m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			klog.ErrorS(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
 				"pod", format.Pod(pod), "resourceName", resourceName)
-			return err
+			switch resourceName {
+			case v1.ResourceMemory:
+				updateContainerResult.Fail(kubecontainer.ErrUpdateContainerMemory, err.Error())
+			case v1.ResourceCPU:
+				updateContainerResult.Fail(kubecontainer.ErrUpdateContainerCPU, err.Error())
+			}
+			return
 		}
 		resizeKey := fmt.Sprintf("%s:resize:%s", container.Name, resourceName)
 
@@ -837,7 +843,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 			cInfo.currentContainerResources.cpuRequest = cInfo.desiredContainerResources.cpuRequest
 		}
 	}
-	return nil
+	return
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
@@ -1337,7 +1343,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if IsInPlacePodVerticalScalingAllowed(pod) {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
-			m.doPodResizeAction(pod, podStatus, podContainerChanges, result)
+			resizeResult := m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges)
+			result.AddPodSyncResult(resizeResult)
+			if resizeResult.Error() != nil {
+				klog.ErrorS(resizeResult.Error(), "doPodResizeAction failed")
+			}
 		}
 	}
 
