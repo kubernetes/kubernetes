@@ -45,7 +45,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	cgroups "k8s.io/kubernetes/third_party/forked/cgroups"
 	"k8s.io/utils/ptr"
 )
 
@@ -339,38 +338,35 @@ var isCgroup2UnifiedMode = func() bool {
 	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
-var (
-	swapControllerAvailability     bool
-	swapControllerAvailabilityOnce sync.Once
-)
-
 // Note: this function variable is being added here so it would be possible to mock
 // the swap controller availability for unit tests by assigning a new function to it. Without it,
 // the swap controller availability would solely depend on the environment running the test.
-var swapControllerAvailable = func() bool {
+var swapControllerAvailable = sync.OnceValue(func() bool {
 	// See https://github.com/containerd/containerd/pull/7838/
-	swapControllerAvailabilityOnce.Do(func() {
-		const warn = "Failed to detect the availability of the swap controller, assuming not available"
-		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
-		if isCgroup2UnifiedMode() {
-			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
-			if err != nil {
-				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
-				return
-			}
-			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+	const warn = "Failed to detect the availability of the swap controller, assuming not available"
+	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+	if isCgroup2UnifiedMode() {
+		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+		cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+			return false
 		}
-		if _, err := os.Stat(p); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				klog.V(5).ErrorS(err, warn)
-			}
-			return
+		// Fr cgroup v2 unified hierarchy, there are no per-controller
+		// cgroup paths, so the cm map returned by ParseCgroupFile above
+		// has a single element where the key is empty string ("") and
+		// the value is the cgroup path the <pid> is in.
+		p = filepath.Join("/sys/fs/cgroup", cm[""], "memory.swap.max")
+	}
+	if _, err := os.Stat(p); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			klog.V(5).ErrorS(err, warn)
 		}
-		swapControllerAvailability = true
-	})
-	return swapControllerAvailability
-}
+		return false
+	}
+
+	return true
+})
 
 type swapConfigurationHelper struct {
 	machineInfo cadvisorv1.MachineInfo
@@ -392,7 +388,6 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 
 	containerMemoryRequest := container.Resources.Requests.Memory()
 	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
-
 	if err != nil {
 		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
 		m.ConfigureNoSwap(lcr)
