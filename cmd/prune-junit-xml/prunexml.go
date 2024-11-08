@@ -33,6 +33,8 @@ func main() {
 	maxTextSize := flag.Int("max-text-size", 1, "maximum size of attribute or text (in MB)")
 	pruneTests := flag.Bool("prune-tests", true,
 		"prune's xml files to display only top level tests and failed sub-tests")
+	fixBenchmarks := flag.Bool("fix-benchmarks", true,
+		"Go reports starting benchmarks, but not that they passed (https://github.com/golang/go/issues/66825#issuecomment-2343229005). This causes gotestsum to report the benchmark as a failure (https://github.com/gotestyourself/gotestsum/issues/413#issuecomment-2172063128). This option controls a heuristic which suppresses such false positives.")
 	flag.Parse()
 	for _, path := range flag.Args() {
 		fmt.Printf("processing junit xml file : %s\n", path)
@@ -46,6 +48,9 @@ func main() {
 			panic(err)
 		}
 
+		if *fixBenchmarks {
+			pruneFalsePositiveBenchmarks(suites)
+		}
 		pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
 		if *pruneTests {
 			pruneTESTS(suites)
@@ -61,6 +66,42 @@ func main() {
 			panic(err)
 		}
 		fmt.Println("done.")
+	}
+}
+
+// pruneFalsePositiveBenchmarks identifies all benchmarks with a false
+// positive and removes their failure message, adjusting the overall suite
+// summary accordingly.
+//
+// False positives are test cases where the failure message doesn't include
+// a "FAIL: <benchmark name>". Because of this check, benchmarks which mark
+// themselves as failed through e.g. b.Errorf are still listed as failure.
+//
+// See https://github.com/golang/go/issues/66825#issuecomment-2343229005
+// and https://github.com/gotestyourself/gotestsum/issues/413#issuecomment-2172063128
+func pruneFalsePositiveBenchmarks(suites *junitxml.JUnitTestSuites) {
+	for i, suite := range suites.Suites {
+		if suite.Failures == 0 {
+			continue
+		}
+		for j, testcase := range suite.TestCases {
+			if testcase.Failure == nil {
+				continue
+			}
+			if !strings.HasPrefix(testcase.Name, "Benchmark") {
+				// Not a benchmark, leave it alone.
+				continue
+			}
+			if strings.Contains(testcase.Failure.Contents, "FAIL: "+testcase.Name) {
+				// Looks genuine, "go test" reported a failure.
+				continue
+			}
+			// Strip out the false positive failure.
+			testcase.Failure = nil
+			suite.TestCases[j] = testcase
+			suite.Failures--
+		}
+		suites.Suites[i] = suite
 	}
 }
 

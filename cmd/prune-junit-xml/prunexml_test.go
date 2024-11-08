@@ -143,3 +143,50 @@ func TestPruneTESTS(t *testing.T) {
 	_ = writer.Flush()
 	assert.Equal(t, outputXML, output.String(), "tests in xml was not pruned correctly")
 }
+
+func TestPruneFalsePositiveBenchmarks(t *testing.T) {
+	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite tests="1" failures="1" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="BenchmarkA" time="0.950000">
+                   <failure message="Failed" type="">=== RUN   BenchmarkA&#xA;BenchmarkA&#xA;BenchmarkA-36    &#x9;    4222&#x9;    256516 ns/op&#xA;</failure>
+                </testcase>
+	</testsuite>
+	<testsuite tests="1" failures="1" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos2" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos2" name="BenchmarkB" time="0.950000">
+			<failure message="Failed" type="">=== RUN   BenchmarkB&#xA;BenchmarkB&#xA;BenchmarkB-36    &#x9;    4222&#x9;    256516 ns/op&#xA;    matching_test.go:675: fake error&#xA;--- FAIL: BenchmarkB&#xA;</failure>
+                </testcase>
+	</testsuite>
+</testsuites>`
+
+	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite tests="1" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="BenchmarkA" time="0.950000"></testcase>
+	</testsuite>
+	<testsuite tests="1" failures="1" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos2" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/cos2" name="BenchmarkB" time="0.950000">
+			<failure message="Failed" type="">=== RUN   BenchmarkB&#xA;BenchmarkB&#xA;BenchmarkB-36    &#x9;    4222&#x9;    256516 ns/op&#xA;    matching_test.go:675: fake error&#xA;--- FAIL: BenchmarkB&#xA;</failure>
+		</testcase>
+	</testsuite>
+</testsuites>`
+	suites, _ := fetchXML(strings.NewReader(sourceXML))
+	pruneFalsePositiveBenchmarks(suites)
+	var output bytes.Buffer
+	writer := bufio.NewWriter(&output)
+	_ = streamXML(writer, suites)
+	_ = writer.Flush()
+	assert.Equal(t, outputXML, output.String(), "tests in xml was not pruned correctly")
+}
