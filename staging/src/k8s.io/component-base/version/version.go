@@ -25,6 +25,8 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
+var floorVersion *version.Version = version.MajorMinor(1, 31)
+
 type EffectiveVersion interface {
 	BinaryVersion() *version.Version
 	EmulationVersion() *version.Version
@@ -134,15 +136,15 @@ func (m *effectiveVersion) Validate() []error {
 	emulationVersion := m.emulationVersion.Load()
 	minCompatibilityVersion := m.minCompatibilityVersion.Load()
 
-	// emulationVersion can only be 1.{binaryMinor-1}...1.{binaryMinor}.
+	// emulationVersion can only be 1.{binaryMinor-3}...1.{binaryMinor}
 	maxEmuVer := binaryVersion
-	minEmuVer := binaryVersion.SubtractMinor(1)
+	minEmuVer := binaryVersion.SubtractMinor(3)
 	if emulationVersion.GreaterThan(maxEmuVer) || emulationVersion.LessThan(minEmuVer) {
 		errs = append(errs, fmt.Errorf("emulation version %s is not between [%s, %s]", emulationVersion.String(), minEmuVer.String(), maxEmuVer.String()))
 	}
-	// minCompatibilityVersion can only be 1.{binaryMinor-1} for alpha.
-	maxCompVer := binaryVersion.SubtractMinor(1)
-	minCompVer := binaryVersion.SubtractMinor(1)
+	// minCompatibilityVersion can only be 1.{binaryMinor-3} to 1.{binaryMinor}
+	maxCompVer := binaryVersion
+	minCompVer := binaryVersion.SubtractMinor(3)
 	if minCompatibilityVersion.GreaterThan(maxCompVer) || minCompatibilityVersion.LessThan(minCompVer) {
 		errs = append(errs, fmt.Errorf("minCompatibilityVersion version %s is not between [%s, %s]", minCompatibilityVersion.String(), minCompVer.String(), maxCompVer.String()))
 	}
@@ -187,13 +189,14 @@ func DefaultKubeEffectiveVersion() MutableEffectiveVersion {
 	return newEffectiveVersion(binaryVersion, false)
 }
 
-// ValidateKubeEffectiveVersion validates the EmulationVersion is equal to the binary version at 1.31 for kube components.
-// emulationVersion is introduced in 1.31, so it is only allowed to be equal to the binary version at 1.31.
+// ValidateKubeEffectiveVersion validates the EmulationVersion and MinCompatibilityVersion are at least 1.31
+// for kube components as the feature was introduced in 1.31.
 func ValidateKubeEffectiveVersion(effectiveVersion EffectiveVersion) error {
-	binaryVersion := version.MajorMinor(effectiveVersion.BinaryVersion().Major(), effectiveVersion.BinaryVersion().Minor())
-	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) && !effectiveVersion.EmulationVersion().EqualTo(binaryVersion) {
-		return fmt.Errorf("emulation version needs to be equal to binary version(%s) in compatibility-version alpha, got %s",
-			binaryVersion.String(), effectiveVersion.EmulationVersion().String())
+	if !effectiveVersion.EmulationVersion().AtLeast(floorVersion) {
+		return fmt.Errorf("emulation version needs to be greater or equal to 1.31, got %s", effectiveVersion.EmulationVersion().String())
+	}
+	if !effectiveVersion.MinCompatibilityVersion().AtLeast(floorVersion) {
+		return fmt.Errorf("emulation version needs to be greater or equal to 1.31, got %s", effectiveVersion.MinCompatibilityVersion().String())
 	}
 	return nil
 }
