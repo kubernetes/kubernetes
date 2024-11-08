@@ -162,6 +162,11 @@ func (d *dispatcher) dispatchInvocations(
 		}
 
 		invocationKey, invocationKeyErr := keyFor(invocation)
+		if invocationKeyErr != nil {
+			// This should never happen. It occurs if there is a programming
+			// error causing the Param not to be a valid object.
+			return nil, k8serrors.NewInternalError(invocationKeyErr)
+		}
 		if reinvokeCtx.IsReinvoke() && !policyReinvokeCtx.ShouldReinvoke(invocationKey) {
 			continue
 		}
@@ -170,12 +175,6 @@ func (d *dispatcher) dispatchInvocations(
 		// Mutations for a single invocation of a MutatingAdmissionPolicy are evaluated
 		// in order.
 		for mutationIndex := range invocation.Policy.Spec.Mutations {
-			if invocationKeyErr != nil {
-				// This should never happen. It occurs if there is a programming
-				// error causing the Param not to be a valid object.
-				return nil, k8serrors.NewInternalError(invocationKeyErr)
-			}
-
 			lastVersionedAttr = versionedAttr
 			if versionedAttr.VersionedObject == nil { // Do not call patchers if there is no object to patch.
 				continue
