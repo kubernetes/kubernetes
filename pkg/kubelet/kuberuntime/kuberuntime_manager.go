@@ -752,9 +752,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 			}
 		}
 		if len(podContainerChanges.InitContainersToUpdate[rName]) > 0 {
-			if err = m.updatePodContainersResources(pod, rName, podContainerChanges.InitContainersToUpdate[rName], true); err != nil {
-				klog.ErrorS(err, "updatePodContainersResources failed for init containers", "pod", format.Pod(pod), "resource", rName)
-				return err
+			updateContainerResults, errUpdate := m.updatePodContainerResources(ctx, pod, rName, podContainerChanges.InitContainersToUpdate[rName], true)
+			for _, containerResult := range updateContainerResults {
+				result.AddSyncResult(containerResult)
+			}
+			if errUpdate != nil {
+				return errUpdate
 			}
 		}
 

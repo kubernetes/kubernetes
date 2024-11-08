@@ -323,7 +323,6 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 			pod.Spec.InitContainers[idx].ResizePolicy = ctr.ResizePolicy
 		}
 	}
-
 	return pod
 }
 

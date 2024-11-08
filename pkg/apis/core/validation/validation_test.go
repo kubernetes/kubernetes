@@ -26073,12 +26073,6 @@ func TestValidatePodResize(t *testing.T) {
 			test.new.Namespace = "namespace"
 			test.old.Namespace = "namespace"
 		}
-		if test.isSideCarCtr {
-			if test.new.Spec.InitContainers == nil && test.old.Spec.InitContainers == nil {
-				test.new.Spec.InitContainers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-				test.old.Spec.InitContainers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-			}
-		}
 		if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
 			test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
 			test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}

@@ -1778,6 +1778,7 @@ func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontaine
 	return true
 }
 
+// allocatedContainerResourcesMatchStatus returns true if the container resources matches with the container statuses resources.
 func allocatedContainerResourcesMatchStatus(allocatedPod *v1.Pod, c *v1.Container, podStatus *kubecontainer.PodStatus) bool {
 	if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
 		if cs.State != kubecontainer.ContainerStateRunning {
