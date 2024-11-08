@@ -123,11 +123,6 @@ func (in *LeaseCandidateSpec) DeepCopyInto(out *LeaseCandidateSpec) {
 		in, out := &in.RenewTime, &out.RenewTime
 		*out = (*in).DeepCopy()
 	}
-	if in.PreferredStrategies != nil {
-		in, out := &in.PreferredStrategies, &out.PreferredStrategies
-		*out = make([]CoordinatedLeaseStrategy, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

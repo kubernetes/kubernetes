@@ -45,7 +45,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -113,7 +113,7 @@ var groups = []runtime.SchemeBuilder{
 	certificatesv1alpha1.SchemeBuilder,
 	coordinationv1.SchemeBuilder,
 	coordinationv1beta1.SchemeBuilder,
-	coordinationv1alpha1.SchemeBuilder,
+	coordinationv1alpha2.SchemeBuilder,
 	corev1.SchemeBuilder,
 	discoveryv1.SchemeBuilder,
 	discoveryv1beta1.SchemeBuilder,

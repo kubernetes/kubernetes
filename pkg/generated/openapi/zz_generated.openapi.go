@@ -385,9 +385,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/coordination/v1.Lease":                                                                      schema_k8sio_api_coordination_v1_Lease(ref),
 		"k8s.io/api/coordination/v1.LeaseList":                                                                  schema_k8sio_api_coordination_v1_LeaseList(ref),
 		"k8s.io/api/coordination/v1.LeaseSpec":                                                                  schema_k8sio_api_coordination_v1_LeaseSpec(ref),
-		"k8s.io/api/coordination/v1alpha1.LeaseCandidate":                                                       schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref),
-		"k8s.io/api/coordination/v1alpha1.LeaseCandidateList":                                                   schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref),
-		"k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec":                                                   schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref),
+		"k8s.io/api/coordination/v1alpha2.LeaseCandidate":                                                       schema_k8sio_api_coordination_v1alpha2_LeaseCandidate(ref),
+		"k8s.io/api/coordination/v1alpha2.LeaseCandidateList":                                                   schema_k8sio_api_coordination_v1alpha2_LeaseCandidateList(ref),
+		"k8s.io/api/coordination/v1alpha2.LeaseCandidateSpec":                                                   schema_k8sio_api_coordination_v1alpha2_LeaseCandidateSpec(ref),
 		"k8s.io/api/coordination/v1beta1.Lease":                                                                 schema_k8sio_api_coordination_v1beta1_Lease(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseList":                                                             schema_k8sio_api_coordination_v1beta1_LeaseList(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseSpec":                                                             schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref),
@@ -19345,7 +19345,7 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha2_LeaseCandidate(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19377,18 +19377,18 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref common.ReferenceC
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec"),
+							Ref:         ref("k8s.io/api/coordination/v1alpha2.LeaseCandidateSpec"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/coordination/v1alpha2.LeaseCandidateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha2_LeaseCandidateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19424,7 +19424,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref common.Refere
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/coordination/v1alpha1.LeaseCandidate"),
+										Ref:     ref("k8s.io/api/coordination/v1alpha2.LeaseCandidate"),
 									},
 								},
 							},
@@ -19435,11 +19435,11 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/coordination/v1alpha1.LeaseCandidate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/coordination/v1alpha2.LeaseCandidate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha2_LeaseCandidateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19468,7 +19468,8 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 					},
 					"binaryVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when strategy is \"OldestEmulationVersion\"",
+							Description: "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19480,28 +19481,15 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 							Format:      "",
 						},
 					},
-					"preferredStrategies": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"strategy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y\n  will be used.\n- If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
+							Description: "Strategy is the strategy that coordinated leader election will use for picking the leader. If multiple candidates for the same Lease return different strategies, the strategy provided by the candidate with the latest BinaryVersion will be used. If there is still conflict, this is a user error and coordinated leader election will not operate the Lease until resolved. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
-				Required: []string{"leaseName", "preferredStrategies"},
+				Required: []string{"leaseName", "binaryVersion", "strategy"},
 			},
 		},
 		Dependencies: []string{

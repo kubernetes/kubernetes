@@ -45,7 +45,7 @@ import (
 	certificatesv1alpha1 "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	coordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
+	coordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -104,7 +104,7 @@ type Interface interface {
 	CertificatesV1() certificatesv1.CertificatesV1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1alpha1Interface
-	CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface
+	CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface
 	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
 	CoordinationV1() coordinationv1.CoordinationV1Interface
 	CoreV1() corev1.CoreV1Interface
@@ -163,7 +163,7 @@ type Clientset struct {
 	certificatesV1                *certificatesv1.CertificatesV1Client
 	certificatesV1beta1           *certificatesv1beta1.CertificatesV1beta1Client
 	certificatesV1alpha1          *certificatesv1alpha1.CertificatesV1alpha1Client
-	coordinationV1alpha1          *coordinationv1alpha1.CoordinationV1alpha1Client
+	coordinationV1alpha2          *coordinationv1alpha2.CoordinationV1alpha2Client
 	coordinationV1beta1           *coordinationv1beta1.CoordinationV1beta1Client
 	coordinationV1                *coordinationv1.CoordinationV1Client
 	coreV1                        *corev1.CoreV1Client
@@ -303,9 +303,9 @@ func (c *Clientset) CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1al
 	return c.certificatesV1alpha1
 }
 
-// CoordinationV1alpha1 retrieves the CoordinationV1alpha1Client
-func (c *Clientset) CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface {
-	return c.coordinationV1alpha1
+// CoordinationV1alpha2 retrieves the CoordinationV1alpha2Client
+func (c *Clientset) CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface {
+	return c.coordinationV1alpha2
 }
 
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
@@ -596,7 +596,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.coordinationV1alpha1, err = coordinationv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.coordinationV1alpha2, err = coordinationv1alpha2.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -770,7 +770,7 @@ func New(c rest.Interface) *Clientset {
 	cs.certificatesV1 = certificatesv1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.certificatesV1alpha1 = certificatesv1alpha1.New(c)
-	cs.coordinationV1alpha1 = coordinationv1alpha1.New(c)
+	cs.coordinationV1alpha2 = coordinationv1alpha2.New(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.New(c)
 	cs.coordinationV1 = coordinationv1.New(c)
 	cs.coreV1 = corev1.New(c)

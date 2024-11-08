@@ -38,7 +38,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
-	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -204,9 +204,9 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case coordinationv1.SchemeGroupVersion.WithResource("leases"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1().Leases().Informer()}, nil
 
-		// Group=coordination.k8s.io, Version=v1alpha1
-	case coordinationv1alpha1.SchemeGroupVersion.WithResource("leasecandidates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1alpha1().LeaseCandidates().Informer()}, nil
+		// Group=coordination.k8s.io, Version=v1alpha2
+	case v1alpha2.SchemeGroupVersion.WithResource("leasecandidates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1alpha2().LeaseCandidates().Informer()}, nil
 
 		// Group=coordination.k8s.io, Version=v1beta1
 	case coordinationv1beta1.SchemeGroupVersion.WithResource("leases"):

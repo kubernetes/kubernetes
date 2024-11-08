@@ -5331,7 +5331,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.coordination.v1alpha1.LeaseCandidate": {
+    "io.k8s.api.coordination.v1alpha2.LeaseCandidate": {
       "description": "LeaseCandidate defines a candidate for a Lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
       "properties": {
         "apiVersion": {
@@ -5347,7 +5347,7 @@
           "description": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec",
+          "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidateSpec",
           "description": "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
@@ -5356,11 +5356,11 @@
         {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       ]
     },
-    "io.k8s.api.coordination.v1alpha1.LeaseCandidateList": {
+    "io.k8s.api.coordination.v1alpha2.LeaseCandidateList": {
       "description": "LeaseCandidateList is a list of Lease objects.",
       "properties": {
         "apiVersion": {
@@ -5370,7 +5370,7 @@
         "items": {
           "description": "items is a list of schema objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+            "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
           },
           "type": "array"
         },
@@ -5391,15 +5391,15 @@
         {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidateList",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       ]
     },
-    "io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec": {
+    "io.k8s.api.coordination.v1alpha2.LeaseCandidateSpec": {
       "description": "LeaseCandidateSpec is a specification of a Lease.",
       "properties": {
         "binaryVersion": {
-          "description": "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when strategy is \"OldestEmulationVersion\"",
+          "description": "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required.",
           "type": "string"
         },
         "emulationVersion": {
@@ -5414,22 +5414,19 @@
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
           "description": "PingTime is the last time that the server has requested the LeaseCandidate to renew. It is only done during leader election to check if any LeaseCandidates have become ineligible. When PingTime is updated, the LeaseCandidate will respond by updating RenewTime."
         },
-        "preferredStrategies": {
-          "description": "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y\n  will be used.\n- If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array",
-          "x-kubernetes-list-type": "atomic"
-        },
         "renewTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
           "description": "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew. The PingTime field is updated regularly to prevent garbage collection for still active LeaseCandidates."
+        },
+        "strategy": {
+          "description": "Strategy is the strategy that coordinated leader election will use for picking the leader. If multiple candidates for the same Lease return different strategies, the strategy provided by the candidate with the latest BinaryVersion will be used. If there is still conflict, this is a user error and coordinated leader election will not operate the Lease until resolved. (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+          "type": "string"
         }
       },
       "required": [
         "leaseName",
-        "preferredStrategies"
+        "binaryVersion",
+        "strategy"
       ],
       "type": "object"
     },
@@ -18325,7 +18322,7 @@
         {
           "group": "coordination.k8s.io",
           "kind": "DeleteOptions",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         },
         {
           "group": "coordination.k8s.io",
@@ -19077,7 +19074,7 @@
         {
           "group": "coordination.k8s.io",
           "kind": "WatchEvent",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         },
         {
           "group": "coordination.k8s.io",
@@ -56932,7 +56929,7 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/": {
+    "/apis/coordination.k8s.io/v1alpha2/": {
       "get": {
         "consumes": [
           "application/json",
@@ -56941,7 +56938,7 @@
           "application/cbor"
         ],
         "description": "get available resources",
-        "operationId": "getCoordinationV1alpha1APIResources",
+        "operationId": "getCoordinationV1alpha2APIResources",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56963,17 +56960,17 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ]
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/leasecandidates": {
+    "/apis/coordination.k8s.io/v1alpha2/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind LeaseCandidate",
-        "operationId": "listCoordinationV1alpha1LeaseCandidateForAllNamespaces",
+        "operationId": "listCoordinationV1alpha2LeaseCandidateForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56987,7 +56984,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateList"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidateList"
             }
           },
           "401": {
@@ -56998,13 +56995,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [
@@ -57043,13 +57040,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/leasecandidates": {
+    "/apis/coordination.k8s.io/v1alpha2/namespaces/{namespace}/leasecandidates": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of LeaseCandidate",
-        "operationId": "deleteCoordinationV1alpha1CollectionNamespacedLeaseCandidate",
+        "operationId": "deleteCoordinationV1alpha2CollectionNamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -57119,13 +57116,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "get": {
@@ -57133,7 +57130,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind LeaseCandidate",
-        "operationId": "listCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "listCoordinationV1alpha2NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -57179,7 +57176,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateList"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidateList"
             }
           },
           "401": {
@@ -57190,13 +57187,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [
@@ -57212,14 +57209,14 @@
           "*/*"
         ],
         "description": "create a LeaseCandidate",
-        "operationId": "createCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "createCoordinationV1alpha2NamespacedLeaseCandidate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           {
@@ -57250,19 +57247,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "401": {
@@ -57273,23 +57270,23 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/leasecandidates/{name}": {
+    "/apis/coordination.k8s.io/v1alpha2/namespaces/{namespace}/leasecandidates/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a LeaseCandidate",
-        "operationId": "deleteCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "deleteCoordinationV1alpha2NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -57341,13 +57338,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "get": {
@@ -57355,7 +57352,7 @@
           "*/*"
         ],
         "description": "read the specified LeaseCandidate",
-        "operationId": "readCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "readCoordinationV1alpha2NamespacedLeaseCandidate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -57366,7 +57363,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "401": {
@@ -57377,13 +57374,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [
@@ -57411,7 +57408,7 @@
           "application/apply-patch+cbor"
         ],
         "description": "partially update the specified LeaseCandidate",
-        "operationId": "patchCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "patchCoordinationV1alpha2NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -57447,13 +57444,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "401": {
@@ -57464,13 +57461,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "put": {
@@ -57478,14 +57475,14 @@
           "*/*"
         ],
         "description": "replace the specified LeaseCandidate",
-        "operationId": "replaceCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "replaceCoordinationV1alpha2NamespacedLeaseCandidate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           {
@@ -57516,13 +57513,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha2.LeaseCandidate"
             }
           },
           "401": {
@@ -57533,23 +57530,23 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/leasecandidates": {
+    "/apis/coordination.k8s.io/v1alpha2/watch/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchCoordinationV1alpha1LeaseCandidateListForAllNamespaces",
+        "operationId": "watchCoordinationV1alpha2LeaseCandidateListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -57574,13 +57571,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [
@@ -57619,13 +57616,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/leasecandidates": {
+    "/apis/coordination.k8s.io/v1alpha2/watch/namespaces/{namespace}/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchCoordinationV1alpha1NamespacedLeaseCandidateList",
+        "operationId": "watchCoordinationV1alpha2NamespacedLeaseCandidateList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -57650,13 +57647,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [
@@ -57698,13 +57695,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/leasecandidates/{name}": {
+    "/apis/coordination.k8s.io/v1alpha2/watch/namespaces/{namespace}/leasecandidates/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchCoordinationV1alpha1NamespacedLeaseCandidate",
+        "operationId": "watchCoordinationV1alpha2NamespacedLeaseCandidate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -57729,13 +57726,13 @@
           "https"
         ],
         "tags": [
-          "coordination_v1alpha1"
+          "coordination_v1alpha2"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
           "kind": "LeaseCandidate",
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       },
       "parameters": [

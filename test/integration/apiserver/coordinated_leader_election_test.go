@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -144,28 +144,28 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expiredLC := &v1alpha1.LeaseCandidate{
+	expiredLC := &v1alpha2.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "expired",
 			Namespace: "default",
 		},
-		Spec: v1alpha1.LeaseCandidateSpec{
-			LeaseName:           "foobaz",
-			BinaryVersion:       "0.1.0",
-			EmulationVersion:    "0.1.0",
-			PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
-			RenewTime:           &metav1.MicroTime{Time: time.Now().Add(-2 * time.Hour)},
-			PingTime:            &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
+		Spec: v1alpha2.LeaseCandidateSpec{
+			LeaseName:        "foobaz",
+			BinaryVersion:    "0.1.0",
+			EmulationVersion: "0.1.0",
+			Strategy:         v1.OldestEmulationVersion,
+			RenewTime:        &metav1.MicroTime{Time: time.Now().Add(-2 * time.Hour)},
+			PingTime:         &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
 		},
 	}
 	ctx := context.Background()
-	_, err = clientset.CoordinationV1alpha1().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
+	_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollUntilContextTimeout(ctx, 1000*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		_, err = clientset.CoordinationV1alpha1().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
+		_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -218,7 +218,7 @@ func (t *cleTest) createAndRunFakeController(name string, namespace string, targ
 		targetLease,
 		binaryVersion,
 		compatibilityVersion,
-		[]v1.CoordinatedLeaseStrategy{"OldestEmulationVersion"},
+		v1.OldestEmulationVersion,
 	)
 	if err != nil {
 		t.t.Error(err)
