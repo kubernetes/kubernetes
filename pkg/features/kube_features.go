@@ -279,6 +279,14 @@ const (
 	// InPlacePodVerticalScaling also be enabled.
 	InPlacePodVerticalScalingAllocatedStatus featuregate.Feature = "InPlacePodVerticalScalingAllocatedStatus"
 
+	// owner: @tallclair @esotsal
+	// alpha: v1.32
+	//
+	// Allow resource resize for containers in Guaranteed pods with integer CPU requests ( default false ).
+	// Applies only in nodes with InPlacePodVerticalScaling and CPU Manager features enabled, and
+	// CPU Manager Static Policy option set.
+	InPlacePodVerticalScalingExclusiveCPUs featuregate.Feature = "InPlacePodVerticalScalingExclusiveCPUs"
+
 	// owner: @trierra
 	//
 	// Disables the Portworx in-tree driver.

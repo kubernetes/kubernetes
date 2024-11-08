@@ -406,6 +406,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	InPlacePodVerticalScalingExclusiveCPUs: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	InTreePluginPortworxUnregister: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 	},
