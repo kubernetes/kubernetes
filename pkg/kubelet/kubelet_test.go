@@ -3651,22 +3651,19 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		name:         "resizing cpu limit",
 		status:       mkPodStatus(resizeCPULimitC1Status, steadyStateC2Status),
 		expectResize: true,
+	}, {
+		name:         "resizing cpu request for restartable init container",
+		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeCPUReqC3Status),
+		expectResize: true,
+	}, {
+		name:         "resizing memory limit for restartable init container",
+		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeMemLimitC3Status),
+		expectResize: true,
+	}, {
+		name:         "non-restartable init container should be ignored",
+		status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, steadyStateC3Status, resizeCPUReqC4Status),
+		expectResize: false,
 	},
-		{
-			name:         "resizing cpu request for restartable init container",
-			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeCPUReqC3Status),
-			expectResize: true,
-		},
-		{
-			name:         "resizing memory limit for restartable init container",
-			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, resizeMemLimitC3Status),
-			expectResize: true,
-		},
-		{
-			name:         "non-restartable init container should be ignored",
-			status:       mkPodStatus(steadyStateC1Status, steadyStateC2Status, steadyStateC3Status, resizeCPUReqC4Status),
-			expectResize: false,
-		},
 	}
 
 	for _, test := range tests {
