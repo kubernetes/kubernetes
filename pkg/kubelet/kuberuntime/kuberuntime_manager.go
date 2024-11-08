@@ -598,6 +598,13 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	// Note: cgroup doesn't support memory request today, so we don't compare that. If canAdmitPod called  during
 	// handlePodResourcesResize finds 'fit', then desiredMemoryRequest == currentMemoryRequest.
 
+	// Special case for minimum CPU request
+	if desiredResources.cpuRequest <= cm.MinShares && currentResources.cpuRequest <= cm.MinShares {
+		// If both desired & current CPU requests are at or below MinShares,
+		// then consider these equal.
+		desiredResources.cpuRequest = currentResources.cpuRequest
+	}
+
 	if currentResources == desiredResources {
 		// No resize required.
 		return true
@@ -824,8 +831,14 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 			case v1.ResourceMemory:
 				return status.Resources.MemoryLimit.Equal(*container.Resources.Limits.Memory())
 			case v1.ResourceCPU:
-				return status.Resources.CPURequest.Equal(*container.Resources.Requests.Cpu()) &&
-					status.Resources.CPULimit.Equal(*container.Resources.Limits.Cpu())
+				if !status.Resources.CPULimit.Equal(*container.Resources.Limits.Cpu()) {
+					return false // limits don't match
+				} else if status.Resources.CPURequest.Equal(*container.Resources.Requests.Cpu()) {
+					return true // requests & limits both match
+				}
+				// Consider requests equal if both are at or below MinShares.
+				return status.Resources.CPURequest.MilliValue() <= cm.MinShares &&
+					container.Resources.Requests.Cpu().MilliValue() <= cm.MinShares
 			default:
 				return true // Shouldn't happen.
 			}

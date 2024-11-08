@@ -1791,7 +1791,9 @@ func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontaine
 
 			// Only compare resizeable resources, and only compare resources that are explicitly configured.
 			if hasCPUReq {
-				if !cpuReq.Equal(*cs.Resources.CPURequest) {
+				// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
+				if !cpuReq.Equal(*cs.Resources.CPURequest) &&
+					(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
 					return false
 				}
 			}
@@ -2150,7 +2152,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		if resources.Requests != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
-				resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+				// If both the allocated & actual resources are at or below MinShares, preserve the
+				// allocated value in the API to avoid confusion and simplify comparisons.
+				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
+					resources.Requests.Cpu().MilliValue() > cm.MinShares {
+					resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+				}
 			} else {
 				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
 			}

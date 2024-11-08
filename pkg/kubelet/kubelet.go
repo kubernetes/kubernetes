@@ -2912,6 +2912,16 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			}
 		}
 		allocatedPod = pod
+
+		// Special case when the updated allocation matches the actual resources. This can occur
+		// when reverting a resize that hasn't been actuated, or when making an equivalent change
+		// (such as CPU requests below MinShares). This is an optimization to clear the resize
+		// status immediately, rather than waiting for the next SyncPod iteration.
+		if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
+			// In this case, consider the resize complete.
+			kl.statusManager.SetPodResizeStatus(pod.UID, "")
+			return allocatedPod, nil
+		}
 	}
 	if resizeStatus != "" {
 		kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus)

@@ -2206,6 +2206,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
+	cpu1m := resource.MustParse("1m")
+	cpu2m := resource.MustParse("2m")
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
@@ -2359,6 +2361,48 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
 					cStatus.Resources = &kubecontainer.ContainerResources{
 						CPULimit: ptr.To(cpu200m.DeepCopy()),
+					}
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				pa := podActions{
+					SandboxID:          podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
+					ContainersToStart:  []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+				}
+				return &pa
+			},
+		},
+		"Nothing when spec.Resources and status.Resources are equivalent": {
+			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				c := &pod.Spec.Containers[1]
+				c.Resources = v1.ResourceRequirements{} // best effort pod
+				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
+					cStatus.Resources = &kubecontainer.ContainerResources{
+						CPURequest: ptr.To(cpu2m.DeepCopy()),
+					}
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				pa := podActions{
+					SandboxID:          podStatus.SandboxStatuses[0].Id,
+					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
+					ContainersToStart:  []int{},
+					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
+				}
+				return &pa
+			},
+		},
+		"Update container CPU resources to equivalent value": {
+			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+				c := &pod.Spec.Containers[1]
+				c.Resources = v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
+				}
+				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
+					cStatus.Resources = &kubecontainer.ContainerResources{
+						CPURequest: ptr.To(cpu2m.DeepCopy()),
 					}
 				}
 			},
