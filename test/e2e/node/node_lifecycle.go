@@ -53,15 +53,21 @@ var _ = SIGDescribe("Node Lifecycle", func() {
 
 		nodeClient := f.ClientSet.CoreV1().Nodes()
 
+		// Create a fake node with a ready condition but unschedulable, so it won't be selected by
+		// the scheduler and won't be deleted by the cloud controller manager when the test runs on
+		// a specific cloud provider.
 		fakeNode := v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "e2e-fake-node-" + utilrand.String(5),
+			},
+			Spec: v1.NodeSpec{
+				Unschedulable: true,
 			},
 			Status: v1.NodeStatus{
 				Phase: v1.NodeRunning,
 				Conditions: []v1.NodeCondition{
 					{
-						Status:  v1.ConditionFalse,
+						Status:  v1.ConditionTrue,
 						Message: "Set from e2e test",
 						Reason:  "E2E",
 						Type:    v1.NodeReady,
