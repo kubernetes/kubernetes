@@ -2161,6 +2161,15 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			} else {
 				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
 			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+					if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
+						resources.Requests[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
+					} else {
+						preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Requests, resources.Requests)
+					}
+				}
+			}
 		}
 
 		return &resources
