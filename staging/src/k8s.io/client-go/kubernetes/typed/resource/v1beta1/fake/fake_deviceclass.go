@@ -19,133 +19,33 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
-
 	v1beta1 "k8s.io/api/resource/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1beta1 "k8s.io/client-go/applyconfigurations/resource/v1beta1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedresourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
 )
 
-// FakeDeviceClasses implements DeviceClassInterface
-type FakeDeviceClasses struct {
+// fakeDeviceClasses implements DeviceClassInterface
+type fakeDeviceClasses struct {
+	*gentype.FakeClientWithListAndApply[*v1beta1.DeviceClass, *v1beta1.DeviceClassList, *resourcev1beta1.DeviceClassApplyConfiguration]
 	Fake *FakeResourceV1beta1
 }
 
-var deviceclassesResource = v1beta1.SchemeGroupVersion.WithResource("deviceclasses")
-
-var deviceclassesKind = v1beta1.SchemeGroupVersion.WithKind("DeviceClass")
-
-// Get takes name of the deviceClass, and returns the corresponding deviceClass object, and an error if there is any.
-func (c *FakeDeviceClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.DeviceClass, err error) {
-	emptyResult := &v1beta1.DeviceClass{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(deviceclassesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeDeviceClasses(fake *FakeResourceV1beta1) typedresourcev1beta1.DeviceClassInterface {
+	return &fakeDeviceClasses{
+		gentype.NewFakeClientWithListAndApply[*v1beta1.DeviceClass, *v1beta1.DeviceClassList, *resourcev1beta1.DeviceClassApplyConfiguration](
+			fake.Fake,
+			"",
+			v1beta1.SchemeGroupVersion.WithResource("deviceclasses"),
+			v1beta1.SchemeGroupVersion.WithKind("DeviceClass"),
+			func() *v1beta1.DeviceClass { return &v1beta1.DeviceClass{} },
+			func() *v1beta1.DeviceClassList { return &v1beta1.DeviceClassList{} },
+			func(dst, src *v1beta1.DeviceClassList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta1.DeviceClassList) []*v1beta1.DeviceClass { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1beta1.DeviceClassList, items []*v1beta1.DeviceClass) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1beta1.DeviceClass), err
-}
-
-// List takes label and field selectors, and returns the list of DeviceClasses that match those selectors.
-func (c *FakeDeviceClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.DeviceClassList, err error) {
-	emptyResult := &v1beta1.DeviceClassList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(deviceclassesResource, deviceclassesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.DeviceClassList{ListMeta: obj.(*v1beta1.DeviceClassList).ListMeta}
-	for _, item := range obj.(*v1beta1.DeviceClassList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested deviceClasses.
-func (c *FakeDeviceClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(deviceclassesResource, opts))
-}
-
-// Create takes the representation of a deviceClass and creates it.  Returns the server's representation of the deviceClass, and an error, if there is any.
-func (c *FakeDeviceClasses) Create(ctx context.Context, deviceClass *v1beta1.DeviceClass, opts v1.CreateOptions) (result *v1beta1.DeviceClass, err error) {
-	emptyResult := &v1beta1.DeviceClass{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(deviceclassesResource, deviceClass, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.DeviceClass), err
-}
-
-// Update takes the representation of a deviceClass and updates it. Returns the server's representation of the deviceClass, and an error, if there is any.
-func (c *FakeDeviceClasses) Update(ctx context.Context, deviceClass *v1beta1.DeviceClass, opts v1.UpdateOptions) (result *v1beta1.DeviceClass, err error) {
-	emptyResult := &v1beta1.DeviceClass{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(deviceclassesResource, deviceClass, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.DeviceClass), err
-}
-
-// Delete takes name of the deviceClass and deletes it. Returns an error if one occurs.
-func (c *FakeDeviceClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(deviceclassesResource, name, opts), &v1beta1.DeviceClass{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeDeviceClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(deviceclassesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.DeviceClassList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched deviceClass.
-func (c *FakeDeviceClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.DeviceClass, err error) {
-	emptyResult := &v1beta1.DeviceClass{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(deviceclassesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.DeviceClass), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied deviceClass.
-func (c *FakeDeviceClasses) Apply(ctx context.Context, deviceClass *resourcev1beta1.DeviceClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.DeviceClass, err error) {
-	if deviceClass == nil {
-		return nil, fmt.Errorf("deviceClass provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(deviceClass)
-	if err != nil {
-		return nil, err
-	}
-	name := deviceClass.Name
-	if name == nil {
-		return nil, fmt.Errorf("deviceClass.Name must be provided to Apply")
-	}
-	emptyResult := &v1beta1.DeviceClass{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(deviceclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.DeviceClass), err
 }
