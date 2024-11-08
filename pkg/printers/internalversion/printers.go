@@ -53,7 +53,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
+	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -896,7 +897,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	initContainers := make(map[string]*api.Container)
 	for i := range pod.Spec.InitContainers {
 		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
-		if isRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+		if podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
 			totalContainers++
 		}
 	}
@@ -911,7 +912,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 				lastRestartDate = terminatedDate
 			}
 		}
-		if isRestartableInitContainer(initContainers[container.Name]) {
+		if podutil.IsRestartableInitContainer(initContainers[container.Name]) {
 			restartableInitContainerRestarts += int(container.RestartCount)
 			if container.LastTerminationState.Terminated != nil {
 				terminatedDate := container.LastTerminationState.Terminated.FinishedAt
@@ -923,7 +924,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		switch {
 		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
 			continue
-		case isRestartableInitContainer(initContainers[container.Name]) &&
+		case podutil.IsRestartableInitContainer(initContainers[container.Name]) &&
 			container.Started != nil && *container.Started:
 			if container.Ready {
 				readyContainers++
@@ -993,7 +994,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
 		reason = "Unknown"
-	} else if pod.DeletionTimestamp != nil && !podutil.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
+	} else if pod.DeletionTimestamp != nil && !podutilv1.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
 		reason = "Terminating"
 	}
 
@@ -3225,17 +3226,6 @@ func (list SortableResourceNames) Swap(i, j int) {
 
 func (list SortableResourceNames) Less(i, j int) bool {
 	return list[i] < list[j]
-}
-
-func isRestartableInitContainer(initContainer *api.Container) bool {
-	if initContainer == nil {
-		return false
-	}
-	if initContainer.RestartPolicy == nil {
-		return false
-	}
-
-	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
 }
 
 func isPodInitializedConditionTrue(status *api.PodStatus) bool {

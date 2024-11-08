@@ -24,6 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -141,7 +142,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for _, c := range admitPod.Spec.InitContainers {
-			if types.IsRestartableInitContainer(&c) {
+			if podutil.IsRestartableInitContainer(&c) {
 				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)
 				klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 				return PodAdmitResult{

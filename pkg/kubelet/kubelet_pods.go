@@ -1585,7 +1585,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 
 	// regular init containers
 	for _, container := range spec.InitContainers {
-		if kubetypes.IsRestartableInitContainer(&container) {
+		if podutil.IsRestartableInitContainer(&container) {
 			// Skip the restartable init containers here to handle them separately as
 			// they are slightly different from the init containers in terms of the
 			// pod phase.
@@ -1628,7 +1628,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		// restartable init containers
 		for _, container := range spec.InitContainers {
-			if !kubetypes.IsRestartableInitContainer(&container) {
+			if !podutil.IsRestartableInitContainer(&container) {
 				// Skip the regular init containers, as they have been handled above.
 				continue
 			}

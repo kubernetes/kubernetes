@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const policyTypeStatic policyType = "Static"
@@ -353,7 +352,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 			// for the detail.
-			if types.IsRestartableInitContainer(&ctr) {
+			if podutil.IsRestartableInitContainer(&ctr) {
 				reqRsrcsByRestartableInitCtrs[rsrcName] += qty
 			} else if reqRsrcsByRestartableInitCtrs[rsrcName]+qty > reqRsrcsByInitCtrs[rsrcName] {
 				reqRsrcsByInitCtrs[rsrcName] = reqRsrcsByRestartableInitCtrs[rsrcName] + qty
@@ -969,7 +968,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 				break
 			}
 
-			if types.IsRestartableInitContainer(&initContainer) {
+			if podutil.IsRestartableInitContainer(&initContainer) {
 				// we should not reuse the resource from any restartable init
 				// container
 				continue
@@ -1011,7 +1010,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 func isRegularInitContainer(pod *v1.Pod, container *v1.Container) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == container.Name {
-			return !types.IsRestartableInitContainer(&initContainer)
+			return !podutil.IsRestartableInitContainer(&initContainer)
 		}
 	}
 
