@@ -2685,7 +2685,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 		}
 		fakeRuntime.Called = []string{}
 		err := m.updatePodContainerResources(pod, tc.resourceName, containersToUpdate)
-		assert.NoError(t, err, dsc)
+		require.NoError(t, err, dsc)
 
 		if tc.invokeUpdateResources {
 			assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources", dsc)
