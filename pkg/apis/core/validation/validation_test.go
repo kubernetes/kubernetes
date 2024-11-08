@@ -25203,6 +25203,74 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
 			err:  "Forbidden: windows pods cannot be resized",
 		},
+		{
+			test: "Pod with nil Resource field in Status",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   nil,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "Forbidden: Pod running on node without support for resize",
+		},
+		{
+			test: "Pod with non-nil Resources field in Status",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   &core.ResourceRequirements{},
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
+		{
+			test: "Pod without running containers",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
+		{
+			test: "Pod with containers which are not running yet",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   &core.ResourceRequirements{},
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
 	}
 
 	for _, test := range tests {
