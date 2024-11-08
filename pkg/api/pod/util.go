@@ -1302,7 +1302,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 					continue
 				}
 				newPod.Status.Resize = api.PodResizeStatusProposed
-				break
+				return
 			}
 		}
 	}

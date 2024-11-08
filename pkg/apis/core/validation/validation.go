@@ -5280,7 +5280,6 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	for ix, container := range mungedPodSpec.Containers {
 		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
 		newContainers = append(newContainers, container)
-
 	}
 	mungedPodSpec.Containers = newContainers
 	// munge spec.initContainers[*].image
@@ -5635,10 +5634,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
 	for ix, container := range originalCPUMemPodSpec.Containers {
-		lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
-		req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
-		container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
-		container.ResizePolicy = oldPod.Spec.Containers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
+		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
 		newContainers = append(newContainers, container)
 	}
 	originalCPUMemPodSpec.Containers = newContainers
@@ -5648,10 +5644,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for ix, container := range originalCPUMemPodSpec.InitContainers {
 			if container.RestartPolicy != nil && *container.RestartPolicy == core.ContainerRestartPolicyAlways { // restartable init container
-				lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.InitContainers[ix].Resources.Limits)
-				req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.InitContainers[ix].Resources.Requests)
-				container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
-				container.ResizePolicy = oldPod.Spec.InitContainers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
+				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
 			}
 			newInitContainers = append(newInitContainers, container)
 		}
@@ -5674,25 +5667,32 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
-func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-	if oldResourceList == nil {
-		return nil
+// dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the container, and copies them from the old pod container resources if present.
+func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
+	dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+		if oldResourceList == nil {
+			return nil
+		}
+		var mungedResourceList core.ResourceList
+		if resourceList == nil {
+			mungedResourceList = make(core.ResourceList)
+		} else {
+			mungedResourceList = resourceList.DeepCopy()
+		}
+		delete(mungedResourceList, core.ResourceCPU)
+		delete(mungedResourceList, core.ResourceMemory)
+		if cpu, found := oldResourceList[core.ResourceCPU]; found {
+			mungedResourceList[core.ResourceCPU] = cpu
+		}
+		if mem, found := oldResourceList[core.ResourceMemory]; found {
+			mungedResourceList[core.ResourceMemory] = mem
+		}
+		return mungedResourceList
 	}
-	var mungedResourceList core.ResourceList
-	if resourceList == nil {
-		mungedResourceList = make(core.ResourceList)
-	} else {
-		mungedResourceList = resourceList.DeepCopy()
-	}
-	delete(mungedResourceList, core.ResourceCPU)
-	delete(mungedResourceList, core.ResourceMemory)
-	if cpu, found := oldResourceList[core.ResourceCPU]; found {
-		mungedResourceList[core.ResourceCPU] = cpu
-	}
-	if mem, found := oldResourceList[core.ResourceMemory]; found {
-		mungedResourceList[core.ResourceMemory] = mem
-	}
-	return mungedResourceList
+	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
+	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+	container.ResizePolicy = oldPodSpecContainer.ResizePolicy // +k8s:verify-mutation:reason=clone
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
@@ -8630,4 +8630,12 @@ func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *fie
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
 	return allErrs
+}
+
+// isRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
+func isRestartableInitContainer(initContainer *core.Container) bool {
+	if initContainer == nil || initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
 }
