@@ -245,11 +245,20 @@ func setDefaultResizePolicy(obj *v1.Container) {
 				})
 		}
 	}
-	if _, exists := obj.Resources.Requests[v1.ResourceCPU]; exists {
-		defaultResizePolicy(v1.ResourceCPU)
+	if !resizePolicySpecified[v1.ResourceCPU] {
+		if _, exists := obj.Resources.Requests[v1.ResourceCPU]; exists {
+			defaultResizePolicy(v1.ResourceCPU)
+		} else if _, exists := obj.Resources.Limits[v1.ResourceCPU]; exists {
+			defaultResizePolicy(v1.ResourceCPU)
+		}
 	}
-	if _, exists := obj.Resources.Requests[v1.ResourceMemory]; exists {
-		defaultResizePolicy(v1.ResourceMemory)
+
+	if !resizePolicySpecified[v1.ResourceMemory] {
+		if _, exists := obj.Resources.Requests[v1.ResourceMemory]; exists {
+			defaultResizePolicy(v1.ResourceMemory)
+		} else if _, exists := obj.Resources.Limits[v1.ResourceMemory]; exists {
+			defaultResizePolicy(v1.ResourceMemory)
+		}
 	}
 }
 

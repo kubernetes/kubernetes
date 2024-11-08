@@ -51,7 +51,6 @@ import (
 	remote "k8s.io/cri-client/pkg"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -1073,13 +1072,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			// found, it means its last status is removed for some reason.
 			// Restart it if it is a restartable init container.
 			if isPreviouslyInitialized && podutil.IsRestartableInitContainer(container) {
-			if isPreviouslyInitialized && podutil.IsRestartableInitContainer(container) {
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			}
 			continue
 		}
 
-		if isPreviouslyInitialized && !podutil.IsRestartableInitContainer(container) {
 		if isPreviouslyInitialized && !podutil.IsRestartableInitContainer(container) {
 			// after initialization, only restartable init containers need to be kept
 			// running
@@ -1096,7 +1093,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 
 		case kubecontainer.ContainerStateRunning:
-			if !podutil.IsRestartableInitContainer(container) {
 			if !podutil.IsRestartableInitContainer(container) {
 				break
 			}
@@ -1174,7 +1170,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 		// Otherwise, restart the init container.
 		case kubecontainer.ContainerStateExited:
 			if podutil.IsRestartableInitContainer(container) {
-			if podutil.IsRestartableInitContainer(container) {
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			} else { // init container
 				if isInitContainerFailed(status) {
@@ -1197,7 +1192,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 			}
 
 		default: // kubecontainer.ContainerStatusUnknown or other unknown states
-			if podutil.IsRestartableInitContainer(container) {
 			if podutil.IsRestartableInitContainer(container) {
 				// If the restartable init container is in unknown state, restart it.
 				changes.ContainersToKill[status.ID] = containerToKillInfo{

@@ -3195,13 +3195,12 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 				}
 				output := roundTrip(t, runtime.Object(&testPod))
 				pod2 := output.(*v1.Pod)
-				if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
-					t.Errorf("expected resize policy %+v, but got %+v for normal containers", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
-				}
 				if isSidecarContainer {
 					if !cmp.Equal(pod2.Spec.InitContainers[0].ResizePolicy, tc.expectedResizePolicy) {
 						t.Errorf("expected resize policy %+v, but got %+v for restartable init containers", tc.expectedResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy)
 					}
+				} else if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
+					t.Errorf("expected resize policy %+v, but got %+v for normal containers", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
 				}
 			})
 		}
