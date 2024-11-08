@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,13 +41,15 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/tracing"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
@@ -416,6 +419,25 @@ func TestNewErrorForbiddenSerializer(t *testing.T) {
 	if err == nil {
 		t.Error("successfully created a new server configured with cbor support")
 	} else if err.Error() != `refusing to create new apiserver "test" with support for media type "application/cbor" (allowed media types are: application/json, application/yaml, application/vnd.kubernetes.protobuf)` {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestNewFeatureGatedSerializer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+
+	config := NewConfig(serializer.NewCodecFactory(scheme, serializer.WithSerializer(func(creater runtime.ObjectCreater, typer runtime.ObjectTyper) runtime.SerializerInfo {
+		return runtime.SerializerInfo{
+			MediaType:        "application/cbor",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "cbor",
+		}
+	})))
+	config.ExternalAddress = "192.168.10.4:443"
+	config.EffectiveVersion = utilversion.NewEffectiveVersion("")
+	config.LoopbackClientConfig = &rest.Config{}
+
+	if _, err := config.Complete(nil).New("test", NewEmptyDelegate()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }

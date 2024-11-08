@@ -24,6 +24,7 @@ import (
 
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
+
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	cgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -52,7 +52,7 @@ var (
 	perNodeCheckValidatingAdmissionPolicyBinding string
 )
 
-var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(features.ServiceAccountTokenNodeBindingValidation), func() {
+var _ = SIGDescribe("ValidatingAdmissionPolicy", func() {
 	defer g.GinkgoRecover()
 	f := framework.NewDefaultFramework("node-authn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted

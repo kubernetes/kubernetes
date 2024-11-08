@@ -40,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
-
+	"k8s.io/apiserver/pkg/util/apihelpers"
 	"k8s.io/klog/v2"
 )
 
@@ -281,7 +281,7 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 		return asTable(ctx, obj, options, scope, target.GroupVersion())
 
 	default:
-		accepted, _ := negotiation.MediaTypesForSerializer(metainternalversionscheme.Codecs)
+		accepted, _ := negotiation.MediaTypesForSerializer(apihelpers.GetMetaInternalVersionCodecs())
 		err := negotiation.NewNotAcceptableError(accepted)
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 	case target == nil:
 	case (target.Kind == "PartialObjectMetadata" || target.Kind == "PartialObjectMetadataList" || target.Kind == "Table") &&
 		(target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
-		return *target, metainternalversionscheme.Codecs, true
+		return *target, apihelpers.GetMetaInternalVersionCodecs(), true
 	}
 	return scope.Kind, scope.Serializer, false
 }

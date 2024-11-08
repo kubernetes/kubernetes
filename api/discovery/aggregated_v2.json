@@ -383,25 +383,6 @@
             }
           ],
           "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "selfsubjectreviews",
-              "responseKind": {
-                "group": "",
-                "kind": "SelfSubjectReview",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "selfsubjectreview",
-              "verbs": [
-                "create"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -1445,29 +1426,14 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicies",
+              "resource": "mutatingadmissionpolicies",
               "responseKind": {
                 "group": "",
-                "kind": "ValidatingAdmissionPolicy",
+                "kind": "MutatingAdmissionPolicy",
                 "version": ""
               },
               "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
+              "singularResource": "mutatingadmissionpolicy",
               "verbs": [
                 "create",
                 "delete",
@@ -1483,14 +1449,14 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicybindings",
+              "resource": "mutatingadmissionpolicybindings",
               "responseKind": {
                 "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
+                "kind": "MutatingAdmissionPolicyBinding",
                 "version": ""
               },
               "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
+              "singularResource": "mutatingadmissionpolicybinding",
               "verbs": [
                 "create",
                 "delete",
@@ -1656,7 +1622,7 @@
               ]
             }
           ],
-          "version": "v1alpha1"
+          "version": "v1alpha2"
         }
       ]
     },
@@ -1731,215 +1697,6 @@
     {
       "metadata": {
         "creationTimestamp": null,
-        "name": "flowcontrol.apiserver.k8s.io"
-      },
-      "versions": [
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "flowschemas",
-              "responseKind": {
-                "group": "",
-                "kind": "FlowSchema",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "flowschema",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "FlowSchema",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "prioritylevelconfigurations",
-              "responseKind": {
-                "group": "",
-                "kind": "PriorityLevelConfiguration",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "prioritylevelconfiguration",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "PriorityLevelConfiguration",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "flowschemas",
-              "responseKind": {
-                "group": "",
-                "kind": "FlowSchema",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "flowschema",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "FlowSchema",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "prioritylevelconfigurations",
-              "responseKind": {
-                "group": "",
-                "kind": "PriorityLevelConfiguration",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "prioritylevelconfiguration",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "PriorityLevelConfiguration",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta3"
-        }
-      ]
-    },
-    {
-      "metadata": {
-        "creationTimestamp": null,
-        "name": "internal.apiserver.k8s.io"
-      },
-      "versions": [
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "storageversions",
-              "responseKind": {
-                "group": "",
-                "kind": "StorageVersion",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "storageversion",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "StorageVersion",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
-        }
-      ]
-    },
-    {
-      "metadata": {
-        "creationTimestamp": null,
         "name": "resource.k8s.io"
       },
       "versions": [
@@ -1967,19 +1724,19 @@
               ]
             },
             {
-              "resource": "podschedulingcontexts",
+              "resource": "resourceclaims",
               "responseKind": {
                 "group": "",
-                "kind": "PodSchedulingContext",
+                "kind": "ResourceClaim",
                 "version": ""
               },
               "scope": "Namespaced",
-              "singularResource": "podschedulingcontext",
+              "singularResource": "resourceclaim",
               "subresources": [
                 {
                   "responseKind": {
                     "group": "",
-                    "kind": "PodSchedulingContext",
+                    "kind": "ResourceClaim",
                     "version": ""
                   },
                   "subresource": "status",
@@ -1990,6 +1747,72 @@
                   ]
                 }
               ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaimtemplates",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimTemplate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimtemplate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "deviceclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "deviceclass",
               "verbs": [
                 "create",
                 "delete",
@@ -2078,6 +1901,139 @@
             }
           ],
           "version": "v1alpha3"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "creationTimestamp": null,
+        "name": "flowcontrol.apiserver.k8s.io"
+      },
+      "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "flowschemas",
+              "responseKind": {
+                "group": "",
+                "kind": "FlowSchema",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "flowschema",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "FlowSchema",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "prioritylevelconfigurations",
+              "responseKind": {
+                "group": "",
+                "kind": "PriorityLevelConfiguration",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "prioritylevelconfiguration",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PriorityLevelConfiguration",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "creationTimestamp": null,
+        "name": "internal.apiserver.k8s.io"
+      },
+      "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "storageversions",
+              "responseKind": {
+                "group": "",
+                "kind": "StorageVersion",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "storageversion",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "StorageVersion",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1alpha1"
         }
       ]
     },

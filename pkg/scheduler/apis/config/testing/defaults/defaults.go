@@ -52,6 +52,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 	PreEnqueue: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},
+			{Name: names.DefaultPreemption},
 		},
 	},
 	QueueSort: config.PluginSet{

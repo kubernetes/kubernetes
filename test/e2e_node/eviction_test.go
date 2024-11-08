@@ -288,51 +288,6 @@ var _ = SIGDescribe("LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodS
 	})
 })
 
-// This test validates that in-memory EmptyDir's are evicted when the Kubelet does
-// not have Sized Memory Volumes enabled. When Sized volumes are enabled, it's
-// not possible to exhaust the quota.
-var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolation, nodefeature.Eviction, func() {
-	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	evictionTestTimeout := 7 * time.Minute
-	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-			initialConfig.FeatureGates["SizeMemoryBackedVolumes"] = false
-		})
-
-		sizeLimit := resource.MustParse("100Mi")
-		useOverLimit := 200 /* Mb */
-		useUnderLimit := 80 /* Mb */
-		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
-
-		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
-			{
-				evictionPriority: 1, // Should be evicted due to disk limit
-				pod: diskConsumingPod("emptydir-memory-over-volume-sizelimit", useOverLimit, &v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
-				}, v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 0, // Should not be evicted, as container limits do not account for memory backed volumes
-				pod: diskConsumingPod("emptydir-memory-over-container-sizelimit", useOverLimit, &v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory"},
-				}, v1.ResourceRequirements{Limits: containerLimit}),
-			},
-			{
-				evictionPriority: 0,
-				pod: diskConsumingPod("emptydir-memory-innocent", useUnderLimit, &v1.VolumeSource{
-					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
-				}, v1.ResourceRequirements{}),
-			},
-		})
-	})
-})
-
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolation, nodefeature.Eviction, func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
@@ -692,7 +647,8 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 					// The disk eviction test may cause the prepulled images to be evicted,
 					// prepull those images again to ensure this test not affect following tests.
-					PrePullAllImages()
+					err := PrePullAllImages(ctx)
+					gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 				}
 			}
 			// Run prePull using a defer to make sure it is executed even when the assertions below fails

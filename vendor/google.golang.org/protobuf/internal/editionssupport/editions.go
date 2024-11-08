@@ -5,7 +5,7 @@
 // Package editionssupport defines constants for editions that are supported.
 package editionssupport
 
-import descriptorpb "google.golang.org/protobuf/types/descriptorpb"
+import "google.golang.org/protobuf/types/descriptorpb"
 
 const (
 	Minimum = descriptorpb.Edition_EDITION_PROTO2

@@ -685,9 +685,27 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
 
-	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
-		resetFields = resetFieldsStrategy.GetResetFields()
+	// Strategies may ignore changes to some fields by resetting the field values.
+	//
+	// For instance, spec resource strategies should reset the status, and status subresource
+	// strategies should reset the spec.
+	//
+	// Strategies that reset fields must report to the field manager which fields are
+	// reset by implementing either the ResetFieldsStrategy or the ResetFieldsFilterStrategy
+	// interface.
+	//
+	// For subresources that provide write access to only specific nested fields
+	// fieldpath.NewPatternFilter can help create a filter to reset all other fields.
+	var resetFieldsFilter map[fieldpath.APIVersion]fieldpath.Filter
+	resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy)
+	if isResetFieldsStrategy {
+		resetFieldsFilter = fieldpath.NewExcludeFilterSetMap(resetFieldsStrategy.GetResetFields())
+	}
+	if resetFieldsStrategy, isResetFieldsFilterStrategy := storage.(rest.ResetFieldsFilterStrategy); isResetFieldsFilterStrategy {
+		if isResetFieldsStrategy {
+			return nil, nil, fmt.Errorf("may not implement both ResetFieldsStrategy and ResetFieldsFilterStrategy")
+		}
+		resetFieldsFilter = resetFieldsStrategy.GetResetFieldsFilter()
 	}
 
 	reqScope.FieldManager, err = managedfields.NewDefaultFieldManager(
@@ -698,7 +716,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		fqKindToRegister,
 		reqScope.HubGroupVersion,
 		subresource,
-		resetFields,
+		resetFieldsFilter,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -875,7 +893,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.JSONPatchType),
 				string(types.MergePatchType),
 				string(types.StrategicMergePatchType),
-				string(types.ApplyPatchType),
+				string(types.ApplyYAMLPatchType),
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+				supportedTypes = append(supportedTypes, string(types.ApplyCBORPatchType))
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
@@ -1194,6 +1215,8 @@ func typeToJSON(typeName string) string {
 	case "v1.ResourceVersionMatch", "*v1.ResourceVersionMatch":
 		return "string"
 	case "v1.IncludeObjectPolicy", "*v1.IncludeObjectPolicy":
+		return "string"
+	case "*string":
 		return "string"
 
 	// TODO: Fix these when go-restful supports a way to specify an array query param:

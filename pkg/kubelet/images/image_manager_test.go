@@ -49,6 +49,7 @@ type pullerExpects struct {
 	shouldRecordStartedPullingTime  bool
 	shouldRecordFinishedPullingTime bool
 	events                          []v1.Event
+	msg                             string
 }
 
 type pullerTestCase struct {
@@ -77,7 +78,7 @@ func pullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 			}},
 
 		{ // image present, don't pull
@@ -92,15 +93,15 @@ func pullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, nil, false, false,
 					[]v1.Event{
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
 					[]v1.Event{
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, nil, false, false,
 					[]v1.Event{
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 			}},
 		// image present, pull it
 		{containerImage: "present_image",
@@ -115,17 +116,17 @@ func pullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 			}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
@@ -139,15 +140,15 @@ func pullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
 					[]v1.Event{
 						{Reason: "ErrImageNeverPull"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
 					[]v1.Event{
 						{Reason: "ErrImageNeverPull"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImageNeverPull, false, false,
 					[]v1.Event{
 						{Reason: "ErrImageNeverPull"},
-					}},
+					}, ""},
 			}},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
@@ -161,15 +162,15 @@ func pullerTestCases() []pullerTestCase {
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImageInspect, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
 			}},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
@@ -184,29 +185,29 @@ func pullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef", "PullImage"}, ErrImagePull, true, false,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
-					}},
+					}, ""},
 				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
-					}},
+					}, ""},
 			}},
 		// image present, non-zero qps, try to pull
 		{containerImage: "present_image",
@@ -221,17 +222,17 @@ func pullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 				{[]string{"PullImage", "GetImageSize"}, nil, true, true,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
-					}},
+					}, ""},
 			}},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
@@ -246,16 +247,16 @@ func pullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
-					}},
+					}, ""},
 				{[]string(nil), ErrImagePull, true, false,
 					[]v1.Event{
 						{Reason: "Pulling"},
 						{Reason: "Failed"},
-					}},
+					}, ""},
 				{[]string(nil), ErrImagePullBackOff, false, false,
 					[]v1.Event{
 						{Reason: "BackOff"},
-					}},
+					}, ""},
 			}},
 		// error case if image name fails validation due to invalid reference format
 		{containerImage: "FAILED_IMAGE",
@@ -269,7 +270,7 @@ func pullerTestCases() []pullerTestCase {
 				{[]string(nil), ErrInvalidImageName, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
 			}},
 		// error case if image name contains http
 		{containerImage: "http://url",
@@ -283,7 +284,7 @@ func pullerTestCases() []pullerTestCase {
 				{[]string(nil), ErrInvalidImageName, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
 			}},
 		// error case if image name contains sha256
 		{containerImage: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -297,7 +298,39 @@ func pullerTestCases() []pullerTestCase {
 				{[]string(nil), ErrInvalidImageName, false, false,
 					[]v1.Event{
 						{Reason: "InspectFailed"},
-					}},
+					}, ""},
+			}},
+		{containerImage: "typo_image",
+			testName:   "image missing, SignatureValidationFailed",
+			policy:     v1.PullIfNotPresent,
+			inspectErr: nil,
+			pullerErr:  crierrors.ErrSignatureValidationFailed,
+			qps:        0.0,
+			burst:      0,
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}, "image pull failed for typo_image because the signature validation failed"},
+				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}, "image pull failed for typo_image because the signature validation failed"},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}, "Back-off pulling image \"typo_image\": SignatureValidationFailed: image pull failed for typo_image because the signature validation failed"},
+				{[]string{"GetImageRef", "PullImage"}, crierrors.ErrSignatureValidationFailed, true, false,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Failed"},
+					}, "image pull failed for typo_image because the signature validation failed"},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff, false, false,
+					[]v1.Event{
+						{Reason: "BackOff"},
+					}, "Back-off pulling image \"typo_image\": SignatureValidationFailed: image pull failed for typo_image because the signature validation failed"},
 			}},
 	}
 }
@@ -372,11 +405,12 @@ func TestParallelPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
 				assert.Equal(t, expected.shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+				assert.Contains(t, msg, expected.msg)
 				fakePodPullingTimeRecorder.reset()
 			}
 		})
@@ -404,11 +438,12 @@ func TestSerializedPuller(t *testing.T) {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, nil, nil, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
 				assert.Equal(t, expected.shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
+				assert.Contains(t, msg, expected.msg)
 				fakePodPullingTimeRecorder.reset()
 			}
 		})
@@ -456,7 +491,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil, ""},
 		}}
 
 	useSerializedEnv := true
@@ -512,7 +547,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true, nil, ""},
 		}}
 
 	useSerializedEnv := true

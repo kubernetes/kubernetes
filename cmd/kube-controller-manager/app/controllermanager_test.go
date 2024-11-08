@@ -86,8 +86,10 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ClusterRoleAggregationController,
 		names.PersistentVolumeClaimProtectionController,
 		names.PersistentVolumeProtectionController,
+		names.VolumeAttributesClassProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
+		names.KubeAPIServerClusterTrustBundlePublisherController,
 		names.EphemeralVolumeController,
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,
@@ -95,6 +97,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
 		names.StorageVersionMigratorController,
+		names.SELinuxWarningController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -217,5 +220,28 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
 			}
 		})
+	}
+}
+
+func TestNoCloudProviderControllerStarted(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	controllerCtx := ControllerContext{}
+	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+	for _, controller := range NewControllerDescriptors() {
+		if !controller.IsCloudProviderController() {
+			continue
+		}
+
+		controllerName := controller.Name()
+		checker, err := StartController(ctx, controllerCtx, controller, nil)
+		if err != nil {
+			t.Errorf("Error starting controller %q: %v", controllerName, err)
+		}
+		if checker != nil {
+			t.Errorf("Controller %q should not be started", controllerName)
+		}
 	}
 }

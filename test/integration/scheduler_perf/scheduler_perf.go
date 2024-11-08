@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -104,7 +105,6 @@ const (
 )
 
 const (
-	configFile               = "config/performance-config.yaml"
 	extensionPointsLabelName = "extension_point"
 	resultLabelName          = "result"
 	pluginLabelName          = "plugin"
@@ -160,21 +160,24 @@ var (
 					values: metrics.ExtentionPoints,
 				},
 			},
-			"scheduler_queueing_hint_execution_duration_seconds": {
-				{
-					label:  pluginLabelName,
-					values: PluginNames,
-				},
-				{
-					label:  eventLabelName,
-					values: clusterEventsToLabels(schedframework.AllEvents),
-				},
+		},
+	}
+
+	qHintMetrics = map[string][]*labelValues{
+		"scheduler_queueing_hint_execution_duration_seconds": {
+			{
+				label:  pluginLabelName,
+				values: PluginNames,
 			},
-			"scheduler_event_handling_duration_seconds": {
-				{
-					label:  eventLabelName,
-					values: clusterEventsToLabels(schedframework.AllEvents),
-				},
+			{
+				label:  eventLabelName,
+				values: schedframework.AllClusterEventLabels(),
+			},
+		},
+		"scheduler_event_handling_duration_seconds": {
+			{
+				label:  eventLabelName,
+				values: schedframework.AllClusterEventLabels(),
 			},
 		},
 	}
@@ -204,12 +207,57 @@ var (
 	}
 )
 
-func clusterEventsToLabels(events []schedframework.ClusterEvent) []string {
-	labels := make([]string, 0, len(events))
-	for _, event := range events {
-		labels = append(labels, event.Label)
+var UseTestingLog *bool
+var PerfSchedulingLabelFilter *string
+var TestSchedulingLabelFilter *string
+
+// InitTests should be called in a TestMain in each config subdirectory.
+func InitTests() error {
+	// Run with -v=2, this is the default log level in production.
+	ktesting.SetDefaultVerbosity(DefaultLoggingVerbosity)
+
+	// test/integration/framework/flags.go unconditionally initializes the
+	// logging flags. That's correct for most tests, but in the
+	// scheduler_perf test we want more control over the flags, therefore
+	// here strip them out.
+	var fs flag.FlagSet
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		switch f.Name {
+		case "log-flush-frequency", "v", "vmodule":
+			// These will be added below ourselves, don't copy.
+		default:
+			fs.Var(f.Value, f.Name, f.Usage)
+		}
+	})
+	flag.CommandLine = &fs
+
+	flag.Var(LoggingFeatureGate, "feature-gate",
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+			"Options are:\n"+strings.Join(LoggingFeatureGate.KnownFeatures(), "\n"))
+
+	UseTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
+	PerfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
+	TestSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test,-performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
+
+	// This would fail if we hadn't removed the logging flags above.
+	logsapi.AddGoFlags(LoggingConfig, flag.CommandLine)
+
+	flag.Parse()
+
+	logs.InitLogs()
+	return logsapi.ValidateAndApply(LoggingConfig, LoggingFeatureGate)
+}
+
+func registerQHintMetrics() {
+	for k, v := range qHintMetrics {
+		defaultMetricsCollectorConfig.Metrics[k] = v
 	}
-	return labels
+}
+
+func unregisterQHintMetrics() {
+	for k := range qHintMetrics {
+		delete(defaultMetricsCollectorConfig.Metrics, k)
+	}
 }
 
 // testCase defines a set of test cases that intends to test the performance of
@@ -938,11 +986,9 @@ func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
 	return &scm, nil
 }
 
-var useTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
-
 func initTestOutput(tb testing.TB) io.Writer {
 	var output io.Writer
-	if *useTestingLog {
+	if *UseTestingLog {
 		output = framework.NewTBWriter(tb)
 	} else {
 		tmpDir := tb.TempDir()
@@ -974,9 +1020,9 @@ func initTestOutput(tb testing.TB) io.Writer {
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
 func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
-	tCtx := ktesting.Init(t, initoption.PerTestOutput(*useTestingLog))
+	tCtx := ktesting.Init(t, initoption.PerTestOutput(*UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
-	if !*useTestingLog && doArtifacts {
+	if !*UseTestingLog && doArtifacts {
 		// Reconfigure logging so that it goes to a separate file per
 		// test instead of stderr. If the test passes, the file gets
 		// deleted. The overall output can be very large (> 200 MB for
@@ -1025,7 +1071,6 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 		if err := logsapi.ValidateAndApplyWithOptions(LoggingConfig, opts, LoggingFeatureGate); err != nil {
 			t.Fatalf("Failed to apply the per-test logging configuration: %v", err)
 		}
-
 	}
 
 	// Ensure that there are no leaked
@@ -1049,10 +1094,20 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	timeout := 30 * time.Minute
 	tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+		registerQHintMetrics()
+		t.Cleanup(func() {
+			unregisterQHintMetrics()
+		})
+	}
+
 	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, outOfTreePluginRegistry)
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
+	if len(src) == 0 {
+		return maps.Clone(overrides)
+	}
 	result := maps.Clone(src)
 	for feature, enabled := range overrides {
 		result[feature] = enabled
@@ -1060,13 +1115,12 @@ func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featurega
 	return result
 }
 
-// RunBenchmarkPerfScheduling runs the scheduler performance tests.
+// RunBenchmarkPerfScheduling runs the scheduler performance benchmark tests.
 //
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
-// testcaseLabelSelectors is available to select specific test cases to run with labels on them.
-func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry, testcaseLabelSelectors []string) {
+func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		b.Fatal(err)
@@ -1074,6 +1128,11 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 	if err = validateTestCases(testCases); err != nil {
 		b.Fatal(err)
 	}
+
+	if testing.Short() {
+		*PerfSchedulingLabelFilter += ",+short"
+	}
+	testcaseLabelSelectors := strings.Split(*PerfSchedulingLabelFilter, ",")
 
 	output := initTestOutput(b)
 
@@ -1091,11 +1150,19 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
-						b.Skipf("disabled by label filter %v", testcaseLabelSelectors)
+						b.Skipf("disabled by label filter %v", PerfSchedulingLabelFilter)
 					}
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					informerFactory, tCtx := setupTestCase(b, tc, featureGates, output, outOfTreePluginRegistry)
+
+					// TODO(#93795): make sure each workload within a test case has a unique
+					// name? The name is used to identify the stats in benchmark reports.
+					// TODO(#94404): check for unused template parameters? Probably a typo.
+					err := w.isValid(tc.MetricsCollectorConfig)
+					if err != nil {
+						b.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
 
 					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
@@ -1140,7 +1207,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 							continue
 						}
 
-						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s.dat", tc.Name, w.Name, runID), "/", "_"))
+						destFile, err := dataFilename(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%s.dat", tc.Name, w.Name, topicName, runID), "/", "_"))
 						if err != nil {
 							b.Fatalf("prepare data file: %v", err)
 						}
@@ -1161,8 +1228,55 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 			}
 		})
 	}
-	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark"); err != nil {
+	if err := dataItems2JSONFile(dataItems, b.Name()+"_benchmark_"+topicName); err != nil {
 		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
+	}
+}
+
+// RunIntegrationPerfScheduling runs the scheduler performance integration tests.
+func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
+	testCases, err := getTestCases(configFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = validateTestCases(testCases); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Short() {
+		*TestSchedulingLabelFilter += ",+short"
+	}
+	testcaseLabelSelectors := strings.Split(*TestSchedulingLabelFilter, ",")
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			for _, w := range tc.Workloads {
+				t.Run(w.Name, func(t *testing.T) {
+					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
+						t.Skipf("disabled by label filter %q", *TestSchedulingLabelFilter)
+					}
+					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
+					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
+					err := w.isValid(tc.MetricsCollectorConfig)
+					if err != nil {
+						t.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
+
+					runWorkload(tCtx, tc, w, informerFactory)
+
+					if featureGates[features.SchedulerQueueingHints] {
+						// In any case, we should make sure InFlightEvents is empty after running the scenario.
+						if err = checkEmptyInFlightEvents(); err != nil {
+							tCtx.Errorf("%s: %s", w.Name, err)
+						}
+					}
+
+					// Reset metrics to prevent metrics generated in current workload gets
+					// carried over to the next workload.
+					legacyregistry.Reset()
+				})
+			}
+		})
 	}
 }
 
@@ -1253,7 +1367,7 @@ func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelec
 }
 
 func checkEmptyInFlightEvents() error {
-	labels := append(clusterEventsToLabels(schedframework.AllEvents), metrics.PodPoppedInFlightEvent)
+	labels := append(schedframework.AllClusterEventLabels(), metrics.PodPoppedInFlightEvent)
 	for _, label := range labels {
 		value, err := testutil.GetGaugeMetricValue(metrics.InFlightEvents.WithLabelValues(label))
 		if err != nil {
@@ -1702,21 +1816,15 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 		nodeStrategy = cno.UniqueNodeLabelStrategy
 	}
 
+	nodeTemplate := StaticNodeTemplate(makeBaseNode(prefix))
 	if cno.NodeTemplatePath != nil {
-		node, err := getNodeSpecFromFile(cno.NodeTemplatePath)
-		if err != nil {
-			return nil, err
-		}
-		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
-			clientset,
-			[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
-			node,
-		), nil
+		nodeTemplate = nodeTemplateFromFile(*cno.NodeTemplatePath)
 	}
-	return framework.NewIntegrationTestNodePreparer(
+
+	return NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
-		prefix,
+		nodeTemplate,
 	), nil
 }
 
@@ -1845,12 +1953,19 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 				}, metav1.ListOptions{})
 				// Ignore errors when the time is up. errors.Is(context.Canceled) would
 				// be more precise, but doesn't work because client-go doesn't reliably
-				// propagate it. Instead, this was seen:
-				//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+				// propagate it.
 				if tCtx.Err() != nil {
 					continue
 				}
 				if err != nil {
+					// Worse, sometimes rate limiting gives up *before* the context deadline is reached.
+					// Then we get here with this error:
+					//   client rate limiter Wait returned an error: rate: Wait(n=1) would exceed context deadline
+					//
+					// This also can be ignored. We'll retry if the test is not done yet.
+					if strings.Contains(err.Error(), "would exceed context deadline") {
+						continue
+					}
 					return fmt.Errorf("delete scheduled pods: %w", err)
 				}
 				err = strategy(tCtx, tCtx.Client(), namespace, cpo.Count)
@@ -2070,15 +2185,6 @@ func validateTestCases(testCases []*testCase) error {
 		if !tc.collectsMetrics() {
 			return fmt.Errorf("%s: no op in the workload template collects metrics", tc.Name)
 		}
-		// TODO(#93795): make sure each workload within a test case has a unique
-		// name? The name is used to identify the stats in benchmark reports.
-		// TODO(#94404): check for unused template parameters? Probably a typo.
-		for _, w := range tc.Workloads {
-			err := w.isValid(tc.MetricsCollectorConfig)
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }
@@ -2103,9 +2209,11 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
-func getNodeSpecFromFile(path *string) (*v1.Node, error) {
+type nodeTemplateFromFile string
+
+func (f nodeTemplateFromFile) GetNodeTemplate(index, count int) (*v1.Node, error) {
 	nodeSpec := &v1.Node{}
-	if err := getSpecFromFile(path, nodeSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, nodeSpec); err != nil {
 		return nil, fmt.Errorf("parsing Node: %w", err)
 	}
 	return nodeSpec, nil

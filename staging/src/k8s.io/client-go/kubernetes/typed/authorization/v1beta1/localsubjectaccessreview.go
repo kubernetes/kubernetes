@@ -54,6 +54,8 @@ func newLocalSubjectAccessReviews(c *AuthorizationV1beta1Client, namespace strin
 			namespace,
 			func() *authorizationv1beta1.LocalSubjectAccessReview {
 				return &authorizationv1beta1.LocalSubjectAccessReview{}
-			}),
+			},
+			gentype.PrefersProtobuf[*authorizationv1beta1.LocalSubjectAccessReview](),
+		),
 	}
 }

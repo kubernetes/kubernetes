@@ -64,6 +64,8 @@ func newNetworkPolicies(c *ExtensionsV1beta1Client, namespace string) *networkPo
 			scheme.ParameterCodec,
 			namespace,
 			func() *extensionsv1beta1.NetworkPolicy { return &extensionsv1beta1.NetworkPolicy{} },
-			func() *extensionsv1beta1.NetworkPolicyList { return &extensionsv1beta1.NetworkPolicyList{} }),
+			func() *extensionsv1beta1.NetworkPolicyList { return &extensionsv1beta1.NetworkPolicyList{} },
+			gentype.PrefersProtobuf[*extensionsv1beta1.NetworkPolicy](),
+		),
 	}
 }

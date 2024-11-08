@@ -72,6 +72,8 @@ func newHorizontalPodAutoscalers(c *AutoscalingV2beta2Client, namespace string) 
 			},
 			func() *autoscalingv2beta2.HorizontalPodAutoscalerList {
 				return &autoscalingv2beta2.HorizontalPodAutoscalerList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*autoscalingv2beta2.HorizontalPodAutoscaler](),
+		),
 	}
 }

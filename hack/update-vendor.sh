@@ -251,7 +251,7 @@ for repo in $(kube::util::list_staging_repos); do
     # drop all unused replace directives
     comm -23 \
       <(go mod edit -json | jq -r '.Replace[] | .Old.Path' | sort) \
-      <(go list -m -json all | jq -r .Path | sort) |
+      <(go list -m -json all | jq -r 'select(.Main | not) | .Path' | sort) |
     while read -r X; do echo "-dropreplace=${X}"; done |
     xargs -L 100 go mod edit -fmt
 
@@ -263,7 +263,7 @@ echo "=== pruning root"
 # drop unused replace directives other than to local paths
 comm -23 \
   <(go mod edit -json | jq -r '.Replace[] | select(.New.Path | startswith("./") | not) | .Old.Path' | sort) \
-  <(go list -m -json all | jq -r .Path | sort) |
+  <(go list -m -json all | jq -r 'select(.Main | not) | .Path' | sort) |
 while read -r X; do echo "-dropreplace=${X}"; done |
 xargs -L 100 go mod edit -fmt
 

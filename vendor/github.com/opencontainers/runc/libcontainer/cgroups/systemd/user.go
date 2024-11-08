@@ -13,8 +13,7 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
-
-	"github.com/opencontainers/runc/libcontainer/userns"
+	"github.com/moby/sys/userns"
 )
 
 // newUserSystemdDbus creates a connection for systemd user-instance.
@@ -77,9 +76,8 @@ func DetectUID() (int, error) {
 	return -1, errors.New("could not detect the OwnerUID")
 }
 
-// DetectUserDbusSessionBusAddress returns $DBUS_SESSION_BUS_ADDRESS if set.
-// Otherwise returns "unix:path=$XDG_RUNTIME_DIR/bus" if $XDG_RUNTIME_DIR/bus exists.
-// Otherwise parses the value from `systemctl --user show-environment` .
+// DetectUserDbusSessionBusAddress returns $DBUS_SESSION_BUS_ADDRESS, if set.
+// Otherwise it returns "unix:path=$XDG_RUNTIME_DIR/bus", if $XDG_RUNTIME_DIR/bus exists.
 func DetectUserDbusSessionBusAddress() (string, error) {
 	if env := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); env != "" {
 		return env, nil
@@ -87,20 +85,9 @@ func DetectUserDbusSessionBusAddress() (string, error) {
 	if xdr := os.Getenv("XDG_RUNTIME_DIR"); xdr != "" {
 		busPath := filepath.Join(xdr, "bus")
 		if _, err := os.Stat(busPath); err == nil {
-			busAddress := "unix:path=" + busPath
+			busAddress := "unix:path=" + dbus.EscapeBusAddressValue(busPath)
 			return busAddress, nil
 		}
 	}
-	b, err := exec.Command("systemctl", "--user", "--no-pager", "show-environment").CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("could not execute `systemctl --user --no-pager show-environment` (output=%q): %w", string(b), err)
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(b))
-	for scanner.Scan() {
-		s := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(s, "DBUS_SESSION_BUS_ADDRESS=") {
-			return strings.TrimPrefix(s, "DBUS_SESSION_BUS_ADDRESS="), nil
-		}
-	}
-	return "", errors.New("could not detect DBUS_SESSION_BUS_ADDRESS from `systemctl --user --no-pager show-environment`. Make sure you have installed the dbus-user-session or dbus-daemon package and then run: `systemctl --user start dbus`")
+	return "", errors.New("could not detect DBUS_SESSION_BUS_ADDRESS from the environment; make sure you have installed the dbus-user-session or dbus-daemon package; note you may need to re-login")
 }

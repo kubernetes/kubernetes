@@ -64,6 +64,8 @@ func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 			scheme.ParameterCodec,
 			"",
 			func() *storagev1beta1.CSIDriver { return &storagev1beta1.CSIDriver{} },
-			func() *storagev1beta1.CSIDriverList { return &storagev1beta1.CSIDriverList{} }),
+			func() *storagev1beta1.CSIDriverList { return &storagev1beta1.CSIDriverList{} },
+			gentype.PrefersProtobuf[*storagev1beta1.CSIDriver](),
+		),
 	}
 }

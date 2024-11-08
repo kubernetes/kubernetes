@@ -1,5 +1,5 @@
-//go:build !linux
-// +build !linux
+//go:build !linux && !windows
+// +build !linux,!windows
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -19,12 +19,8 @@ limitations under the License.
 
 package nodeshutdown
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
-// NewManager returns a fake node shutdown manager for non linux platforms.
-func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
+// NewManager returns a fake node shutdown manager for unsupported platforms.
+func NewManager(conf *Config) Manager {
 	m := managerStub{}
-	return m, m
+	return m
 }

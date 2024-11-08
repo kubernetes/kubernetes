@@ -48,6 +48,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&corev1.PersistentVolumeList{}, func(obj interface{}) { SetObjectDefaults_PersistentVolumeList(obj.(*corev1.PersistentVolumeList)) })
 	scheme.AddTypeDefaultingFunc(&corev1.Pod{}, func(obj interface{}) { SetObjectDefaults_Pod(obj.(*corev1.Pod)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodList{}, func(obj interface{}) { SetObjectDefaults_PodList(obj.(*corev1.PodList)) })
+	scheme.AddTypeDefaultingFunc(&corev1.PodLogOptions{}, func(obj interface{}) { SetObjectDefaults_PodLogOptions(obj.(*corev1.PodLogOptions)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodStatusResult{}, func(obj interface{}) { SetObjectDefaults_PodStatusResult(obj.(*corev1.PodStatusResult)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodTemplate{}, func(obj interface{}) { SetObjectDefaults_PodTemplate(obj.(*corev1.PodTemplate)) })
 	scheme.AddTypeDefaultingFunc(&corev1.PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*corev1.PodTemplateList)) })
@@ -499,6 +500,10 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		}
 	}
 	SetDefaults_ResourceList(&in.Spec.Overhead)
+	if in.Spec.Resources != nil {
+		SetDefaults_ResourceList(&in.Spec.Resources.Limits)
+		SetDefaults_ResourceList(&in.Spec.Resources.Requests)
+	}
 	for i := range in.Status.InitContainerStatuses {
 		a := &in.Status.InitContainerStatuses[i]
 		SetDefaults_ResourceList(&a.AllocatedResources)
@@ -530,6 +535,10 @@ func SetObjectDefaults_PodList(in *corev1.PodList) {
 		a := &in.Items[i]
 		SetObjectDefaults_Pod(a)
 	}
+}
+
+func SetObjectDefaults_PodLogOptions(in *corev1.PodLogOptions) {
+	SetDefaults_PodLogOptions(in)
 }
 
 func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
@@ -854,6 +863,10 @@ func SetObjectDefaults_PodTemplate(in *corev1.PodTemplate) {
 		}
 	}
 	SetDefaults_ResourceList(&in.Template.Spec.Overhead)
+	if in.Template.Spec.Resources != nil {
+		SetDefaults_ResourceList(&in.Template.Spec.Resources.Limits)
+		SetDefaults_ResourceList(&in.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_PodTemplateList(in *corev1.PodTemplateList) {
@@ -1160,6 +1173,10 @@ func SetObjectDefaults_ReplicationController(in *corev1.ReplicationController) {
 			}
 		}
 		SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+		if in.Spec.Template.Spec.Resources != nil {
+			SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+			SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+		}
 	}
 }
 

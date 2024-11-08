@@ -36,7 +36,7 @@ var _ = SIGDescribe("PodOSRejection", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-os-rejection")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
+		ginkgo.It("[LinuxOnly] should reject pod when the node OS doesn't match pod's OS", func(ctx context.Context) {
 			linuxNode, err := findLinuxNode(ctx, f)
 			framework.ExpectNoError(err)
 			pod := &v1.Pod{

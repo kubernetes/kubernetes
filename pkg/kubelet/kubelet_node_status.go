@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	goruntime "runtime"
 	"sort"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
@@ -578,18 +580,40 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)
-	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
-
-	if !shouldPatchNodeStatus {
+	// no need to update the status yet
+	if !changed && !kl.isUpdateStatusPeriodExperid() {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
 
+	// We need to update the node status, if this is caused by a node change we want to calculate a new
+	// random delay so we avoid all the nodes to reach the apiserver at the same time. If the update is not related
+	// to a node change, because we run over the period, we reset the random delay so the node keeps updating
+	// its status at the same cadence
+	if changed {
+		kl.delayAfterNodeStatusChange = kl.calculateDelay()
+	} else {
+		kl.delayAfterNodeStatusChange = 0
+	}
 	updatedNode, err := kl.patchNodeStatus(originalNode, node)
 	if err == nil {
 		kl.markVolumesFromNode(updatedNode)
 	}
 	return err
+}
+
+func (kl *Kubelet) isUpdateStatusPeriodExperid() bool {
+	if kl.lastStatusReportTime.IsZero() {
+		return false
+	}
+	if kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange {
+		return true
+	}
+	return false
+}
+
+func (kl *Kubelet) calculateDelay() time.Duration {
+	return time.Duration(float64(kl.nodeStatusReportFrequency) * (-0.5 + rand.Float64()))
 }
 
 // updateNode creates a copy of originalNode and runs update logic on it.
@@ -741,7 +765,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	}
 	var setters []func(ctx context.Context, n *v1.Node) error
 	setters = append(setters,
-		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
+		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc, utilnet.ResolveBindAddress),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,
 			kl.containerManager.GetDevicePluginResourceCapacity, kl.containerManager.GetNodeAllocatableReservation, kl.recordEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VersionInfo(kl.cadvisor.VersionInfo, kl.containerRuntime.Type, kl.containerRuntime.Version),

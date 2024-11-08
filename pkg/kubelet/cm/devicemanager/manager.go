@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -48,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -100,9 +101,6 @@ type ManagerImpl struct {
 	// devicesToReuse contains devices that can be reused as they have been allocated to
 	// init containers.
 	devicesToReuse PodReusableDevices
-
-	// pendingAdmissionPod contain the pod during the admission phase
-	pendingAdmissionPod *v1.Pod
 
 	// containerMap provides a mapping from (pod, container) -> containerID
 	// for all containers in a pod. Used to detect pods running across a restart
@@ -329,6 +327,11 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	return m.server
 }
 
+// GetHealthChecker returns the plugin handler
+func (m *ManagerImpl) GetHealthChecker() healthz.HealthChecker {
+	return m.server
+}
+
 // checkpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.checkpointdir, kubeletDeviceManagerCheckpoint)
@@ -364,10 +367,6 @@ func (m *ManagerImpl) Stop() error {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -385,7 +384,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 				return err
 			}
-			if !types.IsRestartableInitContainer(&initContainer) {
+			if !podutil.IsRestartableInitContainer(&initContainer) {
 				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 			} else {
 				// If the init container is restartable, we need to keep the
@@ -548,20 +547,14 @@ func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices() {
+	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
-	activeAndAdmittedPods := m.activePods()
-	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
-	}
-
 	podsToBeRemoved := m.podDevices.pods()
-	for _, pod := range activeAndAdmittedPods {
+	for _, pod := range activePods {
 		podsToBeRemoved.Delete(string(pod.UID))
 	}
 	if len(podsToBeRemoved) <= 0 {
@@ -1169,13 +1162,6 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 		return false
 	}
 	return len(checkpoints) == 0
-}
-
-func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.pendingAdmissionPod = pod
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {

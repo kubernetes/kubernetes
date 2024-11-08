@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -118,7 +119,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		}
 
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		_, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, nil)
+		_, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return append(allErrors, err)
 		}
@@ -236,7 +237,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 			return nil, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag)
 		}
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		authorizationConfiguration, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, nil)
+		authorizationConfiguration, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return nil, err
 		}

@@ -24,9 +24,9 @@ import (
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeCertificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error) {
+func (c *fakeCertificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequest *certificates.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificates.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
+		Invokes(core.NewRootUpdateSubresourceAction(c.Resource(), "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

@@ -56,5 +56,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// might be valid JSON which changes during re-encoding.
 			r.Parameters = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
 		},
+		func(r *resource.AllocatedDeviceStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// Match the fuzzer default content for runtime.Object.
+			//
+			// This is necessary because randomly generated content
+			// might be valid JSON which changes during re-encoding.
+			r.Data = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
+		},
 	}
 }

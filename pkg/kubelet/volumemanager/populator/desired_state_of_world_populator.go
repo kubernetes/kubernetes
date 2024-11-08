@@ -27,7 +27,9 @@ import (
 	"sync"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,17 +180,6 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoop(ctx context.Context) {
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods(ctx context.Context) {
-	// Map unique pod name to outer volume name to MountedVolume.
-	mountedVolumesForPod := make(map[volumetypes.UniquePodName]map[string]cache.MountedVolume)
-	for _, mountedVolume := range dswp.actualStateOfWorld.GetMountedVolumes() {
-		mountedVolumes, exist := mountedVolumesForPod[mountedVolume.PodName]
-		if !exist {
-			mountedVolumes = make(map[string]cache.MountedVolume)
-			mountedVolumesForPod[mountedVolume.PodName] = mountedVolumes
-		}
-		mountedVolumes[mountedVolume.OuterVolumeSpecName] = mountedVolume
-	}
-
 	for _, pod := range dswp.podManager.GetPods() {
 		// Keep consistency of adding pod during reconstruction
 		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
@@ -202,7 +193,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods(ctx context.Context)
 			continue
 		}
 
-		dswp.processPodVolumes(ctx, pod, mountedVolumesForPod)
+		dswp.processPodVolumes(ctx, pod)
 	}
 }
 
@@ -284,10 +275,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world.
-func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
-	ctx context.Context,
-	pod *v1.Pod,
-	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
+func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context, pod *v1.Pod) {
 	if pod == nil {
 		return
 	}
@@ -299,7 +287,8 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	allVolumesAdded := true
-	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod)
+	collectSELinuxOptions := utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod)
+	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod, collectSELinuxOptions)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
@@ -309,7 +298,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			continue
 		}
 
-		pvc, volumeSpec, volumeGidValue, err :=
+		pvc, volumeSpec, volumeGIDValue, err :=
 			dswp.createVolumeSpec(logger, podVolume, pod, mounts, devices)
 		if err != nil {
 			logger.Error(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
@@ -319,17 +308,17 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		}
 
 		// Add volume to desired state of world
-		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
-			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue, seLinuxContainerContexts[podVolume.Name])
+		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
+			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGIDValue, seLinuxContainerContexts[podVolume.Name])
 		if err != nil {
 			logger.Error(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
-		} else {
-			logger.V(4).Info("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+			continue
 		}
 
-		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec, uniquePodName, mountedVolumesForPod)
+		logger.V(4).Info("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
+		dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec, uniqueVolumeName)
 	}
 
 	// some of the volume additions may have failed, should not mark this pod as fully processed
@@ -358,8 +347,7 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 	podVolume v1.Volume,
 	pvc *v1.PersistentVolumeClaim,
 	volumeSpec *volume.Spec,
-	uniquePodName volumetypes.UniquePodName,
-	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) {
+	uniqueVolumeName v1.UniqueVolumeName) {
 
 	// if a volumeSpec does not have PV or has InlineVolumeSpecForCSIMigration set or pvc is nil
 	// we can't resize the volume and hence resizing should be skipped.
@@ -368,13 +356,6 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		return
 	}
 
-	uniqueVolumeName, exist := getUniqueVolumeName(uniquePodName, podVolume.Name, mountedVolumesForPod)
-	if !exist {
-		// Volume not exist in ASW, we assume it hasn't been mounted yet. If it needs resize,
-		// it will be handled as offline resize(if it indeed hasn't been mounted yet),
-		// or online resize in subsequent loop(after we confirm it has been mounted).
-		return
-	}
 	// volumeSpec.ReadOnly is the value that determines if volume could be formatted when being mounted.
 	// This is the same flag that determines filesystem resizing behaviour for offline resizing and hence
 	// we should use it here. This value comes from Pod.spec.volumes.persistentVolumeClaim.readOnly.
@@ -384,27 +365,12 @@ func (dswp *desiredStateOfWorldPopulator) checkVolumeFSResize(
 		return
 	}
 
-	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
-	pvcStatusCap := pvc.Status.Capacity.Storage()
+	pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage().DeepCopy()
+	pvcStatusCap := pvc.Status.Capacity.Storage().DeepCopy()
 	dswp.desiredStateOfWorld.UpdatePersistentVolumeSize(uniqueVolumeName, pvCap)
 	klog.V(5).InfoS("NodeExpandVolume updating size", "actualSize", pvcStatusCap.String(), "desiredSize", pvCap.String(), "volumeName", uniqueVolumeName)
 	// in case the actualStateOfWorld was rebuild after kubelet restart ensure that claimSize is set to accurate value
 	dswp.actualStateOfWorld.InitializeClaimSize(klog.TODO(), uniqueVolumeName, pvcStatusCap)
-}
-
-func getUniqueVolumeName(
-	podName volumetypes.UniquePodName,
-	outerVolumeSpecName string,
-	mountedVolumesForPod map[volumetypes.UniquePodName]map[string]cache.MountedVolume) (v1.UniqueVolumeName, bool) {
-	mountedVolumes, exist := mountedVolumesForPod[podName]
-	if !exist {
-		return "", false
-	}
-	mountedVolume, exist := mountedVolumes[outerVolumeSpecName]
-	if !exist {
-		return "", false
-	}
-	return mountedVolume.VolumeName, true
 }
 
 // podPreviouslyProcessed returns true if the volumes for this pod have already
@@ -491,7 +457,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 		logger.V(5).Info("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
 		// Fetch actual PV object
-		volumeSpec, volumeGidValue, err :=
+		volumeSpec, volumeGIDValue, err :=
 			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
@@ -530,7 +496,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 				podVolume.Name,
 				volumeMode)
 		}
-		return pvc, volumeSpec, volumeGidValue, nil
+		return pvc, volumeSpec, volumeGIDValue, nil
 	}
 
 	// Do not return the original volume object, since the source could mutate it
@@ -611,8 +577,8 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 			expectedClaimUID)
 	}
 
-	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
-	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
+	volumeGIDValue := getPVVolumeGidAnnotationValue(pv)
+	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGIDValue, nil
 }
 
 func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {

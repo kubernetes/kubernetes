@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/builtins"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/interfaces"
@@ -60,19 +60,19 @@ func TestWithValueFuzzer(t *testing.T) {
 				reflectCopy := ReflectDeepCopy(original)
 
 				if !reflect.DeepEqual(original, reflectCopy) {
-					t.Errorf("original and reflectCopy are different:\n\n  original = %s\n\n  jsonCopy = %s", spew.Sdump(original), spew.Sdump(reflectCopy))
+					t.Errorf("original and reflectCopy are different:\n\n  original = %s\n\n  jsonCopy = %s", dump.Pretty(original), dump.Pretty(reflectCopy))
 				}
 
 				deepCopy := reflect.ValueOf(original).MethodByName("DeepCopy").Call(nil)[0].Interface()
 
 				if !reflect.DeepEqual(original, deepCopy) {
-					t.Fatalf("original and deepCopy are different:\n\n  original = %s\n\n  deepCopy() = %s", spew.Sdump(original), spew.Sdump(deepCopy))
+					t.Fatalf("original and deepCopy are different:\n\n  original = %s\n\n  deepCopy() = %s", dump.Pretty(original), dump.Pretty(deepCopy))
 				}
 
 				ValueFuzz(original)
 
 				if !reflect.DeepEqual(reflectCopy, deepCopy) {
-					t.Fatalf("reflectCopy and deepCopy are different:\n\n  origin = %s\n\n  jsonCopy() = %s", spew.Sdump(original), spew.Sdump(deepCopy))
+					t.Fatalf("reflectCopy and deepCopy are different:\n\n  origin = %s\n\n  jsonCopy() = %s", dump.Pretty(original), dump.Pretty(deepCopy))
 				}
 			}
 		})

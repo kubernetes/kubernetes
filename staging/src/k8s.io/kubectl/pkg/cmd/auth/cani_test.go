@@ -161,7 +161,7 @@ func TestRunAccessCheck(t *testing.T) {
 						test.serverErr
 				}),
 			}
-			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}, ContentType: runtime.ContentTypeJSON}}
 
 			if err := test.o.Complete(tf, test.args); err != nil {
 				t.Errorf("%s: %v", test.name, err)
@@ -196,6 +196,7 @@ func TestRunAccessList(t *testing.T) {
 			"            [/version]          []                [get]\n"
 
 		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		tf.ClientConfigVal.ContentType = runtime.ContentTypeJSON
 		defer tf.Cleanup()
 
 		ns := scheme.Codecs.WithoutConversion()

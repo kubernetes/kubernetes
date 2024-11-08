@@ -44,6 +44,8 @@ import (
 
 const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
+
+	AppArmorNotAdmittedReason = "AppArmor"
 )
 
 type handlerRunner struct {
@@ -224,7 +226,7 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	}
 	return PodAdmitResult{
 		Admit:   false,
-		Reason:  "AppArmor",
+		Reason:  AppArmorNotAdmittedReason,
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
 }

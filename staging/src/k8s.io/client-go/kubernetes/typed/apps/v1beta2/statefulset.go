@@ -20,7 +20,6 @@ package v1beta2
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -30,6 +29,7 @@ import (
 	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // StatefulSetsGetter has a method to return a StatefulSetInterface.
@@ -74,7 +74,9 @@ func newStatefulSets(c *AppsV1beta2Client, namespace string) *statefulSets {
 			scheme.ParameterCodec,
 			namespace,
 			func() *appsv1beta2.StatefulSet { return &appsv1beta2.StatefulSet{} },
-			func() *appsv1beta2.StatefulSetList { return &appsv1beta2.StatefulSetList{} }),
+			func() *appsv1beta2.StatefulSetList { return &appsv1beta2.StatefulSetList{} },
+			gentype.PrefersProtobuf[*appsv1beta2.StatefulSet](),
+		),
 	}
 }
 
@@ -82,6 +84,7 @@ func newStatefulSets(c *AppsV1beta2Client, namespace string) *statefulSets {
 func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *appsv1beta2.Scale, err error) {
 	result = &appsv1beta2.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
 		Name(statefulSetName).
@@ -96,6 +99,7 @@ func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, opt
 func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.Scale, opts v1.UpdateOptions) (result *appsv1beta2.Scale, err error) {
 	result = &appsv1beta2.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
 		Name(statefulSetName).
@@ -114,19 +118,19 @@ func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, s
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &appsv1beta2.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("statefulsets").
 		Name(statefulSetName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

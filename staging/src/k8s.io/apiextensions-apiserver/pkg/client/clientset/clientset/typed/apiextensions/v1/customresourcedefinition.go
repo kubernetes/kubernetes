@@ -70,6 +70,8 @@ func newCustomResourceDefinitions(c *ApiextensionsV1Client) *customResourceDefin
 			func() *apiextensionsv1.CustomResourceDefinition { return &apiextensionsv1.CustomResourceDefinition{} },
 			func() *apiextensionsv1.CustomResourceDefinitionList {
 				return &apiextensionsv1.CustomResourceDefinitionList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*apiextensionsv1.CustomResourceDefinition](),
+		),
 	}
 }

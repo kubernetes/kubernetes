@@ -64,6 +64,8 @@ func newRoles(c *RbacV1beta1Client, namespace string) *roles {
 			scheme.ParameterCodec,
 			namespace,
 			func() *rbacv1beta1.Role { return &rbacv1beta1.Role{} },
-			func() *rbacv1beta1.RoleList { return &rbacv1beta1.RoleList{} }),
+			func() *rbacv1beta1.RoleList { return &rbacv1beta1.RoleList{} },
+			gentype.PrefersProtobuf[*rbacv1beta1.Role](),
+		),
 	}
 }

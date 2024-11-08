@@ -905,6 +905,7 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 			case 1:
 				podList.ListMeta = metav1.ListMeta{ResourceVersion: "10"}
 			default:
+				t.Errorf("unexpected list call: %d", listCalls)
 				err = fmt.Errorf("unexpected list call")
 			}
 			listCalls++
@@ -927,8 +928,11 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 				for i := 12; i < 18; i++ {
 					w.Add(makePod(i))
 				}
-				w.Stop()
+				// Keep the watch open to avoid another reinitialization,
+				// but register it for cleanup.
+				t.Cleanup(func() { w.Stop() })
 			default:
+				t.Errorf("unexpected watch call: %d", watchCalls)
 				err = fmt.Errorf("unexpected watch call")
 			}
 			watchCalls++
@@ -950,7 +954,6 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	errCh := make(chan error, concurrency)
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
@@ -974,11 +977,11 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 				}
 				rv, err := strconv.Atoi(object.(*example.Pod).ResourceVersion)
 				if err != nil {
-					errCh <- fmt.Errorf("incorrect resource version: %v", err)
+					t.Errorf("incorrect resource version: %v", err)
 					return
 				}
 				if prevRV != -1 && prevRV+1 != rv {
-					errCh <- fmt.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
+					t.Errorf("unexpected event received, prevRV=%d, rv=%d", prevRV, rv)
 					return
 				}
 				prevRV = rv
@@ -987,11 +990,6 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		t.Error(err)
-	}
 }
 
 func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
@@ -2941,5 +2939,151 @@ func forceRequestWatchProgressSupport(t *testing.T) {
 		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil
 	}); err != nil {
 		t.Fatalf("failed to wait for required %v storage feature to initialize", storage.RequestWatchProgress)
+	}
+}
+
+func TestListIndexer(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	tests := []struct {
+		name               string
+		requestedNamespace string
+		recursive          bool
+		fieldSelector      fields.Selector
+		indexFields        []string
+		expectIndex        string
+	}{
+		{
+			name:          "request without namespace, without field selector",
+			recursive:     true,
+			fieldSelector: fields.Everything(),
+		},
+		{
+			name:          "request without namespace, field selector with metadata.namespace",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=node"),
+			indexFields:   []string{"spec.nodeName"},
+			expectIndex:   "f:spec.nodeName",
+		},
+		{
+			name:          "request without namespace, field selector with spec.nodename to filter out",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName!=node"),
+			indexFields:   []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, without field selector",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.Everything(),
+		},
+		{
+			name:               "request with namespace, field selector with matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "request with namespace, field selector with non-matched metadata.namespace",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.namespace=namespace"),
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName=node"),
+			indexFields:        []string{"spec.nodeName"},
+			expectIndex:        "f:spec.nodeName",
+		},
+		{
+			name:               "request with namespace, field selector with spec.nodename to filter out",
+			requestedNamespace: "namespace",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=node"),
+			indexFields:        []string{"spec.nodeName"},
+		},
+		{
+			name:          "request without namespace, field selector with metadata.name",
+			recursive:     true,
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and metadata.namespace",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name and spec.nodeName",
+			recursive: true,
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name": "name",
+				"spec.nodeName": "node",
+			}),
+			indexFields: []string{"spec.nodeName"},
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:      "request without namespace, field selector with metadata.name, and with spec.nodeName to filter out watch",
+			recursive: true,
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=node"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "name"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name",
+			requestedNamespace: "namespace",
+			fieldSelector:      fields.ParseSelectorOrDie("metadata.name=name"),
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name and metadata.namespace",
+			requestedNamespace: "namespace",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+			}),
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace and spec.nodename",
+			requestedNamespace: "namespace",
+			fieldSelector: fields.SelectorFromSet(fields.Set{
+				"metadata.name":      "name",
+				"metadata.namespace": "namespace",
+				"spec.nodeName":      "node",
+			}),
+			indexFields: []string{"spec.nodeName"},
+		},
+		{
+			name:               "request with namespace, with field selector metadata.name, metadata.namespace, and with spec.nodename to filter out",
+			requestedNamespace: "namespace",
+			fieldSelector: fields.AndSelectors(
+				fields.ParseSelectorOrDie("spec.nodeName!=node"),
+				fields.SelectorFromSet(fields.Set{"metadata.name": "name", "metadata.namespace": "namespace"}),
+			),
+			indexFields: []string{"spec.nodeName"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
+			_, _, usedIndex, err := cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, pred, tt.recursive)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if usedIndex != tt.expectIndex {
+				t.Errorf("Index doesn't match, expected: %q, got: %q", tt.expectIndex, usedIndex)
+			}
+		})
 	}
 }

@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/util/storage"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -97,7 +98,9 @@ func (ne *NodeExpander) runPreCheck() bool {
 
 	// PVC is already expanded but we are still trying to expand the volume because
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && ne.resizeStatus == "" {
+	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 &&
+		ne.resizeStatus == "" &&
+		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
 		ne.pvcAlreadyUpdated = true
 		return true
 	}

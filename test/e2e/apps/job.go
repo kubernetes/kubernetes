@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -144,10 +146,10 @@ var _ = SIGDescribe("Job", func() {
 	/*
 		Testname: Ensure pod failure policy allows to ignore failure matching on the exit code
 		Description: This test is using an indexed job. The pod corresponding to each index
-		creates a marker file on the host and runs 'forever' until evicted. Once
-		the marker file is created the pod succeeds seeing it on restart. Thus,
-		we trigger one failure per index due to eviction, so the Job would be
-		marked as failed, if not for the ignore rule matching on exit codes.
+		creates a marker file on the host and fails. Once the marker file is
+		created the pod succeeds seeing it on restart. Thus, we trigger one
+		failure per index, so the Job would be marked as failed, if not for the
+		ignore rule matching on exit codes.
 	*/
 	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on exit code", func(ctx context.Context) {
 		// We set the backoffLimit = numPods-1  so that we can tolerate random
@@ -163,17 +165,15 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a job")
-		job := e2ejob.NewTestJobOnNode("notTerminateOncePerIndex", "evicted-pod-ignore-on-exit-code", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job := e2ejob.NewTestJobOnNode("failOncePerIndex", "fail-pod-ignore-on-exit-code", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
 		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
 		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
 			Rules: []batchv1.PodFailurePolicyRule{
 				{
-					// Ignore the pod failure caused by the eviction based on the
-					// exit code corresponding to SIGKILL.
 					Action: batchv1.PodFailurePolicyActionIgnore,
 					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
 						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
-						Values:   []int32{137},
+						Values:   []int32{42},
 					},
 				},
 			},
@@ -181,41 +181,13 @@ var _ = SIGDescribe("Job", func() {
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Waiting for all the pods to be ready")
-		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(int32(numPods)))
-		framework.ExpectNoError(err, "failed to await for all pods to be ready for job: %s/%s", job.Name, job.Namespace)
-
-		ginkgo.By("Fetch all running pods")
-		pods, err := e2ejob.GetAllRunningJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
-		framework.ExpectNoError(err, "failed to get running pods for the job: %s/%s", job.Name, job.Namespace)
-		gomega.Expect(pods).To(gomega.HaveLen(numPods), "Number of running pods doesn't match parallelism")
-
-		ginkgo.By("Evict all the Pods")
-		workqueue.ParallelizeUntil(ctx, numPods, numPods, func(index int) {
-			defer ginkgo.GinkgoRecover()
-
-			pod := pods[index]
-			ginkgo.By(fmt.Sprintf("Evicting the running pod: %s/%s", pod.Name, pod.Namespace))
-			evictTarget := &policyv1.Eviction{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-				},
-			}
-			err = f.ClientSet.CoreV1().Pods(pod.Namespace).EvictV1(ctx, evictTarget)
-			framework.ExpectNoError(err, "failed to evict the pod: %s/%s", pod.Name, pod.Namespace)
-
-			ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
-			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
-			framework.ExpectNoError(err, "failed to await for all pods to be deleted: %s/%s", pod.Name, pod.Namespace)
-		})
-
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
 	/*
+		Release: v1.32
 		Testname: Ensure pod failure policy allows to ignore failure matching on the DisruptionTarget condition
 		Description: This test is using an indexed job. The pod corresponding to each index
 		creates a marker file on the host and runs 'forever' until evicted. Once
@@ -224,7 +196,7 @@ var _ = SIGDescribe("Job", func() {
 		condition is added in the process). The Job would be marked as failed,
 		if not for the ignore rule matching on exit codes.
 	*/
-	ginkgo.It("should allow to use a pod failure policy to ignore failure matching on DisruptionTarget condition", func(ctx context.Context) {
+	framework.ConformanceIt("should allow to use a pod failure policy to ignore failure matching on DisruptionTarget condition", func(ctx context.Context) {
 		// We set the backoffLimit = numPods-1 so that we can tolerate random
 		// failures (like OutOfPods from kubelet). Yet, the Job would fail if the
 		// pod failures were not be ignored.
@@ -464,6 +436,43 @@ done`}
 		gotIndexes := succeededIndexes.List()
 		wantIndexes := []int{0, 1, 2, 3}
 		gomega.Expect(gotIndexes).To(gomega.Equal(wantIndexes), "expected completed indexes %s, but got %s", wantIndexes, gotIndexes)
+	})
+
+	/*
+		  Release: v1.32
+			Testname: Ensure Pods of an Indexed Job get a unique index for PodIndexLabel key.
+			Description: Create an Indexed job. Job MUST complete successfully.
+			Ensure that created pods have completion index label.
+	*/
+	// TODO: once this test is stable, squash the functionality into pre-existing conformance test called "should create
+	//   pods for an Indexed job with completion indexes and specified hostname" earlier in this file.
+	framework.It("should create pods with completion indexes for an Indexed Job", feature.PodIndexLabel, func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6) // default value
+
+		ginkgo.By("Creating Indexed job")
+		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring all pods have the required index labels")
+		pods, err := e2ejob.GetJobPods(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		succeededIndexes := sets.NewInt()
+		for _, pod := range pods.Items {
+			ix, err := strconv.Atoi(pod.Labels[batchv1.JobCompletionIndexAnnotation])
+			framework.ExpectNoError(err, "failed obtaining completion index in namespace: %s for pod: %s", pod.Namespace, pod.Name)
+			succeededIndexes.Insert(ix)
+		}
+		gotIndexes := succeededIndexes.List()
+		wantIndexes := []int{0, 1, 2, 3}
+		gomega.Expect(gotIndexes).To(gomega.Equal(wantIndexes), "expected completed indexes in namespace: %s for job: %s", job.Namespace, job.Name)
 	})
 
 	/*
@@ -1236,6 +1245,31 @@ done`}
 		ginkgo.By("Ensure the job controller updates the status.ready field")
 		err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To[int32](0))
 		framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+	})
+
+	/*
+		Testname: Jobs, managed-by mechanism
+		Description: This test verifies the built-in Job controller does not
+		reconcile the Job, allowing to delegate the reconciliation to an
+		external controller.
+	*/
+	ginkgo.It("should allow to delegate reconciliation to external controller", func(ctx context.Context) {
+		parallelism := int32(2)
+		completions := int32(4)
+		backoffLimit := int32(6)
+
+		ginkgo.By("Creating a job with a custom managed-by field")
+		job := e2ejob.NewTestJob("succeed", "managed-by", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.ManagedBy = ptr.To("example.com/custom-job-controller")
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
+
+		ginkgo.By(fmt.Sprintf("Verify the Job %s/%s status isn't updated by the built-in controller", job.Namespace, job.Name))
+		// This get function uses HandleRetry to retry on transient API errors
+		get := framework.GetObject(f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get, job.Name, metav1.GetOptions{})
+		gomega.Consistently(ctx, get).
+			WithPolling(time.Second).WithTimeout(3 * time.Second).
+			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 })
 

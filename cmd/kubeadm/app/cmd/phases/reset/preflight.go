@@ -39,7 +39,7 @@ func NewPreflightPhase() workflow.Phase {
 		Run:     runPreflight,
 		InheritFlags: []string{
 			options.IgnorePreflightErrors,
-			options.ForceReset,
+			options.Force,
 			options.DryRun,
 		},
 	}

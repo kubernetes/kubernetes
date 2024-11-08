@@ -194,7 +194,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 			framework.Logf("pod %s/%s running", testPod.Namespace, testPod.Name)
 
 			ginkgo.By("stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("stopping all the local containers - using CRI")
 			rs, _, err := getCRIClient()
@@ -210,7 +210,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 			}
 
 			ginkgo.By("restarting the kubelet")
-			startKubelet()
+			restartKubelet(ctx)
 
 			ginkgo.By("waiting for the kubelet to be ready again")
 			// Wait for the Kubelet to be ready.

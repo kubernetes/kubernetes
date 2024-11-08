@@ -183,7 +183,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 		cfg:                   initCfg,
 		resetCfg:              resetCfg,
 		dryRun:                dryRunFlag,
-		forceReset:            cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.ForceReset, resetCfg.Force, opts.externalcfg.Force).(bool),
+		forceReset:            cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.Force, resetCfg.Force, opts.externalcfg.Force).(bool),
 		cleanupTmpDir:         cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.CleanupTmpDir, resetCfg.CleanupTmpDir, opts.externalcfg.CleanupTmpDir).(bool),
 	}, nil
 }
@@ -195,7 +195,7 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 		`The path to the directory where the certificates are stored. If specified, clean this directory.`,
 	)
 	flagSet.BoolVarP(
-		&resetOptions.externalcfg.Force, options.ForceReset, "f", resetOptions.externalcfg.Force,
+		&resetOptions.externalcfg.Force, options.Force, "f", resetOptions.externalcfg.Force,
 		"Reset the node without prompting for confirmation.",
 	)
 	flagSet.BoolVar(

@@ -27,7 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -242,15 +242,14 @@ func TestPreCheckForNode(t *testing.T) {
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
 		name                   string
-		gvkMap                 map[framework.GVK]framework.ActionType
+		gvkMap                 map[framework.EventResource]framework.ActionType
 		enableDRA              bool
-		enableClassicDRA       bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
 		{
 			name:   "default handlers in framework",
-			gvkMap: map[framework.GVK]framework.ActionType{},
+			gvkMap: map[framework.EventResource]framework.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
 				reflect.TypeOf(&v1.Node{}):      true,
@@ -260,11 +259,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "DRA events disabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
+			gvkMap: map[framework.EventResource]framework.ActionType{
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -274,12 +272,11 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "some DRA events enabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
+			name: "all DRA events enabled",
+			gvkMap: map[framework.EventResource]framework.ActionType{
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
@@ -293,29 +290,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "all DRA events enabled",
-			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext: framework.Add,
-				framework.ResourceClaim:        framework.Add,
-				framework.ResourceSlice:        framework.Add,
-				framework.DeviceClass:          framework.Add,
-			},
-			enableDRA:        true,
-			enableClassicDRA: true,
-			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                           true,
-				reflect.TypeOf(&v1.Node{}):                          true,
-				reflect.TypeOf(&v1.Namespace{}):                     true,
-				reflect.TypeOf(&resourceapi.PodSchedulingContext{}): true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
-			},
-			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
-		},
-		{
 			name: "add GVKs handlers defined in framework dynamically",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			gvkMap: map[framework.EventResource]framework.ActionType{
 				"Pod":                               framework.Add | framework.Delete,
 				"PersistentVolume":                  framework.Delete,
 				"storage.k8s.io/CSIStorageCapacity": framework.Update,
@@ -331,7 +307,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			gvkMap: map[framework.EventResource]framework.ActionType{
 				"daemonsets.v1.apps": framework.Add | framework.Delete,
 				"cronjobs.v1.batch":  framework.Delete,
 			},
@@ -347,7 +323,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically, with one illegal GVK form",
-			gvkMap: map[framework.GVK]framework.ActionType{
+			gvkMap: map[framework.EventResource]framework.ActionType{
 				"daemonsets.v1.apps":    framework.Add | framework.Delete,
 				"custommetrics.v1beta1": framework.Update,
 			},
@@ -372,7 +348,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDRA)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tt.enableClassicDRA)
+
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -389,7 +365,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 			}
 

@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
-	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -55,18 +54,6 @@ const (
 	VerifyControllerAttachedVolumeOpName string = "verify_controller_attached_volume"
 )
 
-// InTreeToCSITranslator contains methods required to check migratable status
-// and perform translations from InTree PVs and Inline to CSI
-type InTreeToCSITranslator interface {
-	IsPVMigratable(pv *v1.PersistentVolume) bool
-	IsInlineMigratable(vol *v1.Volume) bool
-	IsMigratableIntreePluginByName(inTreePluginName string) bool
-	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
-	GetCSINameFromInTreeName(pluginName string) (string, error)
-	TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
-}
-
 var _ OperationGenerator = &operationGenerator{}
 
 type operationGenerator struct {
@@ -83,8 +70,6 @@ type operationGenerator struct {
 
 	// blkUtil provides volume path related operations for block volume
 	blkUtil volumepathhandler.BlockVolumePathHandler
-
-	translator InTreeToCSITranslator
 }
 
 type inTreeResizeResponse struct {
@@ -108,7 +93,6 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 		volumePluginMgr: volumePluginMgr,
 		recorder:        recorder,
 		blkUtil:         blkUtil,
-		translator:      csitrans.New(),
 	}
 }
 
@@ -146,9 +130,6 @@ type OperationGenerator interface {
 
 	// GetVolumePluginMgr returns volume plugin manager
 	GetVolumePluginMgr() *volume.VolumePluginMgr
-
-	// GetCSITranslator returns the CSI Translation Library
-	GetCSITranslator() InTreeToCSITranslator
 
 	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error)
 
@@ -359,10 +340,6 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 	return og.volumePluginMgr
-}
-
-func (og *operationGenerator) GetCSITranslator() InTreeToCSITranslator {
-	return og.translator
 }
 
 func (og *operationGenerator) GenerateDetachVolumeFunc(
@@ -616,7 +593,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			VolumeName:          volumeToMount.VolumeName,
 			Mounter:             volumeMounter,
 			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    VolumeMounted,
 			SELinuxMountContext: volumeToMount.SELinuxLabel,
@@ -785,7 +762,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 				PodUID:              volumeToUnmount.PodUID,
 				VolumeName:          volumeToUnmount.VolumeName,
 				OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-				VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
+				VolumeGIDVolume:     volumeToUnmount.VolumeGIDValue,
 				VolumeSpec:          volumeToUnmount.VolumeSpec,
 				VolumeMountState:    VolumeMountUncertain,
 			}
@@ -801,14 +778,14 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
+			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PluginName,
-			volumeToUnmount.VolumeGidValue)
+			volumeToUnmount.VolumeGIDValue)
 
 		// Update actual state of world
 		markVolMountedErr := actualStateOfWorld.MarkVolumeAsUnmounted(
@@ -1052,7 +1029,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			VolumeName:          volumeToMount.VolumeName,
 			BlockVolumeMapper:   blockVolumeMapper,
 			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeGIDVolume:     volumeToMount.VolumeGIDValue,
 			VolumeSpec:          volumeToMount.VolumeSpec,
 			VolumeMountState:    VolumeMounted,
 		}
@@ -1225,7 +1202,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 			PodUID:              volumeToUnmount.PodUID,
 			VolumeName:          volumeToUnmount.VolumeName,
 			OuterVolumeSpecName: volumeToUnmount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToUnmount.VolumeGidValue,
+			VolumeGIDVolume:     volumeToUnmount.VolumeGIDValue,
 			VolumeSpec:          volumeToUnmount.VolumeSpec,
 			VolumeMountState:    VolumeMountUncertain,
 		}
@@ -1256,14 +1233,14 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		}
 
 		klog.Infof(
-			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
+			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGIDValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
 			volumeToUnmount.PodUID,
 			volumeToUnmount.InnerVolumeSpecName,
 			volumeToUnmount.PluginName,
-			volumeToUnmount.VolumeGidValue)
+			volumeToUnmount.VolumeGIDValue)
 
 		// Update actual state of world
 		markVolUnmountedErr := actualStateOfWorld.MarkVolumeAsUnmounted(
@@ -1436,7 +1413,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		claimSize := actualStateOfWorld.GetClaimSize(volumeToMount.VolumeName)
 
 		// only fetch claimSize if it was not set previously
-		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize == nil && !volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
+		if volumeToMount.VolumeSpec.PersistentVolume != nil && claimSize.IsZero() && !volumeToMount.VolumeSpec.InlineVolumeSpecForCSIMigration {
 			pv := volumeToMount.VolumeSpec.PersistentVolume
 			pvc, err := og.kubeClient.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1445,7 +1422,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			}
 			pvcStatusSize := pvc.Status.Capacity.Storage()
 			if pvcStatusSize != nil {
-				claimSize = pvcStatusSize
+				claimSize = pvcStatusSize.DeepCopy()
 			}
 		}
 
@@ -1964,7 +1941,7 @@ func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 		return false, e1, e2
 	}
 	if resizeDone {
-		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, &newSize)
+		markingDone := actualStateOfWorld.MarkVolumeAsResized(volumeToMount.VolumeName, newSize)
 		if !markingDone {
 			// On failure, return error. Caller will log and retry.
 			genericFailureError := fmt.Errorf("unable to mark volume as resized")

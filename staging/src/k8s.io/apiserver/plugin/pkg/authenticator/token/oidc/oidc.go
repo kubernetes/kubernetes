@@ -86,6 +86,12 @@ type Options struct {
 	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
 	Client *http.Client
 
+	// Optional CEL compiler used to compile the CEL expressions. This is useful to use a shared instance
+	// of the compiler as these compilers holding a CEL environment are expensive to create. If not provided,
+	// a default compiler will be created.
+	// Note: the compiler construction depends on feature gates and the compatibility version to be initialized.
+	Compiler authenticationcel.Compiler
+
 	// SupportedSigningAlgs sets the accepted set of JOSE signing algorithms that
 	// can be used by the provider to sign tokens.
 	//
@@ -245,7 +251,11 @@ type AuthenticatorTokenWithHealthCheck interface {
 // Thus, once the lifecycleCtx is canceled, the authenticator must not be used.
 // A caller may check if the authenticator is healthy by calling the HealthCheck method.
 func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHealthCheck, error) {
-	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(opts.JWTAuthenticator, opts.DisallowedIssuers)
+	compiler := opts.Compiler
+	if compiler == nil {
+		compiler = authenticationcel.NewDefaultCompiler()
+	}
+	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(compiler, opts.JWTAuthenticator, opts.DisallowedIssuers)
 	if err := fieldErr.ToAggregate(); err != nil {
 		return nil, err
 	}

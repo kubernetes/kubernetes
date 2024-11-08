@@ -24,11 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -56,6 +58,9 @@ func (resourceclaimStrategy) NamespaceScoped() bool {
 func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"resource.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -123,6 +128,9 @@ func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fi
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
+		"resource.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
 	}
 
 	return fields
@@ -134,6 +142,7 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	newClaim.Spec = oldClaim.Spec
 	metav1.ResetObjectMetaForStatus(&newClaim.ObjectMeta, &oldClaim.ObjectMeta)
 
+	dropDeallocatedStatusDevices(newClaim, oldClaim)
 	dropDisabledFields(newClaim, oldClaim)
 }
 
@@ -172,35 +181,107 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	return fields
 }
 
-// dropDisabledFields removes fields which are covered by the optional DRAControlPlaneController feature gate.
+// dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
+	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
+	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
+}
+
+func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
 		// No need to drop anything.
 		return
 	}
-
-	if oldClaim == nil {
-		// Always drop on create. There's no status yet, so nothing to do there.
-		newClaim.Spec.Controller = ""
+	if draAdminAccessFeatureInUse(oldClaim) {
+		// If anything was set in the past, then fields must not get
+		// dropped on potentially unrelated updates and, for example,
+		// adding a status with AdminAccess=true is allowed. The
+		// scheduler typically doesn't do that (it also checks the
+		// feature gate and refuses to schedule), but the apiserver
+		// would allow it.
 		return
 	}
 
-	// Drop on (status) update only if not already set.
-	if oldClaim.Spec.Controller == "" {
-		newClaim.Spec.Controller = ""
+	for i := range newClaim.Spec.Devices.Requests {
+		newClaim.Spec.Devices.Requests[i].AdminAccess = nil
 	}
-	// If the claim is handled by a control plane controller, allow
-	// setting it also in the status. Stripping that field would be bad.
-	if oldClaim.Spec.Controller == "" &&
-		newClaim.Status.Allocation != nil &&
-		oldClaim.Status.Allocation == nil &&
-		(oldClaim.Status.Allocation == nil || oldClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.Allocation.Controller = ""
+
+	if newClaim.Status.Allocation == nil {
+		return
 	}
-	// If there is an existing allocation which used a control plane controller, then
-	// allow requesting its deallocation.
-	if !oldClaim.Status.DeallocationRequested &&
-		(newClaim.Status.Allocation == nil || newClaim.Status.Allocation.Controller == "") {
-		newClaim.Status.DeallocationRequested = false
+	for i := range newClaim.Status.Allocation.Devices.Results {
+		newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
+	}
+}
+
+func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
+	for _, request := range claim.Spec.Devices.Requests {
+		if request.AdminAccess != nil {
+			return true
+		}
+	}
+
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if result.AdminAccess != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
+	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
+		newClaim.Status.Devices = nil
+	}
+}
+
+// dropDeallocatedStatusDevices removes the status.devices that were allocated
+// in the oldClaim and that have been removed in the newClaim.
+func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
+	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
+		return
+	}
+
+	deallocatedDevices := sets.New[structured.DeviceID]()
+
+	if oldClaim.Status.Allocation != nil {
+		// Get all devices in the oldClaim.
+		for _, result := range oldClaim.Status.Allocation.Devices.Results {
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			deallocatedDevices.Insert(deviceID)
+		}
+	}
+
+	// Remove devices from deallocatedDevices that are still in newClaim.
+	if newClaim.Status.Allocation != nil {
+		for _, result := range newClaim.Status.Allocation.Devices.Results {
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			deallocatedDevices.Delete(deviceID)
+		}
+	}
+
+	// Remove from newClaim.Status.Devices.
+	n := 0
+	for _, device := range newClaim.Status.Devices {
+		deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
+		if !deallocatedDevices.Has(deviceID) {
+			newClaim.Status.Devices[n] = device
+			n++
+		}
+	}
+	newClaim.Status.Devices = newClaim.Status.Devices[:n]
+
+	if len(newClaim.Status.Devices) == 0 {
+		newClaim.Status.Devices = nil
 	}
 }

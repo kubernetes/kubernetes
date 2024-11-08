@@ -920,9 +920,11 @@ func parseActions(tables []syscall.NetlinkRouteAttr) ([]Action, error) {
 				actionnStatistic = (*ActionStatistic)(s)
 			}
 		}
-		action.Attrs().Statistics = actionnStatistic
-		action.Attrs().Timestamp = actionTimestamp
-		actions = append(actions, action)
+		if action != nil {
+			action.Attrs().Statistics = actionnStatistic
+			action.Attrs().Timestamp = actionTimestamp
+			actions = append(actions, action)
+		}
 	}
 	return actions, nil
 }

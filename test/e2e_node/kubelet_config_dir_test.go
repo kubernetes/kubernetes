@@ -54,12 +54,7 @@ var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Stopping the kubelet")
-			restartKubelet := stopKubelet()
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			configDir := framework.TestContext.KubeletConfigDropinDir
 
@@ -128,7 +123,7 @@ featureGates:
   DynamicResourceAllocation: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
 			ginkgo.By("Restarting the kubelet")
-			restartKubelet()
+			restartKubelet(ctx)
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)

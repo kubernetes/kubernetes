@@ -34,10 +34,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -153,6 +156,12 @@ func validLimitRangeNoDefaults() corev1.LimitRange {
 	externalLimitRange := corev1.LimitRange{}
 	v1.Convert_core_LimitRange_To_v1_LimitRange(&internalLimitRange, &externalLimitRange, nil)
 	return externalLimitRange
+}
+
+func validPodWithPodLevelResources(name string, numContainers int, containerResources api.ResourceRequirements, podResources api.ResourceRequirements) api.Pod {
+	pod := validPod(name, numContainers, containerResources)
+	pod.Spec.Resources = &podResources
+	return pod
 }
 
 func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
@@ -277,8 +286,9 @@ func TestMergePodResourceRequirements(t *testing.T) {
 
 func TestPodLimitFunc(t *testing.T) {
 	type testCase struct {
-		pod        api.Pod
-		limitRange corev1.LimitRange
+		pod                      api.Pod
+		limitRange               corev1.LimitRange
+		podLevelResourcesEnabled bool
 	}
 
 	successCases := []testCase{
@@ -450,17 +460,42 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("300Mi"), getLocalStorageResourceList("450Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
 		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-resources-with-min-max", 3, getResourceRequirements(getComputeResourceList("100m", "60Mi"), getComputeResourceList("200m", "100Mi")),
+				getResourceRequirements(getComputeResourceList("200m", "180Mi"), getComputeResourceList("400m", "200Mi")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("400m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-requests-with-min", 3, getResourceRequirements(getComputeResourceList("50m", "60Mi"), getComputeResourceList("", "")),
+				getResourceRequirements(getComputeResourceList("160m", "200Mi"), getComputeResourceList("", "")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("160m", "200Mi"), getComputeResourceList("", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-limits-with-max", 3, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("50m", "60Mi")),
+				getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("160m", "200Mi")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("", ""), getComputeResourceList("160m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
+		},
 	}
 	for i := range successCases {
 		test := successCases[i]
-		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
-		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
+		t.Run(test.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+		})
 	}
 
 	errorCases := []testCase{
@@ -638,18 +673,41 @@ func TestPodLimitFunc(t *testing.T) {
 			pod: withRestartableInitContainer(getComputeResourceList("1500m", ""), api.ResourceList{},
 				validPod("ctr-max-cpu-limit-restartable-init-container", 1, getResourceRequirements(getComputeResourceList("1000m", ""), getComputeResourceList("1500m", "")))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		}, {
+			pod: validPodWithPodLevelResources("pod-level-resources-exceeding-max", 3, getResourceRequirements(getComputeResourceList("100m", "60Mi"), getComputeResourceList("200m", "100Mi")),
+				getResourceRequirements(getComputeResourceList("200m", "180Mi"), getComputeResourceList("500m", "280Mi")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("400m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-requests-less-than-min", 3, getResourceRequirements(getComputeResourceList("50m", "60Mi"), getComputeResourceList("", "")),
+				getResourceRequirements(getComputeResourceList("100m", "200Mi"), getComputeResourceList("", "")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("160m", "200Mi"), getComputeResourceList("", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-limits-exceeding-max", 3, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("50m", "60Mi")),
+				getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("160m", "300Mi")),
+			),
+			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("", ""), getComputeResourceList("160m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled: true,
 		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
-		err := PodMutateLimitFunc(&test.limitRange, &test.pod)
-		if err != nil {
-			t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
-		}
-		err = PodValidateLimitFunc(&test.limitRange, &test.pod)
-		if err == nil {
-			t.Errorf("Expected error for pod: %s", test.pod.Name)
-		}
+		t.Run(test.pod.Name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
+			if err != nil {
+				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
+			}
+			err = PodValidateLimitFunc(&test.limitRange, &test.pod)
+			if err == nil {
+				t.Errorf("Expected error for pod: %s", test.pod.Name)
+			}
+		})
 	}
 }
 
@@ -751,7 +809,23 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	if err != nil {
 		t.Errorf("Should have ignored calls to any subresource of pod %v", err)
 	}
+}
 
+func TestLimitRangerAllowPodResize(t *testing.T) {
+	limitRange := validLimitRangeNoDefaults()
+	mockClient := newMockClientForTest([]corev1.LimitRange{limitRange})
+	handler, informerFactory, err := newHandlerForTest(mockClient)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+	informerFactory.Start(wait.NeverStop)
+
+	testPod := validPod("testPod", 1, api.ResourceRequirements{})
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "resize", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
+	if err == nil {
+		t.Errorf("expect error, but got nil")
+	}
 }
 
 func TestLimitRangerAdmitPod(t *testing.T) {

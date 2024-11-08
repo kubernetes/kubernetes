@@ -2302,6 +2302,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*[]string)(nil), (**string)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_Pointer_string(a.(*[]string), b.(**string), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*corev1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(a.(*apps.ReplicaSetSpec), b.(*corev1.ReplicationControllerSpec), scope)
 	}); err != nil {
@@ -6327,6 +6332,7 @@ func autoConvert_v1_PodLogOptions_To_core_PodLogOptions(in *corev1.PodLogOptions
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
 	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
+	out.Stream = (*string)(unsafe.Pointer(in.Stream))
 	return nil
 }
 
@@ -6345,6 +6351,7 @@ func autoConvert_core_PodLogOptions_To_v1_PodLogOptions(in *core.PodLogOptions, 
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
 	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
+	out.Stream = (*string)(unsafe.Pointer(in.Stream))
 	return nil
 }
 
@@ -6418,6 +6425,13 @@ func autoConvert_url_Values_To_v1_PodLogOptions(in *url.Values, out *corev1.PodL
 		}
 	} else {
 		out.InsecureSkipTLSVerifyBackend = false
+	}
+	if values, ok := map[string][]string(*in)["stream"]; ok && len(values) > 0 {
+		if err := Convert_Slice_string_To_Pointer_string(&values, &out.Stream, s); err != nil {
+			return err
+		}
+	} else {
+		out.Stream = nil
 	}
 	return nil
 }
@@ -6622,6 +6636,7 @@ func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *corev1.Pod
 	out.FSGroupChangePolicy = (*core.PodFSGroupChangePolicy)(unsafe.Pointer(in.FSGroupChangePolicy))
 	out.SeccompProfile = (*core.SeccompProfile)(unsafe.Pointer(in.SeccompProfile))
 	out.AppArmorProfile = (*core.AppArmorProfile)(unsafe.Pointer(in.AppArmorProfile))
+	out.SELinuxChangePolicy = (*core.PodSELinuxChangePolicy)(unsafe.Pointer(in.SELinuxChangePolicy))
 	return nil
 }
 
@@ -6648,6 +6663,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.Sysctls = *(*[]corev1.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	out.SeccompProfile = (*corev1.SeccompProfile)(unsafe.Pointer(in.SeccompProfile))
 	out.AppArmorProfile = (*corev1.AppArmorProfile)(unsafe.Pointer(in.AppArmorProfile))
+	out.SELinuxChangePolicy = (*corev1.PodSELinuxChangePolicy)(unsafe.Pointer(in.SELinuxChangePolicy))
 	return nil
 }
 
@@ -6734,6 +6750,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *corev1.PodSpec, out *core.PodSpe
 	// INFO: in.HostUsers opted out of conversion generation
 	out.SchedulingGates = *(*[]core.PodSchedulingGate)(unsafe.Pointer(&in.SchedulingGates))
 	out.ResourceClaims = *(*[]core.PodResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
+	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }
 
@@ -6789,6 +6806,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 	out.OS = (*corev1.PodOS)(unsafe.Pointer(in.OS))
 	out.SchedulingGates = *(*[]corev1.PodSchedulingGate)(unsafe.Pointer(&in.SchedulingGates))
 	out.ResourceClaims = *(*[]corev1.PodResourceClaim)(unsafe.Pointer(&in.ResourceClaims))
+	out.Resources = (*corev1.ResourceRequirements)(unsafe.Pointer(in.Resources))
 	return nil
 }
 

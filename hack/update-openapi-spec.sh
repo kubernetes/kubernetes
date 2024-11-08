@@ -79,7 +79,7 @@ kube-apiserver \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true,OpenAPIEnums=false,ConsistentListFromCache=false \
+  --feature-gates=AllAlpha=true,AllBeta=true,OpenAPIEnums=false,ConsistentListFromCache=false \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \

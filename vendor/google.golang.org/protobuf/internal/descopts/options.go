@@ -9,7 +9,7 @@
 // dependency on the descriptor proto package).
 package descopts
 
-import pref "google.golang.org/protobuf/reflect/protoreflect"
+import "google.golang.org/protobuf/reflect/protoreflect"
 
 // These variables are set by the init function in descriptor.pb.go via logic
 // in internal/filetype. In other words, so long as the descriptor proto package
@@ -17,13 +17,13 @@ import pref "google.golang.org/protobuf/reflect/protoreflect"
 //
 // Each variable is populated with a nil pointer to the options struct.
 var (
-	File           pref.ProtoMessage
-	Enum           pref.ProtoMessage
-	EnumValue      pref.ProtoMessage
-	Message        pref.ProtoMessage
-	Field          pref.ProtoMessage
-	Oneof          pref.ProtoMessage
-	ExtensionRange pref.ProtoMessage
-	Service        pref.ProtoMessage
-	Method         pref.ProtoMessage
+	File           protoreflect.ProtoMessage
+	Enum           protoreflect.ProtoMessage
+	EnumValue      protoreflect.ProtoMessage
+	Message        protoreflect.ProtoMessage
+	Field          protoreflect.ProtoMessage
+	Oneof          protoreflect.ProtoMessage
+	ExtensionRange protoreflect.ProtoMessage
+	Service        protoreflect.ProtoMessage
+	Method         protoreflect.ProtoMessage
 )

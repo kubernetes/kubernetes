@@ -27,8 +27,11 @@ type ExprFactory interface {
 	// NewCall creates an Expr value representing a global function call.
 	NewCall(id int64, function string, args ...Expr) Expr
 
-	// NewComprehension creates an Expr value representing a comprehension over a value range.
+	// NewComprehension creates an Expr value representing a one-variable comprehension over a value range.
 	NewComprehension(id int64, iterRange Expr, iterVar, accuVar string, accuInit, loopCondition, loopStep, result Expr) Expr
+
+	// NewComprehensionTwoVar creates an Expr value representing a two-variable comprehension over a value range.
+	NewComprehensionTwoVar(id int64, iterRange Expr, iterVar, iterVar2, accuVar string, accuInit, loopCondition, loopStep, result Expr) Expr
 
 	// NewMemberCall creates an Expr value representing a member function call.
 	NewMemberCall(id int64, function string, receiver Expr, args ...Expr) Expr
@@ -111,11 +114,17 @@ func (fac *baseExprFactory) NewMemberCall(id int64, function string, target Expr
 }
 
 func (fac *baseExprFactory) NewComprehension(id int64, iterRange Expr, iterVar, accuVar string, accuInit, loopCond, loopStep, result Expr) Expr {
+	// Set the iter_var2 to empty string to indicate the second variable is omitted
+	return fac.NewComprehensionTwoVar(id, iterRange, iterVar, "", accuVar, accuInit, loopCond, loopStep, result)
+}
+
+func (fac *baseExprFactory) NewComprehensionTwoVar(id int64, iterRange Expr, iterVar, iterVar2, accuVar string, accuInit, loopCond, loopStep, result Expr) Expr {
 	return fac.newExpr(
 		id,
 		&baseComprehensionExpr{
 			iterRange: iterRange,
 			iterVar:   iterVar,
+			iterVar2:  iterVar2,
 			accuVar:   accuVar,
 			accuInit:  accuInit,
 			loopCond:  loopCond,
@@ -223,9 +232,10 @@ func (fac *baseExprFactory) CopyExpr(e Expr) Expr {
 		return fac.NewMemberCall(e.ID(), c.FunctionName(), fac.CopyExpr(c.Target()), argsCopy...)
 	case ComprehensionKind:
 		compre := e.AsComprehension()
-		return fac.NewComprehension(e.ID(),
+		return fac.NewComprehensionTwoVar(e.ID(),
 			fac.CopyExpr(compre.IterRange()),
 			compre.IterVar(),
+			compre.IterVar2(),
 			compre.AccuVar(),
 			fac.CopyExpr(compre.AccuInit()),
 			fac.CopyExpr(compre.LoopCondition()),

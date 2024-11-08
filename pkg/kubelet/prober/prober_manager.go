@@ -26,10 +26,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/utils/clock"
 )
@@ -171,7 +171,7 @@ func (t probeType) String() string {
 func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 	var restartableInitContainers []v1.Container
 	for _, c := range pod.Spec.InitContainers {
-		if kubetypes.IsRestartableInitContainer(&c) {
+		if podutil.IsRestartableInitContainer(&c) {
 			restartableInitContainers = append(restartableInitContainers, c)
 		}
 	}
@@ -325,7 +325,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 			klog.V(4).InfoS("Mismatch between pod spec and status, likely programmer error", "pod", klog.KObj(pod), "containerName", c.Name)
 			continue
 		}
-		if !kubetypes.IsRestartableInitContainer(&initContainer) {
+		if !podutil.IsRestartableInitContainer(&initContainer) {
 			if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
 				podStatus.InitContainerStatuses[i].Ready = true
 			}

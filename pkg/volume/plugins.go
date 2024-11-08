@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
@@ -309,15 +308,18 @@ type KubeletVolumeHost interface {
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 }
 
+// CSIDriverVolumeHost is a volume host that has access to CSIDriverLister
+type CSIDriverVolumeHost interface {
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelistersv1.CSIDriverLister
+}
+
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
 // to access methods on the Attach Detach Controller.
 type AttachDetachVolumeHost interface {
+	CSIDriverVolumeHost
 	// CSINodeLister returns the informer lister for the CSINode API Object
 	CSINodeLister() storagelistersv1.CSINodeLister
-
-	// CSIDriverLister returns the informer lister for the CSIDriver API Object
-	CSIDriverLister() storagelistersv1.CSIDriverLister
-
 	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
 	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
@@ -417,12 +419,11 @@ type VolumeHost interface {
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
-	mutex                     sync.RWMutex
-	plugins                   map[string]VolumePlugin
-	prober                    DynamicPluginProber
-	probedPlugins             map[string]VolumePlugin
-	loggedDeprecationWarnings sets.Set[string]
-	Host                      VolumeHost
+	mutex         sync.RWMutex
+	plugins       map[string]VolumePlugin
+	prober        DynamicPluginProber
+	probedPlugins map[string]VolumePlugin
+	Host          VolumeHost
 }
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
@@ -563,7 +564,6 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
-	pm.loggedDeprecationWarnings = sets.New[string]()
 
 	if prober == nil {
 		// Use a dummy prober to prevent nil deference.
@@ -605,6 +605,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 		pm.plugins[name] = plugin
 		klog.V(1).InfoS("Loaded volume plugin", "pluginName", name)
 	}
+	pm.refreshProbedPlugins()
 	return utilerrors.NewAggregate(allErrs)
 }
 
@@ -627,7 +628,6 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
-	pm.refreshProbedPlugins()
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
@@ -644,6 +644,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 	}
 
+	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
 			match = plugin
@@ -663,7 +664,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 // FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.refreshProbedPlugins()
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
@@ -672,6 +672,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		match = v
 	}
 
+	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
 		if match != nil {
 			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
@@ -694,12 +695,6 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 		klog.ErrorS(err, "Error dynamically probing plugins")
 	}
 
-	if len(events) == 0 {
-		return
-	}
-
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
 	// because the probe function can return a list of valid plugins
 	// even when an error is present we still must add the plugins
 	// or they will be skipped because each event only fires once

@@ -33,7 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/utils/clock"
 
-	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	resourcehelper "k8s.io/component-helpers/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -122,6 +122,18 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 		return err
 	}
 
+	// As mentioned in the subsequent comment, the older versions required explicit
+	// resource requests for CPU & memory for each container if resource quotas were
+	// enabled for these resources. This was a design flaw as resource validation is
+	// coupled with quota enforcement. With pod-level resources
+	// feature, container-level resources are not mandatory. Hence the check for
+	// missing container requests, for CPU/memory resources that have quotas set,
+	// is skipped when pod-level resources feature is enabled and resources are set
+	// at pod level.
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		return nil
+	}
+
 	// BACKWARD COMPATIBILITY REQUIREMENT: if we quota cpu or memory, then each container
 	// must make an explicit request for the resource.  this was a mistake.  it coupled
 	// validation with resource counting, but we did this before QoS was even defined.
@@ -156,13 +168,14 @@ func (p *podEvaluator) GroupResource() schema.GroupResource {
 // Handles returns true if the evaluator should handle the specified attributes.
 func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
-	if op == admission.Create {
-		return true
+	switch a.GetSubresource() {
+	case "":
+		return op == admission.Create
+	case "resize":
+		return op == admission.Update
+	default:
+		return false
 	}
-	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && op == admission.Update {
-		return true
-	}
-	return false
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -365,7 +378,9 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	}
 
 	opts := resourcehelper.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

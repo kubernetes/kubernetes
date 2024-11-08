@@ -23,12 +23,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 // Calls AddPodToVolume() to add new pod to new volume
@@ -63,7 +65,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 
 	// Assert
 	if err != nil {
@@ -87,8 +89,8 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod3",
-			UID:  "pod3uid",
+			Name: "pod4",
+			UID:  "pod4uid",
 		},
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
@@ -109,13 +111,20 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
-
-	// Assert
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+	generatedVolumeName2, err := dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
+	// Assert
+	if generatedVolumeName != generatedVolumeName2 {
+		t.Fatalf("AddPodToVolume should generate same names, but got %q != %q", generatedVolumeName, generatedVolumeName2)
+	}
 	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinuxContext */, dsw)
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
@@ -316,7 +325,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -415,19 +424,19 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	pod3Name := util.GetUniquePodName(pod3)
 
 	generatedVolume1Name, err := dsw.AddPodToVolume(
-		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
+		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume2Name, err := dsw.AddPodToVolume(
-		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
+		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume3Name, err := dsw.AddPodToVolume(
-		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */, nil /* seLinuxContainerContexts */)
+		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGIDValue */, nil /* seLinuxContainerContexts */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -605,377 +614,656 @@ func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	verifyDesiredSizeLimitInVolumeDsw(t, pod2Name, pod2DesiredSizeLimitMap, dsw)
 }
 
-// Calls AddPodToVolume() with a volume that support SELinux, but is ReadWriteMany.
-// Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: true,
-				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux := v1.SELinuxOptions{
+// Calls AddPodToVolume() in an empty DSW with various SELinux settings / access modes.
+func Test_AddPodToVolume_SELinuxSinglePod(t *testing.T) {
+	completeSELinuxOpts := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
 		Type:  "container_t",
 		Level: "s0:c1,c2",
 	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
+	completeSELinuxLabel := "system_u:object_r:container_file_t:s0:c1,c2"
+
+	incompleteSELinuxOpts := v1.SELinuxOptions{
+		Level: "s0:c1,c2",
+	}
+
+	tests := []struct {
+		name                        string
+		featureGates                []featuregate.Feature
+		volumePluginSupportsSELinux bool
+		volumeAccessMode            v1.PersistentVolumeAccessMode
+		podSELinuxOptions           *v1.SELinuxOptions
+		podChangePolicy             *v1.PodSELinuxChangePolicy
+
+		expectError          bool
+		expectedSELinuxLabel string
+	}{
+		{
+			name:                        "RWOP: ReadWriteOncePod with plugin that supports SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
 		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
+		{
+			name:                        "RWOP: ReadWriteOncePod incomplete SELinuxOptions",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &incompleteSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel, // kubelet files the missing SELinuxOptions fields
+		},
+		{
+			name:                        "RWOP: ReadWriteOncePod no SELinuxOptions",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           nil,
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                        "RWOP: ReadWriteOncePod with plugin that does not support SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: false,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The plugin does not support SELinux
+		},
+		{
+			name:                        "RWOP: ReadWriteMany with plugin that supports SELinux mount",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with the default policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             nil, // emphasize the default value
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with Recursive policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name: "RWOP+ChangePolicy: ReadWriteMany with MountOption policy",
+			// Enabled SELinuxChangePolicy does not change anything from when RWOP is enabled
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // still not supported for RWX
+		},
+		{
+			name:                        "RWOP+ChangePolicy: ReadWriteOncePod with Recursive policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // "Recursive" is applied to RWOP volumes too
+		},
+		{
+			name:                        "RWOP+ChangePolicy: ReadWriteOncePod with MountOption policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			// This can happen when there is a version skew between kubelet and the API server
+			podChangePolicy: ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel, // the policy is ignored, but mounting with SELinux is the default
+		},
+		{
+			name:                        "RWOP+ChangePolicy+Mount: ReadWriteMany with the default policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             nil, // emphasize the default value
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                        "RWOP+ChangePolicy+Mount: ReadWriteMany with Recursive policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                        "RWOP+ChangePolicy+Mount: ReadWriteMany with MountOption policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteMany,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                        "RWOP+ChangePolicy+Mount: ReadWriteOncePod with Recursive policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // "Recursive" is applied to RWOP volumes too
+		},
+		{
+			name:                        "RWOP+ChangePolicy+Mount: ReadWriteOncePod with MountOption policy",
+			featureGates:                []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumePluginSupportsSELinux: true,
+			volumeAccessMode:            v1.ReadWriteOncePod,
+			podSELinuxOptions:           &completeSELinuxOpts,
+			podChangePolicy:             ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, feature := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
+			}
+			// Arrange
+			plugins := []volume.VolumePlugin{
+				&volumetesting.FakeDeviceMountableVolumePlugin{
+					FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+						Plugin: volumetesting.FakeVolumePlugin{
+							PluginName:      "basic",
+							SupportsSELinux: tc.volumePluginSupportsSELinux,
 						},
 					},
 				},
-			},
-		},
+			}
+			volumePluginMgr := volume.VolumePluginMgr{}
+			fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
+				"",  /* rootDir */
+				nil, /* kubeClient */
+				nil, /* plugins */
+			)
+			err := volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
+			if err != nil {
+				t.Fatalf("Failed to init volume plugins: %v", err)
+			}
+			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+			dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions:      tc.podSELinuxOptions,
+						SELinuxChangePolicy: tc.podChangePolicy,
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "volume-name",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "myClaim",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			volumeSpec := &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "basicPV",
+					},
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{tc.volumeAccessMode},
+					},
+				},
+			}
+			podName := util.GetUniquePodName(pod)
+			seLinuxContainerContexts := []*v1.SELinuxOptions{tc.podSELinuxOptions}
+
+			// Act
+			generatedVolumeName, err := dsw.AddPodToVolume(
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+
+			// Assert
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected AddPodToVolume to return error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: %v", err)
+			}
+
+			verifyVolumeExistsDsw(t, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsInVolumesToMount(
+				t, generatedVolumeName, false /* expectReportedInUse */, dsw)
+			verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+		})
 	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
-// Calls AddPodToVolume() with a volume that does not support SELinux.
-// Verifies newly added pod/volume exists via PodExistsInVolume() without SELinux context
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: false,
-				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux := v1.SELinuxOptions{
+// Calls AddPodToVolume() twice to add two pods with various SELinux settings and access modes.
+func Test_AddPodToVolume_SELinux_MultiplePods(t *testing.T) {
+	completeSELinuxOpts := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
 		Type:  "container_t",
 		Level: "s0:c1,c2",
 	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "" /* SELinux */, dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
-}
-
-// Calls AddPodToVolume() twice to add two pods with the same SELinuxContext
-// to the same ReadWriteOncePod PV.
-// Verifies newly added pod/volume exists via PodExistsInVolume()
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Positive_ExistingPodSameSELinuxRWOP(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: true,
-				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux := v1.SELinuxOptions{
+	completeSELinuxLabel := "system_u:object_r:container_file_t:s0:c1,c2"
+	conflictingSELinuxOpts := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
 		Type:  "container_t",
-		Level: "s0:c1,c2",
+		Level: "s0:c98,c99",
 	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
+
+	tests := []struct {
+		name                    string
+		featureGates            []featuregate.Feature
+		volumeAccessMode        v1.PersistentVolumeAccessMode
+		firstPodSELinuxOptions  *v1.SELinuxOptions
+		secondPodSELinuxOptions *v1.SELinuxOptions
+		firstChangePolicy       *v1.PodSELinuxChangePolicy
+		secondChangePolicy      *v1.PodSELinuxChangePolicy
+
+		expectError          bool
+		expectedSELinuxLabel string
+	}{
+		{
+			// Note: RWOP with two pods is not a realistic scenario.
+			// But from AddPodToVolume perspective, it tests how SELinux is handled even for RWO / RWX volumes.
+			name:                    "RWOP: ReadWriteOncePod with the same SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
 		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
+		{
+			name:                    "RWOP: ReadWriteOncePod with conflicting SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+
+			expectError:          true,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP: ReadWriteMany with the same SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // RWX does not support SELinux mount (yet)
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options and same Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // Recursive is applied to RWOP volumes
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteOncePod with the same SELinux options and conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      nil,
+
+			expectError:          true, // Conflicting policies with RWOP are an error
+			expectedSELinuxLabel: "",   // Recursive policy is applied to the first volume
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, but no mount is the default
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption), // This can happen when there is a version skew between kubelet and the API server
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, but no mount is the default
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with the same SELinux options with conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, no error is raised
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with conflicting SELinux options and Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false, // Conflicting SELinux options are allowed with recursive policy
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                    "RWOP+ChangePolicy: ReadWriteMany with conflicting SELinux options and MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // The policy is ignored, no error is raised
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteOncePod with the same SELinux options",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteOncePod with the same SELinux options and same Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "", // Recursive is applied to RWOP volumes
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteOncePod with the same SELinux options and conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteOncePod,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      nil,
+
+			expectError:          true, // Conflicting policies with RWOP are an error
+			expectedSELinuxLabel: "",   // Recursive policy is applied to the first volume
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with the same SELinux options with Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false,
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with the same SELinux options with MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with the same SELinux options with default and MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       nil, // nil should default to MountOption
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          false,
+			expectedSELinuxLabel: completeSELinuxLabel,
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with the same SELinux options with conflicting policies",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &completeSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          true,
+			expectedSELinuxLabel: completeSELinuxLabel, // MountOption policy is applied to the first volume
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with conflicting SELinux options and Recursive policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyRecursive),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyRecursive),
+
+			expectError:          false, // Conflicting SELinux options are allowed with recursive policy
+			expectedSELinuxLabel: "",
+		},
+		{
+			name:                    "RWOP+ChangePolicy+Mount: ReadWriteMany with conflicting SELinux options and MountOption policy",
+			featureGates:            []featuregate.Feature{features.SELinuxMountReadWriteOncePod, features.SELinuxChangePolicy, features.SELinuxMount},
+			volumeAccessMode:        v1.ReadWriteMany,
+			firstPodSELinuxOptions:  &completeSELinuxOpts,
+			secondPodSELinuxOptions: &conflictingSELinuxOpts,
+			firstChangePolicy:       ptr.To(v1.SELinuxChangePolicyMountOption),
+			secondChangePolicy:      ptr.To(v1.SELinuxChangePolicyMountOption),
+
+			expectError:          true,                 // SELinux options cannot conflict with MountOption policy
+			expectedSELinuxLabel: completeSELinuxLabel, // The SELinux label of the first pods is used
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, feature := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
+			}
+			// Arrange
+			plugins := []volume.VolumePlugin{
+				&volumetesting.FakeDeviceMountableVolumePlugin{
+					FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
+						Plugin: volumetesting.FakeVolumePlugin{
+							PluginName:      "basic",
+							SupportsSELinux: true,
 						},
 					},
 				},
-			},
-		},
-	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
-
-	// Arrange: prepare a different pod with the same context
-	pod2 := pod.DeepCopy()
-	pod2.Name = "pod2"
-	pod2.UID = "pod2uid"
-	pod2Name := util.GetUniquePodName(pod)
-
-	// Act
-	generatedVolumeName2, err := dsw.AddPodToVolume(
-		pod2Name, pod2, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-	// Assert
-	if err != nil {
-		t.Fatalf("Second AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-	if generatedVolumeName2 != generatedVolumeName {
-		t.Errorf("Expected second generatedVolumeName %s, got %s", generatedVolumeName, generatedVolumeName2)
-	}
-
-	verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
-}
-
-// Calls AddPodToVolume() twice to add two pods with different SELinuxContext
-// to the same ReadWriteOncePod PV.
-// Verifies newly added pod/volume exists via PodExistsInVolume()
-// VolumeExists() and GetVolumesToMount() and no errors.
-func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
-	// Arrange
-	plugins := []volume.VolumePlugin{
-		&volumetesting.FakeDeviceMountableVolumePlugin{
-			FakeBasicVolumePlugin: volumetesting.FakeBasicVolumePlugin{
-				Plugin: volumetesting.FakeVolumePlugin{
-					PluginName:      "basic",
-					SupportsSELinux: true,
+			}
+			volumePluginMgr := volume.VolumePluginMgr{}
+			fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
+				"",  /* rootDir */
+				nil, /* kubeClient */
+				nil, /* plugins */
+			)
+			err := volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
+			if err != nil {
+				t.Fatalf("Failed to init volume plugins: %v", err)
+			}
+			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+			dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
 				},
-			},
-		},
-	}
-	volumePluginMgr := volume.VolumePluginMgr{}
-	fakeVolumeHost := volumetesting.NewFakeVolumeHost(t,
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
-	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
-	seLinux1 := v1.SELinuxOptions{
-		User:  "system_u",
-		Role:  "object_r",
-		Type:  "container_t",
-		Level: "s0:c1,c2",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod1",
-			UID:  "pod1uid",
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				SELinuxOptions: &seLinux1,
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "volume-name",
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "myClaim",
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions:      tc.firstPodSELinuxOptions,
+						SELinuxChangePolicy: tc.firstChangePolicy,
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "volume-name",
+							VolumeSource: v1.VolumeSource{
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "myClaim",
+								},
+							},
 						},
 					},
 				},
-			},
-		},
+			}
+
+			volumeSpec := &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "basicPV",
+					},
+					Spec: v1.PersistentVolumeSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{tc.volumeAccessMode},
+					},
+				},
+			}
+			podName := util.GetUniquePodName(pod)
+			seLinuxContainerContexts := []*v1.SELinuxOptions{tc.firstPodSELinuxOptions}
+
+			// Act
+			generatedVolumeName, err := dsw.AddPodToVolume(
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+			}
+
+			verifyVolumeExistsDsw(t, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsInVolumesToMount(
+				t, generatedVolumeName, false /* expectReportedInUse */, dsw)
+			verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+			verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+
+			// Arrange: prepare a different pod with the same context
+			pod2 := pod.DeepCopy()
+			pod2.Name = "pod2"
+			pod2.UID = "pod2uid"
+			pod2.Spec.SecurityContext.SELinuxOptions = tc.secondPodSELinuxOptions
+			pod2.Spec.SecurityContext.SELinuxChangePolicy = tc.secondChangePolicy
+			pod2Name := util.GetUniquePodName(pod2)
+			seLinuxContainerContexts = []*v1.SELinuxOptions{tc.secondPodSELinuxOptions}
+
+			// Act
+			generatedVolumeName2, err := dsw.AddPodToVolume(
+				pod2Name, pod2, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, seLinuxContainerContexts)
+			// Assert
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected AddPodToVolume to return error, got nil")
+				}
+				// Verify the original SELinux context is still in DSW
+				verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+				return
+			}
+			if err != nil {
+				t.Fatalf("Second AddPodToVolume failed. Expected: <no error> Actual: %v", err)
+			}
+			if generatedVolumeName2 != generatedVolumeName {
+				t.Errorf("Expected second generatedVolumeName %s, got %s", generatedVolumeName, generatedVolumeName2)
+			}
+			verifyPodExistsInVolumeDsw(t, pod2Name, generatedVolumeName, tc.expectedSELinuxLabel, dsw)
+		})
 	}
-
-	volumeSpec := &volume.Spec{
-		PersistentVolume: &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "basicPV",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
-			},
-		},
-	}
-	podName := util.GetUniquePodName(pod)
-	seLinuxContainerContexts := []*v1.SELinuxOptions{&seLinux1}
-
-	// Act
-	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
-
-	verifyVolumeExistsDsw(t, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
-	verifyVolumeExistsInVolumesToMount(
-		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
-	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
-
-	// Arrange: prepare a different pod with the same context
-	seLinux2 := v1.SELinuxOptions{
-		User:  "system_u",
-		Role:  "object_r",
-		Type:  "container_t",
-		Level: "s0:c3,c4",
-	}
-	seLinuxContainerContexts2 := []*v1.SELinuxOptions{&seLinux2}
-	pod2 := pod.DeepCopy()
-	pod2.Name = "pod2"
-	pod2.UID = "pod2uid"
-	pod2.Spec.SecurityContext.SELinuxOptions = &seLinux2
-	pod2Name := util.GetUniquePodName(pod2)
-
-	// Act
-	_, err = dsw.AddPodToVolume(
-		pod2Name, pod2, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, seLinuxContainerContexts2)
-	// Assert
-	if err == nil {
-		t.Fatalf("Second AddPodToVolume succeeded, expected a failure")
-	}
-	// Verify the original SELinux context is still in DSW
-	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, "system_u:object_r:container_file_t:s0:c1,c2", dsw)
 }
 
 func verifyVolumeExistsDsw(

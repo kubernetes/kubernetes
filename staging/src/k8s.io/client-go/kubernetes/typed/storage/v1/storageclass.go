@@ -64,6 +64,8 @@ func newStorageClasses(c *StorageV1Client) *storageClasses {
 			scheme.ParameterCodec,
 			"",
 			func() *storagev1.StorageClass { return &storagev1.StorageClass{} },
-			func() *storagev1.StorageClassList { return &storagev1.StorageClassList{} }),
+			func() *storagev1.StorageClassList { return &storagev1.StorageClassList{} },
+			gentype.PrefersProtobuf[*storagev1.StorageClass](),
+		),
 	}
 }

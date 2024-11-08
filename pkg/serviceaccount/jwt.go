@@ -53,7 +53,7 @@ type TokenGenerator interface {
 	// the payload object. Public claims take precedent over private
 	// claims i.e. if both claims and privateClaims have an "exp" field,
 	// the value in claims will be used.
-	GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error)
+	GenerateToken(ctx context.Context, claims *jwt.Claims, privateClaims interface{}) (string, error)
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
@@ -118,8 +118,9 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 	}
 
 	// IMPORTANT: If this function is updated to support additional key sizes,
-	// algorithmForPublicKey in serviceaccount/openidmetadata.go must also be
-	// updated to support the same key sizes. Today we only support RS256.
+	// algorithmForPublicKey in serviceaccount/openidmetadata.go and
+	// validateJWTHeader in externaljwt/pkg/plugin/plugin.go must also
+	// be updated to support the same key sizes. Today we only support RS256.
 
 	// Wrap the RSA keypair in a JOSE JWK with the designated key ID.
 	privateJWK := &jose.JSONWebKey{
@@ -146,6 +147,11 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 
 func signerFromECDSAPrivateKey(keyPair *ecdsa.PrivateKey) (jose.Signer, error) {
 	var alg jose.SignatureAlgorithm
+
+	// IMPORTANT: If this function is updated to support additional algorithms,
+	// validateJWTHeader in externaljwt/pkg/plugin/plugin.go must also be updated
+	// to support the same Algorithms. Today we only support "ES256", "ES384", "ES512".
+
 	switch keyPair.Curve {
 	case elliptic.P256():
 		alg = jose.ES256
@@ -211,15 +217,8 @@ type jwtTokenGenerator struct {
 	signer jose.Signer
 }
 
-func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error) {
-	// claims are applied in reverse precedence
-	return jwt.Signed(j.signer).
-		Claims(privateClaims).
-		Claims(claims).
-		Claims(&jwt.Claims{
-			Issuer: j.iss,
-		}).
-		CompactSerialize()
+func (j *jwtTokenGenerator) GenerateToken(ctx context.Context, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	return GenerateToken(j.signer, j.iss, claims, privateClaims)
 }
 
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
@@ -257,12 +256,13 @@ type PublicKeysGetter interface {
 
 	// GetPublicKeys returns public keys to use for verifying a token with the given key id.
 	// keyIDHint may be empty if the token did not have a kid header, or if all public keys are desired.
-	GetPublicKeys(keyIDHint string) []PublicKey
+	GetPublicKeys(ctx context.Context, keyIDHint string) []PublicKey
 }
 
 type PublicKey struct {
-	KeyID     string
-	PublicKey interface{}
+	KeyID                    string
+	PublicKey                interface{}
+	ExcludeFromOIDCDiscovery bool
 }
 
 type staticPublicKeysGetter struct {
@@ -306,7 +306,7 @@ func (s staticPublicKeysGetter) GetCacheAgeMaxSeconds() int {
 	return 3600
 }
 
-func (s staticPublicKeysGetter) GetPublicKeys(keyID string) []PublicKey {
+func (s staticPublicKeysGetter) GetPublicKeys(ctx context.Context, keyID string) []PublicKey {
 	if len(keyID) == 0 {
 		return s.allPublicKeys
 	}
@@ -357,7 +357,7 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Con
 		found   bool
 		errlist []error
 	)
-	keys := j.keysGetter.GetPublicKeys(kid)
+	keys := j.keysGetter.GetPublicKeys(ctx, kid)
 	if len(keys) == 0 {
 		return nil, false, fmt.Errorf("invalid signature, no keys found")
 	}
@@ -437,4 +437,16 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string
 		return false
 	}
 	return j.issuers[claims.Issuer]
+}
+
+// GenerateToken is shared between internal and external signer code to ensure that claim merging logic remains consistent between them.
+func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	// claims are applied in reverse precedence
+	return jwt.Signed(signer).
+		Claims(privateClaims).
+		Claims(claims).
+		Claims(&jwt.Claims{
+			Issuer: iss,
+		}).
+		CompactSerialize()
 }

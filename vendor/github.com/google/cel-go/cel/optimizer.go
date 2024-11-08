@@ -211,6 +211,16 @@ type OptimizerContext struct {
 	*Issues
 }
 
+// ExtendEnv auguments the context's environment with the additional options.
+func (opt *OptimizerContext) ExtendEnv(opts ...EnvOption) error {
+	e, err := opt.Env.Extend(opts...)
+	if err != nil {
+		return err
+	}
+	opt.Env = e
+	return nil
+}
+
 // ASTOptimizer applies an optimization over an AST and returns the optimized result.
 type ASTOptimizer interface {
 	// Optimize optimizes a type-checked AST within an Environment and accumulates any issues.

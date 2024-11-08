@@ -20,6 +20,8 @@ limitations under the License.
 package conntrack
 
 import (
+	"time"
+
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
@@ -27,84 +29,96 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
 )
 
-// CleanStaleEntries takes care of flushing stale conntrack entries for services and endpoints.
-func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily, svcPortMap proxy.ServicePortMap,
-	serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
-	deleteStaleServiceConntrackEntries(ct, ipFamily, svcPortMap, serviceUpdateResult, endpointsUpdateResult)
-	deleteStaleEndpointConntrackEntries(ct, ipFamily, svcPortMap, endpointsUpdateResult)
-}
+// CleanStaleEntries scans conntrack table and removes any entries
+// for a service that do not correspond to a serving endpoint.
+func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
+	svcPortMap proxy.ServicePortMap, endpointsMap proxy.EndpointsMap) {
 
-// deleteStaleServiceConntrackEntries takes care of flushing stale conntrack entries related
-// to UDP Service IPs. When a service has no endpoints and we drop traffic to it, conntrack
-// may create "black hole" entries for that IP+port. When the service gets endpoints we
-// need to delete those entries so further traffic doesn't get dropped.
-func deleteStaleServiceConntrackEntries(ct Interface, ipFamily v1.IPFamily, svcPortMap proxy.ServicePortMap, serviceUpdateResult proxy.UpdateServiceMapResult, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
+	start := time.Now()
+	klog.V(4).InfoS("Started to reconcile conntrack entries", "ipFamily", ipFamily)
+
+	entries, err := ct.ListEntries(ipFamilyMap[ipFamily])
+	if err != nil {
+		klog.ErrorS(err, "Failed to list conntrack entries")
+		return
+	}
+
+	// serviceIPEndpointIPs maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs)
+	// to the set of serving endpoint IPs.
+	serviceIPEndpointIPs := make(map[string]sets.Set[string])
+	// serviceNodePortEndpointIPs maps service NodePort to the set of serving endpoint IPs.
+	serviceNodePortEndpointIPs := make(map[int]sets.Set[string])
+
+	for svcName, svc := range svcPortMap {
+		// we are only interested in UDP services
+		if svc.Protocol() != v1.ProtocolUDP {
+			continue
+		}
+
+		endpointIPs := sets.New[string]()
+		for _, endpoint := range endpointsMap[svcName] {
+			// We need to remove all the conntrack entries for a Service (IP or NodePort)
+			// that are not pointing to a serving endpoint.
+			// We map all the serving endpoint IPs to the service and clear all the conntrack
+			// entries which are destined for the service and are not DNATed to these endpoints.
+			// Changes to the service should not affect existing flows, so we do not take
+			// traffic policies, topology, or terminating status of the service into account.
+			// This ensures that the behavior of UDP services remains consistent with TCP
+			// services.
+			if endpoint.IsServing() {
+				endpointIPs.Insert(endpoint.IP())
+			}
+		}
+
+		serviceIPEndpointIPs[svc.ClusterIP().String()] = endpointIPs
+		for _, loadBalancerIP := range svc.LoadBalancerVIPs() {
+			serviceIPEndpointIPs[loadBalancerIP.String()] = endpointIPs
+		}
+		for _, externalIP := range svc.ExternalIPs() {
+			serviceIPEndpointIPs[externalIP.String()] = endpointIPs
+		}
+		if svc.NodePort() != 0 {
+			serviceNodePortEndpointIPs[svc.NodePort()] = endpointIPs
+		}
+	}
+
 	var filters []netlink.CustomConntrackFilter
-	conntrackCleanupServiceIPs := serviceUpdateResult.DeletedUDPClusterIPs
-	conntrackCleanupServiceNodePorts := sets.New[int]()
+	for _, entry := range entries {
+		// we only deal with UDP protocol entries
+		if entry.Forward.Protocol != unix.IPPROTO_UDP {
+			continue
+		}
 
-	// merge newly active services gathered from endpointsUpdateResult
-	// a UDP service that changes from 0 to non-0 endpoints is newly active.
-	for _, svcPortName := range endpointsUpdateResult.NewlyActiveUDPServices {
-		if svcInfo, ok := svcPortMap[svcPortName]; ok {
-			klog.V(4).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
-			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
-			for _, extIP := range svcInfo.ExternalIPs() {
-				conntrackCleanupServiceIPs.Insert(extIP.String())
+		origDst := entry.Forward.DstIP.String()
+		origPortDst := int(entry.Forward.DstPort)
+		replySrc := entry.Reverse.SrcIP.String()
+
+		// if the original destination (--orig-dst) of the entry is service IP (ClusterIP,
+		// LoadBalancerIPs or ExternalIPs) and the reply source (--reply-src) is not IP of
+		// any serving endpoint, we clear the entry.
+		if _, ok := serviceIPEndpointIPs[origDst]; ok {
+			if !serviceIPEndpointIPs[origDst].Has(replySrc) {
+				filters = append(filters, filterForNAT(origDst, replySrc, v1.ProtocolUDP))
 			}
-			for _, lbIP := range svcInfo.LoadBalancerVIPs() {
-				conntrackCleanupServiceIPs.Insert(lbIP.String())
-			}
-			nodePort := svcInfo.NodePort()
-			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
-				conntrackCleanupServiceNodePorts.Insert(nodePort)
+		}
+
+		// if the original port destination (--orig-port-dst) of the flow is service
+		// NodePort and the reply source (--reply-src) is not IP of any serving endpoint,
+		// we clear the entry.
+		if _, ok := serviceNodePortEndpointIPs[origPortDst]; ok {
+			if !serviceNodePortEndpointIPs[origPortDst].Has(replySrc) {
+				filters = append(filters, filterForPortNAT(replySrc, origPortDst, v1.ProtocolUDP))
 			}
 		}
 	}
 
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
-	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
-		filters = append(filters, filterForIP(svcIP, v1.ProtocolUDP))
-	}
-	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
-	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
-		filters = append(filters, filterForPort(nodePort, v1.ProtocolUDP))
-	}
-
-	if err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
-		klog.ErrorS(err, "Failed to delete stale service connections")
-	}
-}
-
-// deleteStaleEndpointConntrackEntries takes care of flushing stale conntrack entries related
-// to UDP endpoints. After a UDP endpoint is removed we must flush any conntrack entries
-// for it so that if the same client keeps sending, the packets will get routed to a new endpoint.
-func deleteStaleEndpointConntrackEntries(ct Interface, ipFamily v1.IPFamily, svcPortMap proxy.ServicePortMap, endpointsUpdateResult proxy.UpdateEndpointsMapResult) {
-	var filters []netlink.CustomConntrackFilter
-	for _, epSvcPair := range endpointsUpdateResult.DeletedUDPEndpoints {
-		if svcInfo, ok := svcPortMap[epSvcPair.ServicePortName]; ok {
-			endpointIP := proxyutil.IPPart(epSvcPair.Endpoint)
-			nodePort := svcInfo.NodePort()
-			if nodePort != 0 {
-				filters = append(filters, filterForPortNAT(endpointIP, nodePort, v1.ProtocolUDP))
-
-			}
-			filters = append(filters, filterForNAT(svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP))
-			for _, extIP := range svcInfo.ExternalIPs() {
-				filters = append(filters, filterForNAT(extIP.String(), endpointIP, v1.ProtocolUDP))
-			}
-			for _, lbIP := range svcInfo.LoadBalancerVIPs() {
-				filters = append(filters, filterForNAT(lbIP.String(), endpointIP, v1.ProtocolUDP))
-			}
-		}
-	}
-
-	if err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
-		klog.ErrorS(err, "Failed to delete stale endpoint connections")
+	if n, err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
+		klog.ErrorS(err, "Failed to clear all conntrack entries", "ipFamily", ipFamily, "entriesDeleted", n, "took", time.Since(start))
+	} else {
+		klog.V(4).InfoS("Finished reconciling conntrack entries", "ipFamily", ipFamily, "entriesDeleted", n, "took", time.Since(start))
 	}
 }
 
@@ -120,30 +134,6 @@ var protocolMap = map[v1.Protocol]uint8{
 	v1.ProtocolTCP:  unix.IPPROTO_TCP,
 	v1.ProtocolUDP:  unix.IPPROTO_UDP,
 	v1.ProtocolSCTP: unix.IPPROTO_SCTP,
-}
-
-// filterForIP returns *conntrackFilter to delete the conntrack entries for connections
-// specified by the destination IP (original direction).
-func filterForIP(ip string, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-dst", ip, "protocol", protocol)
-	return &conntrackFilter{
-		protocol: protocolMap[protocol],
-		original: &connectionTuple{
-			dstIP: netutils.ParseIPSloppy(ip),
-		},
-	}
-}
-
-// filterForPort returns *conntrackFilter to delete the conntrack entries for connections
-// specified by the destination Port (original direction).
-func filterForPort(port int, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "protocol", protocol)
-	return &conntrackFilter{
-		protocol: protocolMap[protocol],
-		original: &connectionTuple{
-			dstPort: uint16(port),
-		},
-	}
 }
 
 // filterForNAT returns *conntrackFilter to delete the conntrack entries for connections

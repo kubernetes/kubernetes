@@ -6256,16 +6256,6 @@ func TestPrintDeviceClass(t *testing.T) {
 					Name:              "test-deviceclass",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				Spec: resourceapis.DeviceClassSpec{
-					SuitableNodes: &api.NodeSelector{
-						NodeSelectorTerms: []api.NodeSelectorTerm{{
-							MatchExpressions: []api.NodeSelectorRequirement{{
-								Key:      "foo",
-								Operator: api.NodeSelectorOpExists,
-							}},
-						}},
-					},
-				},
 			},
 			// Columns: Name, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"test-deviceclass", "5m"}}},
@@ -6276,16 +6266,6 @@ func TestPrintDeviceClass(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-deviceclass",
 					CreationTimestamp: metav1.Time{},
-				},
-				Spec: resourceapis.DeviceClassSpec{
-					SuitableNodes: &api.NodeSelector{
-						NodeSelectorTerms: []api.NodeSelectorTerm{{
-							MatchExpressions: []api.NodeSelectorRequirement{{
-								Key:      "foo",
-								Operator: api.NodeSelectorOpExists,
-							}},
-						}},
-					},
 				},
 			},
 			// Columns: Name, Age
@@ -6362,35 +6342,6 @@ func TestPrintResourceClaim(t *testing.T) {
 			expected: []metav1.TableRow{{Cells: []interface{}{"test-resourceclaim", "pending", "<unknown>"}}},
 		},
 		{
-			name: "ResourceClaim with Allocated State and Deallocation State",
-			resourceClaim: resourceapis.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-resourceclaim",
-					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
-				},
-				Spec: resourceapis.ResourceClaimSpec{
-					Devices: resourceapis.DeviceClaim{
-						Requests: []resourceapis.DeviceRequest{
-							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
-							},
-						},
-					},
-				},
-				Status: resourceapis.ResourceClaimStatus{
-					Allocation: &resourceapis.AllocationResult{
-						Controller: "dra.example.com",
-					},
-					DeallocationRequested: true,
-				},
-			},
-			// Columns: Name, State, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test-resourceclaim", "allocated,deallocating", "5m"}}},
-		},
-		{
 			name: "ResourceClaim with Allocated and Reserved State",
 			resourceClaim: resourceapis.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -6410,9 +6361,7 @@ func TestPrintResourceClaim(t *testing.T) {
 					},
 				},
 				Status: resourceapis.ResourceClaimStatus{
-					Allocation: &resourceapis.AllocationResult{
-						Controller: "dra.example.com",
-					},
+					Allocation: &resourceapis.AllocationResult{},
 					ReservedFor: []resourceapis.ResourceClaimConsumerReference{
 						{
 							Resource: "pods",
@@ -6420,7 +6369,6 @@ func TestPrintResourceClaim(t *testing.T) {
 							UID:      types.UID("pod-test"),
 						},
 					},
-					DeallocationRequested: true,
 				},
 			},
 			// Columns: Name, State, Age
@@ -6521,79 +6469,6 @@ func TestPrintResourceClaimTemplate(t *testing.T) {
 
 	for i, test := range tests {
 		rows, err := printResourceClaimTemplate(&test.resourceClaimTemplate, printers.GenerateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
-		}
-	}
-}
-
-func TestPrintPodSchedulingContext(t *testing.T) {
-
-	tests := []struct {
-		name                 string
-		podSchedulingContext resourceapis.PodSchedulingContext
-		expected             []metav1.TableRow
-	}{
-		{
-			name: "PodSchedulingContext with SelectedNode",
-			podSchedulingContext: resourceapis.PodSchedulingContext{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-podschedulercontext",
-					Namespace:         "default",
-					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
-				},
-				Spec: resourceapis.PodSchedulingContextSpec{
-					SelectedNode: "worker",
-				},
-				Status: resourceapis.PodSchedulingContextStatus{},
-			},
-
-			// Columns: Name, SelectedNode, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test-podschedulercontext", "worker", "5m"}}},
-		},
-		{
-			// test case for Empty creation timestamp that is translated to <unknown>
-			name: "PodSchedulingContext with SelectedNode and Empty creation timestamp",
-			podSchedulingContext: resourceapis.PodSchedulingContext{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-podschedulercontext",
-					Namespace:         "default",
-					CreationTimestamp: metav1.Time{},
-				},
-				Spec: resourceapis.PodSchedulingContextSpec{
-					SelectedNode: "worker",
-				},
-				Status: resourceapis.PodSchedulingContextStatus{},
-			},
-
-			// Columns: Name, SelectedNode, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test-podschedulercontext", "worker", "<unknown>"}}},
-		},
-		{
-			name: "PodSchedulingContext without SelectedNode",
-			podSchedulingContext: resourceapis.PodSchedulingContext{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-podschedulercontext",
-					Namespace:         "default",
-					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
-				},
-				Spec:   resourceapis.PodSchedulingContextSpec{},
-				Status: resourceapis.PodSchedulingContextStatus{},
-			},
-
-			// Columns: Name, SelectedNode, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"test-podschedulercontext", "", "5m"}}},
-		},
-	}
-
-	for i, test := range tests {
-		rows, err := printPodSchedulingContext(&test.podSchedulingContext, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -6900,6 +6775,125 @@ func TestPrintScale(t *testing.T) {
 	}
 }
 
+func TestPrintClusterTrustBundle(t *testing.T) {
+	tests := []struct {
+		bundle   certificates.ClusterTrustBundle
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			bundle: certificates.ClusterTrustBundle{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-trust-bundle",
+				},
+				Spec: certificates.ClusterTrustBundleSpec{
+					SignerName: "test-signer-name",
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test-cluster-trust-bundle", "test-signer-name"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printClusterTrustBundle(&test.bundle, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintValidatingAdmissionPolicyBinding(t *testing.T) {
+	tests := []struct {
+		validatingAdmissionPolicyBinding admissionregistration.ValidatingAdmissionPolicyBinding
+		options                          printers.GenerateOptions
+		expected                         []metav1.TableRow
+	}{
+		{
+			validatingAdmissionPolicyBinding: admissionregistration.ValidatingAdmissionPolicyBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "config",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+					PolicyName: "test-scale.example.com",
+					ParamRef: &admissionregistration.ParamRef{
+						Name:                    "test-scale-setting.example.com",
+						ParameterNotFoundAction: ptr.To(admissionregistration.DenyAction),
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"config", "test-scale.example.com", "*/test-scale-setting.example.com", "5m"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printValidatingAdmissionPolicyBinding(&test.validatingAdmissionPolicyBinding, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintLeaseCandidate(t *testing.T) {
+	tests := []struct {
+		leaseCandidate coordination.LeaseCandidate
+		options        printers.GenerateOptions
+		expected       []metav1.TableRow
+	}{
+		{
+			leaseCandidate: coordination.LeaseCandidate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-lease",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: coordination.LeaseCandidateSpec{
+					BinaryVersion:    "test-binary-version",
+					EmulationVersion: "test-emulation-version",
+					LeaseName:        "test-lease-name",
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test-lease", "test-lease-name", "test-binary-version", "test-emulation-version", "5m"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printLeaseCandidate(&test.leaseCandidate, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -7029,6 +7023,18 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "ValidatingAdmissionPolicyBinding",
 			printer: func() ([]metav1.TableRow, error) {
 				return printValidatingAdmissionPolicyBinding(&admissionregistration.ValidatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "MutatingAdmissionPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printMutatingAdmissionPolicy(&admissionregistration.MutatingAdmissionPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "MutatingAdmissionPolicyBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printMutatingAdmissionPolicyBinding(&admissionregistration.MutatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
 			},
 		},
 		{
@@ -7212,15 +7218,21 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
-			name: "PodSchedulingContext",
-			printer: func() ([]metav1.TableRow, error) {
-				return printPodSchedulingContext(&resourceapis.PodSchedulingContext{}, printers.GenerateOptions{})
-			},
-		},
-		{
 			name: "ResourceSlice",
 			printer: func() ([]metav1.TableRow, error) {
 				return printResourceSlice(&resourceapis.ResourceSlice{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "LeaseCandidate",
+			printer: func() ([]metav1.TableRow, error) {
+				return printLeaseCandidate(&coordination.LeaseCandidate{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ClusterTrustBundle",
+			printer: func() ([]metav1.TableRow, error) {
+				return printClusterTrustBundle(&certificates.ClusterTrustBundle{}, printers.GenerateOptions{})
 			},
 		},
 	}

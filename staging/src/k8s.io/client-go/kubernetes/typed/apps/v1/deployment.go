@@ -20,7 +20,6 @@ package v1
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +31,7 @@ import (
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.
@@ -76,7 +76,9 @@ func newDeployments(c *AppsV1Client, namespace string) *deployments {
 			scheme.ParameterCodec,
 			namespace,
 			func() *appsv1.Deployment { return &appsv1.Deployment{} },
-			func() *appsv1.DeploymentList { return &appsv1.DeploymentList{} }),
+			func() *appsv1.DeploymentList { return &appsv1.DeploymentList{} },
+			gentype.PrefersProtobuf[*appsv1.Deployment](),
+		),
 	}
 }
 
@@ -84,6 +86,7 @@ func newDeployments(c *AppsV1Client, namespace string) *deployments {
 func (c *deployments) GetScale(ctx context.Context, deploymentName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -98,6 +101,7 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -116,19 +120,19 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

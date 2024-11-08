@@ -430,7 +430,8 @@ const (
 	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	DebugCustomProfile      FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
+	// DebugCustomProfile should be dropped in 1.34
+	DebugCustomProfile FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
@@ -536,10 +537,11 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	}
 }
 
-func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is beta and may change in the future.", usage, allowedSubresources))
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s This flag is beta and may change in the future.", usage))
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+		var commonSubresources = []string{"status", "scale", "resize"}
+		return commonSubresources, cobra.ShellCompDirectiveNoFileComp
 	}))
 }
 

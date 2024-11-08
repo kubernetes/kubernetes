@@ -374,14 +374,14 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 	t.Run("ca bundle too large", func(t *testing.T) {
 		client := fake.NewSimpleClientset()
 		client.PrependReactor("update", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-			return true, nil, apierrors.NewInvalid(schema.GroupKind{Kind: "ConfigMap"}, cm.Name, field.ErrorList{field.TooLong(field.NewPath(""), cm, corev1.MaxSecretSize)})
+			return true, nil, apierrors.NewInvalid(schema.GroupKind{Kind: "ConfigMap"}, cm.Name, field.ErrorList{field.TooLong(field.NewPath(""), "" /*unused*/, corev1.MaxSecretSize)})
 		})
 		client.PrependReactor("delete", "configmaps", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, nil, nil
 		})
 
 		err := writeConfigMap(client.CoreV1(), cm)
-		if err == nil || err.Error() != `ConfigMap "extension-apiserver-authentication" is invalid: []: Too long: must have at most 1048576 bytes` {
+		if err == nil || err.Error() != `ConfigMap "extension-apiserver-authentication" is invalid: []: Too long: may not be more than 1048576 bytes` {
 			t.Fatal(err)
 		}
 		if len(client.Actions()) != 2 {

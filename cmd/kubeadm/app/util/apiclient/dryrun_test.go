@@ -316,6 +316,35 @@ func TestReactors(t *testing.T) {
 			},
 		},
 		{
+			name: "GetCoreDNSConfigReactor",
+			setup: func(d *DryRun) {
+				d.PrependReactor((d.GetCoreDNSConfigReactor()))
+			},
+			apiCall: func(d *DryRun, namespace, name string) error {
+				obj, err := d.FakeClient().CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				expectedObj := getCoreDNSConfigMap()
+				if diff := cmp.Diff(expectedObj, obj); diff != "" {
+					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+				}
+				return nil
+			},
+			apiCallCases: []apiCallCase{
+				{
+					name:          "foo",
+					namespace:     "bar",
+					expectedError: true,
+				},
+				{
+					name:          "coredns",
+					namespace:     metav1.NamespaceSystem,
+					expectedError: false,
+				},
+			},
+		},
+		{
 			name: "DeleteBootstrapTokenReactor",
 			setup: func(d *DryRun) {
 				d.PrependReactor((d.DeleteBootstrapTokenReactor()))
@@ -335,6 +364,89 @@ func TestReactors(t *testing.T) {
 				},
 				{
 					name:          "bootstrap-token-foo",
+					namespace:     metav1.NamespaceSystem,
+					expectedError: false,
+				},
+			},
+		},
+		{
+			name: "GetKubeadmCertsReactor",
+			setup: func(d *DryRun) {
+				d.PrependReactor((d.GetKubeadmCertsReactor()))
+			},
+			apiCall: func(d *DryRun, namespace, name string) error {
+				obj, err := d.FakeClient().CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				expectedObj := getKubeadmCertsSecret()
+				if diff := cmp.Diff(expectedObj, obj); diff != "" {
+					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+				}
+				return nil
+			},
+			apiCallCases: []apiCallCase{
+				{
+					name:          "foo",
+					namespace:     "bar",
+					expectedError: true,
+				},
+				{
+					name:          "kubeadm-certs",
+					namespace:     metav1.NamespaceSystem,
+					expectedError: false,
+				},
+			},
+		},
+		{
+			name: "ListPodsReactor",
+			setup: func(d *DryRun) {
+				d.PrependReactor((d.ListPodsReactor("foo")))
+			},
+			apiCall: func(d *DryRun, namespace, name string) error {
+				obj, err := d.FakeClient().CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return err
+				}
+				expectedObj := getPodList("foo")
+				if diff := cmp.Diff(expectedObj, obj); diff != "" {
+					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+				}
+				return nil
+			},
+			apiCallCases: []apiCallCase{
+				{
+					namespace:     "bar",
+					expectedError: true,
+				},
+				{
+					namespace:     metav1.NamespaceSystem,
+					expectedError: false,
+				},
+			},
+		},
+		{
+			name: "ListDeploymentsReactor",
+			setup: func(d *DryRun) {
+				d.PrependReactor((d.ListDeploymentsReactor()))
+			},
+			apiCall: func(d *DryRun, namespace, name string) error {
+				obj, err := d.FakeClient().AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return err
+				}
+				expectedObj := getDeploymentList()
+				if diff := cmp.Diff(expectedObj, obj); diff != "" {
+					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+				}
+				return nil
+			},
+			apiCallCases: []apiCallCase{
+				{
+					namespace:     "bar",
+					expectedError: true,
+				},
+				{
 					namespace:     metav1.NamespaceSystem,
 					expectedError: false,
 				},

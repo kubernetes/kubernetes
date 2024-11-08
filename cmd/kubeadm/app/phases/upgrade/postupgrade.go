@@ -27,14 +27,15 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -124,19 +125,57 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
-	errs := []error{}
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		// If instance-config.yaml exist on disk, we don't need to create it.
+		_, err := os.Stat(filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName))
+		if os.IsNotExist(err) {
+			var containerRuntimeEndpoint string
+			dynamicFlags, err := kubeletphase.ReadKubeletDynamicEnvFile(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName))
+			if err == nil {
+				args := kubeadmutil.ArgumentsFromCommand(dynamicFlags)
+				for _, arg := range args {
+					if arg.Name == "container-runtime-endpoint" {
+						containerRuntimeEndpoint = arg.Value
+						break
+					}
+				}
+			} else if dryRun {
+				fmt.Fprintf(os.Stdout, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
+					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
+				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
+			} else {
+				return errors.Wrap(err, "error reading kubeadm flags file")
+			}
+
+			kubeletConfig := &kubeletconfig.KubeletConfiguration{
+				ContainerRuntimeEndpoint: containerRuntimeEndpoint,
+			}
+
+			if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, kubeletDir); err != nil {
+				return errors.Wrap(err, "error writing kubelet instance configuration")
+			}
+
+			if dryRun { // Print what contents would be written
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				if err != nil {
+					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
+				}
+			}
+		}
+	}
+
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
-		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
+		return errors.Wrap(err, "error writing kubelet configuration to file")
 	}
 
 	if dryRun { // Print what contents would be written
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		if err != nil {
-			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
 		}
 	}
-	return errorsutil.NewAggregate(errs)
+	return nil
 }
 
 // GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.

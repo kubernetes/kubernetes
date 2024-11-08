@@ -809,7 +809,7 @@ func (nc *Controller) processTaintBaseEviction(ctx context.Context, node *v1.Nod
 			logger.Error(nil, "Failed to remove taints from node. Will retry in next iteration", "node", klog.KObj(node))
 		}
 		if removed {
-			logger.V(2).Info("Node is healthy again, removing all taints", "node", klog.KObj(node))
+			logger.V(2).Info("Node is healthy again, removed all taints", "node", klog.KObj(node))
 		}
 	}
 }
@@ -1258,12 +1258,12 @@ func (nc *Controller) markNodeAsReachable(ctx context.Context, node *v1.Node) (b
 	err := controller.RemoveTaintOffNode(ctx, nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	logger := klog.FromContext(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to remove taint from node", "node", klog.KObj(node))
+		logger.Error(err, "Failed to remove unreachable taint from node", "node", klog.KObj(node))
 		return false, err
 	}
 	err = controller.RemoveTaintOffNode(ctx, nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
 	if err != nil {
-		logger.Error(err, "Failed to remove taint from node", "node", klog.KObj(node))
+		logger.Error(err, "Failed to remove not-ready taint from node", "node", klog.KObj(node))
 		return false, err
 	}
 	nc.evictorLock.Lock()

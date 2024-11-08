@@ -72,7 +72,9 @@ func newCertificateSigningRequests(c *CertificatesV1Client) *certificateSigningR
 			func() *certificatesv1.CertificateSigningRequest { return &certificatesv1.CertificateSigningRequest{} },
 			func() *certificatesv1.CertificateSigningRequestList {
 				return &certificatesv1.CertificateSigningRequestList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*certificatesv1.CertificateSigningRequest](),
+		),
 	}
 }
 
@@ -80,6 +82,7 @@ func newCertificateSigningRequests(c *CertificatesV1Client) *certificateSigningR
 func (c *certificateSigningRequests) UpdateApproval(ctx context.Context, certificateSigningRequestName string, certificateSigningRequest *certificatesv1.CertificateSigningRequest, opts metav1.UpdateOptions) (result *certificatesv1.CertificateSigningRequest, err error) {
 	result = &certificatesv1.CertificateSigningRequest{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Resource("certificatesigningrequests").
 		Name(certificateSigningRequestName).
 		SubResource("approval").

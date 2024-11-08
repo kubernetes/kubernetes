@@ -28,6 +28,8 @@ import (
 
 type AdmissionregistrationV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	MutatingAdmissionPoliciesGetter
+	MutatingAdmissionPolicyBindingsGetter
 	ValidatingAdmissionPoliciesGetter
 	ValidatingAdmissionPolicyBindingsGetter
 }
@@ -35,6 +37,14 @@ type AdmissionregistrationV1alpha1Interface interface {
 // AdmissionregistrationV1alpha1Client is used to interact with features provided by the admissionregistration.k8s.io group.
 type AdmissionregistrationV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AdmissionregistrationV1alpha1Client) MutatingAdmissionPolicies() MutatingAdmissionPolicyInterface {
+	return newMutatingAdmissionPolicies(c)
+}
+
+func (c *AdmissionregistrationV1alpha1Client) MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInterface {
+	return newMutatingAdmissionPolicyBindings(c)
 }
 
 func (c *AdmissionregistrationV1alpha1Client) ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInterface {
@@ -93,7 +103,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := admissionregistrationv1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

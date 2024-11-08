@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -1249,6 +1250,10 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
+			if tc.podIndexLabelDisabled {
+				// TODO: this will be removed in 1.35 when 1.31 will fall out of support matrix
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.jobSuccessPolicy)
@@ -1453,7 +1458,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 	cases := map[string]struct {
 		job                  batch.Job
 		pods                 []*v1.Pod
-		expectedRmFinalizers sets.Set[string]
+		expectedRmFinalizers sets.Set[types.UID]
 		wantSucceeded        int32
 		wantFailed           int32
 	}{
@@ -1510,7 +1515,7 @@ func TestGetNewFinshedPods(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.New("b", "f"),
+			expectedRmFinalizers: sets.New[types.UID]("b", "f"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).Pod,
 				buildPod().uid("b").phase(v1.PodSucceeded).trackingFinalizer().Pod,
@@ -1575,7 +1580,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		job                     batch.Job
 		pods                    []*v1.Pod
 		finishedCond            *batch.JobCondition
-		expectedRmFinalizers    sets.Set[string]
+		expectedRmFinalizers    sets.Set[types.UID]
 		needsFlush              bool
 		statusUpdateErr         error
 		podControlErr           error
@@ -1686,7 +1691,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					},
 				},
 			},
-			expectedRmFinalizers: sets.New("c", "d", "g", "h"),
+			expectedRmFinalizers: sets.New[types.UID]("c", "d", "g", "h"),
 			pods: []*v1.Pod{
 				buildPod().uid("a").phase(v1.PodSucceeded).trackingFinalizer().Pod,
 				buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod,
@@ -3087,6 +3092,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 
 	testCases := map[string]struct {
 		enableJobPodReplacementPolicy bool
+		enableJobManagedBy            bool
 		job                           batch.Job
 		pods                          []v1.Pod
 		wantConditions                []batch.JobCondition
@@ -3411,6 +3417,56 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				},
 				{
 					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonPodFailurePolicy,
+					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    2,
+			wantStatusSucceeded: 0,
+		},
+		"fail job with multiple pods; JobManagedBy enabled delays setting terminal condition": {
+			enableJobManagedBy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  ptr.To[int32](2),
+					Completions:  ptr.To[int32](2),
+					BackoffLimit: ptr.To[int32](6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+					},
+				},
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodFailed,
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main-container",
+								State: v1.ContainerState{
+									Terminated: &v1.ContainerStateTerminated{
+										ExitCode: 5,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonPodFailurePolicy,
 					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
@@ -3759,6 +3815,56 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,
 		},
+		"default job based on OnExitCodes; JobManagedBy enabled triggers adding interim condition": {
+			enableJobManagedBy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  ptr.To[int32](1),
+					Completions:  ptr.To[int32](1),
+					BackoffLimit: ptr.To[int32](0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.Pod{
+				{
+					Status: v1.PodStatus{
+						Phase: v1.PodFailed,
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								State: v1.ContainerState{
+									Terminated: &v1.ContainerStateTerminated{
+										ExitCode: 10,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
 		"count pod failure based on OnExitCodes; both rules are matching, the first is executed only": {
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
@@ -4057,6 +4163,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 
 			if tc.job.Spec.PodReplacementPolicy == nil {
 				tc.job.Spec.PodReplacementPolicy = podReplacementPolicy(batch.Failed)
@@ -7553,11 +7660,11 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	pods := append(newPodList(2, v1.PodSucceeded, job), newPodList(2, v1.PodFailed, job)...)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
 	podIndexer := podInformer.GetIndexer()
-	uids := sets.New[string]()
+	uids := sets.New[types.UID]()
 	for i := range pods {
 		clientset.Tracker().Add(pods[i])
 		podIndexer.Add(pods[i])
-		uids.Insert(string(pods[i].UID))
+		uids.Insert(pods[i].UID)
 	}
 	jobKey := testutil.GetKey(job, t)
 
@@ -7623,7 +7730,7 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Deleting pod that had finalizer: %v", err)
 	}
 
-	uids = sets.New(string(pods[2].UID))
+	uids = sets.New(pods[2].UID)
 	var diff string
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)

@@ -50,14 +50,15 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/features"
@@ -204,8 +205,8 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
-	utilversion.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
+	featuregate.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
 	if instanceOptions.RequestTimeout > 0 {
@@ -373,7 +374,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		s.Authentication.RequestHeader.ExtraHeaderPrefixes = extraHeaders
 	}
 
-	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+	if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
 		return result, err
 	}
 
@@ -389,7 +390,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
-	completedOptions, err := s.Complete()
+	completedOptions, err := s.Complete(tCtx)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}

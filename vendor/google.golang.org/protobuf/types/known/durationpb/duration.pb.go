@@ -245,11 +245,9 @@ func (x *Duration) check() uint {
 
 func (x *Duration) Reset() {
 	*x = Duration{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_duration_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_duration_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Duration) String() string {
@@ -260,7 +258,7 @@ func (*Duration) ProtoMessage() {}
 
 func (x *Duration) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_duration_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -338,20 +336,6 @@ func init() { file_google_protobuf_duration_proto_init() }
 func file_google_protobuf_duration_proto_init() {
 	if File_google_protobuf_duration_proto != nil {
 		return
-	}
-	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_duration_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*Duration); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

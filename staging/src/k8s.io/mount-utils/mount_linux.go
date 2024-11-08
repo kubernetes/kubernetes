@@ -35,7 +35,7 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
+	inuserns "github.com/moby/sys/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -147,7 +147,7 @@ func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, 
 		return err
 	}
 	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	if libcontaineruserns.RunningInUserNS() {
+	if inuserns.RunningInUserNS() {
 		if err == nil {
 			return nil
 		}
@@ -631,7 +631,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		if fstype != existingFormat {
 			// Verify that the disk is formatted with filesystem type we are expecting
 			mountErrorValue = FilesystemMismatch
-			klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
+			klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, fstype, existingFormat)
 		}
 
 		if !readOnly {

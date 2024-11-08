@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -53,7 +54,7 @@ func NewFakeContainerManager() *FakeContainerManager {
 	}
 }
 
-func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
+func (cm *FakeContainerManager) Start(_ context.Context, _ *v1.Node, _ ActivePodsFunc, _ GetNodeFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService, _ bool) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "Start")
@@ -124,11 +125,18 @@ func (cm *FakeContainerManager) GetCapacity(localStorageCapacityIsolation bool) 
 	return c
 }
 
-func (cm *FakeContainerManager) GetPluginRegistrationHandler() cache.PluginHandler {
+func (cm *FakeContainerManager) GetPluginRegistrationHandlers() map[string]cache.PluginHandler {
 	cm.Lock()
 	defer cm.Unlock()
-	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandler")
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationHandlers")
 	return nil
+}
+
+func (cm *FakeContainerManager) GetHealthCheckers() []healthz.HealthChecker {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPluginRegistrationServerChecker")
+	return []healthz.HealthChecker{}
 }
 
 func (cm *FakeContainerManager) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

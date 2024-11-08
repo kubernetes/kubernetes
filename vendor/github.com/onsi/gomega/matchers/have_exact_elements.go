@@ -30,15 +30,18 @@ func (matcher *HaveExactElementsMatcher) Match(actual interface{}) (success bool
 
 	lenMatchers := len(matchers)
 	lenValues := len(values)
+	success = true
 
 	for i := 0; i < lenMatchers || i < lenValues; i++ {
 		if i >= lenMatchers {
 			matcher.extraIndex = i
+			success = false
 			continue
 		}
 
 		if i >= lenValues {
 			matcher.missingIndex = i
+			success = false
 			return
 		}
 
@@ -49,15 +52,17 @@ func (matcher *HaveExactElementsMatcher) Match(actual interface{}) (success bool
 				index:   i,
 				failure: err.Error(),
 			})
+			success = false
 		} else if !match {
 			matcher.mismatchFailures = append(matcher.mismatchFailures, mismatchFailure{
 				index:   i,
 				failure: elemMatcher.FailureMessage(values[i]),
 			})
+			success = false
 		}
 	}
 
-	return matcher.missingIndex+matcher.extraIndex+len(matcher.mismatchFailures) == 0, nil
+	return success, nil
 }
 
 func (matcher *HaveExactElementsMatcher) FailureMessage(actual interface{}) (message string) {

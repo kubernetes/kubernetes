@@ -29,6 +29,9 @@ import (
 	"time"
 	"unsafe"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
@@ -177,15 +180,29 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 		return nil, err
 	}
 
-	return &cadvisorapi.MachineInfo{
+	mi := &cadvisorapi.MachineInfo{
 		NumCores:       ProcessorCount(),
 		MemoryCapacity: p.nodeInfo.memoryPhysicalCapacityBytes,
 		MachineID:      hostname,
 		SystemUUID:     systemUUID,
 		BootID:         bootId,
-	}, nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		numOfPysicalCores, numOfSockets, topology, err := processorInfo(relationAll)
+		if err != nil {
+			return nil, err
+		}
+
+		mi.NumPhysicalCores = numOfPysicalCores
+		mi.NumSockets = numOfSockets
+		mi.Topology = topology
+	}
+
+	return mi, nil
 }
 
+// ProcessorCount returns the number of logical processors on the system.
 // runtime.NumCPU() will only return the information for a single Processor Group.
 // Since a single group can only hold 64 logical processors, this
 // means when there are more they will be divided into multiple groups.

@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount_test
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -161,10 +162,18 @@ func expectConfiguration(t *testing.T, reqURL string, want Configuration) {
 func TestServeKeys(t *testing.T) {
 	wantPubRSA := getPublicKey(rsaPublicKey).(*rsa.PublicKey)
 	wantPubECDSA := getPublicKey(ecdsaPublicKey).(*ecdsa.PublicKey)
+
+	alternateGetter, err := serviceaccount.StaticPublicKeysGetter([]interface{}{wantPubRSA})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var serveKeysTests = []struct {
-		Name     string
-		Keys     []interface{}
-		WantKeys []jose.JSONWebKey
+		Name               string
+		Keys               []interface{}
+		WantKeys           []jose.JSONWebKey
+		updatedKeysGetter  serviceaccount.PublicKeysGetter
+		WantKeysPostUpdate []jose.JSONWebKey
 	}{
 		{
 			Name: "configured public keys",
@@ -220,15 +229,102 @@ func TestServeKeys(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "configured public keys reacting to update",
+			Keys: []interface{}{
+				getPublicKey(rsaPublicKey),
+				getPublicKey(ecdsaPublicKey),
+			},
+			WantKeys: []jose.JSONWebKey{
+				{
+					Algorithm:                   "RS256",
+					Key:                         wantPubRSA,
+					KeyID:                       rsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+				{
+					Algorithm:                   "ES256",
+					Key:                         wantPubECDSA,
+					KeyID:                       ecdsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+			},
+			updatedKeysGetter: alternateGetter,
+			WantKeysPostUpdate: []jose.JSONWebKey{
+				{
+					Algorithm:                   "RS256",
+					Key:                         wantPubRSA,
+					KeyID:                       rsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+			},
+		},
+		{
+			Name: "configured public keys reacting to update while excluding keys",
+			Keys: []interface{}{
+				getPublicKey(rsaPublicKey),
+				getPublicKey(ecdsaPublicKey),
+			},
+			WantKeys: []jose.JSONWebKey{
+				{
+					Algorithm:                   "RS256",
+					Key:                         wantPubRSA,
+					KeyID:                       rsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+				{
+					Algorithm:                   "ES256",
+					Key:                         wantPubECDSA,
+					KeyID:                       ecdsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+			},
+			updatedKeysGetter: dummyPublicKeyGetter{
+				keys: []serviceaccount.PublicKey{
+					{
+						KeyID:                    rsaKeyID,
+						PublicKey:                wantPubRSA,
+						ExcludeFromOIDCDiscovery: true,
+					},
+					{
+						KeyID:                    ecdsaKeyID,
+						PublicKey:                wantPubECDSA,
+						ExcludeFromOIDCDiscovery: false,
+					},
+				},
+			},
+			WantKeysPostUpdate: []jose.JSONWebKey{
+				{
+					Algorithm:                   "ES256",
+					Key:                         wantPubECDSA,
+					KeyID:                       ecdsaKeyID,
+					Use:                         "sig",
+					Certificates:                []*x509.Certificate{},
+					CertificateThumbprintSHA1:   []uint8{},
+					CertificateThumbprintSHA256: []uint8{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range serveKeysTests {
 		t.Run(tt.Name, func(t *testing.T) {
 			initialKeysGetter, err := serviceaccount.StaticPublicKeysGetter(tt.Keys)
-			if err != nil {
-				t.Fatal(err)
-			}
-			updatedKeysGetter, err := serviceaccount.StaticPublicKeysGetter([]interface{}{wantPubRSA})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -239,23 +335,17 @@ func TestServeKeys(t *testing.T) {
 			reqURL := s.URL + "/openid/v1/jwks"
 			expectKeys(t, reqURL, tt.WantKeys)
 
-			// modify the underlying keys, expect the same response
-			keysGetter.PublicKeysGetter = updatedKeysGetter
-			expectKeys(t, reqURL, tt.WantKeys)
+			if tt.updatedKeysGetter != nil {
+				// modify the underlying keys, expect the same response
+				keysGetter.PublicKeysGetter = tt.updatedKeysGetter
+				expectKeys(t, reqURL, tt.WantKeys)
 
-			// notify the metadata the keys changed, expected a modified response
-			for _, listener := range keysGetter.listeners {
-				listener.Enqueue()
+				// notify the metadata the keys changed, expected a modified response
+				for _, listener := range keysGetter.listeners {
+					listener.Enqueue()
+				}
+				expectKeys(t, reqURL, tt.WantKeysPostUpdate)
 			}
-			expectKeys(t, reqURL, []jose.JSONWebKey{{
-				Algorithm:                   "RS256",
-				Key:                         wantPubRSA,
-				KeyID:                       rsaKeyID,
-				Use:                         "sig",
-				Certificates:                []*x509.Certificate{},
-				CertificateThumbprintSHA1:   []uint8{},
-				CertificateThumbprintSHA256: []uint8{},
-			}})
 		})
 	}
 }
@@ -478,4 +568,20 @@ func TestNewOpenIDMetadata(t *testing.T) {
 			}
 		})
 	}
+}
+
+type dummyPublicKeyGetter struct {
+	keys []serviceaccount.PublicKey
+}
+
+func (d dummyPublicKeyGetter) AddListener(listener serviceaccount.Listener) {
+	// no-op
+}
+
+func (d dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
+	return 3600
+}
+
+func (d dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
+	return d.keys
 }

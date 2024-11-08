@@ -22,12 +22,13 @@ import (
 	"net/http"
 	"net/url"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -387,6 +388,12 @@ type ResetFieldsStrategy interface {
 	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
 }
 
+// ResetFieldsFilterStrategy is an optional interface that a storage object can
+// implement if it wishes to provide a fields filter reset by its strategies.
+type ResetFieldsFilterStrategy interface {
+	GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter
+}
+
 // CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy
 // and ResetFieldsStrategy.
 type CreateUpdateResetFieldsStrategy interface {
@@ -399,4 +406,11 @@ type CreateUpdateResetFieldsStrategy interface {
 type UpdateResetFieldsStrategy interface {
 	RESTUpdateStrategy
 	ResetFieldsStrategy
+}
+
+// CorruptObjectDeleterProvider is an interface the storage implements
+// to support unsafe deletion of corrupt object(s). It returns a
+// GracefulDeleter that is used to perform unsafe deletion of corrupt object(s).
+type CorruptObjectDeleterProvider interface {
+	GetCorruptObjDeleter() GracefulDeleter
 }

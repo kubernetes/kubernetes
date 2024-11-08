@@ -142,7 +142,7 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 			ginkgo.By("checking that nltest /QUERY returns successfully")
 			var output string
 			gomega.Eventually(ctx, func() error {
-				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
+				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "nltest", "/QUERY")
 				if err != nil {
 					return fmt.Errorf("unable to run command in container via exec: %w", err)
 				}
@@ -150,7 +150,7 @@ var _ = sigDescribe(feature.Windows, "GMSA Full", framework.WithSerial(), framew
 				if !isValidOutput(output) {
 					// try repairing the secure channel by running reset command
 					// https://kubernetes.io/docs/tasks/configure-pod-container/configure-gmsa/#troubleshooting
-					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
+					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
 					if err != nil {
 						return fmt.Errorf("unable to run command in container via exec: %w", err)
 					}
@@ -283,7 +283,7 @@ func retrieveCRDManifestFileContents(ctx context.Context, f *framework.Framework
 	}
 	e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
-	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "cmd", "/S", "/C", fmt.Sprintf("type %s", gmsaCrdManifestPath))
+	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "--", "cmd", "/S", "/C", fmt.Sprintf("type %s", gmsaCrdManifestPath))
 	if err != nil {
 		framework.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
 	}

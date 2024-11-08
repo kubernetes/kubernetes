@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,13 +48,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	apisv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -148,6 +153,8 @@ var (
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):              true,
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies/status"):       true,
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):        true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"):          true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"):    true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -446,16 +453,26 @@ func (w *warningHandler) HandleWarningHeader(code int, agent string, message str
 
 // TestWebhookAdmissionWithWatchCache tests communication between API server and webhook process.
 func TestWebhookAdmissionWithWatchCache(t *testing.T) {
-	testWebhookAdmission(t, true)
+	testWebhookAdmission(t, true, func(testing.TB, *rest.Config) {})
 }
 
 // TestWebhookAdmissionWithoutWatchCache tests communication between API server and webhook process.
 func TestWebhookAdmissionWithoutWatchCache(t *testing.T) {
-	testWebhookAdmission(t, false)
+	testWebhookAdmission(t, false, func(testing.TB, *rest.Config) {})
+}
+
+func TestWebhookAdmissionWithCBOR(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
+	testWebhookAdmission(t, false, func(t testing.TB, config *rest.Config) {
+		config.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	})
 }
 
 // testWebhookAdmission tests communication between API server and webhook process.
-func testWebhookAdmission(t *testing.T, watchCache bool) {
+func testWebhookAdmission(t *testing.T, watchCache bool, reconfigureClient func(testing.TB, *rest.Config)) {
+
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
@@ -528,10 +545,6 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	}
 
 	// gather resources to test
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, resources, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
@@ -640,6 +653,13 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
 					t.Run(verb, func(t *testing.T) {
+						clientConfig := rest.CopyConfig(clientConfig)
+						reconfigureClient(t, clientConfig)
+						dynamicClient, err := dynamic.NewForConfig(clientConfig)
+						if err != nil {
+							t.Fatal(err)
+						}
+
 						count++
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)

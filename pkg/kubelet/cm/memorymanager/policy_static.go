@@ -18,7 +18,6 @@ package memorymanager
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const policyTypeStatic policyType = "Static"
@@ -354,7 +352,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 			// for the detail.
-			if types.IsRestartableInitContainer(&ctr) {
+			if podutil.IsRestartableInitContainer(&ctr) {
 				reqRsrcsByRestartableInitCtrs[rsrcName] += qty
 			} else if reqRsrcsByRestartableInitCtrs[rsrcName]+qty > reqRsrcsByInitCtrs[rsrcName] {
 				reqRsrcsByInitCtrs[rsrcName] = reqRsrcsByRestartableInitCtrs[rsrcName] + qty
@@ -689,11 +687,46 @@ func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 				return false
 			}
 
-			if !reflect.DeepEqual(*memoryState1, *memoryState2) {
-				klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+			if !areMemoryStatesEqual(memoryState1, memoryState2, nodeID, resourceName) {
+				return false
+			}
+
+			tmpState1 := state.MemoryTable{}
+			tmpState2 := state.MemoryTable{}
+			for _, nodeID := range nodeState1.Cells {
+				tmpState1.Free += ms1[nodeID].MemoryMap[resourceName].Free
+				tmpState1.Reserved += ms1[nodeID].MemoryMap[resourceName].Reserved
+				tmpState2.Free += ms2[nodeID].MemoryMap[resourceName].Free
+				tmpState2.Reserved += ms2[nodeID].MemoryMap[resourceName].Reserved
+			}
+
+			if tmpState1.Free != tmpState2.Free {
+				klog.InfoS("Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "free", "free1", tmpState1.Free, "free2", tmpState2.Free, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+				return false
+			}
+			if tmpState1.Reserved != tmpState2.Reserved {
+				klog.InfoS("Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "reserved", "reserved1", tmpState1.Reserved, "reserved2", tmpState2.Reserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
 				return false
 			}
 		}
+	}
+	return true
+}
+
+func areMemoryStatesEqual(memoryState1, memoryState2 *state.MemoryTable, nodeID int, resourceName v1.ResourceName) bool {
+	if memoryState1.TotalMemSize != memoryState2.TotalMemSize {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "TotalMemSize", "TotalMemSize1", memoryState1.TotalMemSize, "TotalMemSize2", memoryState2.TotalMemSize, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
+	}
+
+	if memoryState1.SystemReserved != memoryState2.SystemReserved {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "SystemReserved", "SystemReserved1", memoryState1.SystemReserved, "SystemReserved2", memoryState2.SystemReserved, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
+	}
+
+	if memoryState1.Allocatable != memoryState2.Allocatable {
+		klog.ErrorS(nil, "Memory states for the NUMA node and resource are different", "node", nodeID, "resource", resourceName, "field", "Allocatable", "Allocatable1", memoryState1.Allocatable, "Allocatable2", memoryState2.Allocatable, "memoryState1", *memoryState1, "memoryState2", *memoryState2)
+		return false
 	}
 	return true
 }
@@ -935,7 +968,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 				break
 			}
 
-			if types.IsRestartableInitContainer(&initContainer) {
+			if podutil.IsRestartableInitContainer(&initContainer) {
 				// we should not reuse the resource from any restartable init
 				// container
 				continue
@@ -977,7 +1010,7 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 func isRegularInitContainer(pod *v1.Pod, container *v1.Container) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == container.Name {
-			return !types.IsRestartableInitContainer(&initContainer)
+			return !podutil.IsRestartableInitContainer(&initContainer)
 		}
 	}
 

@@ -24,6 +24,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestIsSubPath(t *testing.T) {
@@ -61,16 +64,19 @@ func TestIsSubPath(t *testing.T) {
 }
 
 func TestGetRequestAttributes(t *testing.T) {
-	for _, test := range AuthzTestCases() {
-		t.Run(test.Method+":"+test.Path, func(t *testing.T) {
-			getter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
+	for _, fineGrained := range []bool{false, true} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
+		for _, test := range AuthzTestCases(fineGrained) {
+			t.Run(test.Method+":"+test.Path, func(t *testing.T) {
+				getter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
-			req, err := http.NewRequest(test.Method, "https://localhost:1234"+test.Path, nil)
-			require.NoError(t, err)
-			attrs := getter.GetRequestAttributes(AuthzTestUser(), req)
+				req, err := http.NewRequest(test.Method, "https://localhost:1234"+test.Path, nil)
+				require.NoError(t, err)
+				attrs := getter.GetRequestAttributes(AuthzTestUser(), req)
 
-			test.AssertAttributes(t, attrs)
-		})
+				test.AssertAttributes(t, attrs)
+			})
+		}
 	}
 }
 
@@ -82,60 +88,79 @@ const (
 type AuthzTestCase struct {
 	Method, Path string
 
-	ExpectedVerb, ExpectedSubresource string
+	ExpectedVerb         string
+	ExpectedSubresources []string
 }
 
-func (a *AuthzTestCase) AssertAttributes(t *testing.T, attrs authorizer.Attributes) {
-	expectedAttributes := authorizer.AttributesRecord{
-		User:            AuthzTestUser(),
-		APIGroup:        "",
-		APIVersion:      "v1",
-		Verb:            a.ExpectedVerb,
-		Resource:        "nodes",
-		Name:            authzTestNodeName,
-		Subresource:     a.ExpectedSubresource,
-		ResourceRequest: true,
-		Path:            a.Path,
+func (a *AuthzTestCase) AssertAttributes(t *testing.T, attrs []authorizer.Attributes) {
+	var expectedAttributes []authorizer.AttributesRecord
+	for _, subresource := range a.ExpectedSubresources {
+		expectedAttributes = append(expectedAttributes, authorizer.AttributesRecord{
+			User:            AuthzTestUser(),
+			APIGroup:        "",
+			APIVersion:      "v1",
+			Verb:            a.ExpectedVerb,
+			Resource:        "nodes",
+			Name:            authzTestNodeName,
+			Subresource:     subresource,
+			ResourceRequest: true,
+			Path:            a.Path,
+		})
 	}
 
-	assert.Equal(t, expectedAttributes, attrs)
+	assert.Equal(t, len(attrs), len(expectedAttributes))
+	for i := range attrs {
+		assert.Equal(t, attrs[i], expectedAttributes[i])
+	}
 }
 
 func AuthzTestUser() user.Info {
 	return &user.DefaultInfo{Name: authzTestUserName}
 }
 
-func AuthzTestCases() []AuthzTestCase {
+func AuthzTestCases(fineGrained bool) []AuthzTestCase {
 	// Path -> ExpectedSubresource
-	testPaths := map[string]string{
-		"/attach/{podNamespace}/{podID}/{containerName}":       "proxy",
-		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": "proxy",
-		"/checkpoint/{podNamespace}/{podID}/{containerName}":   "checkpoint",
-		"/configz": "proxy",
-		"/containerLogs/{podNamespace}/{podID}/{containerName}": "proxy",
-		"/debug/flags/v":                                     "proxy",
-		"/debug/pprof/{subpath:*}":                           "proxy",
-		"/exec/{podNamespace}/{podID}/{containerName}":       "proxy",
-		"/exec/{podNamespace}/{podID}/{uid}/{containerName}": "proxy",
-		"/healthz":                            "proxy",
-		"/healthz/log":                        "proxy",
-		"/healthz/ping":                       "proxy",
-		"/healthz/syncloop":                   "proxy",
-		"/logs/":                              "log",
-		"/logs/{logpath:*}":                   "log",
-		"/metrics":                            "metrics",
-		"/metrics/cadvisor":                   "metrics",
-		"/metrics/probes":                     "metrics",
-		"/metrics/resource":                   "metrics",
-		"/pods/":                              "proxy",
-		"/portForward/{podNamespace}/{podID}": "proxy",
-		"/portForward/{podNamespace}/{podID}/{uid}":         "proxy",
-		"/run/{podNamespace}/{podID}/{containerName}":       "proxy",
-		"/run/{podNamespace}/{podID}/{uid}/{containerName}": "proxy",
-		"/runningpods/":  "proxy",
-		"/stats/":        "stats",
-		"/stats/summary": "stats",
+	testPaths := map[string][]string{
+		"/attach/{podNamespace}/{podID}/{containerName}":       {"proxy"},
+		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
+		"/checkpoint/{podNamespace}/{podID}/{containerName}":   {"checkpoint"},
+		"/configz": {"proxy"},
+		"/containerLogs/{podNamespace}/{podID}/{containerName}": {"proxy"},
+		"/debug/flags/v":                                     {"proxy"},
+		"/debug/pprof/{subpath:*}":                           {"proxy"},
+		"/exec/{podNamespace}/{podID}/{containerName}":       {"proxy"},
+		"/exec/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
+		"/healthz":                            {"proxy"},
+		"/healthz/log":                        {"proxy"},
+		"/healthz/ping":                       {"proxy"},
+		"/healthz/syncloop":                   {"proxy"},
+		"/logs/":                              {"log"},
+		"/logs/{logpath:*}":                   {"log"},
+		"/metrics":                            {"metrics"},
+		"/metrics/slis":                       {"metrics"},
+		"/metrics/cadvisor":                   {"metrics"},
+		"/metrics/probes":                     {"metrics"},
+		"/metrics/resource":                   {"metrics"},
+		"/pods/":                              {"proxy"},
+		"/portForward/{podNamespace}/{podID}": {"proxy"},
+		"/portForward/{podNamespace}/{podID}/{uid}":         {"proxy"},
+		"/run/{podNamespace}/{podID}/{containerName}":       {"proxy"},
+		"/run/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
+		"/runningpods/":  {"proxy"},
+		"/stats/":        {"stats"},
+		"/stats/summary": {"stats"},
 	}
+
+	if fineGrained {
+		testPaths["/healthz"] = append([]string{"healthz"}, testPaths["/healthz"]...)
+		testPaths["/healthz/log"] = append([]string{"healthz"}, testPaths["/healthz/log"]...)
+		testPaths["/healthz/ping"] = append([]string{"healthz"}, testPaths["/healthz/ping"]...)
+		testPaths["/healthz/syncloop"] = append([]string{"healthz"}, testPaths["/healthz/syncloop"]...)
+		testPaths["/pods/"] = append([]string{"pods"}, testPaths["/pods/"]...)
+		testPaths["/runningpods/"] = append([]string{"pods"}, testPaths["/runningpods/"]...)
+		testPaths["/configz"] = append([]string{"configz"}, testPaths["/configz"]...)
+	}
+
 	testCases := []AuthzTestCase{}
 	for path, subresource := range testPaths {
 		testCases = append(testCases,

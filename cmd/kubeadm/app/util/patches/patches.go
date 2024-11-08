@@ -53,20 +53,20 @@ type PatchTarget struct {
 
 // PatchManager defines an object that can apply patches.
 type PatchManager struct {
-	patchSets    []*patchSet
+	patchSets    []*PatchSet
 	knownTargets []string
 	output       io.Writer
 }
 
-// patchSet defines a set of patches of a certain type that can patch a PatchTarget.
-type patchSet struct {
+// PatchSet defines a set of patches of a certain type that can patch a PatchTarget.
+type PatchSet struct {
 	targetName string
 	patchType  types.PatchType
 	patches    []string
 }
 
 // String() is used for unit-testing.
-func (ps *patchSet) String() string {
+func (ps *PatchSet) String() string {
 	return fmt.Sprintf(
 		"{%q, %q, %#v}",
 		ps.targetName,
@@ -111,6 +111,15 @@ var (
 // KnownTargets returns the locally defined knownTargets.
 func KnownTargets() []string {
 	return knownTargets
+}
+
+// NewPatchManager creates a patch manager that can be used to apply patches to "knownTargets".
+func NewPatchManager(patchSets []*PatchSet, knownTargets []string, output io.Writer) *PatchManager {
+	return &PatchManager{
+		patchSets:    patchSets,
+		knownTargets: knownTargets,
+		output:       output,
+	}
 }
 
 // GetPatchManagerForPath creates a patch manager that can be used to apply patches to "knownTargets".
@@ -257,8 +266,8 @@ func parseFilename(fileName string, knownTargets []string) (string, types.PatchT
 	return targetName, patchType, nil, nil
 }
 
-// createPatchSet creates a patchSet object, by splitting the given "data" by "\n---".
-func createPatchSet(targetName string, patchType types.PatchType, data string) (*patchSet, error) {
+// CreatePatchSet creates a patchSet object, by splitting the given "data" by "\n---".
+func CreatePatchSet(targetName string, patchType types.PatchType, data string) (*PatchSet, error) {
 	var patches []string
 
 	// Split the patches and convert them to JSON.
@@ -285,7 +294,7 @@ func createPatchSet(targetName string, patchType types.PatchType, data string) (
 		patches = append(patches, string(patchJSON))
 	}
 
-	return &patchSet{
+	return &PatchSet{
 		targetName: targetName,
 		patchType:  patchType,
 		patches:    patches,
@@ -294,10 +303,10 @@ func createPatchSet(targetName string, patchType types.PatchType, data string) (
 
 // getPatchSetsFromPath walks a path, ignores sub-directories and non-patch files, and
 // returns a list of patchFile objects.
-func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Writer) ([]*patchSet, []string, []string, error) {
+func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Writer) ([]*PatchSet, []string, []string, error) {
 	patchFiles := []string{}
 	ignoredFiles := []string{}
-	patchSets := []*patchSet{}
+	patchSets := []*PatchSet{}
 
 	// Check if targetPath is a directory.
 	info, err := os.Lstat(targetPath)
@@ -349,7 +358,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		// Create a patchSet object.
-		patchSet, err := createPatchSet(targetName, patchType, string(data))
+		patchSet, err := CreatePatchSet(targetName, patchType, string(data))
 		if err != nil {
 			return err
 		}

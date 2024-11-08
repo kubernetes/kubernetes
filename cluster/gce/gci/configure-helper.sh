@@ -1658,6 +1658,7 @@ After=network-online.target
 [Service]
 Restart=always
 RestartSec=10
+WatchdogSec=30s
 EnvironmentFile=${kubelet_env_file}
 ExecStart=${kubelet_bin} \$KUBELET_OPTS
 
@@ -2223,9 +2224,6 @@ function start-kube-controller-manager {
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=("--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}")
   fi
-  if [[ -n "${CONCURRENT_SERVICE_SYNCS:-}" ]]; then
-    params+=("--concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}")
-  fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
     params+=("--allocate-node-cidrs=true")
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
@@ -2233,10 +2231,6 @@ function start-kube-controller-manager {
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=("--terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}")
-  fi
-  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
-    params+=("--configure-cloud-routes=false")
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=("--feature-gates=${FEATURE_GATES}")

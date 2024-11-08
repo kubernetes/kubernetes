@@ -17,12 +17,12 @@ limitations under the License.
 package devicemanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
-	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
@@ -31,10 +31,6 @@ import (
 // ensures the Device Manager is consulted when Topology Aware Hints for each
 // container are created.
 func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 
@@ -87,10 +83,6 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
 // ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
 func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 

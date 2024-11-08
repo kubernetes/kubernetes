@@ -19,6 +19,8 @@ limitations under the License.
 package testing
 
 import (
+	context "context"
+
 	v1 "github.com/google/cadvisor/info/v1"
 	mock "github.com/stretchr/testify/mock"
 
@@ -38,9 +40,9 @@ func (_m *MockInterface) EXPECT() *MockInterface_Expecter {
 	return &MockInterface_Expecter{mock: &_m.Mock}
 }
 
-// ContainerFsInfo provides a mock function with given fields:
-func (_m *MockInterface) ContainerFsInfo() (v2.FsInfo, error) {
-	ret := _m.Called()
+// ContainerFsInfo provides a mock function with given fields: _a0
+func (_m *MockInterface) ContainerFsInfo(_a0 context.Context) (v2.FsInfo, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ContainerFsInfo")
@@ -48,17 +50,17 @@ func (_m *MockInterface) ContainerFsInfo() (v2.FsInfo, error) {
 
 	var r0 v2.FsInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (v2.FsInfo, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (v2.FsInfo, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func() v2.FsInfo); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) v2.FsInfo); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(v2.FsInfo)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -72,13 +74,14 @@ type MockInterface_ContainerFsInfo_Call struct {
 }
 
 // ContainerFsInfo is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) ContainerFsInfo() *MockInterface_ContainerFsInfo_Call {
-	return &MockInterface_ContainerFsInfo_Call{Call: _e.mock.On("ContainerFsInfo")}
+//   - _a0 context.Context
+func (_e *MockInterface_Expecter) ContainerFsInfo(_a0 interface{}) *MockInterface_ContainerFsInfo_Call {
+	return &MockInterface_ContainerFsInfo_Call{Call: _e.mock.On("ContainerFsInfo", _a0)}
 }
 
-func (_c *MockInterface_ContainerFsInfo_Call) Run(run func()) *MockInterface_ContainerFsInfo_Call {
+func (_c *MockInterface_ContainerFsInfo_Call) Run(run func(_a0 context.Context)) *MockInterface_ContainerFsInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -88,7 +91,7 @@ func (_c *MockInterface_ContainerFsInfo_Call) Return(_a0 v2.FsInfo, _a1 error) *
 	return _c
 }
 
-func (_c *MockInterface_ContainerFsInfo_Call) RunAndReturn(run func() (v2.FsInfo, error)) *MockInterface_ContainerFsInfo_Call {
+func (_c *MockInterface_ContainerFsInfo_Call) RunAndReturn(run func(context.Context) (v2.FsInfo, error)) *MockInterface_ContainerFsInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -267,9 +270,9 @@ func (_c *MockInterface_GetRequestedContainersInfo_Call) RunAndReturn(run func(s
 	return _c
 }
 
-// ImagesFsInfo provides a mock function with given fields:
-func (_m *MockInterface) ImagesFsInfo() (v2.FsInfo, error) {
-	ret := _m.Called()
+// ImagesFsInfo provides a mock function with given fields: _a0
+func (_m *MockInterface) ImagesFsInfo(_a0 context.Context) (v2.FsInfo, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ImagesFsInfo")
@@ -277,17 +280,17 @@ func (_m *MockInterface) ImagesFsInfo() (v2.FsInfo, error) {
 
 	var r0 v2.FsInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (v2.FsInfo, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (v2.FsInfo, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func() v2.FsInfo); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) v2.FsInfo); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(v2.FsInfo)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -301,13 +304,14 @@ type MockInterface_ImagesFsInfo_Call struct {
 }
 
 // ImagesFsInfo is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) ImagesFsInfo() *MockInterface_ImagesFsInfo_Call {
-	return &MockInterface_ImagesFsInfo_Call{Call: _e.mock.On("ImagesFsInfo")}
+//   - _a0 context.Context
+func (_e *MockInterface_Expecter) ImagesFsInfo(_a0 interface{}) *MockInterface_ImagesFsInfo_Call {
+	return &MockInterface_ImagesFsInfo_Call{Call: _e.mock.On("ImagesFsInfo", _a0)}
 }
 
-func (_c *MockInterface_ImagesFsInfo_Call) Run(run func()) *MockInterface_ImagesFsInfo_Call {
+func (_c *MockInterface_ImagesFsInfo_Call) Run(run func(_a0 context.Context)) *MockInterface_ImagesFsInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -317,7 +321,7 @@ func (_c *MockInterface_ImagesFsInfo_Call) Return(_a0 v2.FsInfo, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockInterface_ImagesFsInfo_Call) RunAndReturn(run func() (v2.FsInfo, error)) *MockInterface_ImagesFsInfo_Call {
+func (_c *MockInterface_ImagesFsInfo_Call) RunAndReturn(run func(context.Context) (v2.FsInfo, error)) *MockInterface_ImagesFsInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

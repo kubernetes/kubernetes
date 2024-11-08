@@ -340,15 +340,12 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 		// drives what happens in case we are trying to scale replica sets of the same size.
 		// In such a case when scaling up, we should scale up newer replica sets first, and
 		// when scaling down, we should scale down older replica sets first.
-		var scalingOperation string
 		switch {
 		case deploymentReplicasToAdd > 0:
 			sort.Sort(controller.ReplicaSetsBySizeNewer(allRSs))
-			scalingOperation = "up"
 
 		case deploymentReplicasToAdd < 0:
 			sort.Sort(controller.ReplicaSetsBySizeOlder(allRSs))
-			scalingOperation = "down"
 		}
 
 		// Iterate over all active replica sets and estimate proportions for each of them.
@@ -363,7 +360,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			// Estimate proportions if we have replicas to add, otherwise simply populate
 			// nameToSize with the current sizes for each replica set.
 			if deploymentReplicasToAdd != 0 {
-				proportion := deploymentutil.GetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
+				proportion := deploymentutil.GetReplicaSetProportion(logger, rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
 
 				nameToSize[rs.Name] = *(rs.Spec.Replicas) + proportion
 				deploymentReplicasAdded += proportion
@@ -386,7 +383,7 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			}
 
 			// TODO: Use transactions when we have them.
-			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
+			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
 			}
@@ -400,17 +397,11 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(ctx context.Contex
 	if *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
 	}
-	var scalingOperation string
-	if *(rs.Spec.Replicas) < newScale {
-		scalingOperation = "up"
-	} else {
-		scalingOperation = "down"
-	}
-	scaled, newRS, err := dc.scaleReplicaSet(ctx, rs, newScale, deployment, scalingOperation)
+	scaled, newRS, err := dc.scaleReplicaSet(ctx, rs, newScale, deployment)
 	return scaled, newRS, err
 }
 
-func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
+func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
 
 	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
 
@@ -425,6 +416,12 @@ func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.Re
 		deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
+			var scalingOperation string
+			if oldScale < newScale {
+				scalingOperation = "up"
+			} else {
+				scalingOperation = "down"
+			}
 			scaled = true
 			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s from %d to %d", scalingOperation, rs.Name, oldScale, newScale)
 		}

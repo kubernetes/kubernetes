@@ -1024,6 +1024,125 @@ func TestStaticPolicyStart(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "should validate the totalFree and totalReserved size for a resource within a group",
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         240 * mb,
+						},
+					},
+				},
+				"pod2": map[string][]state.Block{
+					"container2": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         10 * mb,
+						},
+					},
+				},
+			},
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         240 * mb,
+						},
+					},
+				},
+				"pod2": map[string][]state.Block{
+					"container2": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         10 * mb,
+						},
+					},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    220 * mb,
+							Free:           30 * mb,
+							Reserved:       190 * mb,
+							SystemReserved: 20 * mb,
+							TotalMemSize:   240 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    220 * mb,
+							Free:           160 * mb,
+							Reserved:       60 * mb,
+							SystemReserved: 20 * mb,
+							TotalMemSize:   240 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    220 * mb,
+							Free:           10 * mb,
+							Reserved:       210 * mb,
+							SystemReserved: 20 * mb,
+							TotalMemSize:   240 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    220 * mb,
+							Free:           180 * mb,
+							Reserved:       40 * mb,
+							SystemReserved: 20 * mb,
+							TotalMemSize:   240 * mb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 2,
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 20 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 20 * mb,
+				},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{
+				Topology: []cadvisorapi.Node{
+					{
+						Id:     0,
+						Memory: 240 * mb,
+					},
+					{
+						Id:     1,
+						Memory: 240 * mb,
+					},
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {

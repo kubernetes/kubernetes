@@ -207,7 +207,7 @@ func TestGoldenRequest(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to load fixture: %v", err)
 				}
-				if diff := cmp.Diff(got, want); diff != "" {
+				if diff := cmp.Diff(want, got); diff != "" {
 					t.Errorf("unexpected difference from expected bytes:\n%s", diff)
 				}
 			}))

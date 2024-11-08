@@ -22,12 +22,12 @@ import (
 
 	"github.com/blang/semver/v4"
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	"k8s.io/utils/clock"
 )
 
-func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha1.LeaseCandidate) *v1alpha1.LeaseCandidate {
-	var electee *v1alpha1.LeaseCandidate
+func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha2.LeaseCandidate) *v1alpha2.LeaseCandidate {
+	var electee *v1alpha2.LeaseCandidate
 	for _, c := range candidates {
 		if !validLeaseCandidateForOldestEmulationVersion(c) {
 			continue
@@ -39,72 +39,30 @@ func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha1.LeaseCandidate)
 	return electee
 }
 
-// topologicalSortWithOneRoot has a caveat that there may only be one root (indegree=0) node in a valid ordering.
-func topologicalSortWithOneRoot(graph map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy) []v1.CoordinatedLeaseStrategy {
-	inDegree := make(map[v1.CoordinatedLeaseStrategy]int)
-	for node := range graph {
-		inDegree[node] = 0
-	}
-	for _, neighbors := range graph {
-		for _, neighbor := range neighbors {
-			inDegree[neighbor]++
-		}
-	}
-
-	var queue []v1.CoordinatedLeaseStrategy
-	for vertex, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, vertex)
-		}
-	}
-
-	// If multiple nodes have indegree of 0, multiple strategies are non-superceding and is a conflict.
-	if len(queue) > 1 {
-		return nil
-	}
-
-	var sorted []v1.CoordinatedLeaseStrategy
-	for len(queue) > 0 {
-		vertex := queue[0]
-		queue = queue[1:]
-		sorted = append(sorted, vertex)
-
-		for _, neighbor := range graph[vertex] {
-			inDegree[neighbor]--
-			if inDegree[neighbor] == 0 {
-				queue = append(queue, neighbor)
-			}
-		}
-	}
-
-	if len(sorted) != len(graph) {
-		return nil // Cycle detected
-	}
-
-	return sorted
-}
-
-func pickBestStrategy(candidates []*v1alpha1.LeaseCandidate) (v1.CoordinatedLeaseStrategy, error) {
-	graph := make(map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy)
+func pickBestStrategy(candidates []*v1alpha2.LeaseCandidate) (v1.CoordinatedLeaseStrategy, error) {
 	nilStrategy := v1.CoordinatedLeaseStrategy("")
-	for _, c := range candidates {
-		for i := range len(c.Spec.PreferredStrategies) - 1 {
-			graph[c.Spec.PreferredStrategies[i]] = append(graph[c.Spec.PreferredStrategies[i]], c.Spec.PreferredStrategies[i+1])
-		}
-		if _, ok := graph[c.Spec.PreferredStrategies[len(c.Spec.PreferredStrategies)-1]]; !ok {
-			graph[c.Spec.PreferredStrategies[len(c.Spec.PreferredStrategies)-1]] = []v1.CoordinatedLeaseStrategy{}
+	if len(candidates) == 0 {
+		return nilStrategy, fmt.Errorf("no candidates")
+	}
+	candidateName := candidates[0].Name
+	strategy := candidates[0].Spec.Strategy
+	highestBV := getBinaryVersionOrZero(candidates[0])
+
+	for _, c := range candidates[1:] {
+		binVersion := getBinaryVersionOrZero(c)
+		result := highestBV.Compare(binVersion)
+		if result < 0 {
+			strategy = c.Spec.Strategy
+			highestBV = binVersion
+			candidateName = c.Name
+		} else if result == 0 && c.Spec.Strategy != strategy {
+			return nilStrategy, fmt.Errorf("candidates %q, %q at same binary version but received differing strategies %s, %s", candidateName, c.Name, strategy, c.Spec.Strategy)
 		}
 	}
-
-	sorted := topologicalSortWithOneRoot(graph)
-	if sorted == nil {
-		return nilStrategy, fmt.Errorf("invalid strategy")
-	}
-
-	return sorted[0], nil
+	return strategy, nil
 }
 
-func validLeaseCandidateForOldestEmulationVersion(l *v1alpha1.LeaseCandidate) bool {
+func validLeaseCandidateForOldestEmulationVersion(l *v1alpha2.LeaseCandidate) bool {
 	_, err := semver.ParseTolerant(l.Spec.EmulationVersion)
 	if err != nil {
 		return false
@@ -113,7 +71,7 @@ func validLeaseCandidateForOldestEmulationVersion(l *v1alpha1.LeaseCandidate) bo
 	return err == nil
 }
 
-func getEmulationVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
+func getEmulationVersionOrZero(l *v1alpha2.LeaseCandidate) semver.Version {
 	value := l.Spec.EmulationVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -122,7 +80,7 @@ func getEmulationVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
 	return v
 }
 
-func getBinaryVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
+func getBinaryVersionOrZero(l *v1alpha2.LeaseCandidate) semver.Version {
 	value := l.Spec.BinaryVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -132,7 +90,7 @@ func getBinaryVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
 }
 
 // -1: lhs better, 1: rhs better
-func compare(lhs, rhs *v1alpha1.LeaseCandidate) int {
+func compare(lhs, rhs *v1alpha2.LeaseCandidate) int {
 	l := getEmulationVersionOrZero(lhs)
 	r := getEmulationVersionOrZero(rhs)
 	result := l.Compare(r)
@@ -157,7 +115,7 @@ func isLeaseExpired(clock clock.Clock, lease *v1.Lease) bool {
 		lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second).Before(currentTime)
 }
 
-func isLeaseCandidateExpired(clock clock.Clock, lease *v1alpha1.LeaseCandidate) bool {
+func isLeaseCandidateExpired(clock clock.Clock, lease *v1alpha2.LeaseCandidate) bool {
 	currentTime := clock.Now()
 	return lease.Spec.RenewTime == nil ||
 		lease.Spec.RenewTime.Add(leaseCandidateValidDuration).Before(currentTime)

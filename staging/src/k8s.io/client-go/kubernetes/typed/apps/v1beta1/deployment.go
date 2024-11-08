@@ -68,6 +68,8 @@ func newDeployments(c *AppsV1beta1Client, namespace string) *deployments {
 			scheme.ParameterCodec,
 			namespace,
 			func() *appsv1beta1.Deployment { return &appsv1beta1.Deployment{} },
-			func() *appsv1beta1.DeploymentList { return &appsv1beta1.DeploymentList{} }),
+			func() *appsv1beta1.DeploymentList { return &appsv1beta1.DeploymentList{} },
+			gentype.PrefersProtobuf[*appsv1beta1.Deployment](),
+		),
 	}
 }

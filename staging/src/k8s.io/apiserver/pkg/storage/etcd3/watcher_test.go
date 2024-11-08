@@ -64,7 +64,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
 }
 
 // TestWatchFromNonZero tests that
@@ -110,6 +110,12 @@ func TestProgressNotify(t *testing.T) {
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
+}
+
+func TestWatchWithUnsafeDelete(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
 }
 
 // TestWatchDispatchBookmarkEvents makes sure that

@@ -1166,17 +1166,9 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
-	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
+	_ = proxier.svcPortMap.Update(proxier.serviceChanges)
+	_ = proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	deletedUDPClusterIPs := serviceUpdateResult.DeletedUDPClusterIPs
-	// merge stale services gathered from EndpointsMap.Update
-	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
-		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
-			deletedUDPClusterIPs.Insert(svcInfo.ClusterIP().String())
-		}
-	}
 	// Query HNS for endpoints and load balancers
 	queriedEndpoints, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
 	if err != nil {
@@ -1713,13 +1705,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
-	}
-
-	// Finish housekeeping.
-	// TODO: these could be made more consistent.
-	for _, svcIP := range deletedUDPClusterIPs.UnsortedList() {
-		// TODO : Check if this is required to cleanup stale services here
-		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP)
 	}
 
 	// remove stale endpoint refcount entries

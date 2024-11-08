@@ -838,6 +838,11 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
 		}
 
+		if pod.Spec.Resources != nil {
+			w.Write(LEVEL_0, "Resources:\n")
+			describeResources(pod.Spec.Resources, w, LEVEL_1)
+		}
+
 		if len(pod.Spec.InitContainers) > 0 {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
@@ -1800,7 +1805,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		if ok {
 			describeContainerState(status, w)
 		}
-		describeContainerResource(container, w)
+		describeResources(&container.Resources, w, LEVEL_2)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
 			describeContainerEnvFrom(container, resolverFn, w)
@@ -1886,22 +1891,25 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	}
 }
 
-func describeContainerResource(container corev1.Container, w PrefixWriter) {
-	resources := container.Resources
+func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, level int) {
+	if resources == nil {
+		return
+	}
+
 	if len(resources.Limits) > 0 {
-		w.Write(LEVEL_2, "Limits:\n")
+		w.Write(level, "Limits:\n")
 	}
 	for _, name := range SortedResourceNames(resources.Limits) {
 		quantity := resources.Limits[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
 	}
 
 	if len(resources.Requests) > 0 {
-		w.Write(LEVEL_2, "Requests:\n")
+		w.Write(level, "Requests:\n")
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
-		w.Write(LEVEL_3, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
 	}
 }
 

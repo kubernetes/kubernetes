@@ -71,7 +71,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
@@ -79,6 +78,8 @@ import (
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/tracing"
+	utilversion "k8s.io/component-base/version"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
@@ -189,6 +190,7 @@ type Config struct {
 	LivezChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
 	ReadyzChecks []healthz.HealthChecker
+	Flagz        flagz.Reader
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -742,7 +744,7 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 	return c.Config.Complete(c.SharedInformerFactory)
 }
 
-var allowedMediaTypes = []string{
+var defaultAllowedMediaTypes = []string{
 	runtime.ContentTypeJSON,
 	runtime.ContentTypeYAML,
 	runtime.ContentTypeProtobuf,
@@ -754,6 +756,10 @@ var allowedMediaTypes = []string{
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+	}
+	allowedMediaTypes := defaultAllowedMediaTypes
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		allowedMediaTypes = append(allowedMediaTypes, runtime.ContentTypeCBOR)
 	}
 	for _, info := range c.Serializer.SupportedMediaTypes() {
 		var ok bool
@@ -886,8 +892,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	genericApiServerHookName := "generic-apiserver-start-informers"
 	if c.SharedInformerFactory != nil {
 		if !s.isPostStartHookRegistered(genericApiServerHookName) {
-			err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
-				c.SharedInformerFactory.Start(context.StopCh)
+			err := s.AddPostStartHook(genericApiServerHookName, func(hookContext PostStartHookContext) error {
+				c.SharedInformerFactory.Start(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -904,8 +910,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	const priorityAndFairnessConfigConsumerHookName = "priority-and-fairness-config-consumer"
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
-		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
-			go c.FlowControl.Run(context.StopCh)
+		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(hookContext PostStartHookContext) error {
+			go c.FlowControl.Run(hookContext.Done())
 			return nil
 		})
 		if err != nil {
@@ -920,8 +926,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.FlowControl != nil {
 		const priorityAndFairnessFilterHookName = "priority-and-fairness-filter"
 		if !s.isPostStartHookRegistered(priorityAndFairnessFilterHookName) {
-			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(context PostStartHookContext) error {
-				genericfilters.StartPriorityAndFairnessWatermarkMaintenance(context.StopCh)
+			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(hookContext PostStartHookContext) error {
+				genericfilters.StartPriorityAndFairnessWatermarkMaintenance(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -931,8 +937,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	} else {
 		const maxInFlightFilterHookName = "max-in-flight-filter"
 		if !s.isPostStartHookRegistered(maxInFlightFilterHookName) {
-			err := s.AddPostStartHook(maxInFlightFilterHookName, func(context PostStartHookContext) error {
-				genericfilters.StartMaxInFlightWatermarkMaintenance(context.StopCh)
+			err := s.AddPostStartHook(maxInFlightFilterHookName, func(hookContext PostStartHookContext) error {
+				genericfilters.StartMaxInFlightWatermarkMaintenance(hookContext.Done())
 				return nil
 			})
 			if err != nil {
@@ -945,8 +951,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.StorageObjectCountTracker != nil {
 		const storageObjectCountTrackerHookName = "storage-object-count-tracker-hook"
 		if !s.isPostStartHookRegistered(storageObjectCountTrackerHookName) {
-			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(context PostStartHookContext) error {
-				go c.StorageObjectCountTracker.RunUntil(context.StopCh)
+			if err := s.AddPostStartHook(storageObjectCountTrackerHookName, func(hookContext PostStartHookContext) error {
+				go c.StorageObjectCountTracker.RunUntil(hookContext.Done())
 				return nil
 			}); err != nil {
 				return nil, err
@@ -975,7 +981,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
 
-	installAPI(s, c.Config)
+	installAPI(name, s, c.Config)
 
 	// use the UnprotectedHandler from the delegation target to ensure that we don't attempt to double authenticator, authorize,
 	// or some other part of the filter chain in delegation cases.
@@ -1072,7 +1078,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	return handler
 }
 
-func installAPI(s *GenericAPIServer, c *Config) {
+func installAPI(name string, s *GenericAPIServer, c *Config) {
 	if c.EnableIndex {
 		routes.Index{}.Install(s.listedPathProvider, s.Handler.NonGoRestfulMux)
 	}

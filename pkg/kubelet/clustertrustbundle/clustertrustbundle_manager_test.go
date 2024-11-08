@@ -37,15 +37,17 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestBeforeSynced(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	kc := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	ctbInformer := informerFactory.Certificates().V1alpha1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
 
 	_, err := ctbManager.GetTrustAnchorsByName("foo", false)
 	if err == nil {
@@ -55,6 +57,7 @@ func TestBeforeSynced(t *testing.T) {
 
 func TestGetTrustAnchorsByName(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	tCtx := ktesting.Init(t)
 	defer cancel()
 
 	ctb1 := &certificatesv1alpha1.ClusterTrustBundle{
@@ -80,7 +83,7 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	ctbInformer := informerFactory.Certificates().V1alpha1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
@@ -117,7 +120,8 @@ func TestGetTrustAnchorsByName(t *testing.T) {
 }
 
 func TestGetTrustAnchorsByNameCaching(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 	defer cancel()
 
 	ctb1 := &certificatesv1alpha1.ClusterTrustBundle{
@@ -143,7 +147,7 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	ctbInformer := informerFactory.Certificates().V1alpha1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
@@ -204,6 +208,7 @@ func TestGetTrustAnchorsByNameCaching(t *testing.T) {
 
 func TestGetTrustAnchorsBySignerName(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	tCtx := ktesting.Init(t)
 	defer cancel()
 
 	ctb1 := mustMakeCTB("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
@@ -217,7 +222,7 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	ctbInformer := informerFactory.Certificates().V1alpha1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {
@@ -319,7 +324,8 @@ func TestGetTrustAnchorsBySignerName(t *testing.T) {
 }
 
 func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithTimeout(tCtx, 20*time.Second)
 	defer cancel()
 
 	ctb1 := mustMakeCTB("signer-a-label-a-1", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "0"))
@@ -330,7 +336,7 @@ func TestGetTrustAnchorsBySignerNameCaching(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
 
 	ctbInformer := informerFactory.Certificates().V1alpha1().ClusterTrustBundles()
-	ctbManager, _ := NewInformerManager(ctbInformer, 256, 5*time.Minute)
+	ctbManager, _ := NewInformerManager(tCtx, ctbInformer, 256, 5*time.Minute)
 
 	informerFactory.Start(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), ctbInformer.Informer().HasSynced) {

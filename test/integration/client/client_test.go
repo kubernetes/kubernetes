@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"reflect"
 	rt "runtime"
 	"strings"
@@ -28,9 +29,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,31 +46,43 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
+	autoscalingv1ac "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/utils/pointer"
-
-	utilversion "k8s.io/apiserver/pkg/util/version"
-	"k8s.io/component-base/version"
+	"k8s.io/client-go/discovery"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1client "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
+	"k8s.io/utils/ptr"
 )
 
 func TestClient(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	info, err := client.Discovery().ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedInfo := version.Get()
+	expectedInfo := utilversion.Get()
 	kubeVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
 	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
 	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())
@@ -134,7 +150,7 @@ func TestAtomicPut(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	rcBody := v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
@@ -148,7 +164,7 @@ func TestAtomicPut(t *testing.T) {
 			},
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(0),
+			Replicas: ptr.To(int32(0)),
 			Selector: map[string]string{
 				"foo": "bar",
 			},
@@ -223,7 +239,7 @@ func TestPatch(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	name := "patchpod"
 	resource := "pods"
@@ -342,7 +358,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	endpointTemplate := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -450,7 +466,7 @@ func TestAPIVersions(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	clientVersion := c.CoreV1().RESTClient().APIVersion().String()
 	g, err := c.Discovery().ServerGroups()
@@ -472,7 +488,7 @@ func TestEventValidation(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	createNamespace := func(namespace string) string {
 		if namespace == "" {
@@ -580,7 +596,7 @@ func TestEventCompatibility(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	coreevents := []*v1.Event{
 		{
@@ -690,7 +706,7 @@ func TestSingleWatch(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
@@ -774,7 +790,7 @@ func TestMultiWatch(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := kubernetes.NewForConfigOrDie(result.ClientConfig)
 
 	dummyEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("unrelated-%v", i)
@@ -1003,7 +1019,7 @@ func TestApplyWithApplyConfiguration(t *testing.T) {
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer testServer.TearDownFn()
 
-	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(testServer.ClientConfig)
 
 	// Test apply to spec
 	obj, err := c.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: "test-mgr", Force: true})
@@ -1161,7 +1177,7 @@ func TestExtractModifyApply(t *testing.T) {
 
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer testServer.TearDownFn()
-	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(testServer.ClientConfig)
 	deploymentClient := c.AppsV1().Deployments("default")
 	fieldMgr := "test-mgr"
 
@@ -1233,7 +1249,7 @@ func TestExtractModifyApply(t *testing.T) {
 func TestExtractModifyApply_ForceOwnership(t *testing.T) {
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer testServer.TearDownFn()
-	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	c := kubernetes.NewForConfigOrDie(testServer.ClientConfig)
 	deploymentClient := c.AppsV1().Deployments("default")
 
 	// apply an initial state with one field manager
@@ -1346,5 +1362,735 @@ func TestExtractModifyApply_ForceOwnership(t *testing.T) {
 		)
 	if !equality.Semantic.DeepEqual(expectedCreateExtracted, createMgrExtracted) {
 		t.Errorf("createMgrExtracted apply configuration did not match expected, got:\n%s\n", cmp.Diff(expectedCreateExtracted, createMgrExtracted))
+	}
+}
+
+func TestClientCBOREnablement(t *testing.T) {
+	// Generated clients for built-in types force Protobuf by default. They are tested here to
+	// ensure that the CBOR client feature gates do not interfere with this.
+	DoRequestWithProtobufPreferredGeneratedClient := func(t *testing.T, config *rest.Config) error {
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = clientset.CoreV1().Namespaces().Create(
+			context.TODO(),
+			&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-generated-client-cbor-enablement",
+				},
+			},
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		return err
+	}
+
+	DoRequestWithGeneratedClient := func(t *testing.T, config *rest.Config) error {
+		// This is using a generated client from sample-apiserver because it is generated
+		// without --prefer-protobuf. For convenience, the test serves the API as a CRD with
+		// a permissive schema instead of running a real aggregated sample-apiserver.
+		wardleClient, err := wardlev1alpha1client.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = wardleClient.Fischers().Create(
+			context.TODO(),
+			&wardlev1alpha1.Fischer{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-generated-client-cbor-enablement"},
+			},
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		return err
+	}
+
+	DoRequestWithGenericTypedClient := func(t *testing.T, config *rest.Config) error {
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Generated clients for built-in types include the PreferProtobuf option, which
+		// forces Protobuf encoding on a per-request basis.
+		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
+			"namespaces",
+			clientset.CoreV1().RESTClient(),
+			clientscheme.ParameterCodec,
+			"",
+			func() *v1.Namespace { return &v1.Namespace{} },
+			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		)
+		_, err = client.Create(
+			context.TODO(),
+			&v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-generic-client-cbor-enablement",
+				},
+			},
+			metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+		)
+		return err
+	}
+
+	DoWatchRequestWithGenericTypedClient := func(t *testing.T, config *rest.Config) error {
+		clientset, err := kubernetes.NewForConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Generated clients for built-in types include the PreferProtobuf option, which
+		// forces Protobuf encoding on a per-request basis.
+		client := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
+			"namespaces",
+			clientset.CoreV1().RESTClient(),
+			clientscheme.ParameterCodec,
+			"",
+			func() *v1.Namespace { return &v1.Namespace{} },
+			func() *v1.NamespaceList { return &v1.NamespaceList{} },
+		)
+		w, err := client.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
+		if err != nil {
+			return err
+		}
+		w.Stop()
+		return nil
+	}
+
+	type testCase struct {
+		name                    string
+		served                  bool
+		allowed                 bool
+		preferred               bool
+		configuredContentType   string
+		configuredAccept        string
+		wantRequestContentType  string
+		wantRequestAccept       string
+		wantResponseContentType string
+		wantResponseStatus      int
+		wantStatusError         bool
+		doRequest               func(t *testing.T, config *rest.Config) error
+	}
+
+	testCases := []testCase{
+		{
+			name:                    "cbor allowed and preferred client forces protobuf",
+			served:                  true,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/vnd.kubernetes.protobuf",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
+		},
+		{
+			name:                    "cbor allowed and not preferred client forces protobuf",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/vnd.kubernetes.protobuf",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
+		},
+		{
+			name:                    "cbor not allowed and not preferred client forces protobuf",
+			served:                  true,
+			allowed:                 false,
+			preferred:               false,
+			wantRequestContentType:  "application/vnd.kubernetes.protobuf",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
+		},
+		{
+			name:                    "cbor not allowed and preferred client forces protobuf",
+			served:                  true,
+			allowed:                 false,
+			preferred:               true,
+			wantRequestContentType:  "application/vnd.kubernetes.protobuf",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
+		},
+		{
+			name:                    "fully disabled",
+			served:                  true,
+			allowed:                 false,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json, */*",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "send json accept both get json",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json, */*",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "send json accept both get json",
+			served:                  false,
+			allowed:                 true,
+			preferred:               false,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json, */*",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "send cbor accept both get cbor",
+			served:                  true,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/cbor, */*",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "send cbor accept both get 415",
+			served:                  false,
+			allowed:                 true,
+			preferred:               true,
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/cbor, */*",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusUnsupportedMediaType,
+			wantStatusError:         true,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "both gates required to send cbor",
+			served:                  true,
+			allowed:                 false,
+			preferred:               true,
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json, */*",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "actively configured cbor",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/cbor",
+			configuredAccept:        "application/cbor",
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/cbor",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "force disable actively configured cbor",
+			served:                  true,
+			allowed:                 false,
+			preferred:               false,
+			configuredContentType:   "application/cbor",
+			configuredAccept:        "application/cbor",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "actively configured cbor with two accepted media types",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/cbor",
+			configuredAccept:        "application/cbor;q=0.9,example/foo;q=0.8",
+			wantRequestContentType:  "application/cbor",
+			wantRequestAccept:       "application/cbor;q=0.9,example/foo;q=0.8",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "force disable actively configured cbor with two accepted media types",
+			served:                  true,
+			allowed:                 false,
+			preferred:               false,
+			configuredContentType:   "application/cbor",
+			configuredAccept:        "application/cbor;q=0.9,example/foo;q=0.8",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/json; q=0.9,example/foo; q=0.8",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGeneratedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json and protobuf get protobuf",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/vnd.kubernetes.protobuf;q=1,application/cbor;q=0.9,application/json;q=0.8",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/vnd.kubernetes.protobuf;q=1,application/cbor;q=0.9,application/json;q=0.8",
+			wantResponseContentType: "application/vnd.kubernetes.protobuf",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get cbor",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/cbor",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client watch accept cbor and json get cbor-seq",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/cbor-seq",
+			wantResponseStatus:      http.StatusOK,
+			wantStatusError:         false,
+			doRequest:               DoWatchRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get json cbor not served",
+			served:                  false,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=1,application/json;q=0.9",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor and json get json",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor;q=0.9,application/json;q=1",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor;q=0.9,application/json;q=1",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusCreated,
+			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+	}
+
+	for _, served := range []bool{true, false} {
+		t.Run(fmt.Sprintf("served=%t", served), func(t *testing.T) {
+			// Batch test cases with their server configuration instead of starting and stopping
+			// a new apiserver for each test case.
+			if served {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+			}
+
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			apiextensionsClient, err := apiextensionsv1client.NewForConfig(server.ClientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+			crd, err := apiextensionsClient.CustomResourceDefinitions().Create(
+				context.TODO(),
+				&apiextensionsv1.CustomResourceDefinition{
+					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("fischers.%s", wardlev1alpha1.SchemeGroupVersion.Group)},
+					Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+						Group: wardlev1alpha1.SchemeGroupVersion.Group,
+						Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+							Name:    wardlev1alpha1.SchemeGroupVersion.Version,
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									XPreserveUnknownFields: ptr.To(true),
+									Type:                   "object",
+								},
+							},
+						}},
+						Names: apiextensionsv1.CustomResourceDefinitionNames{
+							Plural:   "fischers",
+							Singular: "fischer",
+							Kind:     "Fischer",
+							ListKind: "FischerList",
+						},
+						Scope: apiextensionsv1.ClusterScoped,
+					},
+				},
+				metav1.CreateOptions{},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// wait to see cr in discovery
+			discoveryClient, err := discovery.NewDiscoveryClientForConfig(server.ClientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(context.Context) (done bool, err error) {
+				resources, err := discoveryClient.ServerResourcesForGroupVersion(wardlev1alpha1.SchemeGroupVersion.String())
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return false, nil
+					}
+					return false, err
+				}
+				for _, resource := range resources.APIResources {
+					if resource.Name == crd.Spec.Names.Plural {
+						return true, nil
+					}
+				}
+				return false, nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, tc := range testCases {
+				if tc.served != served {
+					continue
+				}
+
+				t.Run(tc.name, func(t *testing.T) {
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, tc.allowed)
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, tc.preferred)
+
+					config := rest.CopyConfig(server.ClientConfig)
+					config.ContentType = tc.configuredContentType
+					config.AcceptContentTypes = tc.configuredAccept
+					config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+						return roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+							response, err := rt.RoundTrip(request)
+							if got := response.Request.Header.Get("Content-Type"); got != tc.wantRequestContentType {
+								t.Errorf("want request content type %q, got %q", tc.wantRequestContentType, got)
+							}
+							if got := response.Request.Header.Get("Accept"); got != tc.wantRequestAccept {
+								t.Errorf("want request accept %q, got %q", tc.wantRequestAccept, got)
+							}
+							if got := response.Header.Get("Content-Type"); got != tc.wantResponseContentType {
+								t.Errorf("want response content type %q, got %q", tc.wantResponseContentType, got)
+							}
+							if got := response.StatusCode; got != tc.wantResponseStatus {
+								t.Errorf("want response status %d, got %d", tc.wantResponseStatus, got)
+							}
+							return response, err
+						})
+					})
+
+					err := tc.doRequest(t, config)
+					switch {
+					case tc.wantStatusError && apierrors.IsUnsupportedMediaType(err):
+						// ok
+					case !tc.wantStatusError && err == nil:
+						// ok
+					default:
+						t.Errorf("unexpected error: %v", err)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestCBORWithTypedClient(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	const TestNamespace = "test-cbor-typed-client"
+
+	{
+		// Setup using client with default config.
+		clientset, err := kubernetes.NewForConfig(server.ClientConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := clientset.CoreV1().Namespaces().Delete(context.TODO(), TestNamespace, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				t.Fatal(err)
+			}
+		})
+		if _, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: TestNamespace}}, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	config := rest.CopyConfig(server.ClientConfig)
+	// Content negotiation controlled by client feature gates.
+	config.ContentType = ""
+	config.AcceptContentTypes = ""
+	config.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should be identical to
+	// https://github.com/kubernetes/kubernetes/blob/9ec52fc06395e6ac2fd7a947d6b9fbd3f1bbacb3/staging/src/k8s.io/client-go/kubernetes/typed/core/v1/namespace.go#L64-L72
+	// minus the PrefersProtobuf option, which overrides content negotiation to Protobuf on a
+	// per-request basis.
+	var secretClient corev1client.SecretInterface = gentype.NewClientWithListAndApply[*v1.Secret, *v1.SecretList, *corev1ac.SecretApplyConfiguration](
+		"secrets",
+		clientset.CoreV1().RESTClient(),
+		clientscheme.ParameterCodec,
+		TestNamespace,
+		func() *v1.Secret { return &v1.Secret{} },
+		func() *v1.SecretList { return &v1.SecretList{} },
+	)
+
+	secret, err := secretClient.Create(context.TODO(), &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-secret",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := secretClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: secret.ResourceVersion, FieldSelector: fmt.Sprintf("metadata.name=%s", secret.GetName())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	// do a real update to observe a watch event
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		s, err := secretClient.Get(context.TODO(), secret.GetName(), metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if s.Annotations == nil {
+			s.Annotations = map[string]string{}
+		}
+		s.Annotations["foo"] = "bar"
+		_, err = secretClient.Update(context.TODO(), s, metav1.UpdateOptions{})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var seen bool
+	timeout := time.After(5 * time.Second)
+	for !seen {
+		select {
+		case e, ok := <-w.ResultChan():
+			if !ok {
+				t.Fatal("watch closed without receiving expected event")
+			}
+
+			if e.Type == watch.Error {
+				t.Fatalf("watch received unexpected error event: %v", apierrors.FromObject(e.Object))
+			}
+
+			if ns, ok := e.Object.(*v1.Secret); ok && ns.GetAnnotations()["foo"] == "bar" {
+				// observed update
+				seen = true
+				break
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for event")
+		}
+	}
+
+	if err := secretClient.Delete(context.TODO(), secret.GetName(), metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := secretClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "a,!a"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := secretClient.Get(context.TODO(), secret.GetName(), metav1.GetOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := secretClient.List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// for UpdateStatus
+	nsClient := gentype.NewClientWithListAndApply[*v1.Namespace, *v1.NamespaceList, *corev1ac.NamespaceApplyConfiguration](
+		"namespaces",
+		clientset.CoreV1().RESTClient(),
+		clientscheme.ParameterCodec,
+		"",
+		func() *v1.Namespace { return &v1.Namespace{} },
+		func() *v1.NamespaceList { return &v1.NamespaceList{} },
+	)
+
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		ns, err := nsClient.Get(context.TODO(), TestNamespace, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = nsClient.UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	config = rest.CopyConfig(server.ClientConfig)
+	// Configuring a non-empty AcceptContentTypes avoids the "default to accepting Protobuf"
+	// behavior from client-gen's --prefer-protobuf option, which is set when generating all of
+	// the clients with ApplyScale.
+	config.AcceptContentTypes = "application/cbor"
+	config.Wrap(framework.AssertRequestResponseAsCBOR(t))
+	clientset, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// for Apply, ApplyStatus, and ApplyScale
+	rsClient := clientset.AppsV1().ReplicaSets(TestNamespace)
+	rs, err := rsClient.Apply(
+		context.TODO(),
+		appsv1ac.ReplicaSet("test-cbor-typed-client", TestNamespace).
+			WithSpec(appsv1ac.ReplicaSetSpec().
+				WithReplicas(0).
+				WithSelector(metav1ac.LabelSelector().WithMatchLabels(map[string]string{"foo": "bar"})).
+				WithTemplate(corev1ac.PodTemplateSpec().
+					WithLabels(map[string]string{"foo": "bar"}).
+					WithSpec(corev1ac.PodSpec().
+						WithContainers(corev1ac.Container().
+							WithName("testing").
+							WithImage("busybox"),
+						),
+					),
+				),
+			),
+		metav1.ApplyOptions{FieldManager: "test-cbor-typed-client"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rsClient.ApplyScale(
+		context.TODO(),
+		rs.GetName(),
+		autoscalingv1ac.Scale().WithSpec(autoscalingv1ac.ScaleSpec().WithReplicas(1)),
+		metav1.ApplyOptions{
+			FieldManager: "test-cbor-typed-client",
+			DryRun:       []string{metav1.DryRunAll},
+			Force:        true,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := rsClient.ApplyStatus(context.TODO(), appsv1ac.ReplicaSet(rs.GetName(), rs.GetNamespace()), metav1.ApplyOptions{FieldManager: "test-cbor-typed-client", DryRun: []string{metav1.DryRunAll}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnsupportedMediaTypeCircuitBreaker(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	for _, tc := range []struct {
+		name        string
+		contentType string
+	}{
+		{
+			name:        "default content type",
+			contentType: "",
+		},
+		{
+			name:        "explicit content type",
+			contentType: "application/cbor",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := rest.CopyConfig(server.ClientConfig)
+			config.ContentType = tc.contentType
+			config.AcceptContentTypes = "application/json"
+
+			client, err := corev1client.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); !apierrors.IsUnsupportedMediaType(err) {
+				t.Errorf("expected to receive unsupported media type on first cbor request, got: %v", err)
+			}
+
+			// Requests from this client should fall back from application/cbor to application/json.
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); err != nil {
+				t.Errorf("expected to receive nil error on subsequent cbor request, got: %v", err)
+			}
+
+			// The circuit breaker trips on a per-client basis, so it should not begin tripped for a
+			// fresh client with identical config.
+			client, err = corev1client.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := client.Namespaces().Create(
+				context.TODO(),
+				&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-client-415"}},
+				metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
+			); !apierrors.IsUnsupportedMediaType(err) {
+				t.Errorf("expected to receive unsupported media type on cbor request with fresh client, got: %v", err)
+			}
+		})
 	}
 }

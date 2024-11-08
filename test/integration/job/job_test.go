@@ -428,6 +428,59 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  0,
 			},
 		},
+		"pod status matching the configured FailJob rule on a negative exit code - needed for Windows support": {
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:                     "main-container",
+									Image:                    "foo",
+									ImagePullPolicy:          v1.PullIfNotPresent,
+									TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+								},
+							},
+						},
+					},
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{-1073741510, 137},
+								},
+							},
+						},
+					},
+				},
+			},
+			podStatus: v1.PodStatus{
+				Phase: v1.PodFailed,
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "main-container",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: -1073741510,
+							},
+						},
+					},
+				},
+			},
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
+			wantJobFinishedMetric: metricLabelsWithValue{
+				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
+				Value:  1,
+			},
+			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
+				Labels: []string{"FailJob"},
+				Value:  1,
+			},
+		},
 	}
 
 	closeFn, restConfig, clientSet, ns := setup(t, "pod-failure-policy")
@@ -4127,13 +4180,20 @@ func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clients
 	for _, pod := range pods.Items {
 		if metav1.IsControlledBy(&pod, jobObj) {
 			if pod.Status.Phase == v1.PodPending || pod.Status.Phase == v1.PodRunning {
-				ix, err := getCompletionIndex(&pod)
+				annotationIx, err := getCompletionIndex(pod.Annotations)
 				if err != nil {
-					t.Errorf("Failed getting completion index for pod %s: %v", pod.Name, err)
-				} else {
-					gotActive.Insert(ix)
+					t.Errorf("Failed getting completion index in annotations for pod %s: %v", pod.Name, err)
 				}
-				expectedName := fmt.Sprintf("%s-%d", jobObj.Name, ix)
+				labelIx, err := getCompletionIndex(pod.Labels)
+				if err != nil {
+					t.Errorf("Failed getting completion index in labels for pod %s: %v", pod.Name, err)
+				}
+				if annotationIx != labelIx {
+					t.Errorf("Mismatch in value of annotation index: %v and label index: %v", labelIx,
+						annotationIx)
+				}
+				gotActive.Insert(labelIx)
+				expectedName := fmt.Sprintf("%s-%d", jobObj.Name, labelIx)
 				if diff := cmp.Equal(expectedName, pod.Spec.Hostname); !diff {
 					t.Errorf("Got pod hostname %s, want %s", pod.Spec.Hostname, expectedName)
 				}
@@ -4298,7 +4358,7 @@ func setJobPhaseForIndex(ctx context.Context, clientSet clientset.Interface, job
 		if p := pod.Status.Phase; !metav1.IsControlledBy(&pod, jobObj) || p == v1.PodFailed || p == v1.PodSucceeded {
 			continue
 		}
-		if pix, err := getCompletionIndex(&pod); err == nil && pix == ix {
+		if pix, err := getCompletionIndex(pod.Annotations); err == nil && pix == ix {
 			pod.Status.Phase = phase
 			if phase == v1.PodFailed || phase == v1.PodSucceeded {
 				pod.Status.ContainerStatuses = []v1.ContainerStatus{
@@ -4352,20 +4412,17 @@ func getJobPodsForIndex(ctx context.Context, clientSet clientset.Interface, jobO
 		if !filter(&pod) {
 			continue
 		}
-		if pix, err := getCompletionIndex(&pod); err == nil && pix == ix {
+		if pix, err := getCompletionIndex(pod.Annotations); err == nil && pix == ix {
 			result = append(result, &pod)
 		}
 	}
 	return result, nil
 }
 
-func getCompletionIndex(p *v1.Pod) (int, error) {
-	if p.Annotations == nil {
-		return 0, errors.New("no annotations found")
-	}
-	v, ok := p.Annotations[batchv1.JobCompletionIndexAnnotation]
+func getCompletionIndex(lookupMap map[string]string) (int, error) {
+	v, ok := lookupMap[batchv1.JobCompletionIndexAnnotation]
 	if !ok {
-		return 0, fmt.Errorf("annotation %s not found", batchv1.JobCompletionIndexAnnotation)
+		return 0, fmt.Errorf("key %s not found in lookup Map", batchv1.JobCompletionIndexAnnotation)
 	}
 	return strconv.Atoi(v)
 }

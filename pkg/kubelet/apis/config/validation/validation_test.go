@@ -29,6 +29,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -78,6 +79,7 @@ var (
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
+		SingleProcessOOMKill:        ptr.To(!kubeletutil.IsCgroup2UnifiedMode()),
 	}
 )
 
@@ -635,6 +637,27 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return config
 		},
 		errMsg: `invalid configuration: pod logs path "/🧪" mut contains ASCII characters only`,
+	}, {
+		name: "invalid ContainerRuntimeEndpoint",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.ContainerRuntimeEndpoint = ""
+			return conf
+		},
+		errMsg: "invalid configuration: the containerRuntimeEndpoint was not specified or empty",
+	}, {
+		name: "invalid Logging configuration",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.Logging.Format = "invalid"
+			return conf
+		},
+		errMsg: "logging.format: Invalid value: \"invalid\": Unsupported log format",
+	}, {
+		name: "invalid FeatureGate",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates["invalid"] = true
+			return conf
+		},
+		errMsg: "unrecognized feature gate: invalid",
 	},
 	}
 

@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
@@ -1513,12 +1514,264 @@ func TestFitError_Error(t *testing.T) {
 	}
 }
 
+var (
+	cpu500m       = resource.MustParse("500m")
+	mem500M       = resource.MustParse("500Mi")
+	cpu700m       = resource.MustParse("700m")
+	mem800M       = resource.MustParse("800Mi")
+	cpu1200m      = resource.MustParse("1200m")
+	mem1200M      = resource.MustParse("1200Mi")
+	restartAlways = v1.ContainerRestartPolicyAlways
+)
+
+func TestCalculateResources(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		containers               []v1.Container
+		podResources             *v1.ResourceRequirements
+		podLevelResourcesEnabled bool
+		expectedResource         Resource
+		expectedNon0CPU          int64
+		expectedNon0Mem          int64
+		initContainers           []v1.Container
+	}{
+		{
+			name:             "requestless container",
+			containers:       []v1.Container{{}},
+			expectedResource: Resource{},
+			expectedNon0CPU:  schedutil.DefaultMilliCPURequest,
+			expectedNon0Mem:  schedutil.DefaultMemoryRequest,
+		},
+		{
+			name: "1X container with requests",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue(),
+				Memory:   mem500M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: mem500M.Value(),
+		},
+		{
+			name: "2X container with requests",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu700m,
+							v1.ResourceMemory: mem800M,
+						},
+					},
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+				Memory:   mem500M.Value() + mem800M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+			expectedNon0Mem: mem500M.Value() + mem800M.Value(),
+		},
+		{
+			name:                     "1X container and 1X init container with pod-level requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu1200m,
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu1200m.MilliValue(),
+				Memory:   mem1200M.Value(),
+			},
+			expectedNon0CPU: cpu1200m.MilliValue(),
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container and 1X sidecar container with pod-level requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu1200m,
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu1200m.MilliValue(),
+				Memory:   mem1200M.Value(),
+			},
+			expectedNon0CPU: cpu1200m.MilliValue(),
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container with pod-level memory requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				Memory: mem1200M.Value(),
+			},
+			expectedNon0CPU: schedutil.DefaultMilliCPURequest,
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container with pod-level cpu requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: cpu500m,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: schedutil.DefaultMemoryRequest,
+		},
+		{
+			name:                     "1X container unsupported resources and pod-level supported resources",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: mem500M,
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: mem800M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: cpu500m,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU:         cpu500m.MilliValue(),
+				EphemeralStorage: mem800M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: schedutil.DefaultMemoryRequest,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:      tc.podResources,
+					Containers:     tc.containers,
+					InitContainers: tc.initContainers,
+				},
+			}
+			res, non0CPU, non0Mem := calculateResource(pod)
+			if !reflect.DeepEqual(res, tc.expectedResource) {
+				t.Errorf("Test: %s expected resource: %+v, got: %+v", tc.name, tc.expectedResource, res)
+			}
+
+			if non0CPU != tc.expectedNon0CPU {
+				t.Errorf("Test: %s expected non0CPU: %d, got: %d", tc.name, tc.expectedNon0CPU, non0CPU)
+			}
+
+			if non0Mem != tc.expectedNon0Mem {
+				t.Errorf("Test: %s expected non0Mem: %d, got: %d", tc.name, tc.expectedNon0Mem, non0Mem)
+			}
+		})
+	}
+}
+
 func TestCalculatePodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	cpu500m := resource.MustParse("500m")
-	mem500M := resource.MustParse("500Mi")
-	cpu700m := resource.MustParse("700m")
-	mem800M := resource.MustParse("800Mi")
 	testpod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "pod_resize_test",
@@ -1533,9 +1786,9 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 
 	preparePod := func(pod v1.Pod,
-		requests, allocatedResources,
-		initRequests, initAllocatedResources,
-		sidecarRequests, sidecarAllocatedResources *v1.ResourceList,
+		requests, statusResources,
+		initRequests, initStatusResources,
+		sidecarRequests, sidecarStatusResources *v1.ResourceList,
 		resizeStatus v1.PodResizeStatus) v1.Pod {
 
 		if requests != nil {
@@ -1545,11 +1798,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 					Resources: v1.ResourceRequirements{Requests: *requests},
 				})
 		}
-		if allocatedResources != nil {
+		if statusResources != nil {
 			pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses,
 				v1.ContainerStatus{
-					Name:               "c1",
-					AllocatedResources: *allocatedResources,
+					Name: "c1",
+					Resources: &v1.ResourceRequirements{
+						Requests: *statusResources,
+					},
 				})
 		}
 
@@ -1561,11 +1816,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 				},
 			)
 		}
-		if initAllocatedResources != nil {
+		if initStatusResources != nil {
 			pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses,
 				v1.ContainerStatus{
-					Name:               "i1",
-					AllocatedResources: *initAllocatedResources,
+					Name: "i1",
+					Resources: &v1.ResourceRequirements{
+						Requests: *initStatusResources,
+					},
 				})
 		}
 
@@ -1578,11 +1835,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 				},
 			)
 		}
-		if sidecarAllocatedResources != nil {
+		if sidecarStatusResources != nil {
 			pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses,
 				v1.ContainerStatus{
-					Name:               "s1",
-					AllocatedResources: *sidecarAllocatedResources,
+					Name: "s1",
+					Resources: &v1.ResourceRequirements{
+						Requests: *sidecarStatusResources,
+					},
 				})
 		}
 
@@ -1591,74 +1850,74 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		requests                  v1.ResourceList
-		allocatedResources        v1.ResourceList
-		initRequests              *v1.ResourceList
-		initAllocatedResources    *v1.ResourceList
-		sidecarRequests           *v1.ResourceList
-		sidecarAllocatedResources *v1.ResourceList
-		resizeStatus              v1.PodResizeStatus
-		expectedResource          Resource
-		expectedNon0CPU           int64
-		expectedNon0Mem           int64
+		name                   string
+		requests               v1.ResourceList
+		statusResources        v1.ResourceList
+		initRequests           *v1.ResourceList
+		initStatusResources    *v1.ResourceList
+		sidecarRequests        *v1.ResourceList
+		sidecarStatusResources *v1.ResourceList
+		resizeStatus           v1.PodResizeStatus
+		expectedResource       Resource
+		expectedNon0CPU        int64
+		expectedNon0Mem        int64
 	}{
 		{
-			name:               "Pod with no pending resize",
-			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:       "",
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
-			expectedNon0CPU:    cpu500m.MilliValue(),
-			expectedNon0Mem:    mem500M.Value(),
+			name:             "Pod with no pending resize",
+			requests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:     "",
+			expectedResource: Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:  cpu500m.MilliValue(),
+			expectedNon0Mem:  mem500M.Value(),
 		},
 		{
-			name:               "Pod with resize in progress",
-			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:       v1.PodResizeStatusInProgress,
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
-			expectedNon0CPU:    cpu500m.MilliValue(),
-			expectedNon0Mem:    mem500M.Value(),
+			name:             "Pod with resize in progress",
+			requests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:     v1.PodResizeStatusInProgress,
+			expectedResource: Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:  cpu500m.MilliValue(),
+			expectedNon0Mem:  mem500M.Value(),
 		},
 		{
-			name:               "Pod with deferred resize",
-			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:       v1.PodResizeStatusDeferred,
-			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
-			expectedNon0CPU:    cpu700m.MilliValue(),
-			expectedNon0Mem:    mem800M.Value(),
+			name:             "Pod with deferred resize",
+			requests:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			statusResources:  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:     v1.PodResizeStatusDeferred,
+			expectedResource: Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedNon0CPU:  cpu700m.MilliValue(),
+			expectedNon0Mem:  mem800M.Value(),
 		},
 		{
-			name:               "Pod with infeasible resize",
-			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:       v1.PodResizeStatusInfeasible,
-			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
-			expectedNon0CPU:    cpu500m.MilliValue(),
-			expectedNon0Mem:    mem500M.Value(),
+			name:             "Pod with infeasible resize",
+			requests:         v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			statusResources:  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			resizeStatus:     v1.PodResizeStatusInfeasible,
+			expectedResource: Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
+			expectedNon0CPU:  cpu500m.MilliValue(),
+			expectedNon0Mem:  mem500M.Value(),
 		},
 		{
-			name:                   "Pod with init container and no pending resize",
+			name:                "Pod with init container and no pending resize",
+			requests:            v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:     v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			initRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			initStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			resizeStatus:        "",
+			expectedResource:    Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
+			expectedNon0CPU:     cpu700m.MilliValue(),
+			expectedNon0Mem:     mem800M.Value(),
+		},
+		{
+			name:                   "Pod with sider container and no pending resize",
 			requests:               v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			allocatedResources:     v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			statusResources:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			initRequests:           &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			initAllocatedResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			initStatusResources:    &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			sidecarRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
+			sidecarStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			resizeStatus:           "",
-			expectedResource:       Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
-			expectedNon0CPU:        cpu700m.MilliValue(),
-			expectedNon0Mem:        mem800M.Value(),
-		},
-		{
-			name:                      "Pod with sider container and no pending resize",
-			requests:                  v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			allocatedResources:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			initRequests:              &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			initAllocatedResources:    &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			sidecarRequests:           &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			sidecarAllocatedResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resizeStatus:              "",
 			expectedResource: Resource{
 				MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
 				Memory:   mem500M.Value() + mem800M.Value(),
@@ -1671,9 +1930,9 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := preparePod(*testpod.DeepCopy(),
-				&tt.requests, &tt.allocatedResources,
-				tt.initRequests, tt.initAllocatedResources,
-				tt.sidecarRequests, tt.sidecarAllocatedResources,
+				&tt.requests, &tt.statusResources,
+				tt.initRequests, tt.initStatusResources,
+				tt.sidecarRequests, tt.sidecarStatusResources,
 				tt.resizeStatus)
 
 			res, non0CPU, non0Mem := calculateResource(&pod)
@@ -1707,6 +1966,12 @@ func TestCloudEvent_Match(t *testing.T) {
 			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
 			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
 			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' matching with coming events carries unschedulablePod",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: unschedulablePod, ActionType: UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{

@@ -72,7 +72,9 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 			scheme.ParameterCodec,
 			namespace,
 			func() *corev1.ReplicationController { return &corev1.ReplicationController{} },
-			func() *corev1.ReplicationControllerList { return &corev1.ReplicationControllerList{} }),
+			func() *corev1.ReplicationControllerList { return &corev1.ReplicationControllerList{} },
+			gentype.PrefersProtobuf[*corev1.ReplicationController](),
+		),
 	}
 }
 
@@ -80,6 +82,7 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).
@@ -94,6 +97,7 @@ func (c *replicationControllers) GetScale(ctx context.Context, replicationContro
 func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).

@@ -183,13 +183,13 @@ func validateCondition(condition storagemigration.MigrationCondition, fldPath *f
 
 		const maxReasonLen int = 1 * 1024 // 1024
 		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), condition.Reason, maxReasonLen))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
 		}
 	}
 
 	const maxMessageLen int = 32 * 1024 // 32768
 	if len(condition.Message) > maxMessageLen {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, maxMessageLen))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxMessageLen))
 	}
 
 	return allErrs

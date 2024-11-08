@@ -339,6 +339,10 @@ func SetObjectDefaults_DaemonSet(in *appsv1beta2.DaemonSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_DaemonSetList(in *appsv1beta2.DaemonSetList) {
@@ -644,6 +648,10 @@ func SetObjectDefaults_Deployment(in *appsv1beta2.Deployment) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_DeploymentList(in *appsv1beta2.DeploymentList) {
@@ -949,6 +957,10 @@ func SetObjectDefaults_ReplicaSet(in *appsv1beta2.ReplicaSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 }
 
 func SetObjectDefaults_ReplicaSetList(in *appsv1beta2.ReplicaSetList) {
@@ -1254,6 +1266,10 @@ func SetObjectDefaults_StatefulSet(in *appsv1beta2.StatefulSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	if in.Spec.Template.Spec.Resources != nil {
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Limits)
+		corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Resources.Requests)
+	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		corev1.SetDefaults_PersistentVolumeClaim(a)

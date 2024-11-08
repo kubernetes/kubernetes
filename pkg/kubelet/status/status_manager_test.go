@@ -32,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -2032,6 +2034,105 @@ func TestMergePodStatus(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUpdatePodFromAllocation(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345",
+			Name:      "test",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+					},
+				},
+			}, {
+				Name: "c2",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+					},
+				},
+			}},
+		},
+	}
+
+	resizedPod := pod.DeepCopy()
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
+
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		allocs       state.PodResourceAllocation
+		expectPod    *v1.Pod
+		expectUpdate bool
+	}{{
+		name: "steady state",
+		pod:  pod,
+		allocs: state.PodResourceAllocation{
+			string(pod.UID): map[string]v1.ResourceRequirements{
+				"c1": *pod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+			},
+		},
+		expectUpdate: false,
+	}, {
+		name:         "no allocations",
+		pod:          pod,
+		allocs:       state.PodResourceAllocation{},
+		expectUpdate: false,
+	}, {
+		name: "missing container allocation",
+		pod:  pod,
+		allocs: state.PodResourceAllocation{
+			string(pod.UID): map[string]v1.ResourceRequirements{
+				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
+			},
+		},
+		expectUpdate: false,
+	}, {
+		name: "resized container",
+		pod:  pod,
+		allocs: state.PodResourceAllocation{
+			string(pod.UID): map[string]v1.ResourceRequirements{
+				"c1": *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2": *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+			},
+		},
+		expectUpdate: true,
+		expectPod:    resizedPod,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := test.pod.DeepCopy()
+			allocatedPod, updated := updatePodFromAllocation(pod, test.allocs)
+
+			if test.expectUpdate {
+				assert.True(t, updated, "updated")
+				assert.Equal(t, test.expectPod, allocatedPod)
+				assert.NotEqual(t, pod, allocatedPod)
+			} else {
+				assert.False(t, updated, "updated")
+				assert.Same(t, pod, allocatedPod)
+			}
+		})
+	}
 }
 
 func statusEqual(left, right v1.PodStatus) bool {

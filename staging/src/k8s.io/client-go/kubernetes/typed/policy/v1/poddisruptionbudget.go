@@ -68,6 +68,8 @@ func newPodDisruptionBudgets(c *PolicyV1Client, namespace string) *podDisruption
 			scheme.ParameterCodec,
 			namespace,
 			func() *policyv1.PodDisruptionBudget { return &policyv1.PodDisruptionBudget{} },
-			func() *policyv1.PodDisruptionBudgetList { return &policyv1.PodDisruptionBudgetList{} }),
+			func() *policyv1.PodDisruptionBudgetList { return &policyv1.PodDisruptionBudgetList{} },
+			gentype.PrefersProtobuf[*policyv1.PodDisruptionBudget](),
+		),
 	}
 }

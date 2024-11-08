@@ -304,7 +304,7 @@ func TestLog(t *testing.T) {
 
 				o := NewLogsOptions(streams)
 				o.LogsForObject = mock.mockLogsForObject
-				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
+				o.ConsumeRequestFn = func(ctx context.Context, req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
 				}
 				return o
@@ -378,7 +378,7 @@ func TestLog(t *testing.T) {
 
 				o := NewLogsOptions(streams)
 				o.LogsForObject = mock.mockLogsForObject
-				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
+				o.ConsumeRequestFn = func(ctx context.Context, req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
 				}
 				o.Follow = true
@@ -401,7 +401,7 @@ func TestLog(t *testing.T) {
 
 				o := NewLogsOptions(streams)
 				o.LogsForObject = mock.mockLogsForObject
-				o.ConsumeRequestFn = func(req restclient.ResponseWrapper, out io.Writer) error {
+				o.ConsumeRequestFn = func(ctx context.Context, req restclient.ResponseWrapper, out io.Writer) error {
 					return errors.New("Error from the ConsumeRequestFn")
 				}
 				o.Follow = true
@@ -808,7 +808,7 @@ func TestDefaultConsumeRequest(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := DefaultConsumeRequest(test.request, buf)
+			err := DefaultConsumeRequest(context.TODO(), test.request, buf)
 
 			if err != nil && !strings.Contains(err.Error(), test.expectedErr) {
 				t.Errorf("%s: expected to find:\n\t%s\nfound:\n\t%s\n", test.name, test.expectedErr, err.Error())
@@ -932,8 +932,8 @@ type logTestMock struct {
 	wg *sync.WaitGroup
 }
 
-func (l *logTestMock) mockConsumeRequest(request restclient.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream(context.Background())
+func (l *logTestMock) mockConsumeRequest(ctx context.Context, request restclient.ResponseWrapper, out io.Writer) error {
+	readCloser, err := request.Stream(ctx)
 	if err != nil {
 		return err
 	}

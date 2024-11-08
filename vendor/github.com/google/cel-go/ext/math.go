@@ -325,8 +325,12 @@ import (
 //
 //	math.isFinite(0.0/0.0)  // returns false
 //	math.isFinite(1.2)      // returns true
-func Math() cel.EnvOption {
-	return cel.Lib(&mathLib{version: math.MaxUint32})
+func Math(options ...MathOption) cel.EnvOption {
+	m := &mathLib{version: math.MaxUint32}
+	for _, o := range options {
+		m = o(m)
+	}
+	return cel.Lib(m)
 }
 
 const (
@@ -366,8 +370,10 @@ var (
 	errIntOverflow = types.NewErr("integer overflow")
 )
 
+// MathOption declares a functional operator for configuring math extensions.
 type MathOption func(*mathLib) *mathLib
 
+// MathVersion sets the library version for math extensions.
 func MathVersion(version uint32) MathOption {
 	return func(lib *mathLib) *mathLib {
 		lib.version = version

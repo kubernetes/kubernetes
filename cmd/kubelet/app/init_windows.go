@@ -89,7 +89,7 @@ func initForOS(windowsService bool, windowsPriorityClass string) error {
 	}
 
 	if windowsService {
-		return service.InitService(serviceName)
+		return service.InitServiceWithShutdown(serviceName)
 	}
 	return nil
 }

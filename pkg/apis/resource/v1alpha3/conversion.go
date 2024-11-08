@@ -19,8 +19,10 @@ package v1alpha3
 import (
 	"fmt"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/resource"
+	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -36,5 +38,15 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
+	return nil
+}
+
+func Convert_resource_DeviceCapacity_To_resource_Quantity(in *resourceapi.DeviceCapacity, out *resource.Quantity, s conversion.Scope) error {
+	*out = in.Value
+	return nil
+}
+
+func Convert_resource_Quantity_To_resource_DeviceCapacity(in *resource.Quantity, out *resourceapi.DeviceCapacity, s conversion.Scope) error {
+	out.Value = *in
 	return nil
 }

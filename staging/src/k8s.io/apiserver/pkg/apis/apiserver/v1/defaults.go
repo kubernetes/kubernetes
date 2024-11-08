@@ -48,3 +48,12 @@ func SetDefaults_KMSConfiguration(obj *KMSConfiguration) {
 		obj.CacheSize = &defaultCacheSize
 	}
 }
+
+func SetDefaults_WebhookConfiguration(obj *WebhookConfiguration) {
+	if obj.AuthorizedTTL.Duration == 0 {
+		obj.AuthorizedTTL.Duration = 5 * time.Minute
+	}
+	if obj.UnauthorizedTTL.Duration == 0 {
+		obj.UnauthorizedTTL.Duration = 30 * time.Second
+	}
+}

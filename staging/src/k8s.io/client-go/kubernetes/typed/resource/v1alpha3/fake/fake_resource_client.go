@@ -29,23 +29,19 @@ type FakeResourceV1alpha3 struct {
 }
 
 func (c *FakeResourceV1alpha3) DeviceClasses() v1alpha3.DeviceClassInterface {
-	return &FakeDeviceClasses{c}
-}
-
-func (c *FakeResourceV1alpha3) PodSchedulingContexts(namespace string) v1alpha3.PodSchedulingContextInterface {
-	return &FakePodSchedulingContexts{c, namespace}
+	return newFakeDeviceClasses(c)
 }
 
 func (c *FakeResourceV1alpha3) ResourceClaims(namespace string) v1alpha3.ResourceClaimInterface {
-	return &FakeResourceClaims{c, namespace}
+	return newFakeResourceClaims(c, namespace)
 }
 
 func (c *FakeResourceV1alpha3) ResourceClaimTemplates(namespace string) v1alpha3.ResourceClaimTemplateInterface {
-	return &FakeResourceClaimTemplates{c, namespace}
+	return newFakeResourceClaimTemplates(c, namespace)
 }
 
 func (c *FakeResourceV1alpha3) ResourceSlices() v1alpha3.ResourceSliceInterface {
-	return &FakeResourceSlices{c}
+	return newFakeResourceSlices(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -40,13 +40,14 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -91,7 +92,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			// When plugin and kubelet get killed at the end of the tests, they leave ResourceSlices behind.
 			// Perhaps garbage collection would eventually remove them (not sure how the node instance
 			// is managed), but this could take time. Let's clean up explicitly.
-			framework.ExpectNoError(f.ClientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}))
+			framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}))
 		})
 	})
 
@@ -106,7 +107,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 
 			ginkgo.By("restarting Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(getNewCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
@@ -128,16 +129,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Stop Kubelet
 			ginkgo.By("stop kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			// Pod must be in pending state
 			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Pending", framework.PodStartShortTimeout, func(pod *v1.Pod) (bool, error) {
 				return pod.Status.Phase == v1.PodPending, nil
 			})
 			framework.ExpectNoError(err)
-			// Start Kubelet
 			ginkgo.By("restart kubelet")
-			startKubelet()
+			restartKubelet(ctx)
 			// Pod should succeed
 			err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartShortTimeout)
 			framework.ExpectNoError(err)
@@ -226,12 +226,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesFailed)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			unsetNodePrepareResourcesFailureMode()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			ginkgo.By("wait for NodePrepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
@@ -253,12 +253,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			unsetNodeUnprepareResourcesFailureMode()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			ginkgo.By("wait for NodeUnprepareResources call to succeed")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
@@ -312,7 +312,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
 
 			ginkgo.By("restart Kubelet")
-			stopKubelet()()
+			restartKubelet(ctx, true)
 
 			ginkgo.By("wait for NodeUnprepareResources call to fail")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesFailed)
@@ -336,15 +336,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(err)
 
 			ginkgo.By("stop Kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("delete pod")
 			e2epod.DeletePodOrFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name)
 
 			unblockNodePrepareResources()
 
-			ginkgo.By("start Kubelet")
-			startKubelet()
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx)
 
 			calls := kubeletPlugin.CountCalls("/NodePrepareResources")
 			ginkgo.By("make sure NodePrepareResources is not called again")
@@ -446,7 +446,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(err)
 
 			ginkgo.By("restart Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			unblockNodePrepareResources()
 
@@ -471,7 +471,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodePrepareResourcesSucceeded)
 
 			ginkgo.By("restart Kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			unblockNodeUnprepareResources()
 
@@ -486,7 +486,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	f.Context("ResourceSlice", f.WithSerial(), func() {
 		listResources := func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-			slices, err := f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
+			slices, err := f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -499,10 +499,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		f.It("must be removed on kubelet startup", f.WithDisruptive(), func(ctx context.Context) {
 			ginkgo.By("stop kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 			ginkgo.DeferCleanup(func() {
-				if startKubelet != nil {
-					startKubelet()
+				if restartKubelet != nil {
+					restartKubelet(ctx)
 				}
 			})
 
@@ -517,9 +517,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchAll, "ResourceSlices without kubelet")
 
-			ginkgo.By("start kubelet")
-			startKubelet()
-			startKubelet = nil
+			ginkgo.By("restart kubelet")
+			restartKubelet(ctx)
+			restartKubelet = nil
 
 			ginkgo.By("wait for exactly the node's ResourceSlice to get deleted")
 			gomega.Eventually(ctx, listResources).Should(matchOtherNode, "ResourceSlices with kubelet")
@@ -576,7 +576,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
 		// A separate test checks this explicitly.
-		framework.ExpectNoError(clientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
+		framework.ExpectNoError(clientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
 	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
@@ -594,10 +594,10 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			Name: className,
 		},
 	}
-	_, err := clientSet.ResourceV1alpha3().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
+	_, err := clientSet.ResourceV1beta1().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().DeviceClasses().Delete, className, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1beta1().DeviceClasses().Delete, className, metav1.DeleteOptions{})
 
 	// ResourceClaim
 	podClaimName := "resource-claim"
@@ -614,10 +614,10 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			},
 		},
 	}
-	createdClaim, err := clientSet.ResourceV1alpha3().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := clientSet.ResourceV1beta1().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1beta1().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
 
 	// The pod checks its own env with grep. Each driver injects its own parameters,
 	// with the driver name as part of the variable name. Sorting ensures that a
@@ -673,10 +673,11 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
 	for i, driverName := range driverNames {
 		results[i] = resourceapi.DeviceRequestAllocationResult{
-			Driver:  driverName,
-			Pool:    "some-pool",
-			Device:  "some-device",
-			Request: claim.Spec.Devices.Requests[0].Name,
+			Driver:      driverName,
+			Pool:        "some-pool",
+			Device:      "some-device",
+			Request:     claim.Spec.Devices.Requests[0].Name,
+			AdminAccess: ptr.To(false),
 		}
 		config[i] = resourceapi.DeviceAllocationConfiguration{
 			Source: resourceapi.AllocationConfigSourceClaim,
@@ -700,7 +701,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			},
 		},
 	}
-	_, err = clientSet.ResourceV1alpha3().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	_, err = clientSet.ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
 
 	return pod
@@ -722,11 +723,11 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating ResourceSlice %s", nodeName))
-	slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+	slice, err := clientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "create ResourceSlice")
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Deleting ResourceSlice %s", nodeName))
-		err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+		err := clientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete ResourceSlice")
 		}

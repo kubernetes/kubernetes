@@ -526,7 +526,7 @@ func ValidateIngressClassUpdate(newIngressClass, oldIngressClass *networking.Ing
 func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(spec.Controller) > maxLenIngressClassController {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), spec.Controller, maxLenIngressClassController))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), "" /*unused*/, maxLenIngressClassController))
 	}
 	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
 	allErrs = append(allErrs, validateIngressClassParametersReference(spec.Parameters, fldPath.Child("parameters"))...)

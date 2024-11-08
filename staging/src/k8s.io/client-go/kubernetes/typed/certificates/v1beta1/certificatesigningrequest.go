@@ -72,6 +72,8 @@ func newCertificateSigningRequests(c *CertificatesV1beta1Client) *certificateSig
 			},
 			func() *certificatesv1beta1.CertificateSigningRequestList {
 				return &certificatesv1beta1.CertificateSigningRequestList{}
-			}),
+			},
+			gentype.PrefersProtobuf[*certificatesv1beta1.CertificateSigningRequest](),
+		),
 	}
 }

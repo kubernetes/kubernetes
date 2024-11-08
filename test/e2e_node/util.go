@@ -216,12 +216,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ctx
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
-
-	// wait until the kubelet health check will fail
-	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
+	restartKubelet := mustStopKubelet(ctx, f)
 
 	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
 	if deleteStateFiles {
@@ -231,9 +226,8 @@ func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletCon
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
 
-	ginkgo.By("Starting the kubelet")
-	startKubelet()
-	waitForKubeletToStart(ctx, f)
+	ginkgo.By("Restarting the kubelet")
+	restartKubelet(ctx)
 }
 
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
@@ -433,31 +427,37 @@ func startContainerRuntime() error {
 // Warning: the "current" kubelet is poorly defined. The "current" kubelet is assumed to be the most
 // recent kubelet service unit, IOW there is not a unique ID we use to bind explicitly a kubelet
 // instance to a test run.
-func restartKubelet(running bool) {
+func restartKubelet(ctx context.Context, running bool) {
 	kubeletServiceName := findKubeletServiceName(running)
 	// reset the kubelet service start-limit-hit
-	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
+	stdout, err := exec.CommandContext(ctx, "sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
 
-	stdout, err = exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
+	stdout, err = exec.CommandContext(ctx, "sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %s", err, string(stdout))
 }
 
-// stopKubelet will kill the running kubelet, and returns a func that will restart the process again
-func stopKubelet() func() {
+// mustStopKubelet will kill the running kubelet, and returns a func that will restart the process again
+func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx context.Context) {
 	kubeletServiceName := findKubeletServiceName(true)
 
 	// reset the kubelet service start-limit-hit
-	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
+	stdout, err := exec.CommandContext(ctx, "sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
 
-	stdout, err = exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
+	stdout, err = exec.CommandContext(ctx, "sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %s", err, string(stdout))
 
-	return func() {
+	// wait until the kubelet health check fail
+	gomega.Eventually(ctx, func() bool {
+		return kubeletHealthCheck(kubeletHealthCheckURL)
+	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
+
+	return func(ctx context.Context) {
 		// we should restart service, otherwise the transient service start will fail
-		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
+		stdout, err := exec.CommandContext(ctx, "sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+		waitForKubeletToStart(ctx, f)
 	}
 }
 

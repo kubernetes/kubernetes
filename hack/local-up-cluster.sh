@@ -51,12 +51,12 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
-# if true, limited swap is being used instead of unlimited swap (default)
+# if true, limited swap is being used instead of no swap (default)
 LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.5.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.6.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -95,6 +95,7 @@ CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
+TOPOLOGY_MANAGER_POLICY=${TOPOLOGY_MANAGER_POLICY:-""}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
@@ -168,6 +169,7 @@ function usage {
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
             echo "Example 4: FEATURE_GATES=CPUManagerPolicyOptions=true \\"
+            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
             echo "           CPUMANAGER_POLICY=\"static\" \\"
             echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
@@ -944,6 +946,11 @@ EOF
       # feature gate
       if [[ -n ${FEATURE_GATES} ]]; then
         parse_feature_gates "${FEATURE_GATES}"
+      fi
+
+      # topology maanager policy
+      if [[ -n ${TOPOLOGY_MANAGER_POLICY} ]]; then
+        echo "topologyManagerPolicy: \"${TOPOLOGY_MANAGER_POLICY}\""
       fi
 
       # cpumanager policy

@@ -21,12 +21,20 @@ limitations under the License.
 package contract
 
 import (
+	resourceapi "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 var _ framework.NodeInfoLister = &nodeInfoListerContract{}
 var _ framework.StorageInfoLister = &storageInfoListerContract{}
 var _ framework.SharedLister = &shareListerContract{}
+var _ framework.ResourceSliceLister = &resourceSliceListerContract{}
+var _ framework.DeviceClassLister = &deviceClassListerContract{}
+var _ framework.ResourceClaimTracker = &resourceClaimTrackerContract{}
+var _ framework.SharedDRAManager = &sharedDRAManagerContract{}
 
 type nodeInfoListerContract struct{}
 
@@ -59,5 +67,68 @@ func (c *shareListerContract) NodeInfos() framework.NodeInfoLister {
 }
 
 func (c *shareListerContract) StorageInfos() framework.StorageInfoLister {
+	return nil
+}
+
+type resourceSliceListerContract struct{}
+
+func (c *resourceSliceListerContract) List() ([]*resourceapi.ResourceSlice, error) {
+	return nil, nil
+}
+
+type deviceClassListerContract struct{}
+
+func (c *deviceClassListerContract) List() ([]*resourceapi.DeviceClass, error) {
+	return nil, nil
+}
+
+func (c *deviceClassListerContract) Get(_ string) (*resourceapi.DeviceClass, error) {
+	return nil, nil
+}
+
+type resourceClaimTrackerContract struct{}
+
+func (r *resourceClaimTrackerContract) List() ([]*resourceapi.ResourceClaim, error) {
+	return nil, nil
+}
+
+func (r *resourceClaimTrackerContract) Get(_, _ string) (*resourceapi.ResourceClaim, error) {
+	return nil, nil
+}
+
+func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+	return nil, nil
+}
+
+func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID, _ *resourceapi.ResourceClaim) error {
+	return nil
+}
+
+func (r *resourceClaimTrackerContract) ClaimHasPendingAllocation(_ types.UID) bool {
+	return false
+}
+
+func (r *resourceClaimTrackerContract) RemoveClaimPendingAllocation(_ types.UID) (deleted bool) {
+	return false
+}
+
+func (r *resourceClaimTrackerContract) AssumeClaimAfterAPICall(_ *resourceapi.ResourceClaim) error {
+	return nil
+}
+
+func (r *resourceClaimTrackerContract) AssumedClaimRestore(_, _ string) {
+}
+
+type sharedDRAManagerContract struct{}
+
+func (s *sharedDRAManagerContract) ResourceClaims() framework.ResourceClaimTracker {
+	return nil
+}
+
+func (s *sharedDRAManagerContract) ResourceSlices() framework.ResourceSliceLister {
+	return nil
+}
+
+func (s *sharedDRAManagerContract) DeviceClasses() framework.DeviceClassLister {
 	return nil
 }

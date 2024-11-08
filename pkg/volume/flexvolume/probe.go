@@ -40,7 +40,6 @@ type flexVolumeProber struct {
 	factory        PluginFactory
 	fs             utilfs.Filesystem
 	probeAllNeeded bool
-	probeAllOnce   sync.Once
 	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the corresponding operation
 }
 
@@ -56,7 +55,7 @@ func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.Dyna
 }
 
 func (prober *flexVolumeProber) Init() error {
-	prober.probeAllNeeded = true
+	prober.testAndSetProbeAllNeeded(true)
 	prober.eventsMap = map[string]volume.ProbeOperation{}
 
 	if err := prober.createPluginDir(); err != nil {
@@ -69,18 +68,14 @@ func (prober *flexVolumeProber) Init() error {
 	return nil
 }
 
-// If we haven't yet done so, probe all pluginDir
+// If probeAllNeeded is true, probe all pluginDir
 // else probe events in eventsMap
 func (prober *flexVolumeProber) Probe() (events []volume.ProbeEvent, err error) {
-	probedAll := false
-	prober.probeAllOnce.Do(func() {
-		events, err = prober.probeAll()
-		probedAll = true
-		prober.probeAllNeeded = false
-	})
-	if probedAll {
-		return events, err
+	if prober.probeAllNeeded {
+		prober.testAndSetProbeAllNeeded(false)
+		return prober.probeAll()
 	}
+
 	return prober.probeMap()
 }
 
@@ -282,4 +277,11 @@ func (prober *flexVolumeProber) createPluginDir() error {
 	}
 
 	return nil
+}
+
+func (prober *flexVolumeProber) testAndSetProbeAllNeeded(newval bool) (oldval bool) {
+	prober.mutex.Lock()
+	defer prober.mutex.Unlock()
+	oldval, prober.probeAllNeeded = prober.probeAllNeeded, newval
+	return
 }

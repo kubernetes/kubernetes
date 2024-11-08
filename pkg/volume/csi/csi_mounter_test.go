@@ -861,6 +861,15 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			fsGroup:    3000,
 		},
 		{
+			name: "fstype, fsgroup, RWOP provided (should apply fsgroup)",
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOncePod,
+			},
+			fsType:     "ext4",
+			setFsGroup: true,
+			fsGroup:    3000,
+		},
+		{
 			name: "fstype, fsgroup, RWO provided, FSGroupPolicy ReadWriteOnceWithFSType (should apply fsgroup)",
 			accessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,

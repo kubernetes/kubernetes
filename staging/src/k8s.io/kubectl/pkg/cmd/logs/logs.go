@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -124,7 +125,7 @@ type LogsOptions struct {
 	Options       runtime.Object
 	Resources     []string
 
-	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
+	ConsumeRequestFn func(context.Context, rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
 	SinceTime                    string
@@ -375,14 +376,21 @@ func (o LogsOptions) RunLogs() error {
 				len(requests), o.MaxFollowConcurrency,
 			)
 		}
-
-		return o.parallelConsumeRequest(requests)
 	}
 
-	return o.sequentialConsumeRequest(requests)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
+	return intr.Run(func() error {
+		if o.Follow && len(requests) > 1 {
+			return o.parallelConsumeRequest(ctx, requests)
+		}
+
+		return o.sequentialConsumeRequest(ctx, requests)
+	})
 }
 
-func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
@@ -390,7 +398,7 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
-			if err := o.ConsumeRequestFn(request, out); err != nil {
+			if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
 
@@ -413,10 +421,10 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 	return err
 }
 
-func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) sequentialConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.ConsumeRequestFn(request, out); err != nil {
+		if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
 			if !o.IgnoreLogErrors {
 				return err
 			}
@@ -457,8 +465,8 @@ func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Wri
 // A successful read returns err == nil, not err == io.EOF.
 // Because the function is defined to read from request until io.EOF, it does
 // not treat an io.EOF as an error to be reported.
-func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream(context.TODO())
+func DefaultConsumeRequest(ctx context.Context, request rest.ResponseWrapper, out io.Writer) error {
+	readCloser, err := request.Stream(ctx)
 	if err != nil {
 		return err
 	}

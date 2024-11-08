@@ -19,14 +19,15 @@ package etcd3
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"reflect"
 	"strings"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +73,7 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client              *clientv3.Client
+	client              *kubernetes.Client
 	codec               runtime.Codec
 	versioner           storage.Versioner
 	transformer         value.Transformer
@@ -82,6 +83,7 @@ type store struct {
 	watcher             *watcher
 	leaseManager        *leaseManager
 	decoder             Decoder
+	listErrAggrFactory  func() ListErrorAggregator
 }
 
 func (s *store) RequestWatchProgress(ctx context.Context) error {
@@ -98,12 +100,52 @@ type objState struct {
 	stale bool
 }
 
-// New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) storage.Interface {
-	return newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner)
+// ListErrorAggregator aggregates the error(s) that the LIST operation
+// encounters while retrieving object(s) from the storage
+type ListErrorAggregator interface {
+	// Aggregate aggregates the given error from list operation
+	// key: it identifies the given object in the storage.
+	// err: it represents the error the list operation encountered while
+	// retrieving the given object from the storage.
+	// done: true if the aggregation is done and the list operation should
+	// abort, otherwise the list operation will continue
+	Aggregate(key string, err error) bool
+
+	// Err returns the aggregated error
+	Err() error
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+// defaultListErrorAggregatorFactory returns the default list error
+// aggregator that maintains backward compatibility, which is abort
+// the list operation as soon as it encounters the first error
+func defaultListErrorAggregatorFactory() ListErrorAggregator { return &abortOnFirstError{} }
+
+// LIST aborts on the first error it encounters (backward compatible)
+type abortOnFirstError struct {
+	err error
+}
+
+func (a *abortOnFirstError) Aggregate(key string, err error) bool {
+	a.err = err
+	return true
+}
+func (a *abortOnFirstError) Err() error { return a.err }
+
+// New returns an etcd3 implementation of storage.Interface.
+func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) storage.Interface {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		transformer = WithCorruptObjErrorHandlingTransformer(transformer)
+		decoder = WithCorruptObjErrorHandlingDecoder(decoder)
+	}
+	var store storage.Interface
+	store = newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner)
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		store = NewStoreWithUnsafeCorruptObjectDeletion(store, groupResource)
+	}
+	return store
+}
+
+func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -113,8 +155,13 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 		pathPrefix += "/"
 	}
 
+	listErrAggrFactory := defaultListErrorAggregatorFactory
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		listErrAggrFactory = corruptObjErrAggregatorFactory(100)
+	}
+
 	w := &watcher{
-		client:        c,
+		client:        c.Client,
 		codec:         codec,
 		newFunc:       newFunc,
 		groupResource: groupResource,
@@ -135,8 +182,9 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
 		watcher:             w,
-		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
+		leaseManager:        newDefaultLeaseManager(c.Client, leaseManagerConfig),
 		decoder:             decoder,
+		listErrAggrFactory:  listErrAggrFactory,
 	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
@@ -160,29 +208,28 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return err
 	}
 	startTime := time.Now()
-	getResp, err := s.client.KV.Get(ctx, preparedKey)
+	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 	if err != nil {
 		return err
 	}
-	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 		return err
 	}
 
-	if len(getResp.Kvs) == 0 {
+	if getResp.KV == nil {
 		if opts.IgnoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
 		return storage.NewKeyNotFoundError(preparedKey, 0)
 	}
-	kv := getResp.Kvs[0]
 
-	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
+	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
 		return storage.NewInternalError(err)
 	}
 
-	err = s.decoder.Decode(data, out, kv.ModRevision)
+	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
 		recordDecodeError(s.groupResourceString, preparedKey)
 		return err
@@ -217,9 +264,12 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 	span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
 
-	opts, err := s.ttlOpts(ctx, int64(ttl))
-	if err != nil {
-		return err
+	var lease clientv3.LeaseID
+	if ttl != 0 {
+		lease, err = s.leaseManager.GetLease(ctx, int64(ttl))
+		if err != nil {
+			return err
+		}
 	}
 
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(preparedKey))
@@ -230,11 +280,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	span.AddEvent("TransformToStorage succeeded")
 
 	startTime := time.Now()
-	txnResp, err := s.client.KV.Txn(ctx).If(
-		notFound(preparedKey),
-	).Then(
-		clientv3.OpPut(preparedKey, string(newData), opts...),
-	).Commit()
+	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, 0, kubernetes.PutOptions{LeaseID: lease})
 	metrics.RecordEtcdRequest("create", s.groupResourceString, err, startTime)
 	if err != nil {
 		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
@@ -247,8 +293,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 
 	if out != nil {
-		putResp := txnResp.Responses[0].GetResponsePut()
-		err = s.decoder.Decode(data, out, putResp.Header.Revision)
+		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResourceString, preparedKey)
@@ -273,6 +318,9 @@ func (s *store) Delete(
 	}
 
 	skipTransformDecode := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
+		skipTransformDecode = opts.IgnoreStoreReadError
+	}
 	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, skipTransformDecode)
 }
 
@@ -349,21 +397,16 @@ func (s *store) conditionalDelete(
 		}
 
 		startTime := time.Now()
-		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
-		).Then(
-			clientv3.OpDelete(key),
-		).Else(
-			clientv3.OpGet(key),
-		).Commit()
+		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
+			GetOnFailure: true,
+		})
 		metrics.RecordEtcdRequest("delete", s.groupResourceString, err, startTime)
 		if err != nil {
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(ctx, getResp, key, v, false, skipTransformDecode)
+			origState, err = s.getState(ctx, txnResp.KV, key, v, false, skipTransformDecode)
 			if err != nil {
 				return err
 			}
@@ -371,15 +414,8 @@ func (s *store) conditionalDelete(
 			continue
 		}
 
-		if len(txnResp.Responses) == 0 || txnResp.Responses[0].GetResponseDeleteRange() == nil {
-			return errors.New(fmt.Sprintf("invalid DeleteRange response: %v", txnResp.Responses))
-		}
-		deleteResp := txnResp.Responses[0].GetResponseDeleteRange()
-		if deleteResp.Header == nil {
-			return errors.New("invalid DeleteRange response - nil header")
-		}
 		if !skipTransformDecode {
-			err = s.decoder.Decode(origState.data, out, deleteResp.Header.Revision)
+			err = s.decoder.Decode(origState.data, out, txnResp.Revision)
 			if err != nil {
 				recordDecodeError(s.groupResourceString, key)
 				return err
@@ -512,20 +548,21 @@ func (s *store) GuaranteedUpdate(
 		}
 		span.AddEvent("TransformToStorage succeeded")
 
-		opts, err := s.ttlOpts(ctx, int64(ttl))
-		if err != nil {
-			return err
+		var lease clientv3.LeaseID
+		if ttl != 0 {
+			lease, err = s.leaseManager.GetLease(ctx, int64(ttl))
+			if err != nil {
+				return err
+			}
 		}
 		span.AddEvent("Transaction prepared")
 
 		startTime := time.Now()
-		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModRevision(preparedKey), "=", origState.rev),
-		).Then(
-			clientv3.OpPut(preparedKey, string(newData), opts...),
-		).Else(
-			clientv3.OpGet(preparedKey),
-		).Commit()
+
+		txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.rev, kubernetes.PutOptions{
+			GetOnFailure: true,
+			LeaseID:      lease,
+		})
 		metrics.RecordEtcdRequest("update", s.groupResourceString, err, startTime)
 		if err != nil {
 			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
@@ -534,10 +571,8 @@ func (s *store) GuaranteedUpdate(
 		span.AddEvent("Txn call completed")
 		span.AddEvent("Transaction committed")
 		if !txnResp.Succeeded {
-			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-			skipTransformDecode := false
-			origState, err = s.getState(ctx, getResp, preparedKey, v, ignoreNotFound, skipTransformDecode)
+			origState, err = s.getState(ctx, txnResp.KV, preparedKey, v, ignoreNotFound, skipTransformDecode)
 			if err != nil {
 				return err
 			}
@@ -545,9 +580,8 @@ func (s *store) GuaranteedUpdate(
 			origStateIsCurrent = true
 			continue
 		}
-		putResp := txnResp.Responses[0].GetResponsePut()
 
-		err = s.decoder.Decode(data, destination, putResp.Header.Revision)
+		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResourceString, preparedKey)
@@ -589,12 +623,12 @@ func (s *store) Count(key string) (int64, error) {
 	}
 
 	startTime := time.Now()
-	getResp, err := s.client.KV.Get(context.Background(), preparedKey, clientv3.WithRange(clientv3.GetPrefixRangeEnd(preparedKey)), clientv3.WithCountOnly())
+	count, err := s.client.Kubernetes.Count(context.Background(), preparedKey, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", preparedKey, err, startTime)
 	if err != nil {
 		return 0, err
 	}
-	return getResp.Count, nil
+	return count, nil
 }
 
 // ReadinessCheck implements storage.Interface.
@@ -645,7 +679,7 @@ func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts sto
 
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	keyPrefix, err := s.prepareKey(key)
 	if err != nil {
 		return err
 	}
@@ -670,27 +704,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
 	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
+	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
+		keyPrefix += "/"
 	}
-	keyPrefix := preparedKey
 
 	// set the appropriate clientv3 options to filter the returned data set
-	var limitOption *clientv3.OpOption
 	limit := opts.Predicate.Limit
-	var paging bool
-	options := make([]clientv3.OpOption, 0, 4)
-	if opts.Predicate.Limit > 0 {
-		paging = true
-		options = append(options, clientv3.WithLimit(limit))
-		limitOption = &options[len(options)-1]
-	}
-
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	}
-
+	paging := opts.Predicate.Limit > 0
 	newItemFunc := getNewItemFunc(listObj, v)
 
 	var continueRV, withRev int64
@@ -700,20 +720,15 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
-		preparedKey = continueKey
 	}
 	if withRev, err = s.resolveGetListRev(continueKey, continueRV, opts); err != nil {
 		return err
 	}
 
-	if withRev != 0 {
-		options = append(options, clientv3.WithRev(withRev))
-	}
-
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
-	var getResp *clientv3.GetResponse
+	var getResp kubernetes.ListResponse
 	var numFetched int
 	var numEvald int
 	// Because these metrics are for understanding the costs of handling LIST requests,
@@ -728,26 +743,30 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		metricsOp = "list"
 	}
 
+	aggregator := s.listErrAggrFactory()
 	for {
 		startTime := time.Now()
-		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
+		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, kubernetes.ListOptions{
+			Revision: withRev,
+			Limit:    limit,
+			Continue: continueKey,
+		})
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
 		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 			return err
 		}
-		hasMore = getResp.More
+		hasMore = int64(len(getResp.Kvs)) < getResp.Count
 
-		if len(getResp.Kvs) == 0 && getResp.More {
+		if len(getResp.Kvs) == 0 && hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
 		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			options = append(options, clientv3.WithRev(withRev))
+			withRev = getResp.Revision
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
@@ -768,7 +787,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))
+				if done := aggregator.Aggregate(string(kv.Key), storage.NewInternalError(fmt.Errorf("unable to transform key %q: %w", kv.Key, err))); done {
+					return aggregator.Err()
+				}
+				continue
 			}
 
 			// Check if the request has already timed out before decode object
@@ -782,7 +804,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 			if err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				if done := aggregator.Aggregate(string(kv.Key), err); done {
+					return aggregator.Err()
+				}
+				continue
 			}
 
 			// being unable to set the version does not prevent the object from being extracted
@@ -795,6 +820,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
 		}
+		continueKey = string(lastKey) + "\x00"
 
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
@@ -812,9 +838,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			if limit > maxLimit {
 				limit = maxLimit
 			}
-			*limitOption = clientv3.WithLimit(limit)
 		}
-		preparedKey = string(lastKey) + "\x00"
+	}
+
+	if err := aggregator.Err(); err != nil {
+		return err
 	}
 
 	if v.IsNil() {
@@ -827,6 +855,26 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		return err
 	}
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
+}
+
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (kubernetes.ListResponse, error) {
+	if recursive {
+		return s.client.Kubernetes.List(ctx, keyPrefix, options)
+	}
+	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, kubernetes.GetOptions{
+		Revision: options.Revision,
+	})
+	var resp kubernetes.ListResponse
+	if getResp.KV != nil {
+		resp.Kvs = []*mvccpb.KeyValue{getResp.KV}
+		resp.Count = 1
+		resp.Revision = getResp.Revision
+	} else {
+		resp.Kvs = []*mvccpb.KeyValue{}
+		resp.Count = 0
+		resp.Revision = getResp.Revision
+	}
+	return resp, err
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -887,12 +935,12 @@ func (s *store) watchContext(ctx context.Context) context.Context {
 func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value, ignoreNotFound bool, skipTransformDecode bool) func() (*objState, error) {
 	return func() (*objState, error) {
 		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key)
+		getResp, err := s.client.Kubernetes.Get(ctx, key, kubernetes.GetOptions{})
 		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(ctx, getResp, key, v, ignoreNotFound, skipTransformDecode)
+		return s.getState(ctx, getResp.KV, key, v, ignoreNotFound, skipTransformDecode)
 	}
 }
 
@@ -902,7 +950,7 @@ func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value
 // storage will be transformed and decoded.
 // NOTE: when skipTransformDecode is true, the 'data', and the 'obj' fields
 // of the objState will be nil, and 'stale' will be set to true.
-func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool, skipTransformDecode bool) (*objState, error) {
+func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v reflect.Value, ignoreNotFound bool, skipTransformDecode bool) (*objState, error) {
 	state := &objState{
 		meta: &storage.ResponseMeta{},
 	}
@@ -913,7 +961,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
 	}
 
-	if len(getResp.Kvs) == 0 {
+	if kv == nil {
 		if !ignoreNotFound {
 			return nil, storage.NewKeyNotFoundError(key, 0)
 		}
@@ -921,7 +969,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 			return nil, err
 		}
 	} else {
-		state.rev = getResp.Kvs[0].ModRevision
+		state.rev = kv.ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 
 		if skipTransformDecode {
@@ -931,7 +979,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 			return state, nil
 		}
 
-		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
+		data, stale, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(key))
 		if err != nil {
 			return nil, storage.NewInternalError(err)
 		}
@@ -991,19 +1039,6 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 	return ret, ttl, nil
 }
 
-// ttlOpts returns client options based on given ttl.
-// ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
-func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, error) {
-	if ttl == 0 {
-		return nil, nil
-	}
-	id, err := s.leaseManager.GetLease(ctx, ttl)
-	if err != nil {
-		return nil, err
-	}
-	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
-}
-
 // validateMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
 // greater than the most recent actualRevision available from storage.
 func (s *store) validateMinimumResourceVersion(minimumResourceVersion string, actualRevision uint64) error {
@@ -1050,10 +1085,6 @@ func (s *store) prepareKey(key string) (string, error) {
 func recordDecodeError(resource string, key string) {
 	metrics.RecordDecodeError(resource)
 	klog.V(4).Infof("Decoding %s \"%s\" failed", resource, key)
-}
-
-func notFound(key string) clientv3.Cmp {
-	return clientv3.Compare(clientv3.ModRevision(key), "=", 0)
 }
 
 // getTypeName returns type name of an object for reporting purposes.

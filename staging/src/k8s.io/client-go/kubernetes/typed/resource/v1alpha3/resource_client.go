@@ -29,7 +29,6 @@ import (
 type ResourceV1alpha3Interface interface {
 	RESTClient() rest.Interface
 	DeviceClassesGetter
-	PodSchedulingContextsGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
@@ -42,10 +41,6 @@ type ResourceV1alpha3Client struct {
 
 func (c *ResourceV1alpha3Client) DeviceClasses() DeviceClassInterface {
 	return newDeviceClasses(c)
-}
-
-func (c *ResourceV1alpha3Client) PodSchedulingContexts(namespace string) PodSchedulingContextInterface {
-	return newPodSchedulingContexts(c, namespace)
 }
 
 func (c *ResourceV1alpha3Client) ResourceClaims(namespace string) ResourceClaimInterface {
@@ -108,7 +103,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := resourcev1alpha3.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

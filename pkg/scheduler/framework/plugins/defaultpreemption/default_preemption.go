@@ -53,9 +53,11 @@ type DefaultPreemption struct {
 	args      config.DefaultPreemptionArgs
 	podLister corelisters.PodLister
 	pdbLister policylisters.PodDisruptionBudgetLister
+	Evaluator *preemption.Evaluator
 }
 
 var _ framework.PostFilterPlugin = &DefaultPreemption{}
+var _ framework.PreEnqueuePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
@@ -71,13 +73,19 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 	if err := validation.ValidateDefaultPreemptionArgs(nil, args); err != nil {
 		return nil, err
 	}
+
+	podLister := fh.SharedInformerFactory().Core().V1().Pods().Lister()
+	pdbLister := getPDBLister(fh.SharedInformerFactory())
+
 	pl := DefaultPreemption{
 		fh:        fh,
 		fts:       fts,
 		args:      *args,
-		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		pdbLister: getPDBLister(fh.SharedInformerFactory()),
+		podLister: podLister,
+		pdbLister: pdbLister,
 	}
+	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+
 	return &pl, nil
 }
 
@@ -87,21 +95,30 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 		metrics.PreemptionAttempts.Inc()
 	}()
 
-	pe := preemption.Evaluator{
-		PluginName: names.DefaultPreemption,
-		Handler:    pl.fh,
-		PodLister:  pl.podLister,
-		PdbLister:  pl.pdbLister,
-		State:      state,
-		Interface:  pl,
-	}
-
-	result, status := pe.Preempt(ctx, pod, m)
+	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return result, framework.NewStatus(status.Code(), "preemption: "+msg)
 	}
 	return result, status
+}
+
+func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	if !pl.fts.EnableAsyncPreemption {
+		return nil
+	}
+	if pl.Evaluator.IsPodRunningPreemption(p.GetUID()) {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
+	}
+	return nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	// The plugin moves the preemptor Pod to acviteQ/backoffQ once the preemption API calls are all done,
+	// and we don't need to move the Pod with any events.
+	return nil, nil
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates
@@ -191,6 +208,8 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
+	// Sort potentialVictims by pod priority from high to low, which ensures to
+	// reprieve higher priority pods first.
 	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
@@ -224,6 +243,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		if _, err := reprievePod(p); err != nil {
 			return nil, 0, framework.AsStatus(err)
 		}
+	}
+
+	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of priority from high to low.
+	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
+		sort.Slice(victims, func(i, j int) bool { return util.MoreImportantPod(victims[i], victims[j]) })
 	}
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
 }

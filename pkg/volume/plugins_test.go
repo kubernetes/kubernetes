@@ -17,8 +17,6 @@ limitations under the License.
 package volume
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -26,6 +24,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testPluginName = "kubernetes.io/testPlugin"
@@ -184,6 +185,7 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_, err := vpm.FindPluginByName(testPluginName)
@@ -191,13 +193,14 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 				totalErrors.Add(1)
 			}
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 
 	assert.Equal(t, int32(0), totalErrors.Load())
+	totalErrors.Store(0)
 
 	for i := 0; i < 100; i++ {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			_, err := vpm.FindPluginBySpec(volumeSpec)
@@ -205,7 +208,6 @@ func TestVolumePluginMultiThreaded(t *testing.T) {
 				totalErrors.Add(1)
 			}
 		}()
-		wg.Add(1)
 	}
 	wg.Wait()
 

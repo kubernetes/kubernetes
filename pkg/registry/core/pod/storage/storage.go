@@ -54,6 +54,7 @@ type PodStorage struct {
 	Eviction            *EvictionREST
 	Status              *StatusREST
 	EphemeralContainers *EphemeralContainersREST
+	Resize              *ResizeREST
 	Log                 *podrest.LogREST
 	Proxy               *podrest.ProxyREST
 	Exec                *podrest.ExecREST
@@ -100,6 +101,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
+	resizeStore := *store
+	resizeStore.UpdateStrategy = registrypod.ResizeStrategy
 
 	bindingREST := &BindingREST{store: store}
 	return PodStorage{
@@ -109,6 +112,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
+		Resize:              &ResizeREST{store: &resizeStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
 		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
@@ -361,6 +365,36 @@ func (r *EphemeralContainersREST) Destroy() {
 
 // Update alters the EphemeralContainers field in PodSpec
 func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// ResizeREST implements the REST endpoint for resizing Pod containers.
+type ResizeREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Patcher(&ResizeREST{})
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *ResizeREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
+}
+
+// New creates a new pod resource
+func (r *ResizeREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *ResizeREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
+// Update alters the resource fields in PodSpec
+func (r *ResizeREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)

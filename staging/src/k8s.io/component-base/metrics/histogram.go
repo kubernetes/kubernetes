@@ -18,18 +18,57 @@ package metrics
 
 import (
 	"context"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
+	ctx context.Context
 	ObserverMetric
 	*HistogramOpts
 	lazyMetric
 	selfCollector
+}
+
+// exemplarHistogramMetric holds a context to extract exemplar labels from, and a historgram metric to attach them to. It implements the metricWithExemplar interface.
+type exemplarHistogramMetric struct {
+	*Histogram
+}
+
+type exemplarHistogramVec struct {
+	*HistogramVecWithContext
+	observer prometheus.Observer
+}
+
+func (h *Histogram) Observe(v float64) {
+	h.withExemplar(v)
+}
+
+// withExemplar initializes the exemplarMetric object and sets the exemplar value.
+func (h *Histogram) withExemplar(v float64) {
+	(&exemplarHistogramMetric{h}).withExemplar(v)
+}
+
+// withExemplar attaches an exemplar to the metric.
+func (e *exemplarHistogramMetric) withExemplar(v float64) {
+	if m, ok := e.Histogram.ObserverMetric.(prometheus.ExemplarObserver); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(e.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			exemplarLabels := prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			}
+			m.ObserveWithExemplar(v, exemplarLabels)
+			return
+		}
+	}
+
+	e.ObserverMetric.Observe(v)
 }
 
 // NewHistogram returns an object which is Histogram-like. However, nothing
@@ -74,6 +113,7 @@ func (h *Histogram) initializeDeprecatedMetric() {
 
 // WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
 func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	h.ctx = ctx
 	return h.ObserverMetric
 }
 
@@ -96,11 +136,6 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
 	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
 
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
@@ -148,6 +183,15 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	} else {
+		v.initializeLabelAllowListsOnce.Do(func() {
+			allowListLock.RLock()
+			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+				v.LabelValueAllowLists = allowList
+				allowList.ConstrainToAllowedList(v.originalLabels, lvs)
+			}
+			allowListLock.RUnlock()
+		})
 	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
@@ -162,6 +206,15 @@ func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	}
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
+	} else {
+		v.initializeLabelAllowListsOnce.Do(func() {
+			allowListLock.RLock()
+			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+				v.LabelValueAllowLists = allowList
+				allowList.ConstrainLabelMap(labels)
+			}
+			allowListLock.RUnlock()
+		})
 	}
 	return v.HistogramVec.With(labels)
 }
@@ -189,6 +242,13 @@ func (v *HistogramVec) Reset() {
 	v.HistogramVec.Reset()
 }
 
+// ResetLabelAllowLists resets the label allow list for the HistogramVec.
+// NOTE: This should only be used in test.
+func (v *HistogramVec) ResetLabelAllowLists() {
+	v.initializeLabelAllowListsOnce = sync.Once{}
+	v.LabelValueAllowLists = nil
+}
+
 // WithContext returns wrapped HistogramVec with context
 func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
 	return &HistogramVecWithContext{
@@ -203,12 +263,37 @@ type HistogramVecWithContext struct {
 	ctx context.Context
 }
 
+func (h *exemplarHistogramVec) Observe(v float64) {
+	h.withExemplar(v)
+}
+
+func (h *exemplarHistogramVec) withExemplar(v float64) {
+	if m, ok := h.observer.(prometheus.ExemplarObserver); ok {
+		maybeSpanCtx := trace.SpanContextFromContext(h.HistogramVecWithContext.ctx)
+		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
+			m.ObserveWithExemplar(v, prometheus.Labels{
+				"trace_id": maybeSpanCtx.TraceID().String(),
+				"span_id":  maybeSpanCtx.SpanID().String(),
+			})
+			return
+		}
+	}
+
+	h.observer.Observe(v)
+}
+
 // WithLabelValues is the wrapper of HistogramVec.WithLabelValues.
-func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
-	return vc.HistogramVec.WithLabelValues(lvs...)
+func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) *exemplarHistogramVec {
+	return &exemplarHistogramVec{
+		HistogramVecWithContext: vc,
+		observer:                vc.HistogramVec.WithLabelValues(lvs...),
+	}
 }
 
 // With is the wrapper of HistogramVec.With.
-func (vc *HistogramVecWithContext) With(labels map[string]string) ObserverMetric {
-	return vc.HistogramVec.With(labels)
+func (vc *HistogramVecWithContext) With(labels map[string]string) *exemplarHistogramVec {
+	return &exemplarHistogramVec{
+		HistogramVecWithContext: vc,
+		observer:                vc.HistogramVec.With(labels),
+	}
 }

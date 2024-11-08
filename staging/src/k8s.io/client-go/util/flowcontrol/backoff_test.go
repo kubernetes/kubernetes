@@ -125,6 +125,67 @@ func TestBackoffGC(t *testing.T) {
 	}
 }
 
+func TestAlternateBackoffGC(t *testing.T) {
+	cases := []struct {
+		name           string
+		hasExpiredFunc func(time.Time, time.Time, time.Duration) bool
+		maxDuration    time.Duration
+		nonExpiredTime time.Duration
+		expiredTime    time.Duration
+	}{
+		{
+			name:           "default GC",
+			maxDuration:    time.Duration(50 * time.Second),
+			nonExpiredTime: time.Duration(5 * time.Second),
+			expiredTime:    time.Duration(101 * time.Second),
+		},
+		{
+			name: "GC later than 2*maxDuration",
+			hasExpiredFunc: func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+				return eventTime.Sub(lastUpdate) >= 200*time.Second
+			},
+			maxDuration:    time.Duration(50 * time.Second),
+			nonExpiredTime: time.Duration(101 * time.Second),
+			expiredTime:    time.Duration(501 * time.Second),
+		},
+	}
+
+	for _, tt := range cases {
+		clock := testingclock.NewFakeClock(time.Now())
+		base := time.Second
+		maxDuration := tt.maxDuration
+		id := tt.name
+
+		b := NewFakeBackOff(base, maxDuration, clock)
+		if tt.hasExpiredFunc != nil {
+			b.HasExpiredFunc = tt.hasExpiredFunc
+		}
+
+		// initialize backoff
+		lastUpdate := clock.Now()
+		b.Next(id, lastUpdate)
+
+		// increment to a time within GC expiration
+		clock.Step(tt.nonExpiredTime)
+		b.GC()
+
+		// confirm we did not GC this entry
+		_, found := b.perItemBackoff[id]
+		if !found {
+			t.Errorf("[%s] expected GC to skip entry, elapsed time=%s", tt.name, clock.Since(lastUpdate))
+		}
+
+		// increment to a time beyond GC expiration
+		clock.Step(tt.expiredTime)
+		b.GC()
+		r, found := b.perItemBackoff[id]
+		if found {
+			t.Errorf("[%s] expected GC of entry after %s got entry %v", tt.name, clock.Since(lastUpdate), r)
+		}
+
+	}
+}
+
 func TestIsInBackOffSinceUpdate(t *testing.T) {
 	id := "_idIsInBackOffSinceUpdate"
 	tc := testingclock.NewFakeClock(time.Now())
@@ -249,4 +310,68 @@ func TestBackoffWithJitter(t *testing.T) {
 	}
 
 	t.Logf("exponentially backed off jittered delays: %v", delays)
+}
+
+func TestAlternateHasExpiredFunc(t *testing.T) {
+	cases := []struct {
+		name           string
+		hasExpiredFunc func(time.Time, time.Time, time.Duration) bool
+		maxDuration    time.Duration
+		nonExpiredTime time.Duration
+		expiredTime    time.Duration
+	}{
+		{
+			name:           "default expiration",
+			maxDuration:    time.Duration(50 * time.Second),
+			nonExpiredTime: time.Duration(5 * time.Second),
+			expiredTime:    time.Duration(101 * time.Second),
+		},
+		{
+			name: "expires faster than maxDuration",
+			hasExpiredFunc: func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+				return eventTime.Sub(lastUpdate) >= 8*time.Second
+			},
+			maxDuration:    time.Duration(50 * time.Second),
+			nonExpiredTime: time.Duration(5 * time.Second),
+			expiredTime:    time.Duration(9 * time.Second),
+		},
+	}
+
+	for _, tt := range cases {
+		clock := testingclock.NewFakeClock(time.Now())
+		base := time.Second
+		maxDuration := tt.maxDuration
+		id := tt.name
+
+		b := NewFakeBackOff(base, maxDuration, clock)
+
+		if tt.hasExpiredFunc != nil {
+			b.HasExpiredFunc = tt.hasExpiredFunc
+		}
+		// initialize backoff
+		b.Next(id, clock.Now())
+
+		// increment to a time within expiration
+		clock.Step(tt.nonExpiredTime)
+		b.Next(id, clock.Now())
+
+		// confirm we did a backoff
+		w := b.Get(id)
+		if w < base*2 {
+			t.Errorf("case %v: backoff object has not incremented like expected: want %s, got %s", tt.name, base*2, w)
+		}
+
+		// increment to a time beyond expiration
+		clock.Step(tt.expiredTime)
+		b.Next(id, clock.Now())
+
+		// confirm we have reset the backoff to base
+		w = b.Get(id)
+		if w != base {
+			t.Errorf("case %v: hasexpired value: expected %s (backoff to be reset to initial), got %s", tt.name, base, w)
+		}
+
+		clock.SetTime(time.Now())
+		b.Reset(id)
+	}
 }

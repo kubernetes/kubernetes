@@ -46,7 +46,7 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnableDRAControlPlaneController:              feature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController),
+		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeCapacityPriority:                 feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
@@ -54,6 +54,8 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
 		EnableSchedulingQueueHint:                    feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
+		EnableAsyncPreemption:                        feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption),
+		EnablePodLevelResources:                      feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 
 	registry := runtime.Registry{

@@ -210,7 +210,6 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch", "create", "delete").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims", "resourceclaims/status").RuleOrDie(),
 				rbacv1helpers.NewRule("update", "patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 				eventsRule(),
@@ -428,6 +427,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "volumeattributesclass-protection-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(storageGroup).Resources("volumeattributesclasses").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ttl-after-finished-controller"},
 		Rules: []rbacv1.PolicyRule{
@@ -442,6 +453,18 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "kube-apiserver-serving-clustertrustbundle-publisher"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/kube-apiserver-serving").RuleOrDie(),
+				rbacv1helpers.NewRule("create", "update", "delete", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "validatingadmissionpolicy-status-controller"},
 		Rules: []rbacv1.PolicyRule{
@@ -486,6 +509,19 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
 				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
+			},
+		})
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "selinux-warning-controller"},
+			Rules: []rbacv1.PolicyRule{
+				eventsRule(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
 			},
 		})
 	}

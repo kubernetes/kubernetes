@@ -18,8 +18,27 @@ limitations under the License.
 
 package fake
 
-// FakeEvictions implements EvictionInterface
-type FakeEvictions struct {
+import (
+	v1 "k8s.io/api/policy/v1"
+	gentype "k8s.io/client-go/gentype"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
+)
+
+// fakeEvictions implements EvictionInterface
+type fakeEvictions struct {
+	*gentype.FakeClient[*v1.Eviction]
 	Fake *FakePolicyV1
-	ns   string
+}
+
+func newFakeEvictions(fake *FakePolicyV1, namespace string) policyv1.EvictionInterface {
+	return &fakeEvictions{
+		gentype.NewFakeClient[*v1.Eviction](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("evictions"),
+			v1.SchemeGroupVersion.WithKind("Eviction"),
+			func() *v1.Eviction { return &v1.Eviction{} },
+		),
+		fake,
+	}
 }

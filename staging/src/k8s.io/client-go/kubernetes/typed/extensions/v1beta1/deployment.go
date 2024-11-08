@@ -20,7 +20,6 @@ package v1beta1
 
 import (
 	context "context"
-	json "encoding/json"
 	fmt "fmt"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -30,6 +29,7 @@ import (
 	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.
@@ -74,7 +74,9 @@ func newDeployments(c *ExtensionsV1beta1Client, namespace string) *deployments {
 			scheme.ParameterCodec,
 			namespace,
 			func() *extensionsv1beta1.Deployment { return &extensionsv1beta1.Deployment{} },
-			func() *extensionsv1beta1.DeploymentList { return &extensionsv1beta1.DeploymentList{} }),
+			func() *extensionsv1beta1.DeploymentList { return &extensionsv1beta1.DeploymentList{} },
+			gentype.PrefersProtobuf[*extensionsv1beta1.Deployment](),
+		),
 	}
 }
 
@@ -82,6 +84,7 @@ func newDeployments(c *ExtensionsV1beta1Client, namespace string) *deployments {
 func (c *deployments) GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (result *extensionsv1beta1.Scale, err error) {
 	result = &extensionsv1beta1.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -96,6 +99,7 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *extensionsv1beta1.Scale, opts v1.UpdateOptions) (result *extensionsv1beta1.Scale, err error) {
 	result = &extensionsv1beta1.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -114,19 +118,19 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &extensionsv1beta1.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

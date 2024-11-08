@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
-	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -181,8 +180,6 @@ var (
 
 var ApplySetToolVersion = version.Get().GitVersion
 
-var supportedSubresources = []string{"status", "scale"}
-
 // NewApplyFlags returns a default ApplyFlags
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
@@ -240,7 +237,7 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef)
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmdutil.AddSubresourceFlags(cmd, &flags.Subresource, "If specified, apply will operate on the subresource of the requested object.  Only allowed when using --server-side.", supportedSubresources...)
+	cmdutil.AddSubresourceFlags(cmd, &flags.Subresource, "If specified, apply will operate on the subresource of the requested object.  Only allowed when using --server-side.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -444,9 +441,6 @@ func (o *ApplyOptions) Validate() error {
 				return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
 			}
 		}
-	}
-	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
-		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
 	}
 	if len(o.Subresource) > 0 && !o.ServerSideApply {
 		return fmt.Errorf("--subresource can only be specified for --server-side")

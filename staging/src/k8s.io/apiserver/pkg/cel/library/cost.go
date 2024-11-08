@@ -35,16 +35,25 @@ var panicOnUnknown = false
 
 // builtInFunctions is a list of functions used in cost tests that are not handled by CostEstimator.
 var knownUnhandledFunctions = map[string]bool{
-	"uint":          true,
-	"duration":      true,
-	"bytes":         true,
-	"timestamp":     true,
-	"value":         true,
-	"_==_":          true,
-	"_&&_":          true,
-	"_>_":           true,
-	"!_":            true,
-	"strings.quote": true,
+	"@not_strictly_false": true,
+	"uint":                true,
+	"duration":            true,
+	"bytes":               true,
+	"cel.@mapInsert":      true,
+	"timestamp":           true,
+	"strings.quote":       true,
+	"value":               true,
+	"_==_":                true,
+	"_&&_":                true,
+	"_||_":                true,
+	"_>_":                 true,
+	"_>=_":                true,
+	"_<_":                 true,
+	"_<=_":                true,
+	"!_":                  true,
+	"_?_:_":               true,
+	"_+_":                 true,
+	"_-_":                 true,
 }
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
@@ -97,7 +106,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 			cost += traversalCost(args[0]) // these O(n) operations all cost roughly the cost of a single traversal
 		}
 		return &cost
-	case "url", "lowerAscii", "upperAscii", "substring", "trim":
+	case "url", "lowerAscii", "upperAscii", "substring", "trim", "jsonpatch.escapeKey":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
@@ -294,7 +303,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				return &checker.CallEstimate{CostEstimate: l.sizeEstimate(*target).MultiplyByCostFactor(common.StringTraversalCostFactor)}
 			}
 		}
-	case "url":
+	case "url", "jsonpatch.escapeKey":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
