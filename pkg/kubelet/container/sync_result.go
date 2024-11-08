@@ -45,12 +45,6 @@ var (
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	// ErrKillPodSandbox returned when runtime failed to stop pod's sandbox.
 	ErrKillPodSandbox = errors.New("KillPodSandboxError")
-	// ErrUpdatePodSandbox returned when runtime failed to update the pod's sandbox config.
-	ErrUpdatePodSandbox = errors.New("UpdatePodSandboxError")
-	// ErrUpdateContainerMemory returned when runtime failed to update the pod's container config.
-	ErrUpdateContainerMemory = errors.New("UpdateContainerMemoryError")
-	// ErrUpdateContainerCPU returned when runtime failed to update the pod's container config.
-	ErrUpdateContainerCPU = errors.New("UpdateContainerCPUError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
@@ -74,12 +68,6 @@ const (
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	// KillPodSandbox action
 	KillPodSandbox SyncAction = "KillPodSandbox"
-	// UpdatePodSandbox action
-	UpdatePodSandbox SyncAction = "UpdatePodSandbox"
-	// UpdateContainerMemory action
-	UpdateContainerMemory SyncAction = "UpdateContainerMemory"
-	// UpdateContainerCPU action
-	UpdateContainerCPU SyncAction = "UpdateContainerCPU"
 )
 
 // SyncResult is the result of sync action.

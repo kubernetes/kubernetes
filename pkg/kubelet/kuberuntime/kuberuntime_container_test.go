@@ -963,7 +963,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	assert.NoError(t, err)
 	containerID := cStatus[0].ID
 
-	err = m.updateContainerResources(ctx, pod, &pod.Spec.Containers[0], containerID)
+	err = m.updateContainerResources(pod, &pod.Spec.Containers[0], containerID)
 	assert.NoError(t, err)
 
 	// Verify container is updated
