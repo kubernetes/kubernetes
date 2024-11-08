@@ -63,7 +63,7 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	if err != nil {
 		return nil, fmt.Errorf("unable to read admission control configuration from %q [%v]", configFilePath, err)
 	}
-	codecs := serializer.NewCodecFactory(configScheme)
+	codecs := serializer.NewCodecFactory(configScheme, serializer.EnableStrict)
 	decoder := codecs.UniversalDecoder()
 	decodedObj, err := runtime.Decode(decoder, data)
 	// we were able to decode the file successfully

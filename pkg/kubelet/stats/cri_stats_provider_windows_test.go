@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hnslib"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,17 +39,32 @@ type fakeNetworkStatsProvider struct {
 	containers []containerStats
 }
 
-type containerStats struct {
-	container hcsshim.ContainerProperties
-	hcsStats  []hcsshim.NetworkStats
+// NetworkStats holds the network statistics for a container
+type fakeNetworkStats struct {
+	BytesReceived          uint64
+	BytesSent              uint64
+	PacketsReceived        uint64
+	PacketsSent            uint64
+	DroppedPacketsIncoming uint64
+	DroppedPacketsOutgoing uint64
+	EndpointId             string
+	InstanceId             string
 }
 
-func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcsshim.HNSEndpointStats, error) {
-	eps := hcsshim.HNSEndpointStats{}
+type fakeContainerProperties struct {
+	ID string
+}
+type containerStats struct {
+	container fakeContainerProperties
+	hcsStats  []fakeNetworkStats
+}
+
+func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error) {
+	eps := hnslib.HNSEndpointStats{}
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
 			if endpointName == stat.InstanceId {
-				eps = hcsshim.HNSEndpointStats{
+				eps = hnslib.HNSEndpointStats{
 					EndpointID:      stat.EndpointId,
 					BytesSent:       stat.BytesSent,
 					BytesReceived:   stat.BytesReceived,
@@ -63,8 +78,8 @@ func (s fakeNetworkStatsProvider) GetHNSEndpointStats(endpointName string) (*hcs
 	return &eps, nil
 }
 
-func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoint, error) {
-	uniqueEndpoints := map[string]*hcsshim.HNSEndpoint{}
+func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error) {
+	uniqueEndpoints := map[string]*hnslib.HNSEndpoint{}
 
 	for _, c := range s.containers {
 		for _, stat := range c.hcsStats {
@@ -75,7 +90,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 				continue
 			}
 
-			uniqueEndpoints[stat.EndpointId] = &hcsshim.HNSEndpoint{
+			uniqueEndpoints[stat.EndpointId] = &hnslib.HNSEndpoint{
 				Name:             stat.EndpointId,
 				Id:               stat.EndpointId,
 				SharedContainers: []string{c.container.ID},
@@ -83,7 +98,7 @@ func (s fakeNetworkStatsProvider) HNSListEndpointRequest() ([]hcsshim.HNSEndpoin
 		}
 	}
 
-	eps := []hcsshim.HNSEndpoint{}
+	eps := []hnslib.HNSEndpoint{}
 	for _, ep := range uniqueEndpoints {
 		eps = append(eps, *ep)
 	}
@@ -105,9 +120,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -117,9 +132,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -170,9 +185,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -182,9 +197,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -194,9 +209,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c3",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 3,
 								BytesSent:     30,
@@ -262,9 +277,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -280,9 +295,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,
@@ -333,9 +348,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			fields: fakeNetworkStatsProvider{
 				containers: []containerStats{
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c1",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 1,
 								BytesSent:     10,
@@ -351,9 +366,9 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 						},
 					},
 					{
-						container: hcsshim.ContainerProperties{
+						container: fakeContainerProperties{
 							ID: "c2",
-						}, hcsStats: []hcsshim.NetworkStats{
+						}, hcsStats: []fakeNetworkStats{
 							{
 								BytesReceived: 2,
 								BytesSent:     20,

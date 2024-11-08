@@ -30,26 +30,34 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"sigs.k8s.io/yaml"
 )
 
 func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
@@ -1030,7 +1038,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 	}
 
 	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyYAMLPatchType).
 		Namespace("default").
 		Resource("configmaps").
 		Name("large-patch-test-cm").
@@ -1047,6 +1055,79 @@ func TestPatchVeryLargeObject(t *testing.T) {
 		Get()
 	if err == nil {
 		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+}
+
+// TestPatchVeryLargeObjectCBORApply mirrors TestPatchVeryLargeObject using the +cbor structured
+// syntax suffix for application/apply-patch and with CBOR enabled.
+func TestPatchVeryLargeObjectCBORApply(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	cfg := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "large-patch-test-cm",
+			Namespace: "default",
+		},
+		Data: map[string]string{"k": "v"},
+	}
+
+	// Create a small config map.
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(context.TODO(), cfg, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unable to create configMap: %v", err)
+	}
+
+	patchString := `{"data":{"k":"v"`
+	for i := 0; i < 9999; i++ {
+		unique := fmt.Sprintf("this-key-is-very-long-so-as-to-create-a-very-large-serialized-fieldset-%v", i)
+		patchString = fmt.Sprintf("%s,%q:%q", patchString, unique, "A")
+	}
+	patchString = fmt.Sprintf("%s}}", patchString)
+
+	// Should be able to update a small object to be near the object size limit.
+	_, err := client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/api/v1").
+		Namespace(cfg.Namespace).
+		Resource("configmaps").
+		Name(cfg.Name).
+		Body([]byte(patchString)).Do(context.TODO()).Get()
+	if err != nil {
+		t.Errorf("unable to patch configMap: %v", err)
+	}
+
+	// Applying to the same object should cause managedFields to go over the object size limit, and fail.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyYAMLPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("large-patch-test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "large-patch-test-cm",
+				"namespace": "default",
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch, but succeeded")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyCBORPatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("large-patch-test-cm").
+		Param("fieldManager", "apply_test").
+		Body([]byte("\xa3\x4aapiVersion\x42v1\x44kind\x49ConfigMap\x48metadata\xa2\x44name\x53large-patch-test-cm\x49namespace\x47default")).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Fatalf("expected to fail to update object using Apply patch (cbor), but succeeded")
 	}
 }
 
@@ -4779,4 +4860,120 @@ func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry
 	if len(diff) > 0 {
 		t.Fatalf("Want:\n%s\nGot:\n%s\nDiff:\n%s", string(want), string(got), diff)
 	}
+}
+
+// TestCreateOnApplyFailsWithForbidden makes sure that PATCH requests with the apply content type
+// will not create the object if the user does not have both patch and create permissions.
+func TestCreateOnApplyFailsWithForbidden(t *testing.T) {
+	// Enable RBAC so we can exercise authorization errors.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, append([]string{"--authorization-mode=RBAC"}, framework.DefaultTestServerFlags()...), framework.SharedEtcd())
+	t.Cleanup(server.TearDownFn)
+
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
+
+	pandaConfig := restclient.CopyConfig(server.ClientConfig)
+	pandaConfig.Impersonate.UserName = "panda"
+	pandaClient := clientset.NewForConfigOrDie(pandaConfig)
+
+	errPatch := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errPatch, `pods "test-pod" is forbidden: User "panda" cannot patch resource "pods" in API group "" in the namespace "default"`)
+
+	createPodRBACAndWait(t, adminClient, "patch")
+
+	errCreate := ssaPod(pandaClient)
+
+	requireForbiddenPodErr(t, errCreate, `pods "test-pod" is forbidden: User "panda" cannot create resource "pods" in API group "" in the namespace "default"`)
+
+	createPodRBACAndWait(t, adminClient, "create")
+
+	errNone := ssaPod(pandaClient)
+	require.NoError(t, errNone, "pod create via SSA should succeed now that RBAC is correct")
+}
+
+func requireForbiddenPodErr(t *testing.T, err error, message string) {
+	t.Helper()
+
+	require.Truef(t, apierrors.IsForbidden(err), "Expected forbidden error but got: %v", err)
+
+	wantStatusErr := &apierrors.StatusError{ErrStatus: metav1.Status{
+		Status:  "Failure",
+		Message: message,
+		Reason:  "Forbidden",
+		Details: &metav1.StatusDetails{
+			Name: "test-pod",
+			Kind: "pods",
+		},
+		Code: http.StatusForbidden,
+	}}
+	require.Equal(t, wantStatusErr, err, "unexpected status error")
+}
+
+func ssaPod(client *clientset.Clientset) error {
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test-pod").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test-pod"
+			},
+			"spec": {
+				"containers": [{
+					"name":  "test-container",
+					"image": "test-image"
+				}]
+			}
+		}`)).
+		Do(context.TODO()).
+		Get()
+	return err
+}
+
+func createPodRBACAndWait(t *testing.T, client *clientset.Clientset, verb string) {
+	t.Helper()
+
+	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{verb},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = client.RbacV1().RoleBindings("default").Create(context.TODO(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("can-%s-pods", verb),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: rbacv1.UserKind,
+				Name: "panda",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     fmt.Sprintf("can-%s-pods", verb),
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
+		"panda",
+		"default",
+		verb,
+		"",
+		schema.GroupResource{Resource: "pods"},
+		true,
+	)
 }

@@ -133,7 +133,7 @@ func TestCheckListFromCacheDataConsistencyIfRequestedInternalHappyPath(t *testin
 
 			require.Equal(t, 1, fakeLister.counter)
 			require.Len(t, fakeLister.requestOptions, 1)
-			require.Equal(t, fakeLister.requestOptions[0], scenario.expectedRequestOptions)
+			require.Equal(t, scenario.expectedRequestOptions, fakeLister.requestOptions[0])
 		})
 	}
 }

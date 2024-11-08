@@ -174,7 +174,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
-	rsaToken, err := rsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
+	c, pc := serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret)
+	rsaToken, err := rsaGenerator.GenerateToken(context.TODO(), c, pc)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -188,7 +189,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	checkJSONWebSignatureHasKeyID(t, rsaToken, rsaKeyID)
 
 	// Generate RSA token with invalidAutoSecret
-	invalidAutoSecretToken, err := rsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *invalidAutoSecret))
+	c, pc = serviceaccount.LegacyClaims(*serviceAccount, *invalidAutoSecret)
+	invalidAutoSecretToken, err := rsaGenerator.GenerateToken(context.TODO(), c, pc)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -217,7 +219,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
-	badIssuerToken, err := badIssuerGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
+	c, pc = serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret)
+	badIssuerToken, err := badIssuerGenerator.GenerateToken(context.TODO(), c, pc)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -227,7 +230,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
-	differentIssuerToken, err := differentIssuerGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
+	c, pc = serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret)
+	differentIssuerToken, err := differentIssuerGenerator.GenerateToken(context.TODO(), c, pc)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -394,7 +398,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, keysGetter, auds, validator)
 
 		// An invalid, non-JWT token should always fail
-		ctx := authenticator.WithAudiences(context.Background(), auds)
+		ctx := authenticator.WithAudiences(context.TODO(), auds)
 		if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
 			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
 			continue
@@ -445,15 +449,15 @@ type keyIDPrefixer struct {
 	keyIDPrefix string
 }
 
-func (k *keyIDPrefixer) GetPublicKeys(keyIDHint string) []serviceaccount.PublicKey {
+func (k *keyIDPrefixer) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
 	if k.keyIDPrefix == "" {
-		return k.PublicKeysGetter.GetPublicKeys(keyIDHint)
+		return k.PublicKeysGetter.GetPublicKeys(context.TODO(), keyIDHint)
 	}
 	if keyIDHint != "" {
 		keyIDHint = k.keyIDPrefix + keyIDHint
 	}
 	var retval []serviceaccount.PublicKey
-	for _, key := range k.PublicKeysGetter.GetPublicKeys(keyIDHint) {
+	for _, key := range k.PublicKeysGetter.GetPublicKeys(context.TODO(), keyIDHint) {
 		key.KeyID = k.keyIDPrefix + key.KeyID
 		retval = append(retval, key)
 	}
@@ -503,7 +507,8 @@ func generateECDSAToken(t *testing.T, iss string, serviceAccount *v1.ServiceAcco
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
-	ecdsaToken, err := ecdsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *ecdsaSecret))
+	c, pc := serviceaccount.LegacyClaims(*serviceAccount, *ecdsaSecret)
+	ecdsaToken, err := ecdsaGenerator.GenerateToken(context.TODO(), c, pc)
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -590,17 +595,17 @@ func TestStaticPublicKeysGetter(t *testing.T) {
 				t.Fatalf("unexpected construction error: %v", err)
 			}
 
-			bogusKeys := getter.GetPublicKeys("bogus")
+			bogusKeys := getter.GetPublicKeys(context.TODO(), "bogus")
 			if len(bogusKeys) != 0 {
 				t.Fatalf("unexpected bogus keys: %#v", bogusKeys)
 			}
 
-			allKeys := getter.GetPublicKeys("")
+			allKeys := getter.GetPublicKeys(context.TODO(), "")
 			if !reflect.DeepEqual(tc.ExpectKeys, allKeys) {
 				t.Fatalf("unexpected keys: %#v", allKeys)
 			}
 			for _, key := range allKeys {
-				keysByID := getter.GetPublicKeys(key.KeyID)
+				keysByID := getter.GetPublicKeys(context.TODO(), key.KeyID)
 				if len(keysByID) != 1 {
 					t.Fatalf("expected 1 key for id %s, got %d", key.KeyID, len(keysByID))
 				}

@@ -204,3 +204,14 @@ func (pb podBuilder) withGenericEphemeralVolume(name string) podBuilder {
 	})
 	return pb
 }
+
+func (pb podBuilder) withCSI(driver string) podBuilder {
+	pb.Pod.Spec.Volumes = append(pb.Pod.Spec.Volumes, v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			CSI: &v1.CSIVolumeSource{
+				Driver: driver,
+			},
+		},
+	})
+	return pb
+}

@@ -322,9 +322,7 @@ func Test_resourceAttributesFrom(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.enableAuthorizationSelector {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, tt.enableAuthorizationSelector)
 
 			if got := resourceAttributesFrom(tt.args.attr); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("resourceAttributesFrom() = %v, want %v", got, tt.want)

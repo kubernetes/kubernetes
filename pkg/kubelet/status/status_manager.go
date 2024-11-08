@@ -143,17 +143,27 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetContainerResourceAllocation returns checkpointed AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
+	// GetPodResizeStatus returns cached PodStatus.Resize value
+	GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus
 
-	// GetPodResizeStatus returns checkpointed PodStatus.Resize value
-	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
+	// SetPodResizeStatus caches the last resizing decision for the pod.
+	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus)
+
+	allocationManager
+}
+
+// TODO(tallclair): Refactor allocation state handling out of the status manager.
+type allocationManager interface {
+	// GetContainerResourceAllocation returns the checkpointed AllocatedResources value for the container
+	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
+
+	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
+	// This function does a deep copy only if updates are needed.
+	// Returns the updated (or original) pod, and whether there was an allocation stored.
+	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
 	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
 	SetPodAllocation(pod *v1.Pod) error
-
-	// SetPodResizeStatus checkpoints the last resizing decision for the pod.
-	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus) error
 }
 
 const syncPeriod = 10 * time.Second
@@ -236,18 +246,50 @@ func (m *manager) Start() {
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
 // If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool) {
+func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
-// GetPodResizeStatus returns the last checkpointed ResizeStaus value
-// If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool) {
+// UpdatePodFromAllocation overwrites the pod spec with the allocation.
+// This function does a deep copy only if updates are needed.
+func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.GetPodResizeStatus(podUID)
+	// TODO(tallclair): This clones the whole cache, but we only need 1 pod.
+	allocs := m.state.GetPodResourceAllocation()
+	return updatePodFromAllocation(pod, allocs)
+}
+
+func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
+	allocated, found := allocs[string(pod.UID)]
+	if !found {
+		return pod, false
+	}
+
+	updated := false
+	for i, c := range pod.Spec.Containers {
+		if cAlloc, ok := allocated[c.Name]; ok {
+			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
+				// Allocation differs from pod spec, update
+				if !updated {
+					// If this is the first update, copy the pod
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				pod.Spec.Containers[i].Resources = cAlloc
+			}
+		}
+	}
+	return pod, updated
+}
+
+// GetPodResizeStatus returns the last cached ResizeStatus value.
+func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
+	m.podStatusesLock.RLock()
+	defer m.podStatusesLock.RUnlock()
+	return m.state.GetPodResizeStatus(string(podUID))
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
@@ -255,10 +297,7 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 	for _, container := range pod.Spec.Containers {
-		var alloc v1.ResourceList
-		if container.Resources.Requests != nil {
-			alloc = container.Resources.Requests.DeepCopy()
-		}
+		alloc := *container.Resources.DeepCopy()
 		if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
 			return err
 		}
@@ -267,10 +306,10 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 }
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
-func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) error {
+func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -513,7 +552,7 @@ func hasPodInitialized(pod *v1.Pod) bool {
 		}
 
 		containerStatus := pod.Status.InitContainerStatuses[l-1]
-		if kubetypes.IsRestartableInitContainer(&container) {
+		if podutil.IsRestartableInitContainer(&container) {
 			if containerStatus.State.Running != nil &&
 				containerStatus.Started != nil && *containerStatus.Started {
 				return true
@@ -577,7 +616,7 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 			return fmt.Errorf("found mismatch between pod spec and status, container: %v", oldStatus.Name)
 		}
 		// Skip any restartable init container as it always is allowed to restart
-		if kubetypes.IsRestartableInitContainer(&initContainer) {
+		if podutil.IsRestartableInitContainer(&initContainer) {
 			continue
 		}
 		// Skip any container that wasn't terminated
@@ -993,7 +1032,7 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 // Related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
-	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {
+	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers) + len(pod.Spec.EphemeralContainers); containers > 0 {
 		bytesPerStatus = bytesPerStatus / containers
 	}
 	normalizeTimeStamp := func(t *metav1.Time) {
@@ -1021,23 +1060,23 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 		normalizeTimeStamp(&condition.LastTransitionTime)
 	}
 
-	// update container statuses
-	for i := range status.ContainerStatuses {
-		cstatus := &status.ContainerStatuses[i]
-		normalizeContainerState(&cstatus.State)
-		normalizeContainerState(&cstatus.LastTerminationState)
+	normalizeContainerStatuses := func(containerStatuses []v1.ContainerStatus) {
+		for i := range containerStatuses {
+			cstatus := &containerStatuses[i]
+			normalizeContainerState(&cstatus.State)
+			normalizeContainerState(&cstatus.LastTerminationState)
+		}
 	}
-	// Sort the container statuses, so that the order won't affect the result of comparison
+
+	normalizeContainerStatuses(status.ContainerStatuses)
 	sort.Sort(kubetypes.SortedContainerStatuses(status.ContainerStatuses))
 
-	// update init container statuses
-	for i := range status.InitContainerStatuses {
-		cstatus := &status.InitContainerStatuses[i]
-		normalizeContainerState(&cstatus.State)
-		normalizeContainerState(&cstatus.LastTerminationState)
-	}
-	// Sort the container statuses, so that the order won't affect the result of comparison
+	normalizeContainerStatuses(status.InitContainerStatuses)
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
+
+	normalizeContainerStatuses(status.EphemeralContainerStatuses)
+	sort.Sort(kubetypes.SortedContainerStatuses(status.EphemeralContainerStatuses))
+
 	return status
 }
 

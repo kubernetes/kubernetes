@@ -35,7 +35,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -261,7 +260,7 @@ func TestNewCmdToken(t *testing.T) {
 	}
 }
 
-func TestGetClientSet(t *testing.T) {
+func TestGetClientForTokenCommands(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
 	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
@@ -271,14 +270,14 @@ func TestGetClientSet(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	fullPath := filepath.Join(tmpDir, testConfigTokenFile)
 
-	// test dryRun = false on a non-exisiting file
-	if _, err = cmdutil.GetClientSet(fullPath, false); err == nil {
-		t.Errorf("GetClientSet(); dry-run: false; did no fail for test file %q: %v", fullPath, err)
+	// test dryRun = false on a non-existing file
+	if _, err = getClientForTokenCommands(fullPath, false); err == nil {
+		t.Errorf("dry-run: false; did no fail for test file %q: %v", fullPath, err)
 	}
 
-	// test dryRun = true on a non-exisiting file
-	if _, err = cmdutil.GetClientSet(fullPath, true); err == nil {
-		t.Errorf("GetClientSet(); dry-run: true; did no fail for test file %q: %v", fullPath, err)
+	// test dryRun = true on a non-existing file
+	if _, err = getClientForTokenCommands(fullPath, true); err == nil {
+		t.Errorf("dry-run: true; did no fail for test file %q: %v", fullPath, err)
 	}
 
 	f, err := os.Create(fullPath)
@@ -291,9 +290,9 @@ func TestGetClientSet(t *testing.T) {
 		t.Errorf("Unable to write test file %q: %v", fullPath, err)
 	}
 
-	// test dryRun = true on an exisiting file
-	if _, err = cmdutil.GetClientSet(fullPath, true); err != nil {
-		t.Errorf("GetClientSet(); dry-run: true; failed for test file %q: %v", fullPath, err)
+	// test dryRun = true on an existing file
+	if _, err = getClientForTokenCommands(fullPath, true); err != nil {
+		t.Errorf("dry-run: true; failed for test file %q: %v", fullPath, err)
 	}
 }
 
@@ -317,9 +316,9 @@ func TestRunDeleteTokens(t *testing.T) {
 		t.Errorf("Unable to write test file %q: %v", fullPath, err)
 	}
 
-	client, err := cmdutil.GetClientSet(fullPath, true)
+	client, err := getClientForTokenCommands(fullPath, true)
 	if err != nil {
-		t.Errorf("Unable to run GetClientSet() for test file %q: %v", fullPath, err)
+		t.Errorf("unable to create client for test file %q: %v", fullPath, err)
 	}
 
 	// test valid; should not fail

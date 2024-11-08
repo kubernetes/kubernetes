@@ -357,6 +357,17 @@
     },
     {
       "kind": "Pod",
+      "name": "pods/resize",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Pod",
       "name": "pods/status",
       "namespaced": true,
       "singularName": "",

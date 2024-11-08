@@ -21,13 +21,11 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"time"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
@@ -45,7 +43,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -73,7 +70,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		}
 	}
 
-	client, err := getClient(flags.kubeConfigPath, *isDryRun)
+	client, err := getClient(flags.kubeConfigPath, *isDryRun, printer)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
@@ -97,11 +94,6 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			_, _ = printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
-			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-		}
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
@@ -139,7 +131,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, printer); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
@@ -191,44 +183,59 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not
-func getClient(file string, dryRun bool) (clientset.Interface, error) {
+func getClient(file string, dryRun bool, printer output.Printer) (clientset.Interface, error) {
 	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
+		// Default the server version to the kubeadm version.
+		serverVersion := constants.CurrentKubernetesVersion.Info()
+
+		dryRun := apiclient.NewDryRun()
+		dryRun.WithDefaultMarshalFunction().
+			WithWriter(os.Stdout).
+			PrependReactor(dryRun.HealthCheckJobReactor()).
+			PrependReactor(dryRun.PatchNodeReactor())
+
+		// If the kubeconfig exists, construct a real client from it and get the real serverVersion.
+		if _, err := os.Stat(file); err == nil {
+			_, _ = printer.Printf("[dryrun] Creating a real client from %q\n", file)
+			if err := dryRun.WithKubeConfigFile(file); err != nil {
+				return nil, err
+			}
+			serverVersion, err = dryRun.Client().Discovery().ServerVersion()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get server version")
+			}
+		} else if os.IsNotExist(err) {
+			// If the file (supposedly admin.conf) does not exist, add more reactors.
+			// Knowing the node name is required by the ListPodsReactor. For that we try to use
+			// the kubelet.conf client, if it exists. If not, it falls back to hostname.
+			_, _ = printer.Printf("[dryrun] Dryrunning without a real client\n")
+			kubeconfigPath := filepath.Join(constants.KubernetesDir, constants.KubeletKubeConfigFileName)
+			nodeName, err := configutil.GetNodeName(kubeconfigPath)
+			if err != nil {
+				return nil, err
+			}
+			dryRun.PrependReactor(dryRun.GetKubeadmConfigReactor()).
+				PrependReactor(dryRun.GetKubeletConfigReactor()).
+				PrependReactor(dryRun.GetKubeProxyConfigReactor()).
+				PrependReactor(dryRun.GetNodeReactor()).
+				PrependReactor(dryRun.ListPodsReactor(nodeName)).
+				PrependReactor(dryRun.GetCoreDNSConfigReactor()).
+				PrependReactor(dryRun.ListDeploymentsReactor())
+		} else {
+			// Throw an error if the file exists but there was a different stat error.
+			return nil, errors.Wrapf(err, "could not create a client from %q", file)
 		}
 
-		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
-		// real version; we have to do some clever API machinery tricks. First, we get the real
-		// API Server's version
-		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get server version")
-		}
-
-		// Get the fake clientset
-		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
-		// Print GET and LIST requests
-		dryRunOpts.PrintGETAndLIST = true
-		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
-		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
-		// we can convert it to that struct.
-		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
+		// Obtain the FakeDiscovery object for this fake client.
+		fakeClient := dryRun.FakeClient()
+		fakeClientDiscovery, ok := fakeClient.Discovery().(*fakediscovery.FakeDiscovery)
 		if !ok {
-			return nil, errors.New("couldn't set fake discovery's server version")
+			return nil, errors.New("could not set fake discovery's server version")
 		}
-		// Lastly, set the right server version to be used
-		fakeclientDiscovery.FakedServerVersion = realServerVersion
-		// return the fake clientset used for dry-running
-		return fakeclient, nil
+		// Set the right server version for it.
+		fakeClientDiscovery.FakedServerVersion = serverVersion
+
+		return fakeClient, nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-// getWaiter gets the right waiter implementation
-func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) apiclient.Waiter {
-	if dryRun {
-		return dryrunutil.NewWaiter()
-	}
-	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }

@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	applyconfigurationapiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1"
 	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -38,36 +38,40 @@ type CustomResourceDefinitionsGetter interface {
 
 // CustomResourceDefinitionInterface has methods to work with CustomResourceDefinition resources.
 type CustomResourceDefinitionInterface interface {
-	Create(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.CreateOptions) (*v1.CustomResourceDefinition, error)
-	Update(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (*v1.CustomResourceDefinition, error)
+	Create(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts metav1.CreateOptions) (*apiextensionsv1.CustomResourceDefinition, error)
+	Update(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts metav1.UpdateOptions) (*apiextensionsv1.CustomResourceDefinition, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, customResourceDefinition *v1.CustomResourceDefinition, opts metav1.UpdateOptions) (*v1.CustomResourceDefinition, error)
+	UpdateStatus(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinition, opts metav1.UpdateOptions) (*apiextensionsv1.CustomResourceDefinition, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CustomResourceDefinition, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.CustomResourceDefinitionList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiextensionsv1.CustomResourceDefinition, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*apiextensionsv1.CustomResourceDefinitionList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CustomResourceDefinition, err error)
-	Apply(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CustomResourceDefinition, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apiextensionsv1.CustomResourceDefinition, err error)
+	Apply(ctx context.Context, customResourceDefinition *applyconfigurationapiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *apiextensionsv1.CustomResourceDefinition, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, customResourceDefinition *apiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CustomResourceDefinition, err error)
+	ApplyStatus(ctx context.Context, customResourceDefinition *applyconfigurationapiextensionsv1.CustomResourceDefinitionApplyConfiguration, opts metav1.ApplyOptions) (result *apiextensionsv1.CustomResourceDefinition, err error)
 	CustomResourceDefinitionExpansion
 }
 
 // customResourceDefinitions implements CustomResourceDefinitionInterface
 type customResourceDefinitions struct {
-	*gentype.ClientWithListAndApply[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList, *apiextensionsv1.CustomResourceDefinitionApplyConfiguration]
+	*gentype.ClientWithListAndApply[*apiextensionsv1.CustomResourceDefinition, *apiextensionsv1.CustomResourceDefinitionList, *applyconfigurationapiextensionsv1.CustomResourceDefinitionApplyConfiguration]
 }
 
 // newCustomResourceDefinitions returns a CustomResourceDefinitions
 func newCustomResourceDefinitions(c *ApiextensionsV1Client) *customResourceDefinitions {
 	return &customResourceDefinitions{
-		gentype.NewClientWithListAndApply[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList, *apiextensionsv1.CustomResourceDefinitionApplyConfiguration](
+		gentype.NewClientWithListAndApply[*apiextensionsv1.CustomResourceDefinition, *apiextensionsv1.CustomResourceDefinitionList, *applyconfigurationapiextensionsv1.CustomResourceDefinitionApplyConfiguration](
 			"customresourcedefinitions",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.CustomResourceDefinition { return &v1.CustomResourceDefinition{} },
-			func() *v1.CustomResourceDefinitionList { return &v1.CustomResourceDefinitionList{} }),
+			func() *apiextensionsv1.CustomResourceDefinition { return &apiextensionsv1.CustomResourceDefinition{} },
+			func() *apiextensionsv1.CustomResourceDefinitionList {
+				return &apiextensionsv1.CustomResourceDefinitionList{}
+			},
+			gentype.PrefersProtobuf[*apiextensionsv1.CustomResourceDefinition](),
+		),
 	}
 }

@@ -157,6 +157,16 @@ func MatchContainerOutput(
 	containerName string,
 	expectedOutput []string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
+
+	return MatchMultipleContainerOutputs(ctx, f, pod, map[string][]string{containerName: expectedOutput}, matcher)
+}
+
+func MatchMultipleContainerOutputs(
+	ctx context.Context,
+	f *framework.Framework,
+	pod *v1.Pod,
+	expectedOutputs map[string][]string, // map of container name -> expected outputs
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
 	ns := pod.ObjectMeta.Namespace
 	if ns == "" {
 		ns = f.Namespace.Name
@@ -193,24 +203,26 @@ func MatchContainerOutput(
 		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
 	}
 
-	framework.Logf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+	for cName, expectedOutput := range expectedOutputs {
+		framework.Logf("Trying to get logs from node %s pod %s container %s: %v",
+			podStatus.Spec.NodeName, podStatus.Name, cName, err)
 
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, containerName)
-	if err != nil {
-		framework.Logf("Failed to get logs from node %q pod %q container %q. %v",
-			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %w", podStatus.Name, containerName, err)
-	}
-
-	for _, expected := range expectedOutput {
-		m := matcher(expected)
-		matches, err := m.Match(logs)
+		// Sometimes the actual containers take a second to get started, try to get logs for 60s
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, ns, podStatus.Name, cName)
 		if err != nil {
-			return fmt.Errorf("expected %q in container output: %w", expected, err)
-		} else if !matches {
-			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
+			framework.Logf("Failed to get logs from node %q pod %q container %q. %v",
+				podStatus.Spec.NodeName, podStatus.Name, cName, err)
+			return fmt.Errorf("failed to get logs from %s for %s: %w", podStatus.Name, cName, err)
+		}
+
+		for _, expected := range expectedOutput {
+			m := matcher(expected)
+			matches, err := m.Match(logs)
+			if err != nil {
+				return fmt.Errorf("expected %q in container output: %w", expected, err)
+			} else if !matches {
+				return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
+			}
 		}
 	}
 
@@ -228,7 +240,11 @@ func TestContainerOutput(ctx context.Context, f *framework.Framework, scenarioNa
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a regexp matcher.
 func TestContainerOutputRegexp(ctx context.Context, f *framework.Framework, scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutputMatcher(ctx, f, scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
+	TestContainerOutputsRegexp(ctx, f, scenarioName, pod, map[int][]string{containerIndex: expectedOutput})
+}
+
+func TestContainerOutputsRegexp(ctx context.Context, f *framework.Framework, scenarioName string, pod *v1.Pod, expectedOutputs map[int][]string) {
+	TestContainerOutputsMatcher(ctx, f, scenarioName, pod, expectedOutputs, gomega.MatchRegexp)
 }
 
 // TestContainerOutputMatcher runs the given pod in the given namespace and waits
@@ -245,4 +261,24 @@ func TestContainerOutputMatcher(ctx context.Context, f *framework.Framework,
 		framework.Failf("Invalid container index: %d", containerIndex)
 	}
 	framework.ExpectNoError(MatchContainerOutput(ctx, f, pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
+}
+
+func TestContainerOutputsMatcher(ctx context.Context, f *framework.Framework,
+	scenarioName string,
+	pod *v1.Pod,
+	expectedOutputs map[int][]string,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
+
+	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+
+	expectedNameOutputs := make(map[string][]string, len(expectedOutputs))
+	for containerIndex, expectedOutput := range expectedOutputs {
+		expectedOutput := expectedOutput
+		if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
+			framework.Failf("Invalid container index: %d", containerIndex)
+		}
+		expectedNameOutputs[pod.Spec.Containers[containerIndex].Name] = expectedOutput
+	}
+	framework.ExpectNoError(MatchMultipleContainerOutputs(ctx, f, pod, expectedNameOutputs, matcher))
+
 }

@@ -38,14 +38,13 @@ import (
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/cel"
-	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/cert"
 )
 
 // ValidateAuthenticationConfiguration validates a given AuthenticationConfiguration.
-func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, disallowedIssuers []string) field.ErrorList {
+func ValidateAuthenticationConfiguration(compiler authenticationcel.Compiler, c *api.AuthenticationConfiguration, disallowedIssuers []string) field.ErrorList {
 	root := field.NewPath("jwt")
 	var allErrs field.ErrorList
 
@@ -62,7 +61,7 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 	seenDiscoveryURLs := sets.New[string]()
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
-		_, errs := validateJWTAuthenticator(a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+		_, errs := validateJWTAuthenticator(compiler, a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 		allErrs = append(allErrs, errs...)
 
 		if seenIssuers.Has(a.Issuer.URL) {
@@ -93,18 +92,16 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 // CompileAndValidateJWTAuthenticator validates a given JWTAuthenticator and returns a CELMapper with the compiled
 // CEL expressions for claim mappings and validation rules.
 // This is exported for use in oidc package.
-func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator, disallowedIssuers []string) (authenticationcel.CELMapper, field.ErrorList) {
-	return validateJWTAuthenticator(authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+func CompileAndValidateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, disallowedIssuers []string) (authenticationcel.CELMapper, field.ErrorList) {
+	return validateJWTAuthenticator(compiler, authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 }
 
-func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
+func validateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
 	var allErrs field.ErrorList
 
-	// strictCost is set to true which enables the strict cost for CEL validation.
-	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	state := &validationState{}
 
-	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"))...)
+	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateClaimValidationRules(compiler, state, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateClaimMappings(compiler, state, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateUserValidationRules(compiler, state, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
@@ -118,12 +115,12 @@ type validationState struct {
 	usesEmailVerifiedClaim bool
 }
 
-func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
+func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validateIssuerURL(issuer.URL, disallowedIssuers, fldPath.Child("url"))...)
-	allErrs = append(allErrs, validateIssuerDiscoveryURL(issuer.URL, issuer.DiscoveryURL, fldPath.Child("discoveryURL"))...)
-	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"))...)
+	allErrs = append(allErrs, validateIssuerDiscoveryURL(issuer.URL, issuer.DiscoveryURL, fldPath.Child("discoveryURL"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateCertificateAuthority(issuer.CertificateAuthority, fldPath.Child("certificateAuthority"))...)
 
 	return allErrs
@@ -137,11 +134,15 @@ func validateIssuerURL(issuerURL string, disallowedIssuers sets.Set[string], fld
 	return validateURL(issuerURL, disallowedIssuers, fldPath)
 }
 
-func validateIssuerDiscoveryURL(issuerURL, issuerDiscoveryURL string, fldPath *field.Path) field.ErrorList {
+func validateIssuerDiscoveryURL(issuerURL, issuerDiscoveryURL string, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(issuerDiscoveryURL) == 0 {
 		return nil
+	}
+
+	if !structuredAuthnFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath, issuerDiscoveryURL, "discoveryURL is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 	}
 
 	if len(issuerURL) > 0 && strings.TrimRight(issuerURL, "/") == strings.TrimRight(issuerDiscoveryURL, "/") {
@@ -181,12 +182,16 @@ func validateURL(issuerURL string, disallowedIssuers sets.Set[string], fldPath *
 	return allErrs
 }
 
-func validateAudiences(audiences []string, audienceMatchPolicy api.AudienceMatchPolicyType, fldPath, audienceMatchPolicyFldPath *field.Path) field.ErrorList {
+func validateAudiences(audiences []string, audienceMatchPolicy api.AudienceMatchPolicyType, fldPath, audienceMatchPolicyFldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(audiences) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, fmt.Sprintf(atLeastOneRequiredErrFmt, fldPath)))
 		return allErrs
+	}
+
+	if len(audiences) > 1 && !structuredAuthnFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath, audiences, "multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 	}
 
 	seenAudiences := sets.NewString()
@@ -347,6 +352,11 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		if mapping.Key != strings.ToLower(mapping.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "key must be lowercase"))
 		}
+
+		if isKubernetesDomainPrefix(mapping.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use"))
+		}
+
 		if seenExtraKeys.Has(mapping.Key) {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Child("key"), mapping.Key))
 			continue
@@ -384,6 +394,24 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 	}
 
 	return allErrs
+}
+
+func isKubernetesDomainPrefix(key string) bool {
+	domainPrefix := getDomainPrefix(key)
+	if domainPrefix == "kubernetes.io" || strings.HasSuffix(domainPrefix, ".kubernetes.io") {
+		return true
+	}
+	if domainPrefix == "k8s.io" || strings.HasSuffix(domainPrefix, ".k8s.io") {
+		return true
+	}
+	return false
+}
+
+func getDomainPrefix(key string) string {
+	if parts := strings.SplitN(key, "/", 2); len(parts) == 2 {
+		return parts[0]
+	}
+	return ""
 }
 
 func usesEmailClaim(ast *celgo.Ast) bool {
@@ -585,7 +613,7 @@ func compileUserCELExpression(compiler authenticationcel.Compiler, expression au
 }
 
 // ValidateAuthorizationConfiguration validates a given AuthorizationConfiguration.
-func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.AuthorizationConfiguration, knownTypes sets.String, repeatableTypes sets.String) field.ErrorList {
+func ValidateAuthorizationConfiguration(compiler authorizationcel.Compiler, fldPath *field.Path, c *api.AuthorizationConfiguration, knownTypes sets.Set[string], repeatableTypes sets.Set[string]) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(c.Authorizers) == 0 {
@@ -602,7 +630,7 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 			continue
 		}
 		if !knownTypes.Has(aType) {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), aType, knownTypes.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), aType, sets.List(knownTypes)))
 			continue
 		}
 		if seenAuthorizerTypes.Has(aType) && !repeatableTypes.Has(aType) {
@@ -626,7 +654,7 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 				allErrs = append(allErrs, field.Required(fldPath.Child("webhook"), "required when type=Webhook"))
 				continue
 			}
-			allErrs = append(allErrs, ValidateWebhookConfiguration(fldPath, a.Webhook)...)
+			allErrs = append(allErrs, ValidateWebhookConfiguration(compiler, fldPath, a.Webhook)...)
 		default:
 			if a.Webhook != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("webhook"), "non-null", "may only be specified when type=Webhook"))
@@ -637,7 +665,7 @@ func ValidateAuthorizationConfiguration(fldPath *field.Path, c *api.Authorizatio
 	return allErrs
 }
 
-func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfiguration) field.ErrorList {
+func ValidateWebhookConfiguration(compiler authorizationcel.Compiler, fldPath *field.Path, c *api.WebhookConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if c.Timeout.Duration == 0 {
@@ -709,7 +737,7 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("connectionInfo", "type"), c.ConnectionInfo, []string{api.AuthorizationWebhookConnectionInfoTypeInCluster, api.AuthorizationWebhookConnectionInfoTypeKubeConfigFile}))
 	}
 
-	_, errs := compileMatchConditions(c.MatchConditions, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+	_, errs := compileMatchConditions(compiler, c.MatchConditions, fldPath, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
 	allErrs = append(allErrs, errs...)
 
 	return allErrs
@@ -717,11 +745,11 @@ func ValidateWebhookConfiguration(fldPath *field.Path, c *api.WebhookConfigurati
 
 // ValidateAndCompileMatchConditions validates a given webhook's matchConditions.
 // This is exported for use in authz package.
-func ValidateAndCompileMatchConditions(matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
-	return compileMatchConditions(matchConditions, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
+func ValidateAndCompileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition) (*authorizationcel.CELMatcher, field.ErrorList) {
+	return compileMatchConditions(compiler, matchConditions, nil, utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration))
 }
 
-func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath *field.Path, structuredAuthzFeatureEnabled bool) (*authorizationcel.CELMatcher, field.ErrorList) {
+func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions []api.WebhookMatchCondition, fldPath *field.Path, structuredAuthzFeatureEnabled bool) (*authorizationcel.CELMatcher, field.ErrorList) {
 	var allErrs field.ErrorList
 	// should fail when match conditions are used without feature enabled
 	if len(matchConditions) > 0 && !structuredAuthzFeatureEnabled {
@@ -732,8 +760,6 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 		return nil, allErrs
 	}
 
-	// strictCost is set to true which enables the strict cost for CEL validation.
-	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	seenExpressions := sets.NewString()
 	var compilationResults []authorizationcel.CompilationResult
 	var usesFieldSelector, usesLabelSelector bool

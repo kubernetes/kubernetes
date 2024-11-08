@@ -41,9 +41,9 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +54,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -82,6 +83,7 @@ import (
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -101,6 +103,8 @@ const (
 	checkpointPath      = "/checkpoint/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
+	podsPath            = "/pods"
+	runningPodsPath     = "/runningpods/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -111,6 +115,7 @@ type Server struct {
 	metricsBuckets       sets.Set[string]
 	metricsMethodBuckets sets.Set[string]
 	resourceAnalyzer     stats.ResourceAnalyzer
+	extendedCheckers     []healthz.HealthChecker
 }
 
 // TLSOptions holds the TLS options.
@@ -153,6 +158,7 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
@@ -161,7 +167,7 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, kubeCfg)
+	handler := NewServer(host, resourceAnalyzer, checkers, auth, kubeCfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		handler.InstallTracingFilter(tp)
@@ -195,11 +201,12 @@ func ListenAndServeKubeletServer(
 func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	address net.IP,
 	port uint,
 	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, nil, nil)
+	s := NewServer(host, resourceAnalyzer, checkers, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
@@ -240,10 +247,14 @@ func ListenAndServePodResources(endpoint string, providers podresources.PodResou
 	}
 }
 
+type NodeRequestAttributesGetter interface {
+	GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes
+}
+
 // AuthInterface contains all methods required by the auth filters
 type AuthInterface interface {
 	authenticator.Request
-	authorizer.RequestAttributesGetter
+	NodeRequestAttributesGetter
 	authorizer.Authorizer
 }
 
@@ -258,9 +269,8 @@ type HostInterface interface {
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
-	ResyncInterval() time.Duration
 	GetHostname() string
-	LatestLoopEntryTime() time.Time
+	SyncLoopHealthCheck(req *http.Request) error
 	GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
@@ -272,6 +282,7 @@ type HostInterface interface {
 func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
+	checkers []healthz.HealthChecker,
 	auth AuthInterface,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
@@ -282,6 +293,7 @@ func NewServer(
 		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
 		metricsBuckets:       sets.New[string](),
 		metricsMethodBuckets: sets.New[string]("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
+		extendedCheckers:     checkers,
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
@@ -317,19 +329,35 @@ func (s *Server) InstallAuthFilter() {
 
 		// Get authorization attributes
 		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
+		var allowed bool
+		var msg string
+		var subresources []string
+		for _, attr := range attrs {
+			subresources = append(subresources, attr.GetSubresource())
+			decision, _, err := s.auth.Authorize(req.Request.Context(), attr)
+			if err != nil {
+				klog.ErrorS(err, "Authorization error", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
+				msg = fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attr.GetUser().GetName(), attr.GetVerb(), attr.GetResource(), attr.GetSubresource())
+				resp.WriteErrorString(http.StatusInternalServerError, msg)
+				return
 
-		// Authorize
-		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
-		if err != nil {
-			klog.ErrorS(err, "Authorization error", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
-			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			resp.WriteErrorString(http.StatusInternalServerError, msg)
-			return
+			}
+
+			if decision == authorizer.DecisionAllow {
+				allowed = true
+				break
+			}
 		}
-		if decision != authorizer.DecisionAllow {
-			klog.V(2).InfoS("Forbidden", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
-			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			resp.WriteErrorString(http.StatusForbidden, msg)
+
+		if !allowed {
+			if len(attrs) == 0 {
+				klog.ErrorS(fmt.Errorf("could not determine attributes for request"), "Authorization error")
+				resp.WriteErrorString(http.StatusForbidden, "Authorization error: could not determine attributes for request")
+				return
+			}
+			// The attributes only differ by subresource so we just use the first one.
+			klog.V(2).InfoS("Forbidden", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
+			resp.WriteErrorString(http.StatusForbidden, fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource(s)=%v)\n", attrs[0].GetUser().GetName(), attrs[0].GetVerb(), attrs[0].GetResource(), subresources))
 			return
 		}
 
@@ -370,18 +398,20 @@ func (s *Server) getMetricMethodBucket(method string) string {
 // patterns with the restful Container.
 func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("healthz")
-	healthz.InstallHandler(s.restfulCont,
+	checkers := []healthz.HealthChecker{
 		healthz.PingHealthz,
 		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
-	)
+		healthz.NamedCheck("syncloop", s.host.SyncLoopHealthCheck),
+	}
+	checkers = append(checkers, s.extendedCheckers...)
+	healthz.InstallHandler(s.restfulCont, checkers...)
 
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
 
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.
-		Path("/pods").
+		Path(podsPath).
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getPods).
@@ -541,7 +571,7 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
 	ws.
-		Path("/runningpods/").
+		Path(runningPodsPath).
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getRunningPods).
@@ -565,7 +595,7 @@ func (s *Server) InstallDebuggingDisabledHandlers() {
 	s.addMetricsBucketMatcher("logs")
 	paths := []string{
 		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/",
-		"/runningpods/", pprofBasePath, logsPath}
+		runningPodsPath, pprofBasePath, logsPath}
 	for _, p := range paths {
 		s.restfulCont.Handle(p, h)
 	}
@@ -655,20 +685,6 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 	}
 }
 
-// Checks if kubelet's sync loop  that updates containers is working.
-func (s *Server) syncLoopHealthCheck(req *http.Request) error {
-	duration := s.host.ResyncInterval() * 2
-	minDuration := time.Minute * 5
-	if duration < minDuration {
-		duration = minDuration
-	}
-	enterLoopTime := s.host.LatestLoopEntryTime()
-	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
-		return fmt.Errorf("sync Loop took longer than expected")
-	}
-	return nil
-}
-
 // getContainerLogs handles containerLogs request against the Kubelet
 func (s *Server) getContainerLogs(request *restful.Request, response *restful.Response) {
 	podNamespace := request.PathParameter("podNamespace")
@@ -708,6 +724,13 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		response.WriteError(http.StatusBadRequest, fmt.Errorf(`{"message": "Unable to decode query."}`))
 		return
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams) {
+		// Even with defaulters, logOptions.Stream can be nil if no arguments are provided at all.
+		if logOptions.Stream == nil {
+			// Default to "All" to maintain backward compatibility.
+			logOptions.Stream = ptr.To(v1.LogStreamAll)
+		}
+	}
 	logOptions.TypeMeta = metav1.TypeMeta{}
 	if errs := validation.ValidatePodLogOptions(logOptions); len(errs) > 0 {
 		response.WriteError(http.StatusUnprocessableEntity, fmt.Errorf(`{"message": "Invalid request."}`))
@@ -729,9 +752,40 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		response.WriteError(http.StatusInternalServerError, fmt.Errorf("unable to convert %v into http.Flusher, cannot show logs", reflect.TypeOf(response)))
 		return
 	}
-	fw := flushwriter.Wrap(response.ResponseWriter)
+
+	var (
+		stdout io.Writer
+		stderr io.Writer
+		fw     = flushwriter.Wrap(response.ResponseWriter)
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams) {
+		wantedStream := logOptions.Stream
+		// No stream type specified, default to All
+		if wantedStream == nil {
+			allStream := v1.LogStreamAll
+			wantedStream = &allStream
+		}
+		switch *wantedStream {
+		case v1.LogStreamStdout:
+			stdout, stderr = fw, nil
+		case v1.LogStreamStderr:
+			stdout, stderr = nil, fw
+		case v1.LogStreamAll:
+			stdout, stderr = fw, fw
+		default:
+			_ = response.WriteError(http.StatusBadRequest, fmt.Errorf("invalid stream type %q", *logOptions.Stream))
+			return
+		}
+	} else {
+		if logOptions.Stream != nil && *logOptions.Stream != v1.LogStreamAll {
+			_ = response.WriteError(http.StatusBadRequest, fmt.Errorf("unable to return the given log stream: %q. Please enable PodLogsQuerySplitStreams feature gate in kubelet", *logOptions.Stream))
+			return
+		}
+		stdout, stderr = fw, fw
+	}
+
 	response.Header().Set("Transfer-Encoding", "chunked")
-	if err := s.host.GetKubeletContainerLogs(ctx, kubecontainer.GetPodFullName(pod), containerName, logOptions, fw, fw); err != nil {
+	if err := s.host.GetKubeletContainerLogs(ctx, kubecontainer.GetPodFullName(pod), containerName, logOptions, stdout, stderr); err != nil {
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}

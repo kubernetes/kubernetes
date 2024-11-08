@@ -41,11 +41,11 @@ type Format struct {
 	MaxRegexSize int
 }
 
-func (d *Format) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (d Format) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	return nil, fmt.Errorf("type conversion error from 'Format' to '%v'", typeDesc)
 }
 
-func (d *Format) ConvertToType(typeVal ref.Type) ref.Val {
+func (d Format) ConvertToType(typeVal ref.Type) ref.Val {
 	switch typeVal {
 	case FormatType:
 		return d
@@ -56,18 +56,18 @@ func (d *Format) ConvertToType(typeVal ref.Type) ref.Val {
 	}
 }
 
-func (d *Format) Equal(other ref.Val) ref.Val {
-	otherDur, ok := other.(*Format)
+func (d Format) Equal(other ref.Val) ref.Val {
+	otherDur, ok := other.(Format)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 	return types.Bool(d.Name == otherDur.Name)
 }
 
-func (d *Format) Type() ref.Type {
+func (d Format) Type() ref.Type {
 	return FormatType
 }
 
-func (d *Format) Value() interface{} {
+func (d Format) Value() interface{} {
 	return d
 }

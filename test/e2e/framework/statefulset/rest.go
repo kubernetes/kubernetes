@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,11 +52,11 @@ func CreateStatefulSet(ctx context.Context, c clientset.Interface, manifestPath,
 	svc, err := e2emanifest.SvcFromManifest(mkpath("service.yaml"))
 	framework.ExpectNoError(err)
 
-	framework.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
+	framework.Logf("creating %s service", ss.Name)
 	_, err = c.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
+	framework.Logf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector)
 	_, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
@@ -230,6 +232,26 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 			expectedServiceName, ss.Spec.ServiceName)
 	}
 
+	return nil
+}
+
+// CheckPodIndexLabel asserts that the pods for ss have expected index label and values.
+func CheckPodIndexLabel(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) error {
+	pods := GetPodList(ctx, c, ss)
+	labelIndices := sets.NewInt()
+	for _, pod := range pods.Items {
+		ix, err := strconv.Atoi(pod.Labels[appsv1.PodIndexLabel])
+		if err != nil {
+			return err
+		}
+		labelIndices.Insert(ix)
+	}
+	wantIndexes := []int{0, 1, 2}
+	gotIndexes := labelIndices.List()
+
+	if !reflect.DeepEqual(gotIndexes, wantIndexes) {
+		return fmt.Errorf("pod index labels are not as expected, got: %v, want: %v", gotIndexes, wantIndexes)
+	}
 	return nil
 }
 

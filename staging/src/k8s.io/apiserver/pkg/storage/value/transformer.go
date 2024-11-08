@@ -105,6 +105,7 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, bool, error) {
 	start := time.Now()
 	var errs []error
+	resource := getResourceFromContext(ctx)
 	for i, transformer := range t.transformers {
 		if bytes.HasPrefix(data, transformer.Prefix) {
 			result, stale, err := transformer.Transformer.TransformFromStorage(ctx, data[len(transformer.Prefix):], dataCtx)
@@ -116,9 +117,9 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 				continue
 			}
 			if len(transformer.Prefix) == 0 {
-				RecordTransformation("from_storage", "identity", time.Since(start), err)
+				RecordTransformation(resource, "from_storage", "identity", time.Since(start), err)
 			} else {
-				RecordTransformation("from_storage", string(transformer.Prefix), time.Since(start), err)
+				RecordTransformation(resource, "from_storage", string(transformer.Prefix), time.Since(start), err)
 			}
 
 			// It is valid to have overlapping prefixes when the same encryption provider
@@ -163,7 +164,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 		logTransformErr(ctx, err, "failed to decrypt data")
 		return nil, false, err
 	}
-	RecordTransformation("from_storage", "unknown", time.Since(start), t.err)
+	RecordTransformation(resource, "from_storage", "unknown", time.Since(start), t.err)
 	return nil, false, t.err
 }
 
@@ -171,8 +172,9 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	start := time.Now()
 	transformer := t.transformers[0]
+	resource := getResourceFromContext(ctx)
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
-	RecordTransformation("to_storage", string(transformer.Prefix), time.Since(start), err)
+	RecordTransformation(resource, "to_storage", string(transformer.Prefix), time.Since(start), err)
 	if err != nil {
 		logTransformErr(ctx, err, "failed to encrypt data")
 		return nil, err
@@ -209,5 +211,11 @@ func getRequestInfoFromContext(ctx context.Context) *genericapirequest.RequestIn
 	if reqInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		return reqInfo
 	}
+	klog.V(4).InfoSDepth(1, "no request info on context")
 	return &genericapirequest.RequestInfo{}
+}
+
+func getResourceFromContext(ctx context.Context) string {
+	reqInfo := getRequestInfoFromContext(ctx)
+	return schema.GroupResource{Group: reqInfo.APIGroup, Resource: reqInfo.Resource}.String()
 }

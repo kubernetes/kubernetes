@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -26,16 +27,19 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	commonphases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // nodeOptions defines all the options exposed via flags by kubeadm upgrade node.
@@ -83,7 +87,15 @@ func newCmdNode(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			return nodeRunner.Run(args)
+			if err := nodeRunner.Run(args); err != nil {
+				return err
+			}
+			if nodeOptions.dryRun {
+				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+				return nil
+			}
+
+			return nil
 		},
 		Args: cobra.NoArgs,
 	}
@@ -98,12 +110,14 @@ func newCmdNode(out io.Writer) *cobra.Command {
 	nodeRunner.AppendPhase(phases.NewPreflightPhase())
 	nodeRunner.AppendPhase(phases.NewControlPlane())
 	nodeRunner.AppendPhase(phases.NewKubeconfigPhase())
-	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
+	nodeRunner.AppendPhase(commonphases.NewKubeletConfigPhase())
+	nodeRunner.AppendPhase(commonphases.NewAddonPhase())
+	nodeRunner.AppendPhase(commonphases.NewPostUpgradePhase())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		data, err := newNodeData(cmd, args, nodeOptions, out)
+		data, err := newNodeData(cmd, nodeOptions, out)
 		if err != nil {
 			return nil, err
 		}
@@ -142,11 +156,12 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
 // This func takes care of validating nodeOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm upgrade node workflow
-func newNodeData(cmd *cobra.Command, args []string, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
+func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
 	// Checks if a node is a control-plane node by looking up the kube-apiserver manifest file
 	isControlPlaneNode := true
 	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
 	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		klog.V(1).Infof("assuming this is not a control plane node because %q is missing", filepath)
 		isControlPlaneNode = false
 	}
 	if len(nodeOptions.kubeConfigPath) == 0 {
@@ -168,7 +183,9 @@ func newNodeData(cmd *cobra.Command, args []string, nodeOptions *nodeOptions, ou
 	if !ok {
 		return nil, cmdutil.TypeMismatchErr("dryRun", "bool")
 	}
-	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun)
+
+	printer := &output.TextPrinter{}
+	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun, printer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", nodeOptions.kubeConfigPath)
 	}

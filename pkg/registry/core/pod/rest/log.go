@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,7 +88,10 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 
 	countSkipTLSMetric(logOpts.InsecureSkipTLSVerifyBackend)
 
-	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams) {
+		logOpts.Stream = nil
+	}
+	if errs := validation.ValidatePodLogOptions(logOpts, utilfeature.DefaultFeatureGate.Enabled(features.PodLogsQuerySplitStreams)); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}
 	location, transport, err := pod.LogLocation(ctx, r.Store, r.KubeletConn, name, logOpts)

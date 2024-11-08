@@ -25,7 +25,7 @@ import (
 	unsafe "unsafe"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/events/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -38,40 +38,40 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.EventList)(nil), (*core.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_EventList_To_core_EventList(a.(*v1.EventList), b.(*core.EventList), scope)
+	if err := s.AddGeneratedConversionFunc((*eventsv1.EventList)(nil), (*core.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_EventList_To_core_EventList(a.(*eventsv1.EventList), b.(*core.EventList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.EventList)(nil), (*v1.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_EventList_To_v1_EventList(a.(*core.EventList), b.(*v1.EventList), scope)
+	if err := s.AddGeneratedConversionFunc((*core.EventList)(nil), (*eventsv1.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EventList_To_v1_EventList(a.(*core.EventList), b.(*eventsv1.EventList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.EventSeries)(nil), (*core.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_EventSeries_To_core_EventSeries(a.(*v1.EventSeries), b.(*core.EventSeries), scope)
+	if err := s.AddGeneratedConversionFunc((*eventsv1.EventSeries)(nil), (*core.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_EventSeries_To_core_EventSeries(a.(*eventsv1.EventSeries), b.(*core.EventSeries), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.EventSeries)(nil), (*v1.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_EventSeries_To_v1_EventSeries(a.(*core.EventSeries), b.(*v1.EventSeries), scope)
+	if err := s.AddGeneratedConversionFunc((*core.EventSeries)(nil), (*eventsv1.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EventSeries_To_v1_EventSeries(a.(*core.EventSeries), b.(*eventsv1.EventSeries), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*core.Event)(nil), (*v1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Event_To_v1_Event(a.(*core.Event), b.(*v1.Event), scope)
+	if err := s.AddConversionFunc((*core.Event)(nil), (*eventsv1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_Event_To_v1_Event(a.(*core.Event), b.(*eventsv1.Event), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Event_To_core_Event(a.(*v1.Event), b.(*core.Event), scope)
+	if err := s.AddConversionFunc((*eventsv1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Event_To_core_Event(a.(*eventsv1.Event), b.(*core.Event), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s conversion.Scope) error {
+func autoConvert_v1_Event_To_core_Event(in *eventsv1.Event, out *core.Event, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.EventTime = in.EventTime
 	out.Series = (*core.EventSeries)(unsafe.Pointer(in.Series))
@@ -90,7 +90,7 @@ func autoConvert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s convers
 	return nil
 }
 
-func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s conversion.Scope) error {
+func autoConvert_core_Event_To_v1_Event(in *core.Event, out *eventsv1.Event, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	// WARNING: in.InvolvedObject requires manual conversion: does not exist in peer-type
 	out.Reason = in.Reason
@@ -101,7 +101,7 @@ func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s convers
 	// WARNING: in.Count requires manual conversion: does not exist in peer-type
 	out.Type = in.Type
 	out.EventTime = in.EventTime
-	out.Series = (*v1.EventSeries)(unsafe.Pointer(in.Series))
+	out.Series = (*eventsv1.EventSeries)(unsafe.Pointer(in.Series))
 	out.Action = in.Action
 	out.Related = (*corev1.ObjectReference)(unsafe.Pointer(in.Related))
 	out.ReportingController = in.ReportingController
@@ -109,7 +109,7 @@ func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s convers
 	return nil
 }
 
-func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventList, s conversion.Scope) error {
+func autoConvert_v1_EventList_To_core_EventList(in *eventsv1.EventList, out *core.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -126,15 +126,15 @@ func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.Even
 }
 
 // Convert_v1_EventList_To_core_EventList is an autogenerated conversion function.
-func Convert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventList, s conversion.Scope) error {
+func Convert_v1_EventList_To_core_EventList(in *eventsv1.EventList, out *core.EventList, s conversion.Scope) error {
 	return autoConvert_v1_EventList_To_core_EventList(in, out, s)
 }
 
-func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventList, s conversion.Scope) error {
+func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *eventsv1.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.Event, len(*in))
+		*out = make([]eventsv1.Event, len(*in))
 		for i := range *in {
 			if err := Convert_core_Event_To_v1_Event(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -147,28 +147,28 @@ func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.Even
 }
 
 // Convert_core_EventList_To_v1_EventList is an autogenerated conversion function.
-func Convert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventList, s conversion.Scope) error {
+func Convert_core_EventList_To_v1_EventList(in *core.EventList, out *eventsv1.EventList, s conversion.Scope) error {
 	return autoConvert_core_EventList_To_v1_EventList(in, out, s)
 }
 
-func autoConvert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
+func autoConvert_v1_EventSeries_To_core_EventSeries(in *eventsv1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
 	return nil
 }
 
 // Convert_v1_EventSeries_To_core_EventSeries is an autogenerated conversion function.
-func Convert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
+func Convert_v1_EventSeries_To_core_EventSeries(in *eventsv1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
 	return autoConvert_v1_EventSeries_To_core_EventSeries(in, out, s)
 }
 
-func autoConvert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *v1.EventSeries, s conversion.Scope) error {
+func autoConvert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *eventsv1.EventSeries, s conversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
 	return nil
 }
 
 // Convert_core_EventSeries_To_v1_EventSeries is an autogenerated conversion function.
-func Convert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *v1.EventSeries, s conversion.Scope) error {
+func Convert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *eventsv1.EventSeries, s conversion.Scope) error {
 	return autoConvert_core_EventSeries_To_v1_EventSeries(in, out, s)
 }

@@ -21,10 +21,7 @@ import (
 // export data.
 type PkgDecoder struct {
 	// version is the file format version.
-	version uint32
-
-	// aliases determines whether types.Aliases should be created
-	aliases bool
+	version Version
 
 	// sync indicates whether the file uses sync markers.
 	sync bool
@@ -71,12 +68,9 @@ func (pr *PkgDecoder) SyncMarkers() bool { return pr.sync }
 // NewPkgDecoder returns a PkgDecoder initialized to read the Unified
 // IR export data from input. pkgPath is the package path for the
 // compilation unit that produced the export data.
-//
-// TODO(mdempsky): Remove pkgPath parameter; unneeded since CL 391014.
 func NewPkgDecoder(pkgPath, input string) PkgDecoder {
 	pr := PkgDecoder{
 		pkgPath: pkgPath,
-		//aliases: aliases.Enabled(),
 	}
 
 	// TODO(mdempsky): Implement direct indexing of input string to
@@ -84,14 +78,15 @@ func NewPkgDecoder(pkgPath, input string) PkgDecoder {
 
 	r := strings.NewReader(input)
 
-	assert(binary.Read(r, binary.LittleEndian, &pr.version) == nil)
+	var ver uint32
+	assert(binary.Read(r, binary.LittleEndian, &ver) == nil)
+	pr.version = Version(ver)
 
-	switch pr.version {
-	default:
-		panic(fmt.Errorf("unsupported version: %v", pr.version))
-	case 0:
-		// no flags
-	case 1:
+	if pr.version >= numVersions {
+		panic(fmt.Errorf("cannot decode %q, export data version %d is greater than maximum supported version %d", pkgPath, pr.version, numVersions-1))
+	}
+
+	if pr.version.Has(Flags) {
 		var flags uint32
 		assert(binary.Read(r, binary.LittleEndian, &flags) == nil)
 		pr.sync = flags&flagSyncMarkers != 0
@@ -106,7 +101,9 @@ func NewPkgDecoder(pkgPath, input string) PkgDecoder {
 	assert(err == nil)
 
 	pr.elemData = input[pos:]
-	assert(len(pr.elemData)-8 == int(pr.elemEnds[len(pr.elemEnds)-1]))
+
+	const fingerprintSize = 8
+	assert(len(pr.elemData)-fingerprintSize == int(pr.elemEnds[len(pr.elemEnds)-1]))
 
 	return pr
 }
@@ -140,7 +137,7 @@ func (pr *PkgDecoder) AbsIdx(k RelocKind, idx Index) int {
 		absIdx += int(pr.elemEndsEnds[k-1])
 	}
 	if absIdx >= int(pr.elemEndsEnds[k]) {
-		errorf("%v:%v is out of bounds; %v", k, idx, pr.elemEndsEnds)
+		panicf("%v:%v is out of bounds; %v", k, idx, pr.elemEndsEnds)
 	}
 	return absIdx
 }
@@ -197,9 +194,7 @@ func (pr *PkgDecoder) NewDecoderRaw(k RelocKind, idx Index) Decoder {
 		Idx:    idx,
 	}
 
-	// TODO(mdempsky) r.data.Reset(...) after #44505 is resolved.
-	r.Data = *strings.NewReader(pr.DataIdx(k, idx))
-
+	r.Data.Reset(pr.DataIdx(k, idx))
 	r.Sync(SyncRelocs)
 	r.Relocs = make([]RelocEnt, r.Len())
 	for i := range r.Relocs {
@@ -248,7 +243,7 @@ type Decoder struct {
 
 func (r *Decoder) checkErr(err error) {
 	if err != nil {
-		errorf("unexpected decoding error: %w", err)
+		panicf("unexpected decoding error: %w", err)
 	}
 }
 
@@ -519,3 +514,6 @@ func (pr *PkgDecoder) PeekObj(idx Index) (string, string, CodeObj) {
 
 	return path, name, tag
 }
+
+// Version reports the version of the bitstream.
+func (w *Decoder) Version() Version { return w.common.version }

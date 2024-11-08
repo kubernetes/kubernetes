@@ -35,7 +35,7 @@ var processStartTime = NewGaugeVec(
 // a prometheus registry. This metric needs to be included to ensure counter
 // data fidelity.
 func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
-	start, err := getProcessStart()
+	start, err := GetProcessStart()
 	if err != nil {
 		klog.Errorf("Could not get process start time, %v", err)
 		start = float64(time.Now().Unix())

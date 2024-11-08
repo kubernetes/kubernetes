@@ -80,7 +80,7 @@ func TestNewResetData(t *testing.T) {
 				options.CertificatesDir:       "/tmp",
 				options.NodeCRISocket:         constants.CRISocketCRIO,
 				options.IgnorePreflightErrors: "all",
-				options.ForceReset:            "true",
+				options.Force:                 "true",
 				options.DryRun:                "true",
 				options.CleanupTmpDir:         "true",
 			},
@@ -184,8 +184,8 @@ func TestNewResetData(t *testing.T) {
 		{
 			name: "--force flag is not allowed to mix with config",
 			flags: map[string]string{
-				options.CfgPath:    configFilePath,
-				options.ForceReset: "false",
+				options.CfgPath: configFilePath,
+				options.Force:   "false",
 			},
 			expectError: "can not mix '--config' with arguments",
 		},
@@ -218,6 +218,9 @@ func TestNewResetData(t *testing.T) {
 			// initialize an external reset option and inject it to the reset cmd
 			resetOptions := newResetOptions()
 			cmd := newCmdReset(nil, nil, resetOptions)
+
+			// make sure all cases use dry-run as we are not constructing a kubeconfig
+			tc.flags[options.DryRun] = "true"
 
 			// sets cmd flags (that will be reflected on the reset options)
 			for f, v := range tc.flags {

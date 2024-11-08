@@ -355,18 +355,6 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 	}
 }
 
-// TryLoadCSRFromDisk tries to load the CSR from the disk
-func TryLoadCSRFromDisk(pkiPath, name string) (*x509.CertificateRequest, error) {
-	csrPath := pathForCSR(pkiPath, name)
-
-	csr, err := CertificateRequestFromFile(csrPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not load the CSR %s", csrPath)
-	}
-
-	return csr, nil
-}
-
 // PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
 func PathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
@@ -507,34 +495,6 @@ func EncodeCSRPEM(csr *x509.CertificateRequest) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
-	block, _ := pem.Decode(pemCSR)
-	if block == nil {
-		return nil, errors.New("data doesn't contain a valid certificate request")
-	}
-
-	if block.Type != certutil.CertificateRequestBlockType {
-		return nil, errors.Errorf("expected block type %q, but PEM had type %q", certutil.CertificateRequestBlockType, block.Type)
-	}
-
-	return x509.ParseCertificateRequest(block.Bytes)
-}
-
-// CertificateRequestFromFile returns the CertificateRequest from a given PEM-encoded file.
-// Returns an error if the file could not be read or if the CSR could not be parsed.
-func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
-	pemBlock, err := os.ReadFile(file)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read file")
-	}
-
-	csr, err := parseCSRPEM(pemBlock)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error reading certificate request file %s", file)
-	}
-	return csr, nil
-}
-
 // NewCSR creates a new CSR
 func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error) {
 	RemoveDuplicateAltNames(&cfg.AltNames)
@@ -557,7 +517,7 @@ func NewCSR(cfg CertConfig, key crypto.Signer) (*x509.CertificateRequest, error)
 	return x509.ParseCertificateRequest(csrBytes)
 }
 
-// EncodeCertPEM returns PEM-endcoded certificate data
+// EncodeCertPEM returns PEM-encoded certificate data
 func EncodeCertPEM(cert *x509.Certificate) []byte {
 	block := pem.Block{
 		Type:  CertificateBlockType,
@@ -566,7 +526,7 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-// EncodeCertBundlePEM returns PEM-endcoded certificate bundle
+// EncodeCertBundlePEM returns PEM-encoded certificate bundle
 func EncodeCertBundlePEM(certs []*x509.Certificate) ([]byte, error) {
 	buf := bytes.Buffer{}
 

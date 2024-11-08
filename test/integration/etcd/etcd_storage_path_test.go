@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -33,7 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -71,6 +75,9 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 
@@ -121,7 +128,8 @@ func TestEtcdStoragePath(t *testing.T) {
 				err   error
 			)
 			if shouldCreate {
-				if input, err = jsonToMetaObject([]byte(testData.Stub)); err != nil || input.isEmpty() {
+				input = new(metaObject)
+				if err = utiljson.Unmarshal([]byte(testData.Stub), input); err != nil || input.isEmpty() {
 					t.Fatalf("invalid test data for %s: %v", gvResource, err)
 				}
 				// unset type meta fields - we only set these in the CRD test data and it makes
@@ -149,7 +157,20 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 			}
 
-			output, err := getFromEtcd(apiServer.KV, testData.ExpectedEtcdPath)
+			// Build a decoder that can decode JSON and CBOR from storage.
+			scheme := runtime.NewScheme()
+			if testData.ExpectedGVK != nil {
+				scheme.AddKnownTypeWithName(*testData.ExpectedGVK, &metaObject{})
+			} else {
+				scheme.AddKnownTypeWithName(gvk, &metaObject{})
+
+			}
+			decoder := recognizer.NewDecoder(
+				cbor.NewSerializer(scheme, scheme),
+				json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{}),
+			)
+
+			output, err := getFromEtcd(decoder, apiServer.KV, testData.ExpectedEtcdPath)
 			if err != nil {
 				t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
 			}
@@ -205,7 +226,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				)
 			}
 
-			actualGVK := output.getGVK()
+			actualGVK := output.GroupVersionKind()
 			if actualGVK != expectedGVK {
 				t.Errorf("GVK for %s does not match, expected %s got %s", kind, expectedGVK, actualGVK)
 			}
@@ -286,9 +307,7 @@ func getEtcdBucket(path string) string {
 
 // stable fields to compare as a sanity check
 type metaObject struct {
-	// all of type meta
-	Kind       string `json:"kind,omitempty"`
-	APIVersion string `json:"apiVersion,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
 	// parts of object meta
 	Metadata struct {
@@ -297,8 +316,10 @@ type metaObject struct {
 	} `json:"metadata,omitempty"`
 }
 
-func (obj *metaObject) getGVK() schema.GroupVersionKind {
-	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
+var _ runtime.Object = &metaObject{}
+
+func (*metaObject) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
 }
 
 func (obj *metaObject) isEmpty() bool {
@@ -310,14 +331,6 @@ type empty struct{}
 type cleanupData struct {
 	obj      *unstructured.Unstructured
 	resource schema.GroupVersionResource
-}
-
-func jsonToMetaObject(stub []byte) (*metaObject, error) {
-	obj := &metaObject{}
-	if err := json.Unmarshal(stub, obj); err != nil {
-		return nil, err
-	}
-	return obj, nil
 }
 
 func keyStringer(i interface{}) string {
@@ -383,7 +396,7 @@ func (c *allClient) createPrerequisites(mapper meta.RESTMapper, ns string, prere
 	return nil
 }
 
-func getFromEtcd(keys clientv3.KV, path string) (*metaObject, error) {
+func getFromEtcd(decoder runtime.Decoder, keys clientv3.KV, path string) (*metaObject, error) {
 	response, err := keys.Get(context.Background(), path)
 	if err != nil {
 		return nil, err
@@ -391,7 +404,11 @@ func getFromEtcd(keys clientv3.KV, path string) (*metaObject, error) {
 	if response.More || response.Count != 1 || len(response.Kvs) != 1 {
 		return nil, fmt.Errorf("Invalid etcd response (not found == %v): %#v", response.Count == 0, response)
 	}
-	return jsonToMetaObject(response.Kvs[0].Value)
+	var obj metaObject
+	if err := runtime.DecodeInto(decoder, response.Kvs[0].Value, &obj); err != nil {
+		return nil, err
+	}
+	return &obj, nil
 }
 
 func diffMaps(a, b interface{}) ([]string, []string) {

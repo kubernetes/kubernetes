@@ -202,6 +202,7 @@ type GoFlagsConfig struct {
 	A             bool
 	ASMFlags      string
 	BuildMode     string
+	BuildVCS      bool
 	Compiler      string
 	GCCGoFlags    string
 	GCFlags       string
@@ -219,6 +220,7 @@ type GoFlagsConfig struct {
 	ToolExec      string
 	Work          bool
 	X             bool
+	O             string
 }
 
 func NewDefaultGoFlagsConfig() GoFlagsConfig {
@@ -326,7 +328,7 @@ var ParallelConfigFlags = GinkgoFlags{
 // ReporterConfigFlags provides flags for the Ginkgo test process, and CLI
 var ReporterConfigFlags = GinkgoFlags{
 	{KeyPath: "R.NoColor", Name: "no-color", SectionKey: "output", DeprecatedName: "noColor", DeprecatedDocLink: "changed-command-line-flags",
-		Usage: "If set, suppress color output in default reporter."},
+		Usage: "If set, suppress color output in default reporter.  You can also set the environment variable GINKGO_NO_COLOR=TRUE"},
 	{KeyPath: "R.Verbose", Name: "v", SectionKey: "output",
 		Usage: "If set, emits more output including GinkgoWriter contents."},
 	{KeyPath: "R.VeryVerbose", Name: "vv", SectionKey: "output",
@@ -511,7 +513,7 @@ var GinkgoCLIWatchFlags = GinkgoFlags{
 // GoBuildFlags provides flags for the Ginkgo CLI build, run, and watch commands that capture go's build-time flags.  These are passed to go test -c by the ginkgo CLI
 var GoBuildFlags = GinkgoFlags{
 	{KeyPath: "Go.Race", Name: "race", SectionKey: "code-and-coverage-analysis",
-		Usage: "enable data race detection. Supported only on linux/amd64, freebsd/amd64, darwin/amd64, windows/amd64, linux/ppc64le and linux/arm64 (only for 48-bit VMA)."},
+		Usage: "enable data race detection. Supported on linux/amd64, linux/ppc64le, linux/arm64, linux/s390x, freebsd/amd64, netbsd/amd64, darwin/amd64, darwin/arm64, and windows/amd64."},
 	{KeyPath: "Go.Vet", Name: "vet", UsageArgument: "list", SectionKey: "code-and-coverage-analysis",
 		Usage: `Configure the invocation of "go vet" during "go test" to use the comma-separated list of vet checks.  If list is empty, "go test" runs "go vet" with a curated list of checks believed to be always worth addressing.  If list is "off", "go test" does not run "go vet" at all.  Available checks can be found by running 'go doc cmd/vet'`},
 	{KeyPath: "Go.Cover", Name: "cover", SectionKey: "code-and-coverage-analysis",
@@ -527,6 +529,8 @@ var GoBuildFlags = GinkgoFlags{
 		Usage: "arguments to pass on each go tool asm invocation."},
 	{KeyPath: "Go.BuildMode", Name: "buildmode", UsageArgument: "mode", SectionKey: "go-build",
 		Usage: "build mode to use. See 'go help buildmode' for more."},
+	{KeyPath: "Go.BuildVCS", Name: "buildvcs", SectionKey: "go-build",
+		Usage: "adds version control information."},
 	{KeyPath: "Go.Compiler", Name: "compiler", UsageArgument: "name", SectionKey: "go-build",
 		Usage: "name of compiler to use, as in runtime.Compiler (gccgo or gc)."},
 	{KeyPath: "Go.GCCGoFlags", Name: "gccgoflags", UsageArgument: "'[pattern=]arg list'", SectionKey: "go-build",
@@ -561,6 +565,8 @@ var GoBuildFlags = GinkgoFlags{
 		Usage: "print the name of the temporary work directory and do not delete it when exiting."},
 	{KeyPath: "Go.X", Name: "x", SectionKey: "go-build",
 		Usage: "print the commands."},
+	{KeyPath: "Go.O", Name: "o", SectionKey: "go-build",
+		Usage: "output binary path (including name)."},
 }
 
 // GoRunFlags provides flags for the Ginkgo CLI  run, and watch commands that capture go's run-time flags.  These are passed to the compiled test binary by the ginkgo CLI
@@ -614,7 +620,7 @@ func VetAndInitializeCLIAndGoConfig(cliConfig CLIConfig, goFlagsConfig GoFlagsCo
 }
 
 // GenerateGoTestCompileArgs is used by the Ginkgo CLI to generate command line arguments to pass to the go test -c command when compiling the test
-func GenerateGoTestCompileArgs(goFlagsConfig GoFlagsConfig, destination string, packageToBuild string, pathToInvocationPath string) ([]string, error) {
+func GenerateGoTestCompileArgs(goFlagsConfig GoFlagsConfig, packageToBuild string, pathToInvocationPath string) ([]string, error) {
 	// if the user has set the CoverProfile run-time flag make sure to set the build-time cover flag to make sure
 	// the built test binary can generate a coverprofile
 	if goFlagsConfig.CoverProfile != "" {
@@ -637,7 +643,7 @@ func GenerateGoTestCompileArgs(goFlagsConfig GoFlagsConfig, destination string, 
 		goFlagsConfig.CoverPkg = strings.Join(adjustedCoverPkgs, ",")
 	}
 
-	args := []string{"test", "-c", "-o", destination, packageToBuild}
+	args := []string{"test", "-c", packageToBuild}
 	goArgs, err := GenerateFlagArgs(
 		GoBuildFlags,
 		map[string]interface{}{

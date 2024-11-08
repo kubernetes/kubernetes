@@ -60,11 +60,11 @@ type StaticPodPathManager interface {
 	TempManifestPath(component string) string
 	// TempManifestDir should point to the temporary directory created for generating new manifests for the upgrade
 	TempManifestDir() string
-	// BackupManifestPath gets the file path for the component in the backup directory used for backuping manifests during the transition
+	// BackupManifestPath gets the file path for the component in the backup directory used for backing up manifests during the transition
 	BackupManifestPath(component string) string
-	// BackupManifestDir should point to the backup directory used for backuping manifests during the transition
+	// BackupManifestDir should point to the backup directory used for backing up manifests during the transition
 	BackupManifestDir() string
-	// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
+	// BackupEtcdDir should point to the backup directory used for backing up manifests during the transition
 	BackupEtcdDir() string
 	// CleanupDirs cleans up all temporary directories
 	CleanupDirs() error
@@ -99,16 +99,15 @@ func NewKubeStaticPodPathManager(kubernetesDir, patchesDir, tempDir, backupDir, 
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
 func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, patchesDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
-
-	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm(kubernetesDir, "kubeadm-upgraded-manifests")
+	upgradedManifestsDir, err := constants.CreateTempDir(kubernetesDir, "kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupManifestsDir, err := constants.CreateTimestampDirForKubeadm(kubernetesDir, "kubeadm-backup-manifests")
+	backupManifestsDir, err := constants.CreateTimestampDir(kubernetesDir, "kubeadm-backup-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupEtcdDir, err := constants.CreateTimestampDirForKubeadm(kubernetesDir, "kubeadm-backup-etcd")
+	backupEtcdDir, err := constants.CreateTimestampDir(kubernetesDir, "kubeadm-backup-etcd")
 	if err != nil {
 		return nil, err
 	}
@@ -151,17 +150,17 @@ func (spm *KubeStaticPodPathManager) TempManifestDir() string {
 	return spm.tempManifestDir
 }
 
-// BackupManifestPath gets the file path for the component in the backup directory used for backuping manifests during the transition
+// BackupManifestPath gets the file path for the component in the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.backupManifestDir)
 }
 
-// BackupManifestDir should point to the backup directory used for backuping manifests during the transition
+// BackupManifestDir should point to the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
 }
 
-// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
+// BackupEtcdDir should point to the backup directory used for backing up manifests during the transition
 func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }
@@ -650,11 +649,11 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
 func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration) error {
-
-	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
+	dryRunManifestDir, err := constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-dryrun", klog.Warningf)
 	if err != nil {
 		return err
 	}
+
 	defer os.RemoveAll(dryRunManifestDir)
 	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, patchesDir, internalcfg, true /* isDryRun */); err != nil {
 		return err

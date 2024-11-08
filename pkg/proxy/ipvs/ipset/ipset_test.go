@@ -406,7 +406,7 @@ func TestAddEntry(t *testing.T) {
 			t.Errorf("expected success, got %v", err)
 		}
 		if fcmd.CombinedOutputCalls != 2 {
-			t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+			t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 		}
 		if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(testCases[i].addCombinedOutputLog[1]...) {
 			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
@@ -489,7 +489,7 @@ func TestTestEntry(t *testing.T) {
 		t.Errorf("expected success, got %v", err)
 	}
 	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "10.120.7.100,tcp:8080") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])

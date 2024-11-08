@@ -3,6 +3,7 @@ deleteOptions:
   dryRun:
   - dryRunValue
   gracePeriodSeconds: 1
+  ignoreStoreReadErrorWithClusterBreakingPotential: true
   orphanDependents: true
   preconditions:
     resourceVersion: resourceVersionValue

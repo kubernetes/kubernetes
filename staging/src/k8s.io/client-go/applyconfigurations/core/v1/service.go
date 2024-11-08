@@ -19,21 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
 type ServiceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ServiceStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Service constructs a declarative configuration of the Service type for use with
@@ -58,18 +58,18 @@ func Service(name, namespace string) *ServiceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractService(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractService(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "")
 }
 
 // ExtractServiceStatus is the same as ExtractService except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractServiceStatus(service *apicorev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
+func ExtractServiceStatus(service *corev1.Service, fieldManager string) (*ServiceApplyConfiguration, error) {
 	return extractService(service, fieldManager, "status")
 }
 
-func extractService(service *apicorev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
+func extractService(service *corev1.Service, fieldManager string, subresource string) (*ServiceApplyConfiguration, error) {
 	b := &ServiceApplyConfiguration{}
 	err := managedfields.ExtractInto(service, internal.Parser().Type("io.k8s.api.core.v1.Service"), fieldManager, b, subresource)
 	if err != nil {
@@ -87,7 +87,7 @@ func extractService(service *apicorev1.Service, fieldManager string, subresource
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithKind(value string) *ServiceApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -95,7 +95,7 @@ func (b *ServiceApplyConfiguration) WithKind(value string) *ServiceApplyConfigur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithAPIVersion(value string) *ServiceApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -104,7 +104,7 @@ func (b *ServiceApplyConfiguration) WithAPIVersion(value string) *ServiceApplyCo
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithName(value string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -113,7 +113,7 @@ func (b *ServiceApplyConfiguration) WithName(value string) *ServiceApplyConfigur
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithGenerateName(value string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -122,7 +122,7 @@ func (b *ServiceApplyConfiguration) WithGenerateName(value string) *ServiceApply
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithNamespace(value string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -131,7 +131,7 @@ func (b *ServiceApplyConfiguration) WithNamespace(value string) *ServiceApplyCon
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithUID(value types.UID) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -140,7 +140,7 @@ func (b *ServiceApplyConfiguration) WithUID(value types.UID) *ServiceApplyConfig
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithResourceVersion(value string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -149,25 +149,25 @@ func (b *ServiceApplyConfiguration) WithResourceVersion(value string) *ServiceAp
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithGeneration(value int64) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ServiceApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ServiceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -176,7 +176,7 @@ func (b *ServiceApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *Se
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ServiceApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -186,11 +186,11 @@ func (b *ServiceApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) 
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ServiceApplyConfiguration) WithLabels(entries map[string]string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -201,11 +201,11 @@ func (b *ServiceApplyConfiguration) WithLabels(entries map[string]string) *Servi
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ServiceApplyConfiguration) WithAnnotations(entries map[string]string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -213,13 +213,13 @@ func (b *ServiceApplyConfiguration) WithAnnotations(entries map[string]string) *
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ServiceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ServiceApplyConfiguration {
+func (b *ServiceApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -230,14 +230,14 @@ func (b *ServiceApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerRefer
 func (b *ServiceApplyConfiguration) WithFinalizers(values ...string) *ServiceApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ServiceApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -260,5 +260,5 @@ func (b *ServiceApplyConfiguration) WithStatus(value *ServiceStatusApplyConfigur
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ServiceApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

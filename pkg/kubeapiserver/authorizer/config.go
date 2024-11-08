@@ -31,9 +31,10 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
-	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -72,6 +73,8 @@ type Config struct {
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
 // stopCh is used to shut down config reload goroutines when the server is shutting down.
+//
+// Note: the cel compiler construction depends on feature gates and the compatibility version to be initialized.
 func (config Config) New(ctx context.Context, serverID string) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
@@ -82,6 +85,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		apiServerID:      serverID,
 		lastLoadedConfig: config.AuthorizationConfiguration,
 		reloadInterval:   time.Minute,
+		compiler:         authorizationcel.NewDefaultCompiler(),
 	}
 
 	seenTypes := sets.New[authzconfig.AuthorizerType]()
@@ -95,7 +99,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		case authzconfig.AuthorizerType(modes.ModeNode):
 			var slices resourceinformers.ResourceSliceInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1alpha3().ResourceSlices()
+				slices = config.VersionedInformerFactory.Resource().V1beta1().ResourceSlices()
 			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
@@ -156,15 +160,15 @@ func GetNameForAuthorizerMode(mode string) string {
 	return strings.ToLower(mode)
 }
 
-func LoadAndValidateFile(configFile string, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+func LoadAndValidateFile(configFile string, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
-	return LoadAndValidateData(data, requireNonWebhookTypes)
+	return LoadAndValidateData(data, compiler, requireNonWebhookTypes)
 }
 
-func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+func LoadAndValidateData(data []byte, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
 	// load the file and check for errors
 	authorizationConfiguration, err := load.LoadFromData(data)
 	if err != nil {
@@ -172,11 +176,11 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 	}
 
 	// validate the file and return any error
-	if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
-		sets.NewString(modes.AuthorizationModeChoices...),
-		sets.NewString(repeatableAuthorizerTypes...),
+	if errors := validation.ValidateAuthorizationConfiguration(compiler, nil, authorizationConfiguration,
+		sets.New(modes.AuthorizationModeChoices...),
+		sets.New(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
-		return nil, fmt.Errorf(errors.ToAggregate().Error())
+		return nil, errors.ToAggregate()
 	}
 
 	// test to check if the authorizer names passed conform to the authorizers for type!=Webhook

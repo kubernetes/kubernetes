@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
+	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type ResourceSlicesGetter interface {
 
 // ResourceSliceInterface has methods to work with ResourceSlice resources.
 type ResourceSliceInterface interface {
-	Create(ctx context.Context, resourceSlice *v1alpha3.ResourceSlice, opts v1.CreateOptions) (*v1alpha3.ResourceSlice, error)
-	Update(ctx context.Context, resourceSlice *v1alpha3.ResourceSlice, opts v1.UpdateOptions) (*v1alpha3.ResourceSlice, error)
+	Create(ctx context.Context, resourceSlice *resourcev1alpha3.ResourceSlice, opts v1.CreateOptions) (*resourcev1alpha3.ResourceSlice, error)
+	Update(ctx context.Context, resourceSlice *resourcev1alpha3.ResourceSlice, opts v1.UpdateOptions) (*resourcev1alpha3.ResourceSlice, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha3.ResourceSlice, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha3.ResourceSliceList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1alpha3.ResourceSlice, error)
+	List(ctx context.Context, opts v1.ListOptions) (*resourcev1alpha3.ResourceSliceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha3.ResourceSlice, err error)
-	Apply(ctx context.Context, resourceSlice *resourcev1alpha3.ResourceSliceApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha3.ResourceSlice, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *resourcev1alpha3.ResourceSlice, err error)
+	Apply(ctx context.Context, resourceSlice *applyconfigurationsresourcev1alpha3.ResourceSliceApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.ResourceSlice, err error)
 	ResourceSliceExpansion
 }
 
 // resourceSlices implements ResourceSliceInterface
 type resourceSlices struct {
-	*gentype.ClientWithListAndApply[*v1alpha3.ResourceSlice, *v1alpha3.ResourceSliceList, *resourcev1alpha3.ResourceSliceApplyConfiguration]
+	*gentype.ClientWithListAndApply[*resourcev1alpha3.ResourceSlice, *resourcev1alpha3.ResourceSliceList, *applyconfigurationsresourcev1alpha3.ResourceSliceApplyConfiguration]
 }
 
 // newResourceSlices returns a ResourceSlices
 func newResourceSlices(c *ResourceV1alpha3Client) *resourceSlices {
 	return &resourceSlices{
-		gentype.NewClientWithListAndApply[*v1alpha3.ResourceSlice, *v1alpha3.ResourceSliceList, *resourcev1alpha3.ResourceSliceApplyConfiguration](
+		gentype.NewClientWithListAndApply[*resourcev1alpha3.ResourceSlice, *resourcev1alpha3.ResourceSliceList, *applyconfigurationsresourcev1alpha3.ResourceSliceApplyConfiguration](
 			"resourceslices",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha3.ResourceSlice { return &v1alpha3.ResourceSlice{} },
-			func() *v1alpha3.ResourceSliceList { return &v1alpha3.ResourceSliceList{} }),
+			func() *resourcev1alpha3.ResourceSlice { return &resourcev1alpha3.ResourceSlice{} },
+			func() *resourcev1alpha3.ResourceSliceList { return &resourcev1alpha3.ResourceSliceList{} },
+			gentype.PrefersProtobuf[*resourcev1alpha3.ResourceSlice](),
+		),
 	}
 }

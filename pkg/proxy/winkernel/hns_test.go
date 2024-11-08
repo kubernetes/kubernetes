@@ -22,7 +22,7 @@ package winkernel
 import (
 	"encoding/json"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hnslib/hcn"
 	"github.com/stretchr/testify/assert"
 
 	"strings"

@@ -20,7 +20,6 @@ reviewers:
   - janetkuo
   - justinsb
   - pwittrock
-  - ncdc
   - mwielgus
   - soltysh
   - dims
@@ -28,3 +27,5 @@ reviewers:
   - jpbetz
 emeritus_approvers:
   - lavalamp
+emeritus_reviewers:
+  - ncdc

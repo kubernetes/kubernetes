@@ -2,10 +2,12 @@
 
 approvers:
   - mikedanese
+  - jefftree
 reviewers:
   - wojtek-t
   - deads2k
   - mikedanese
   - ingvagabund
+  - jefftree
 emeritus_approvers:
   - timothysc

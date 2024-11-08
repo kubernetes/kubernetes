@@ -102,7 +102,7 @@ func TestVerifySandboxStatus(t *testing.T) {
 		if actual != nil {
 			assert.EqualError(t, actual, status.expected.Error())
 		} else {
-			assert.Nil(t, status.expected)
+			assert.NoError(t, status.expected)
 		}
 	}
 }
@@ -175,7 +175,7 @@ func TestVerifyContainerStatus(t *testing.T) {
 		if actual != nil {
 			assert.EqualError(t, actual, status.expected.Error())
 		} else {
-			assert.Nil(t, status.expected)
+			assert.NoError(t, status.expected)
 		}
 	}
 }

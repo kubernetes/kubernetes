@@ -21,10 +21,12 @@ keep track of registered plugins.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 )
 
@@ -100,7 +102,7 @@ func (plugin *PluginInfo) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg, d
 // that can be used in logs.
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ",
 func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(plugin.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for plugins to register
@@ -108,7 +110,7 @@ func (plugin *PluginInfo) GenerateErrorDetailed(prefixMsg string, err error) (de
 // The msg format follows the pattern "<prefixMsg> <plugin details>: <err> ".
 func (plugin *PluginInfo) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := plugin.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // Generates an error string with the format ": <err>" if err exists
@@ -132,12 +134,13 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 	}
 
 	// Update the PluginInfo object.
-	// Note that we only update the timestamp in the desired state of world, not the actual state of world
+	// Note that we only update the timestamp and UUID in the desired state of world, not the actual state of world
 	// because in the reconciler, we need to check if the plugin in the actual state of world is the same
 	// version as the plugin in the desired state of world
 	dsw.socketFileToInfo[socketPath] = PluginInfo{
 		SocketPath: socketPath,
 		Timestamp:  time.Now(),
+		UUID:       uuid.NewUUID(),
 	}
 	return nil
 }

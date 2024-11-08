@@ -351,7 +351,7 @@ func (d decoder) unmarshalScalar(fd protoreflect.FieldDescriptor) (protoreflect.
 		panic(fmt.Sprintf("unmarshalScalar: invalid scalar kind %v", kind))
 	}
 
-	return protoreflect.Value{}, d.newError(tok.Pos(), "invalid value for %v type: %v", kind, tok.RawString())
+	return protoreflect.Value{}, d.newError(tok.Pos(), "invalid value for %v field %v: %v", kind, fd.JSONName(), tok.RawString())
 }
 
 func unmarshalInt(tok json.Token, bitSize int) (protoreflect.Value, bool) {

@@ -144,7 +144,7 @@ func TestRoundtripToUnstructured(t *testing.T) {
 		}
 	}
 
-	roundtrip.RoundtripToUnstructured(t, legacyscheme.Scheme, FuzzerFuncs, skipped)
+	roundtrip.RoundtripToUnstructured(t, legacyscheme.Scheme, FuzzerFuncs, skipped, nil)
 }
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {

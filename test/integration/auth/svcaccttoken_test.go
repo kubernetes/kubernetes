@@ -22,6 +22,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"io"
 	"net/http"
 	"net/url"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -51,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	svcacct "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -66,6 +69,58 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 	tokenExpirationSeconds = 60*60 + 7
 )
+
+func TestServiceAccountAnnotationDeprecation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	// Start the server
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{})
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(kubeClient, "myns", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
+
+	warningHandler := &recordingWarningHandler{}
+
+	configWithWarningHandler := rest.CopyConfig(kubeConfig)
+	configWithWarningHandler.WarningHandler = warningHandler
+	cs, err := clientset.NewForConfig(configWithWarningHandler)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	var (
+		saWithAnnotation = &v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-svcacct",
+				Namespace: ns.Name,
+			},
+		}
+		pod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: saWithAnnotation.Namespace,
+			},
+			Spec: v1.PodSpec{
+				ServiceAccountName: saWithAnnotation.Name,
+				Containers:         []v1.Container{{Name: "test-container", Image: "nginx"}},
+			},
+		}
+	)
+
+	t.Run("service account with deprecated annotation", func(t *testing.T) {
+		warningHandler.clear()
+		// test warning is emitted when the service account has this deprecated annotation
+		saWithAnnotation.Annotations = map[string]string{svcacct.EnforceMountableSecretsAnnotation: "true"}
+		_, delSvcAcct := createDeleteSvcAcct(t, cs, saWithAnnotation)
+		defer delSvcAcct()
+		warningHandler.assertEqual(t, []string{fmt.Sprintf("metadata.annotations[%s]: deprecated in v1.32+; prefer separate namespaces to isolate access to mounted secrets", svcacct.EnforceMountableSecretsAnnotation)})
+
+		warningHandler.clear()
+		// no warning when a pod is created with a service account that has this deprecated annotation
+		_, delPod := createDeletePod(t, cs, pod)
+		defer delPod()
+		warningHandler.assertEqual(t, nil)
+	})
+}
 
 func TestServiceAccountTokenCreate(t *testing.T) {
 	const iss = "https://foo.bar.example.com"
@@ -237,7 +292,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		info := doTokenReview(t, cs, treq, false)
 		// we are not testing the credential-id feature, so delete this value from the returned extra info map
 		if info.Extra != nil {
-			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+			delete(info.Extra, user.CredentialIDKey)
 		}
 		if len(info.Extra) > 0 {
 			t.Fatalf("expected Extra to be empty but got: %#v", info.Extra)
@@ -247,8 +302,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 
 	t.Run("bound to service account and pod", func(t *testing.T) {
-		// Disable embedding pod's node info
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, false)
 		treq := &authenticationv1.TokenRequest{
 			Spec: authenticationv1.TokenRequestSpec{
 				Audiences: []string{"api"},
@@ -309,7 +362,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		info := doTokenReview(t, cs, treq, false)
 		// we are not testing the credential-id feature, so delete this value from the returned extra info map
-		delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+		delete(info.Extra, user.CredentialIDKey)
 		if len(info.Extra) != 2 {
 			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
 		}
@@ -405,7 +458,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 			info := doTokenReview(t, cs, treq, false)
 			// we are not testing the credential-id feature, so delete this value from the returned extra info map
-			delete(info.Extra, apiserverserviceaccount.CredentialIDKey)
+			delete(info.Extra, user.CredentialIDKey)
 			if len(info.Extra) != len(expectedExtraValues) {
 				t.Fatalf("expected Extra have length of %d but was length %d: %#v", len(expectedExtraValues), len(info.Extra), info.Extra)
 			}
@@ -638,7 +691,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("err calling Claims: %v", err)
 		}
-		tok, err := tokenGenerator.GenerateToken(sc, pc)
+		tok, err := tokenGenerator.GenerateToken(context.TODO(), sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
 		}

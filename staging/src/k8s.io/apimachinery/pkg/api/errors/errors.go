@@ -54,6 +54,7 @@ var knownReasons = map[metav1.StatusReason]struct{}{
 	metav1.StatusReasonGone:                  {},
 	metav1.StatusReasonInvalid:               {},
 	metav1.StatusReasonServerTimeout:         {},
+	metav1.StatusReasonStoreReadError:        {},
 	metav1.StatusReasonTimeout:               {},
 	metav1.StatusReasonTooManyRequests:       {},
 	metav1.StatusReasonBadRequest:            {},
@@ -773,6 +774,12 @@ func IsUnexpectedServerError(err error) bool {
 func IsUnexpectedObjectError(err error) bool {
 	uoe, ok := err.(*UnexpectedObjectError)
 	return err != nil && (ok || errors.As(err, &uoe))
+}
+
+// IsStoreReadError determines if err is due to either failure to transform the
+// data from the storage, or failure to decode the object appropriately.
+func IsStoreReadError(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonStoreReadError
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the

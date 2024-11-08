@@ -108,20 +108,17 @@ func initTestSchedulerForPriorityTest(t *testing.T, preScorePluginName, scorePlu
 	return testCtx
 }
 
-func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext {
+func initTestSchedulerForNodeResourcesTest(t *testing.T, strategy configv1.ScoringStrategyType) *testutils.TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
 				SchedulerName: pointer.String(v1.DefaultSchedulerName),
-			},
-			{
-				SchedulerName: pointer.String("gpu-binpacking-scheduler"),
 				PluginConfig: []configv1.PluginConfig{
 					{
 						Name: noderesources.Name,
 						Args: runtime.RawExtension{Object: &configv1.NodeResourcesFitArgs{
 							ScoringStrategy: &configv1.ScoringStrategy{
-								Type: configv1.MostAllocated,
+								Type: strategy,
 								Resources: []configv1.ResourceSpec{
 									{Name: string(v1.ResourceCPU), Weight: 1},
 									{Name: string(v1.ResourceMemory), Weight: 1},
@@ -147,63 +144,146 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 // TestNodeResourcesScoring verifies that scheduler's node resources priority function
 // works correctly.
 func TestNodeResourcesScoring(t *testing.T) {
-	testCtx := initTestSchedulerForNodeResourcesTest(t)
-	// Add a few nodes.
-	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Capacity(
-		map[v1.ResourceName]string{
-			v1.ResourceCPU:    "8",
-			v1.ResourceMemory: "16G",
-			resourceGPU:       "4",
-		}), 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound1").Res(
-		map[v1.ResourceName]string{
-			v1.ResourceCPU:    "2",
-			v1.ResourceMemory: "4G",
-			resourceGPU:       "1",
+	tests := []struct {
+		name         string
+		pod          func(testCtx *testutils.TestContext) *v1.Pod
+		existingPods func(testCtx *testutils.TestContext) []*v1.Pod
+		nodes        []*v1.Node
+		strategy     configv1.ScoringStrategyType
+		// expectedNodeName is the list of node names. The pod should be scheduled on either of them.
+		expectedNodeName []string
+	}{
+		{
+			name: "with least allocated strategy, take existing sidecars into consideration",
+			pod: func(testCtx *testutils.TestContext) *v1.Pod {
+				return st.MakePod().Namespace(testCtx.NS.Name).Name("pod").
+					Res(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "2",
+						v1.ResourceMemory: "4G",
+						resourceGPU:       "1",
+					}).Obj()
+			},
+			existingPods: func(testCtx *testutils.TestContext) []*v1.Pod {
+				return []*v1.Pod{
+					st.MakePod().Namespace(testCtx.NS.Name).Name("existing-pod-1").Node("node-1").
+						Res(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "4G",
+							resourceGPU:       "1",
+						}).
+						SidecarReq(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "2G",
+						}).
+						Obj(),
+					st.MakePod().Namespace(testCtx.NS.Name).Name("existing-pod-2").Node("node-2").
+						Res(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "4G",
+							resourceGPU:       "1",
+						}).Obj(),
+				}
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "8",
+						v1.ResourceMemory: "16G",
+						resourceGPU:       "4",
+					}).Obj(),
+				st.MakeNode().Name("node-2").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "8",
+						v1.ResourceMemory: "16G",
+						resourceGPU:       "4",
+					}).Obj(),
+			},
+			strategy:         configv1.LeastAllocated,
+			expectedNodeName: []string{"node-2"},
 		},
-	).Obj())
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpuBoundPod1, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("gpubound1").Res(
-		map[v1.ResourceName]string{
-			v1.ResourceCPU:    "1",
-			v1.ResourceMemory: "2G",
-			resourceGPU:       "2",
+		{
+			name: "with most allocated strategy, take existing sidecars into consideration",
+			pod: func(testCtx *testutils.TestContext) *v1.Pod {
+				return st.MakePod().Namespace(testCtx.NS.Name).Name("pod").
+					Res(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "2",
+						v1.ResourceMemory: "4G",
+						resourceGPU:       "1",
+					}).Obj()
+			},
+			existingPods: func(testCtx *testutils.TestContext) []*v1.Pod {
+				return []*v1.Pod{
+					st.MakePod().Namespace(testCtx.NS.Name).Name("existing-pod-1").Node("node-1").
+						Res(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "4G",
+							resourceGPU:       "1",
+						}).
+						SidecarReq(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "2G",
+						}).
+						Obj(),
+					st.MakePod().Namespace(testCtx.NS.Name).Name("existing-pod-2").Node("node-2").
+						Res(map[v1.ResourceName]string{
+							v1.ResourceCPU:    "2",
+							v1.ResourceMemory: "4G",
+							resourceGPU:       "1",
+						}).Obj(),
+				}
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "8",
+						v1.ResourceMemory: "16G",
+						resourceGPU:       "4",
+					}).Obj(),
+				st.MakeNode().Name("node-2").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "8",
+						v1.ResourceMemory: "16G",
+						resourceGPU:       "4",
+					}).Obj(),
+			},
+			strategy:         configv1.MostAllocated,
+			expectedNodeName: []string{"node-1"},
 		},
-	).Obj())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cpuBoundPod1.Spec.NodeName == "" || gpuBoundPod1.Spec.NodeName == "" {
-		t.Fatalf("pods should have nodeName assigned, got %q and %q",
-			cpuBoundPod1.Spec.NodeName, gpuBoundPod1.Spec.NodeName)
 	}
 
-	// Since both pods used the default scheduler, then they should land on two different
-	// nodes because the default configuration uses LeastAllocated.
-	if cpuBoundPod1.Spec.NodeName == gpuBoundPod1.Spec.NodeName {
-		t.Fatalf("pods should have landed on different nodes, both scheduled on %q",
-			cpuBoundPod1.Spec.NodeName)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+			testCtx := initTestSchedulerForNodeResourcesTest(t, tt.strategy)
 
-	// The following pod is using the gpu-binpacking-scheduler profile, which gives a higher weight to
-	// GPU-based binpacking, and so it should land on the node with higher GPU utilization.
-	cpuBoundPod2, err := runPausePod(testCtx.ClientSet, st.MakePod().Namespace(testCtx.NS.Name).Name("cpubound2").SchedulerName("gpu-binpacking-scheduler").Res(
-		map[v1.ResourceName]string{
-			v1.ResourceCPU:    "2",
-			v1.ResourceMemory: "4G",
-			resourceGPU:       "1",
-		},
-	).Obj())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cpuBoundPod2.Spec.NodeName != gpuBoundPod1.Spec.NodeName {
-		t.Errorf("pods should have landed on the same node")
+			for _, n := range tt.nodes {
+				if _, err := createNode(testCtx.ClientSet, n); err != nil {
+					t.Fatalf("failed to create node: %v", err)
+				}
+			}
+
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("failed to wait for nodes in cache: %v", err)
+			}
+
+			if tt.existingPods != nil {
+				for _, p := range tt.existingPods(testCtx) {
+					if _, err := runPausePod(testCtx.ClientSet, p); err != nil {
+						t.Fatalf("failed to create existing pod: %v", err)
+					}
+				}
+			}
+
+			pod, err := runPausePod(testCtx.ClientSet, tt.pod(testCtx))
+			if err != nil {
+				t.Fatalf("Error running pause pod: %v", err)
+			}
+
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(testCtx.ClientSet, pod.Namespace, pod.Name, tt.expectedNodeName))
+			if err != nil {
+				t.Errorf("Error while trying to wait for a pod to be scheduled: %v", err)
+			}
+		})
 	}
 }
 

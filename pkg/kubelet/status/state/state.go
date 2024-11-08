@@ -17,11 +17,11 @@ limitations under the License.
 package state
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // PodResourceAllocation type is used in tracking resources allocated to pod's containers
-type PodResourceAllocation map[string]map[string]v1.ResourceList
+type PodResourceAllocation map[string]map[string]v1.ResourceRequirements
 
 // PodResizeStatus type is used in tracking the last resize decision for pod
 type PodResizeStatus map[string]v1.PodResizeStatus
@@ -30,9 +30,9 @@ type PodResizeStatus map[string]v1.PodResizeStatus
 func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 	prCopy := make(PodResourceAllocation)
 	for pod := range pr {
-		prCopy[pod] = make(map[string]v1.ResourceList)
+		prCopy[pod] = make(map[string]v1.ResourceRequirements)
 		for container, alloc := range pr[pod] {
-			prCopy[pod][container] = alloc.DeepCopy()
+			prCopy[pod][container] = *alloc.DeepCopy()
 		}
 	}
 	return prCopy
@@ -40,17 +40,15 @@ func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 
 // Reader interface used to read current pod resource allocation state
 type Reader interface {
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceList, bool)
+	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
 	GetPodResourceAllocation() PodResourceAllocation
-	GetPodResizeStatus(podUID string) (v1.PodResizeStatus, bool)
-	GetResizeStatus() PodResizeStatus
+	GetPodResizeStatus(podUID string) v1.PodResizeStatus
 }
 
 type writer interface {
-	SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceList) error
+	SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error
 	SetPodResourceAllocation(PodResourceAllocation) error
-	SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus) error
-	SetResizeStatus(PodResizeStatus) error
+	SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus)
 	Delete(podUID string, containerName string) error
 	ClearState() error
 }

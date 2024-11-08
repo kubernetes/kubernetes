@@ -383,7 +383,7 @@ kube::golang::best_guess_go_targets() {
       continue
     fi
 
-    if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+    if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/".+ ]]; then
       # If the target starts with what looks like a domain name, assume it has a
       # fully-qualified Go package name.
       echo "${target}"
@@ -413,6 +413,19 @@ kube::golang::best_guess_go_targets() {
   done
 }
 
+kube::golang::internal::lazy_normalize() {
+  target="$1"
+
+  if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/".+ ]]; then
+    # If the target starts with what looks like a domain name, assume it has a
+    # fully-qualified Go package name.
+    echo "${target}"
+    return
+  fi
+
+  go list -find -e "${target}"
+}
+
 # kube::golang::normalize_go_targets takes a list of build targets, which might
 # be Go-style names (e.g. example.com/foo/bar or ./foo/bar) or just local paths
 # (e.g. foo/bar) and produces a respective list (on stdout) of Go package
@@ -433,7 +446,7 @@ kube::golang::normalize_go_targets() {
       local tst
       tst="$(basename "${target}")"
       local pkg
-      pkg="$(go list -find -e "${dir}")"
+      pkg="$(kube::golang::internal::lazy_normalize "${dir}")"
       echo "${pkg}/${tst}"
       continue
     fi
@@ -441,11 +454,11 @@ kube::golang::normalize_go_targets() {
       local dir
       dir="$(dirname "${target}")"
       local pkg
-      pkg="$(go list -find -e "${dir}")"
+      pkg="$(kube::golang::internal::lazy_normalize "${dir}")"
       echo "${pkg}/..."
       continue
     fi
-    go list -find -e "${target}"
+    kube::golang::internal::lazy_normalize "${target}"
   done
 }
 
@@ -538,7 +551,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.22
+  minimum_go_version=go1.23
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.

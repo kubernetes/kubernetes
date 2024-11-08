@@ -19,6 +19,7 @@ package dynamic
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,6 +63,12 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 			},
 		},
 	}
+}
+
+func getObjectFromJSON(b []byte) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	_ = obj.UnmarshalJSON(b) // can ignore parse error because the comparison will fail
+	return obj
 }
 
 func getClientServer(h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
@@ -177,7 +184,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("10")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:              "true",
+						metav1.InitialEventsListBlueprintAnnotationKey: base64.StdEncoding.EncodeToString(getJSON("vTest", "rTests", "")),
+					})
 					return obj
 				}()},
 			},
@@ -189,9 +199,10 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "vTest",
+					"kind":       "rTests",
 					"metadata": map[string]interface{}{
+						"name":            "",
 						"resourceVersion": "10",
 					},
 				},
@@ -209,7 +220,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("39")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:              "true",
+						metav1.InitialEventsListBlueprintAnnotationKey: base64.StdEncoding.EncodeToString(getJSON("vTest", "rTests", "")),
+					})
 					return obj
 				}()},
 			},
@@ -221,9 +235,10 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "vTest",
+					"kind":       "rTests",
 					"metadata": map[string]interface{}{
+						"name":            "",
 						"resourceVersion": "39",
 					},
 				},
@@ -358,6 +373,15 @@ func TestGet(t *testing.T) {
 			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get/srtest",
 			resp:        getJSON("vTest", "srTest", "namespaced_subresource_get"),
 			want:        getObject("vTest", "srTest", "namespaced_subresource_get"),
+		},
+		{
+			resource:    "rtest",
+			subresource: []string{"srtest"},
+			namespace:   "nstest",
+			name:        "namespaced_subresource_get_list",
+			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_get_list/srtest",
+			resp:        getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1")),
+			want:        getObjectFromJSON(getListJSON("vTest", "srTest", getJSON("vTest", "srTest", "a1"))),
 		},
 	}
 	for _, tc := range tcs {

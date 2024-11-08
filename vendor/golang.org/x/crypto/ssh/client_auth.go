@@ -71,6 +71,10 @@ func (c *connection) clientAuthenticate(config *ClientConfig) error {
 	for auth := AuthMethod(new(noneAuth)); auth != nil; {
 		ok, methods, err := auth.auth(sessionID, config.User, c.transport, config.Rand, extensions)
 		if err != nil {
+			// On disconnect, return error immediately
+			if _, ok := err.(*disconnectMsg); ok {
+				return err
+			}
 			// We return the error later if there is no other method left to
 			// try.
 			ok = authFailure

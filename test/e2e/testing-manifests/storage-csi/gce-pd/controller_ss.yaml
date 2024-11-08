@@ -21,7 +21,7 @@ spec:
       serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.1.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -39,7 +39,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v3.4.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -73,7 +73,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.0.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.7.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -102,7 +102,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.6.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.12.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"

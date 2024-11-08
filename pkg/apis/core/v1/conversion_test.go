@@ -52,6 +52,8 @@ func TestPodLogOptions(t *testing.T) {
 	sinceTime := metav1.NewTime(time.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC).Local())
 	tailLines := int64(2)
 	limitBytes := int64(3)
+	v1StreamStderr := v1.LogStreamStderr
+	coreStreamStderr := core.LogStreamStderr
 
 	versionedLogOptions := &v1.PodLogOptions{
 		Container:    "mycontainer",
@@ -62,6 +64,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &v1StreamStderr,
 	}
 	unversionedLogOptions := &core.PodLogOptions{
 		Container:    "mycontainer",
@@ -72,6 +75,7 @@ func TestPodLogOptions(t *testing.T) {
 		Timestamps:   true,
 		TailLines:    &tailLines,
 		LimitBytes:   &limitBytes,
+		Stream:       &coreStreamStderr,
 	}
 	expectedParameters := url.Values{
 		"container":    {"mycontainer"},
@@ -82,6 +86,7 @@ func TestPodLogOptions(t *testing.T) {
 		"timestamps":   {"true"},
 		"tailLines":    {"2"},
 		"limitBytes":   {"3"},
+		"stream":       {"Stderr"},
 	}
 
 	codec := runtime.NewParameterCodec(legacyscheme.Scheme)

@@ -63,7 +63,7 @@ func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 	return err
 }
 
-// Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration converts a private JoinConfinguration to a public JoinCOnfiguration.
+// Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration converts a private JoinConfiguration to a public JoinConfiguration.
 func Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
 	err := autoConvert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in, out, s)
 	timeoutControlPlane := kubeadm.GetConversionTimeoutControlPlane() // Remove with v1beta3.

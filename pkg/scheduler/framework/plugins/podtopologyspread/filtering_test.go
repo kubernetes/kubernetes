@@ -24,17 +24,19 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
 )
@@ -68,6 +70,7 @@ func (p *criticalPaths) sort() {
 }
 
 func TestPreFilterState(t *testing.T) {
+	metrics.Register()
 	tests := []struct {
 		name                      string
 		pod                       *v1.Pod
@@ -806,7 +809,7 @@ func TestPreFilterState(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy honored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -845,7 +848,7 @@ func TestPreFilterState(t *testing.T) {
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, barSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2388,6 +2391,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 }
 
 func BenchmarkFilter(b *testing.B) {
+	metrics.Register()
 	tests := []struct {
 		name             string
 		pod              *v1.Pod
@@ -2708,7 +2712,7 @@ func TestSingleConstraint(t *testing.T) {
 			// the fact that node-a fits can prove the underlying logic works
 			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("node", []string{"node-a", "node-y"}).
+				NodeAffinityIn("node", []string{"node-a", "node-y"}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2951,7 +2955,7 @@ func TestSingleConstraint(t *testing.T) {
 			// pods spread across node as 1/1/0/~0~
 			name: "NodeAffinityPolicy honored with nodeAffinity",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -2977,7 +2981,7 @@ func TestSingleConstraint(t *testing.T) {
 			// pods spread across node as 1/1/0/~1~
 			name: "NodeAffinityPolicy ignored with labelSelectors",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				NodeAffinityIn("foo", []string{""}).
+				NodeAffinityIn("foo", []string{""}, st.NodeSelectorTypeMatchExpressions).
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, &ignorePolicy, nil, nil).
 				Obj(),
 			nodes: []*v1.Node{
@@ -3064,7 +3068,7 @@ func TestSingleConstraint(t *testing.T) {
 
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(ctx, state, tt.pod, nodeInfo)
 				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
 					t.Errorf("[%s]: expected status code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
@@ -3408,7 +3412,7 @@ func TestMultipleConstraints(t *testing.T) {
 
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(ctx, state, tt.pod, nodeInfo)
 				if len(tt.wantStatusCode) != 0 && status.Code() != tt.wantStatusCode[node.Name] {
 					t.Errorf("[%s]: expected error code %v got %v", node.Name, tt.wantStatusCode[node.Name], status.Code())
 				}
@@ -3425,7 +3429,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
+	gotStatus := p.(*PodTopologySpread).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)

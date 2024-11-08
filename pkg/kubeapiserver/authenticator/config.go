@@ -49,7 +49,6 @@ import (
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -111,6 +110,7 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
+			config.RequestHeaderConfig.UIDHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
@@ -138,7 +138,7 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
-	if len(config.ServiceAccountIssuers) > 0 {
+	if len(config.ServiceAccountIssuers) > 0 && config.ServiceAccountPublicKeysGetter != nil {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuers, config.ServiceAccountPublicKeysGetter, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, nil, nil, err
@@ -323,12 +323,6 @@ func (c *authenticationConfigUpdater) updateAuthenticationConfig(ctx context.Con
 	}()
 
 	return nil
-}
-
-// IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
-func IsValidServiceAccountKeyFile(file string) bool {
-	_, err := keyutil.PublicKeysFromFile(file)
-	return err == nil
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Token or an error

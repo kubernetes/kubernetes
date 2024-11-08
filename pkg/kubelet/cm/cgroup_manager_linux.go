@@ -21,14 +21,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
-	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
+	libcontainercgroupmanager "github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
@@ -242,7 +241,7 @@ func (m *cgroupCommon) Destroy(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, false)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
@@ -253,6 +252,15 @@ func (m *cgroupCommon) Destroy(cgroupConfig *CgroupConfig) error {
 	}
 
 	return nil
+}
+
+func (m *cgroupCommon) SetCgroupConfig(name CgroupName, resourceConfig *ResourceConfig) error {
+	containerConfig := &CgroupConfig{
+		Name:               name,
+		ResourceParameters: resourceConfig,
+	}
+
+	return m.Update(containerConfig)
 }
 
 // getCPUWeight converts from the range [2, 262144] to [1, 10000]
@@ -297,6 +305,9 @@ func (m *cgroupCommon) toResources(resourceConfig *ResourceConfig) *libcontainer
 	}
 	if resourceConfig.PidsLimit != nil {
 		resources.PidsLimit = *resourceConfig.PidsLimit
+	}
+	if !resourceConfig.CPUSet.IsEmpty() {
+		resources.CpusetCpus = resourceConfig.CPUSet.String()
 	}
 
 	m.maybeSetHugetlb(resourceConfig, resources)
@@ -359,7 +370,7 @@ func (m *cgroupCommon) Update(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup manager: %v", err)
 	}
@@ -374,7 +385,7 @@ func (m *cgroupCommon) Create(cgroupConfig *CgroupConfig) error {
 	}()
 
 	libcontainerCgroupConfig := m.libctCgroupConfig(cgroupConfig, true)
-	manager, err := manager.New(libcontainerCgroupConfig)
+	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
 		return err
 	}
@@ -471,13 +482,4 @@ func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceCo
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
 	return &ResourceConfig{Memory: &mLim}, nil
 
-}
-
-func writeCgroupMemoryLimit(memoryLimitFileLocation string, resourceConfig *ResourceConfig) error {
-	memLimit := strconv.FormatInt(*resourceConfig.Memory, 10)
-	if err := os.WriteFile(memoryLimitFileLocation, []byte(memLimit), 0700); err != nil {
-		return fmt.Errorf("failed to write %v to %v: %w", memLimit, memoryLimitFileLocation, err)
-	}
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support
-	return nil
 }

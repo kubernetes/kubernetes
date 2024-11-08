@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 )
 
 // PriorityLevelConfigurationSpecApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationSpec type for use
 // with apply.
 type PriorityLevelConfigurationSpecApplyConfiguration struct {
-	Type    *v1.PriorityLevelEnablement                          `json:"type,omitempty"`
+	Type    *flowcontrolv1.PriorityLevelEnablement               `json:"type,omitempty"`
 	Limited *LimitedPriorityLevelConfigurationApplyConfiguration `json:"limited,omitempty"`
 	Exempt  *ExemptPriorityLevelConfigurationApplyConfiguration  `json:"exempt,omitempty"`
 }
@@ -39,7 +39,7 @@ func PriorityLevelConfigurationSpec() *PriorityLevelConfigurationSpecApplyConfig
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PriorityLevelConfigurationSpecApplyConfiguration) WithType(value v1.PriorityLevelEnablement) *PriorityLevelConfigurationSpecApplyConfiguration {
+func (b *PriorityLevelConfigurationSpecApplyConfiguration) WithType(value flowcontrolv1.PriorityLevelEnablement) *PriorityLevelConfigurationSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }

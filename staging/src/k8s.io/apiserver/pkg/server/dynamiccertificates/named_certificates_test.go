@@ -236,7 +236,7 @@ NextTest:
 			for name, cert := range certMap {
 				x509Certs, err := x509.ParseCertificates(cert.Certificate[0])
 				assert.NoError(t, err, "%d - invalid certificate for %q", i, name)
-				assert.True(t, len(x509Certs) > 0, "%d - expected at least one x509 cert in tls cert for %q", i, name)
+				assert.NotEmpty(t, x509Certs, "%d - expected at least one x509 cert in tls cert for %q", i, name)
 				got[name] = bySignature[x509CertSignature(x509Certs[0])]
 			}
 

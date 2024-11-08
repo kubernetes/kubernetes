@@ -44,7 +44,7 @@ func TestPullImage(t *testing.T) {
 	images, err := fakeManager.ListImages(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, images, 1)
-	assert.Equal(t, images[0].RepoTags, []string{"busybox"})
+	assert.Equal(t, []string{"busybox"}, images[0].RepoTags)
 }
 
 func TestPullImageWithError(t *testing.T) {

@@ -18,7 +18,6 @@ package apparmor
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -45,9 +44,9 @@ func TestValidateBadHost(t *testing.T) {
 	for _, test := range tests {
 		err := v.Validate(getPodWithProfile(test.profile))
 		if test.expectValid {
-			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
+			assert.NoErrorf(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.Equal(t, hostErr, err, "Pod with profile %q should trigger a host validation error", test.profile)
+			assert.Equalf(t, hostErr, err, "Pod with profile %q should trigger a host validation error", test.profile)
 		}
 	}
 }
@@ -71,9 +70,9 @@ func TestValidateValidHost(t *testing.T) {
 	for _, test := range tests {
 		err := v.Validate(getPodWithProfile(test.profile))
 		if test.expectValid {
-			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
+			assert.NoErrorf(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.Error(t, err, fmt.Sprintf("Pod with profile %q should trigger a validation error", test.profile))
+			assert.Errorf(t, err, "Pod with profile %q should trigger a validation error", test.profile)
 		}
 	}
 

@@ -53,7 +53,6 @@ import (
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
-	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
@@ -256,7 +255,7 @@ func NewProxier(ctx context.Context,
 		nftables:            nft,
 		masqueradeAll:       masqueradeAll,
 		masqueradeMark:      masqueradeMark,
-		conntrack:           conntrack.NewExec(utilexec.New()),
+		conntrack:           conntrack.New(),
 		localDetector:       localDetector,
 		hostname:            hostname,
 		nodeIP:              nodeIP,
@@ -1839,8 +1838,10 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
 	}
 
-	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	if endpointUpdateResult.ConntrackCleanupRequired {
+		// Finish housekeeping, clear stale conntrack entries for UDP Services
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+	}
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {

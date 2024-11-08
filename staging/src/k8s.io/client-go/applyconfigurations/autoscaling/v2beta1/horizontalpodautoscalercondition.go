@@ -19,7 +19,7 @@ limitations under the License.
 package v2beta1
 
 import (
-	v2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,11 +27,11 @@ import (
 // HorizontalPodAutoscalerConditionApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerCondition type for use
 // with apply.
 type HorizontalPodAutoscalerConditionApplyConfiguration struct {
-	Type               *v2beta1.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                           `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                                  `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                       `json:"reason,omitempty"`
-	Message            *string                                       `json:"message,omitempty"`
+	Type               *autoscalingv2beta1.HorizontalPodAutoscalerConditionType `json:"type,omitempty"`
+	Status             *v1.ConditionStatus                                      `json:"status,omitempty"`
+	LastTransitionTime *metav1.Time                                             `json:"lastTransitionTime,omitempty"`
+	Reason             *string                                                  `json:"reason,omitempty"`
+	Message            *string                                                  `json:"message,omitempty"`
 }
 
 // HorizontalPodAutoscalerConditionApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerCondition type for use with
@@ -43,7 +43,7 @@ func HorizontalPodAutoscalerCondition() *HorizontalPodAutoscalerConditionApplyCo
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithType(value v2beta1.HorizontalPodAutoscalerConditionType) *HorizontalPodAutoscalerConditionApplyConfiguration {
+func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithType(value autoscalingv2beta1.HorizontalPodAutoscalerConditionType) *HorizontalPodAutoscalerConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

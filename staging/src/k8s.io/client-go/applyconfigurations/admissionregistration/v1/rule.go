@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 // RuleApplyConfiguration represents a declarative configuration of the Rule type for use
 // with apply.
 type RuleApplyConfiguration struct {
-	APIGroups   []string      `json:"apiGroups,omitempty"`
-	APIVersions []string      `json:"apiVersions,omitempty"`
-	Resources   []string      `json:"resources,omitempty"`
-	Scope       *v1.ScopeType `json:"scope,omitempty"`
+	APIGroups   []string                           `json:"apiGroups,omitempty"`
+	APIVersions []string                           `json:"apiVersions,omitempty"`
+	Resources   []string                           `json:"resources,omitempty"`
+	Scope       *admissionregistrationv1.ScopeType `json:"scope,omitempty"`
 }
 
 // RuleApplyConfiguration constructs a declarative configuration of the Rule type for use with
@@ -70,7 +70,7 @@ func (b *RuleApplyConfiguration) WithResources(values ...string) *RuleApplyConfi
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *RuleApplyConfiguration) WithScope(value v1.ScopeType) *RuleApplyConfiguration {
+func (b *RuleApplyConfiguration) WithScope(value admissionregistrationv1.ScopeType) *RuleApplyConfiguration {
 	b.Scope = &value
 	return b
 }

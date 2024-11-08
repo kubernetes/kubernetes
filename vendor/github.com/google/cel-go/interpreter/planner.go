@@ -603,6 +603,7 @@ func (p *planner) planComprehension(expr ast.Expr) (Interpretable, error) {
 		accuVar:   fold.AccuVar(),
 		accu:      accu,
 		iterVar:   fold.IterVar(),
+		iterVar2:  fold.IterVar2(),
 		iterRange: iterRange,
 		cond:      cond,
 		step:      step,

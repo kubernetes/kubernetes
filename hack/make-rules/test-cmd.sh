@@ -64,7 +64,13 @@ function run_kube_apiserver() {
   # Enable features
   ENABLE_FEATURE_GATES=""
 
+  VERSION_OVERRIDE=""
+  if [[ "${CUSTOM_VERSION_SUFFIX:-}" != "" ]]; then
+    VERSION_OVERRIDE="--version=$("${THIS_PLATFORM_BIN}/kube-apiserver" --version | awk '{print $2}')${CUSTOM_VERSION_SUFFIX:-}"
+  fi
+
   "${THIS_PLATFORM_BIN}/kube-apiserver" \
+    ${VERSION_OVERRIDE:+"${VERSION_OVERRIDE}"} \
     --bind-address="127.0.0.1" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
@@ -185,6 +191,14 @@ fi
 kube::log::status "Running kubectl tests for kube-apiserver"
 
 setup
+
+# Test custom version invocation
+CUSTOM_VERSION_SUFFIX=-custom run_kube_apiserver
+kube::test::if_has_string "$(kubectl get --raw /version)" "gitVersion.*-custom"
+kill "${APISERVER_PID}" 1>&2 2>/dev/null
+wait "${APISERVER_PID}" || true
+unset APISERVER_PID
+
 run_kube_apiserver
 run_kube_controller_manager
 create_node

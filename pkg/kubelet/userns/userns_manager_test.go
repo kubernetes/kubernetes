@@ -122,9 +122,9 @@ func TestUserNsManagerAllocate(t *testing.T) {
 		allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
 		assert.Equal(t, userNsLength, int(length), "length is not the expected. iter: %v", i)
 		assert.NoError(t, err)
-		assert.True(t, allocated >= minimumMappingUID)
+		assert.GreaterOrEqual(t, allocated, uint32(minimumMappingUID))
 		// The last ID of the userns range (allocated+userNsLength) should be within bounds.
-		assert.True(t, allocated <= minimumMappingUID+mappingLen-userNsLength)
+		assert.LessOrEqual(t, allocated, uint32(minimumMappingUID+mappingLen-userNsLength))
 		allocs = append(allocs, allocated)
 	}
 	for i, v := range allocs {

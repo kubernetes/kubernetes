@@ -19,7 +19,7 @@ package testing
 import (
 	"testing"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -27,15 +27,15 @@ import (
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
-	V3Client *clientv3.Client
+	V3Client *kubernetes.Client
 }
 
-func (e *EtcdTestServer) Terminate(t *testing.T) {
+func (e *EtcdTestServer) Terminate(t testing.TB) {
 	// no-op, server termination moved to test cleanup
 }
 
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
-func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+func NewUnsecuredEtcd3TestClientServer(t testing.TB) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{}
 	server.V3Client = testserver.RunEtcd(t, nil)
 	config := &storagebackend.Config{

@@ -3937,6 +3937,11 @@ func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.Stream != nil {
+		in, out := &in.Stream, &out.Stream
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -4180,6 +4185,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		in, out := &in.AppArmorProfile, &out.AppArmorProfile
 		*out = new(AppArmorProfile)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.SELinuxChangePolicy != nil {
+		in, out := &in.SELinuxChangePolicy, &out.SELinuxChangePolicy
+		*out = new(PodSELinuxChangePolicy)
+		**out = **in
 	}
 	return
 }

@@ -215,6 +215,11 @@ func (w *debugWriter) appendComprehension(comprehension ast.ComprehensionExpr) {
 	w.append(comprehension.IterVar())
 	w.append(",")
 	w.appendLine()
+	if comprehension.HasIterVar2() {
+		w.append(comprehension.IterVar2())
+		w.append(",")
+		w.appendLine()
+	}
 	w.append("// Target")
 	w.appendLine()
 	w.Buffer(comprehension.IterRange())

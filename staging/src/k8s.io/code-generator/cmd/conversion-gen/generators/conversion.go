@@ -158,16 +158,16 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 			klog.V(6).Infof("%s has a receiver", f.Name)
 			continue
 		}
-		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
+		if len(signature.Parameters) != 3 || signature.Parameters[2].Type.Name != scopeName {
 			klog.V(6).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
-		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
+		if len(signature.Results) != 1 || signature.Results[0].Type.Name != errorName {
 			klog.V(6).Infof("%s has wrong results", f.Name)
 			continue
 		}
-		inType := signature.Parameters[0]
-		outType := signature.Parameters[1]
+		inType := signature.Parameters[0].Type
+		outType := signature.Parameters[1].Type
 		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
 			klog.V(6).Infof("%s has wrong parameter types", f.Name)
 			continue
@@ -196,7 +196,7 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 }
 
 func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
-	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, args.GeneratedBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
@@ -478,7 +478,7 @@ func NewGenConversion(outputFilename, typesPackage, outputPackage string, manual
 		outputPackage:       outputPackage,
 		peerPackages:        peerPkgs,
 		manualConversions:   manualConversions,
-		imports:             generator.NewImportTracker(),
+		imports:             generator.NewImportTrackerForPackage(outputPackage),
 		types:               []*types.Type{},
 		explicitConversions: []conversionPair{},
 		skippedFields:       map[*types.Type][]string{},

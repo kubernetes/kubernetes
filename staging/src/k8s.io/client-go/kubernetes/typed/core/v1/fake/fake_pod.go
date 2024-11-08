@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	"context"
+	context "context"
 	json "encoding/json"
-	"fmt"
+	fmt "fmt"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -201,6 +201,18 @@ func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "ephemeralcontainers", c.ns, pod, opts), &v1.Pod{})
+
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.Pod), err
+}
+
+// UpdateResize takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) UpdateResize(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
+	emptyResult := &v1.Pod{}
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "resize", c.ns, pod, opts), &v1.Pod{})
 
 	if obj == nil {
 		return emptyResult, err

@@ -37,6 +37,7 @@ type PodSecurityContextApplyConfiguration struct {
 	FSGroupChangePolicy      *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty"`
 	SeccompProfile           *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
 	AppArmorProfile          *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
+	SELinuxChangePolicy      *corev1.PodSELinuxChangePolicy                   `json:"seLinuxChangePolicy,omitempty"`
 }
 
 // PodSecurityContextApplyConfiguration constructs a declarative configuration of the PodSecurityContext type for use with
@@ -145,5 +146,13 @@ func (b *PodSecurityContextApplyConfiguration) WithSeccompProfile(value *Seccomp
 // If called multiple times, the AppArmorProfile field is set to the value of the last call.
 func (b *PodSecurityContextApplyConfiguration) WithAppArmorProfile(value *AppArmorProfileApplyConfiguration) *PodSecurityContextApplyConfiguration {
 	b.AppArmorProfile = value
+	return b
+}
+
+// WithSELinuxChangePolicy sets the SELinuxChangePolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SELinuxChangePolicy field is set to the value of the last call.
+func (b *PodSecurityContextApplyConfiguration) WithSELinuxChangePolicy(value corev1.PodSELinuxChangePolicy) *PodSecurityContextApplyConfiguration {
+	b.SELinuxChangePolicy = &value
 	return b
 }

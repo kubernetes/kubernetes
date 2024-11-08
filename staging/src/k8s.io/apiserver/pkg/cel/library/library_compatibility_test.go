@@ -17,19 +17,22 @@ limitations under the License.
 package library
 
 import (
-	"testing"
-
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/decls"
+	"github.com/google/cel-go/common/types"
+	"strings"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestLibraryCompatibility(t *testing.T) {
-	var libs []map[string][]cel.FunctionOpt
-	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls, formatLibraryDecls, authzSelectorsLibraryDecls)
 	functionNames := sets.New[string]()
-	for _, lib := range libs {
-		for name := range lib {
+	for _, lib := range KnownLibraries() {
+		if !strings.HasPrefix(lib.LibraryName(), "kubernetes.") {
+			t.Errorf("Expected all kubernetes CEL libraries to have a name package with a 'kubernetes.' prefix but got %v", lib.LibraryName())
+		}
+		for name := range lib.declarations() {
 			functionNames[name] = struct{}{}
 		}
 	}
@@ -50,7 +53,9 @@ func TestLibraryCompatibility(t *testing.T) {
 		// Kubernetes <1.30>:
 		"ip", "family", "isUnspecified", "isLoopback", "isLinkLocalMulticast", "isLinkLocalUnicast", "isGlobalUnicast", "ip.isCanonical", "isIP", "cidr", "containsIP", "containsCIDR", "masked", "prefixLength", "isCIDR", "string",
 		// Kubernetes <1.31>:
-		"fieldSelector", "labelSelector", "validate", "format.named",
+		"fieldSelector", "labelSelector", "validate", "format.named", "isSemver", "major", "minor", "patch", "semver",
+		// Kubernetes <1.32>:
+		"jsonpatch.escapeKey",
 		// Kubernetes <1.??>:
 	)
 
@@ -66,3 +71,46 @@ func TestLibraryCompatibility(t *testing.T) {
 		t.Errorf("Expected all functions in the libraries to be assigned to a kubernetes release, but found the missing function names: %v", missing)
 	}
 }
+
+// TestTypeRegistration ensures that all custom types defined and used by Kubernetes CEL libraries
+// are returned by library.Types().  Other tests depend on Types() to provide an up-to-date list of
+// types declared in a library.
+func TestTypeRegistration(t *testing.T) {
+	for _, lib := range KnownLibraries() {
+		registeredTypes := sets.New[*cel.Type]()
+		usedTypes := sets.New[*cel.Type]()
+		// scan all registered function declarations for the library
+		for _, fn := range lib.declarations() {
+			fn, err := decls.NewFunction("placeholder-not-used", fn...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, o := range fn.OverloadDecls() {
+				// ArgTypes include both the receiver type (if present) and
+				// all function argument types.
+				for _, at := range o.ArgTypes() {
+					switch at.Kind() {
+					// User defined types are either Opaque or Struct.
+					case types.OpaqueKind, types.StructKind:
+						usedTypes.Insert(at)
+					default:
+						// skip
+					}
+				}
+			}
+		}
+		for _, lb := range lib.Types() {
+			registeredTypes.Insert(lb)
+			if !strings.HasPrefix(lb.TypeName(), "kubernetes.") && !legacyTypeNames.Has(lb.TypeName()) {
+				t.Errorf("Expected all types in kubernetes CEL libraries to have a type name packaged with a 'kubernetes.' prefix but got %v", lb.TypeName())
+			}
+		}
+		unregistered := usedTypes.Difference(registeredTypes)
+		if len(unregistered) != 0 {
+			t.Errorf("Expected types to be registered with the %s library Type() functions, but they were not: %v", lib.LibraryName(), unregistered)
+		}
+	}
+}
+
+// TODO: Consider renaming these to "kubernetes.net.IP" and "kubernetes.net.CIDR" if we decide not to promote them to cel-go
+var legacyTypeNames = sets.New[string]("net.IP", "net.CIDR")

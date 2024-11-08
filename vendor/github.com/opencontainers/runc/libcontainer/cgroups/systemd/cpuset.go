@@ -21,13 +21,13 @@ func RangeToBits(str string) ([]byte, error) {
 		if r == "" {
 			continue
 		}
-		ranges := strings.SplitN(r, "-", 2)
-		if len(ranges) > 1 {
-			start, err := strconv.ParseUint(ranges[0], 10, 32)
+		startr, endr, ok := strings.Cut(r, "-")
+		if ok {
+			start, err := strconv.ParseUint(startr, 10, 32)
 			if err != nil {
 				return nil, err
 			}
-			end, err := strconv.ParseUint(ranges[1], 10, 32)
+			end, err := strconv.ParseUint(endr, 10, 32)
 			if err != nil {
 				return nil, err
 			}
@@ -38,7 +38,7 @@ func RangeToBits(str string) ([]byte, error) {
 				bits.SetBit(bits, int(i), 1)
 			}
 		} else {
-			val, err := strconv.ParseUint(ranges[0], 10, 32)
+			val, err := strconv.ParseUint(startr, 10, 32)
 			if err != nil {
 				return nil, err
 			}

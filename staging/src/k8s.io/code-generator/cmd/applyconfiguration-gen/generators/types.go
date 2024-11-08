@@ -19,6 +19,8 @@ package generators
 import "k8s.io/gengo/v2/types"
 
 var (
+	fmtSprintf           = types.Ref("fmt", "Sprintf")
+	syncOnce             = types.Ref("sync", "Once")
 	applyConfiguration   = types.Ref("k8s.io/apimachinery/pkg/runtime", "ApplyConfiguration")
 	groupVersionKind     = types.Ref("k8s.io/apimachinery/pkg/runtime/schema", "GroupVersionKind")
 	typeMeta             = types.Ref("k8s.io/apimachinery/pkg/apis/meta/v1", "TypeMeta")
@@ -31,5 +33,4 @@ var (
 	smdParser            = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "Parser")
 	testingTypeConverter = types.Ref("k8s.io/client-go/testing", "TypeConverter")
 	yamlObject           = types.Ref("sigs.k8s.io/structured-merge-diff/v4/typed", "YAMLObject")
-	yamlUnmarshal        = types.Ref("gopkg.in/yaml.v2", "Unmarshal")
 )

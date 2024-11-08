@@ -1024,6 +1024,13 @@ type MethodSettings struct {
 
 	// The fully qualified name of the method, for which the options below apply.
 	// This is used to find the method to apply the options.
+	//
+	// Example:
+	//
+	//	publishing:
+	//	  method_settings:
+	//	  - selector: google.storage.control.v2.StorageControl.CreateFolder
+	//	    # method settings for CreateFolder...
 	Selector string `protobuf:"bytes,1,opt,name=selector,proto3" json:"selector,omitempty"`
 	// Describes settings to use for long-running operations when generating
 	// API methods for RPCs. Complements RPCs that use the annotations in
@@ -1033,15 +1040,12 @@ type MethodSettings struct {
 	//
 	//	publishing:
 	//	  method_settings:
-	//	    - selector: google.cloud.speech.v2.Speech.BatchRecognize
-	//	      long_running:
-	//	        initial_poll_delay:
-	//	          seconds: 60 # 1 minute
-	//	        poll_delay_multiplier: 1.5
-	//	        max_poll_delay:
-	//	          seconds: 360 # 6 minutes
-	//	        total_poll_timeout:
-	//	           seconds: 54000 # 90 minutes
+	//	  - selector: google.cloud.speech.v2.Speech.BatchRecognize
+	//	    long_running:
+	//	      initial_poll_delay: 60s # 1 minute
+	//	      poll_delay_multiplier: 1.5
+	//	      max_poll_delay: 360s # 6 minutes
+	//	      total_poll_timeout: 54000s # 90 minutes
 	LongRunning *MethodSettings_LongRunning `protobuf:"bytes,2,opt,name=long_running,json=longRunning,proto3" json:"long_running,omitempty"`
 	// List of top-level fields of the request message, that should be
 	// automatically populated by the client libraries based on their
@@ -1051,9 +1055,9 @@ type MethodSettings struct {
 	//
 	//	publishing:
 	//	  method_settings:
-	//	    - selector: google.example.v1.ExampleService.CreateExample
-	//	      auto_populated_fields:
-	//	      - request_id
+	//	  - selector: google.example.v1.ExampleService.CreateExample
+	//	    auto_populated_fields:
+	//	    - request_id
 	AutoPopulatedFields []string `protobuf:"bytes,3,rep,name=auto_populated_fields,json=autoPopulatedFields,proto3" json:"auto_populated_fields,omitempty"`
 }
 

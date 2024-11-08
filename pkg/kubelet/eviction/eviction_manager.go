@@ -34,8 +34,8 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/utils/clock"
 
+	resourcehelper "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -252,13 +252,20 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
 	if m.dedicatedImageFs == nil {
-		hasImageFs, splitDiskError := diskInfoProvider.HasDedicatedImageFs(ctx)
-		if splitDiskError != nil {
-			klog.ErrorS(splitDiskError, "Eviction manager: failed to get HasDedicatedImageFs")
-			return nil, fmt.Errorf("eviction manager: failed to get HasDedicatedImageFs: %v", splitDiskError)
+		hasImageFs, imageFsErr := diskInfoProvider.HasDedicatedImageFs(ctx)
+		if imageFsErr != nil {
+			// TODO: This should be refactored to log an error and retry the HasDedicatedImageFs
+			// If we have a transient error this will never be retried and we will not set eviction signals
+			klog.ErrorS(imageFsErr, "Eviction manager: failed to get HasDedicatedImageFs")
+			return nil, fmt.Errorf("eviction manager: failed to get HasDedicatedImageFs: %w", imageFsErr)
 		}
 		m.dedicatedImageFs = &hasImageFs
-		splitContainerImageFs := m.containerGC.IsContainerFsSeparateFromImageFs(ctx)
+		splitContainerImageFs, splitErr := diskInfoProvider.HasDedicatedContainerFs(ctx)
+		if splitErr != nil {
+			// A common error case is when there is no split filesystem
+			// there is an error finding the split filesystem label and we want to ignore these errors
+			klog.ErrorS(splitErr, "eviction manager: failed to check if we have separate container filesystem. Ignoring.")
+		}
 
 		// If we are a split filesystem but the feature is turned off
 		// we should return an error.
@@ -411,7 +418,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
+			if pod.Spec.TerminationGracePeriodSeconds != nil && !utilfeature.DefaultFeatureGate.Enabled(features.AllowOverwriteTerminationGracePeriodSeconds) {
+				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
+			}
 		}
+
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		condition := &v1.PodCondition{
 			Type:    v1.DisruptionTarget,

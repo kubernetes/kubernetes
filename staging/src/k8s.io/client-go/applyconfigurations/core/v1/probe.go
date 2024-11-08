@@ -40,7 +40,7 @@ func Probe() *ProbeApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Exec field is set to the value of the last call.
 func (b *ProbeApplyConfiguration) WithExec(value *ExecActionApplyConfiguration) *ProbeApplyConfiguration {
-	b.Exec = value
+	b.ProbeHandlerApplyConfiguration.Exec = value
 	return b
 }
 
@@ -48,7 +48,7 @@ func (b *ProbeApplyConfiguration) WithExec(value *ExecActionApplyConfiguration) 
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the HTTPGet field is set to the value of the last call.
 func (b *ProbeApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfiguration) *ProbeApplyConfiguration {
-	b.HTTPGet = value
+	b.ProbeHandlerApplyConfiguration.HTTPGet = value
 	return b
 }
 
@@ -56,7 +56,7 @@ func (b *ProbeApplyConfiguration) WithHTTPGet(value *HTTPGetActionApplyConfigura
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the TCPSocket field is set to the value of the last call.
 func (b *ProbeApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfiguration) *ProbeApplyConfiguration {
-	b.TCPSocket = value
+	b.ProbeHandlerApplyConfiguration.TCPSocket = value
 	return b
 }
 
@@ -64,7 +64,7 @@ func (b *ProbeApplyConfiguration) WithTCPSocket(value *TCPSocketActionApplyConfi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GRPC field is set to the value of the last call.
 func (b *ProbeApplyConfiguration) WithGRPC(value *GRPCActionApplyConfiguration) *ProbeApplyConfiguration {
-	b.GRPC = value
+	b.ProbeHandlerApplyConfiguration.GRPC = value
 	return b
 }
 

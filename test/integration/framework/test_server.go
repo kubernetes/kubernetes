@@ -158,7 +158,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		setup.ModifyServerRunOptions(opts)
 	}
 
-	completedOptions, err := opts.Complete()
+	completedOptions, err := opts.Complete(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

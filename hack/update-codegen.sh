@@ -645,6 +645,7 @@ function codegen::clients() {
         --input-base="k8s.io/api" \
         --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
+        --prefers-protobuf \
         $(printf -- " --input %s" "${gv_dirs[@]}") \
         "$@"
 
@@ -784,6 +785,8 @@ function codegen::protobindings() {
 
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
         "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
+
+        "staging/src/k8s.io/externaljwt/apis"
     )
 
     kube::log::status "Generating protobuf bindings for ${#apis[@]} targets"

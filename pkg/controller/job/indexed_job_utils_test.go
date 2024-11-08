@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -405,7 +406,7 @@ func TestGetPodsWithDelayedDeletionPerIndex(t *testing.T) {
 	cases := map[string]struct {
 		job                                 batch.Job
 		pods                                []*v1.Pod
-		expectedRmFinalizers                sets.Set[string]
+		expectedRmFinalizers                sets.Set[types.UID]
 		wantPodsWithDelayedDeletionPerIndex []string
 	}{
 		"failed pods are kept corresponding to non-failed indexes are kept": {
@@ -444,7 +445,7 @@ func TestGetPodsWithDelayedDeletionPerIndex(t *testing.T) {
 			pods: []*v1.Pod{
 				buildPod().uid("a").indexFailureCount("0").phase(v1.PodFailed).index("0").trackingFinalizer().Pod,
 			},
-			expectedRmFinalizers:                sets.New("a"),
+			expectedRmFinalizers:                sets.New[types.UID]("a"),
 			wantPodsWithDelayedDeletionPerIndex: []string{},
 		},
 		"failed pod with index outside of completions; the pod's deletion is not delayed": {

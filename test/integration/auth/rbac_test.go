@@ -24,9 +24,11 @@ import (
 	"net/http/httputil"
 	gopath "path"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacapi "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,11 +42,15 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	unionauthz "k8s.io/apiserver/pkg/authorization/union"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -133,26 +139,27 @@ type bootstrapRoles struct {
 //
 // client should be authenticated as the RBAC super user.
 func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
+	ctx := context.TODO()
 	for _, r := range b.clusterRoles {
-		_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), &r, metav1.CreateOptions{})
+		_, err := client.RbacV1().ClusterRoles().Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roles {
-		_, err := client.RbacV1().Roles(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
+		_, err := client.RbacV1().Roles(r.Namespace).Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
-		_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), &r, metav1.CreateOptions{})
+		_, err := client.RbacV1().ClusterRoleBindings().Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roleBindings {
-		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(context.TODO(), &r, metav1.CreateOptions{})
+		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(ctx, &r, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
@@ -815,5 +822,330 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	}
 	if !reflect.DeepEqual(publicInfoViewerRoleBinding.Subjects, newDiscRoleBinding.Subjects) {
 		t.Errorf("`system:public-info-viewer` should have inherited Subjects from `system:discovery` Wanted: %v, got %v", newDiscRoleBinding.Subjects, publicInfoViewerRoleBinding.Subjects)
+	}
+}
+
+type authorizeRequest struct {
+	ar       authorizer.AttributesRecord
+	expected authorizer.Decision
+}
+
+// For 1.31 ctx was wired into the authorizers. This tests check that context values
+// are not used inside the code to resolve namespaces or users with the goal of
+// preventing regressions in the future.
+func TestRBACContextContamination(t *testing.T) {
+	superUser := "admin/system:masters"
+	validNamespace := "pod-namespace"
+	invalidNamespace := "forbidden-namespace"
+
+	roles := bootstrapRoles{}
+	testcases := []authorizeRequest{}
+
+	// Tests itself is bit oververbose and each case creates its own objects.
+	// This makes readability bit easier over trying to overoptimize test case.
+
+	// Case 1: clusterrole+clusterbinding
+	// should allow cluster-scoped request
+	// should allow namespace-scoped request in any namespace
+	// should disallow request for resource not in rules
+	{
+		roles.clusterRoles = append(roles.clusterRoles, rbacapi.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "c1-clusterrole"},
+			Rules:      []rbacapi.PolicyRule{ruleReadPods},
+		})
+		roles.clusterRoleBindings = append(roles.clusterRoleBindings, rbacapi.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "c1-clusterrolebinding"},
+			Subjects:   []rbacapi.Subject{{Kind: "User", Name: "c1-user"}},
+			RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "c1-clusterrole"},
+		})
+
+		user := &user.DefaultInfo{Name: "c1-user"}
+		testcases = append(testcases, []authorizeRequest{
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
+				expected: authorizer.DecisionAllow,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionAllow,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: "", ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+		}...,
+		)
+	}
+
+	// case 2: clusterrole+rolebinding
+	// should disallow cluster-scoped request
+	// should allow namespace-scoped request in rolebinding namespace
+	// should disallow namespace-scoped request in other namespace
+	// should disallow request for resource not in rules
+	{
+		roles.clusterRoles = append(roles.clusterRoles, rbacapi.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "c2-clusterrole"},
+			Rules:      []rbacapi.PolicyRule{ruleReadPods},
+		})
+		roles.roleBindings = append(roles.roleBindings, rbacapi.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "c2-rolebinding",
+				Namespace: validNamespace,
+			},
+			Subjects: []rbacapi.Subject{{Kind: "User", Name: "c2-user"}},
+			RoleRef:  rbacapi.RoleRef{Kind: "ClusterRole", Name: "c2-clusterrole"},
+		})
+
+		user := &user.DefaultInfo{Name: "c2-user"}
+		testcases = append(testcases, []authorizeRequest{
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionAllow,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: validNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: invalidNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+		}...,
+		)
+	}
+
+	// case 3: role+rolebinding
+	// should disallow cluster-scoped request
+	// should allow namespace-scoped request in rolebinding namespace
+	// should disallow namespace-scoped request in other namespace
+	// should disallow request for resource not in rules
+	{
+		roles.roles = append(roles.roles, rbacapi.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "c3-role",
+				Namespace: validNamespace,
+			},
+			Rules: []rbacapi.PolicyRule{ruleReadPods},
+		})
+		roles.roleBindings = append(roles.roleBindings, rbacapi.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "c3-rolebinding",
+				Namespace: validNamespace,
+			},
+			Subjects: []rbacapi.Subject{{Kind: "User", Name: "c3-user"}},
+			RoleRef:  rbacapi.RoleRef{Kind: "Role", Name: "c3-role"},
+		})
+
+		user := &user.DefaultInfo{Name: "c3-user"}
+		testcases = append(testcases, []authorizeRequest{
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: "", ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: validNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionAllow,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "configmaps", Namespace: validNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+			{
+				ar:       authorizer.AttributesRecord{Verb: "list", Resource: "pods", Namespace: invalidNamespace, ResourceRequest: true, User: user},
+				expected: authorizer.DecisionNoOpinion,
+			},
+		}...,
+		)
+	}
+
+	authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+	})))
+
+	var tearDownAuthorizerFn func()
+	defer func() {
+		if tearDownAuthorizerFn != nil {
+			tearDownAuthorizerFn()
+		}
+	}()
+	var rbacAuthz authorizer.Authorizer
+	_, kubeConfig, tearDownFn := framework.StartTestServer(context.Background(), t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			// Also disable namespace lifecycle to workaroung the test limitation that first creates
+			// roles/rolebindings and only then creates corresponding namespaces.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
+			// Disable built-in authorizers
+			opts.Authorization.Modes = []string{"AlwaysDeny"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Append our custom test authenticator
+			config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
+			// Append our custom test authorizer
+			rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
+		},
+	})
+	defer tearDownFn()
+
+	// Bootstrap the API Server with the test case's initial roles.
+	superuserClient, _ := clientsetForToken(superUser, kubeConfig)
+	if err := roles.bootstrap(superuserClient); err != nil {
+		t.Errorf("failed to apply initial roles: %v", err)
+		return
+	}
+
+	for _, ns := range []string{validNamespace, invalidNamespace} {
+		_, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ns,
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("failed to create namespace: %v", err)
+			return
+		}
+	}
+
+	// 3 cases shared for all test cases:
+	// 1. Default context
+	// 2. Empty namespace
+	// 3. Invalid namespace in the context
+	for j, r := range testcases {
+		ctx := context.Background()
+		// 1. Default context
+		if decision, _, err := rbacAuthz.Authorize(ctx, &r.ar); err != nil {
+			t.Errorf("req %d: unexpected error: %v", j, err)
+			return
+		} else if decision != r.expected {
+			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
+		}
+		// 2. Empty namespace
+		if decision, _, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, ""), &r.ar); err != nil {
+			t.Errorf("req %d: unexpected error: %v", j, err)
+			return
+		} else if decision != r.expected {
+			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
+		}
+		// 3. Invalid namespace in the context
+		if decision, _, err := rbacAuthz.Authorize(genericapirequest.WithNamespace(ctx, invalidNamespace), &r.ar); err != nil {
+			t.Errorf("req %d: unexpected error: %v", j, err)
+			return
+		} else if decision != r.expected {
+			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
+		}
+
+	}
+}
+
+func TestMonitoringURLs(t *testing.T) {
+	type request struct {
+		path          string
+		wantBodyRegex string
+	}
+
+	tests := []struct {
+		name     string
+		requests []request
+	}{
+		{
+			name: "monitoring endpoints",
+			requests: []request{
+				{
+					path:          "/metrics",
+					wantBodyRegex: `# HELP \w+`,
+				},
+				{
+					path:          "/metrics/slis",
+					wantBodyRegex: `kubernetes_healthcheck\{\w+`,
+				},
+				{
+					path:          "/livez",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/readyz",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/healthz",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/statusz",
+					wantBodyRegex: `kube-apiserver statusz`,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+			tCtx := ktesting.Init(t)
+
+			// Create a user with the system:monitoring role
+			monitoringUser := "monitoring-user"
+			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				monitoringUser: {Name: monitoringUser, Groups: []string{"system:monitoring"}},
+			})))
+
+			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Authorization.Modes = []string{"RBAC"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator
+				},
+			})
+			defer tearDownFn()
+
+			transport, err := restclient.TransportFor(kubeConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, r := range tc.requests {
+				req, err := http.NewRequest(http.MethodGet, kubeConfig.Host+r.path, nil)
+				if r.path == "/statusz" {
+					req.Header.Set("Accept", "text/plain")
+				}
+				if err != nil {
+					t.Fatalf("failed to create request: %v", err)
+				}
+
+				resp, err := clientForToken(monitoringUser, transport).Do(req)
+				if err != nil {
+					t.Errorf("failed to make request to %s: %v", r, err)
+					continue
+				}
+				defer func() {
+					_ = resp.Body.Close()
+				}()
+
+				if resp.StatusCode != http.StatusOK {
+					t.Fatalf("request to %s: expected %q got %q", r, statusCode(http.StatusOK), statusCode(resp.StatusCode))
+				}
+
+				parsedBytes, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
+
+				parsedStr := string(parsedBytes)
+				matched, err := regexp.MatchString(r.wantBodyRegex, parsedStr)
+				if err != nil {
+					t.Fatalf("invalid regex: %v", err)
+				}
+
+				if !matched {
+					t.Errorf("request to %s: response body does not match expected pattern", r.path)
+				}
+			}
+		})
 	}
 }

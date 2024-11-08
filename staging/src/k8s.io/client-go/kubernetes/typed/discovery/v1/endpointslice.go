@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/discovery/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	discoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
+	applyconfigurationsdiscoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type EndpointSlicesGetter interface {
 
 // EndpointSliceInterface has methods to work with EndpointSlice resources.
 type EndpointSliceInterface interface {
-	Create(ctx context.Context, endpointSlice *v1.EndpointSlice, opts metav1.CreateOptions) (*v1.EndpointSlice, error)
-	Update(ctx context.Context, endpointSlice *v1.EndpointSlice, opts metav1.UpdateOptions) (*v1.EndpointSlice, error)
+	Create(ctx context.Context, endpointSlice *discoveryv1.EndpointSlice, opts metav1.CreateOptions) (*discoveryv1.EndpointSlice, error)
+	Update(ctx context.Context, endpointSlice *discoveryv1.EndpointSlice, opts metav1.UpdateOptions) (*discoveryv1.EndpointSlice, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.EndpointSlice, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointSliceList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*discoveryv1.EndpointSlice, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*discoveryv1.EndpointSliceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.EndpointSlice, err error)
-	Apply(ctx context.Context, endpointSlice *discoveryv1.EndpointSliceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.EndpointSlice, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *discoveryv1.EndpointSlice, err error)
+	Apply(ctx context.Context, endpointSlice *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration, opts metav1.ApplyOptions) (result *discoveryv1.EndpointSlice, err error)
 	EndpointSliceExpansion
 }
 
 // endpointSlices implements EndpointSliceInterface
 type endpointSlices struct {
-	*gentype.ClientWithListAndApply[*v1.EndpointSlice, *v1.EndpointSliceList, *discoveryv1.EndpointSliceApplyConfiguration]
+	*gentype.ClientWithListAndApply[*discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList, *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration]
 }
 
 // newEndpointSlices returns a EndpointSlices
 func newEndpointSlices(c *DiscoveryV1Client, namespace string) *endpointSlices {
 	return &endpointSlices{
-		gentype.NewClientWithListAndApply[*v1.EndpointSlice, *v1.EndpointSliceList, *discoveryv1.EndpointSliceApplyConfiguration](
+		gentype.NewClientWithListAndApply[*discoveryv1.EndpointSlice, *discoveryv1.EndpointSliceList, *applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration](
 			"endpointslices",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.EndpointSlice { return &v1.EndpointSlice{} },
-			func() *v1.EndpointSliceList { return &v1.EndpointSliceList{} }),
+			func() *discoveryv1.EndpointSlice { return &discoveryv1.EndpointSlice{} },
+			func() *discoveryv1.EndpointSliceList { return &discoveryv1.EndpointSliceList{} },
+			gentype.PrefersProtobuf[*discoveryv1.EndpointSlice](),
+		),
 	}
 }

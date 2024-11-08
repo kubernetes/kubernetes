@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Namespaces.
 type NamespaceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.NamespaceLister
+	Lister() corev1.NamespaceLister
 }
 
 type namespaceInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredNamespaceInformer(client kubernetes.Interface, resyncPeriod time
 				return client.CoreV1().Namespaces().Watch(context.TODO(), options)
 			},
 		},
-		&corev1.Namespace{},
+		&apicorev1.Namespace{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *namespaceInformer) defaultInformer(client kubernetes.Interface, resyncP
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Namespace{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.Namespace{}, f.defaultInformer)
 }
 
-func (f *namespaceInformer) Lister() v1.NamespaceLister {
-	return v1.NewNamespaceLister(f.Informer().GetIndexer())
+func (f *namespaceInformer) Lister() corev1.NamespaceLister {
+	return corev1.NewNamespaceLister(f.Informer().GetIndexer())
 }

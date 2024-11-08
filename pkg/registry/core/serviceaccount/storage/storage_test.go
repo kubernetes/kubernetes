@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -42,6 +43,10 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+	return newTokenStorage(t, fakeTokenGenerator{"fake"}, nil, panicGetter{}, panicGetter{}, nil)
+}
+
+func newTokenStorage(t *testing.T, issuer token.TokenGenerator, auds authenticator.Audiences, podStorage, secretStorage, nodeStorage rest.Getter) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -50,7 +55,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		ResourcePrefix:          "serviceaccounts",
 	}
 	// set issuer, podStore and secretStore to allow the token endpoint to be initialised
-	rest, err := NewREST(restOptions, fakeTokenGenerator{"fake"}, nil, 0, panicGetter{}, panicGetter{}, nil, false)
+	rest, err := NewREST(restOptions, issuer, auds, 0, podStorage, secretStorage, nodeStorage, false, false)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -62,7 +67,7 @@ type fakeTokenGenerator struct {
 	staticToken string
 }
 
-func (f fakeTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims interface{}) (string, error) {
+func (f fakeTokenGenerator) GenerateToken(ctx context.Context, claims *jwt.Claims, privateClaims interface{}) (string, error) {
 	return f.staticToken, nil
 }
 

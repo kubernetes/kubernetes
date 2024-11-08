@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -586,6 +587,107 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
 			histogramVec, _ := GetHistogramVecFromGatherer(gather, metricName, tt.lvMap)
 			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields", "CreatedTimestamp"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
+				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGetCounterValuesFromGatherer(t *testing.T) {
+	namespace := "namespace"
+	subsystem := "subsystem"
+	name := "metric_test_name"
+	metricName := fmt.Sprintf("%s_%s_%s", namespace, subsystem, name)
+
+	tests := map[string]struct {
+		metricName string // Empty is replaced with valid name.
+		lvMap      map[string]string
+		labelName  string
+
+		wantCounterValues map[string]float64
+		wantErr           string
+	}{
+		"wrong-metric": {
+			metricName: "no-such-metric",
+			wantErr:    `metric "no-such-metric" not found`,
+		},
+
+		"none": {
+			metricName: metricName,
+			lvMap:      map[string]string{"no-such-label": "a"},
+
+			wantCounterValues: map[string]float64{},
+		},
+
+		"value1-0": {
+			metricName: metricName,
+			lvMap:      map[string]string{"label1": "value1-0"},
+			labelName:  "label2",
+
+			wantCounterValues: map[string]float64{"value2-0": 1.5, "value2-1": 2.5},
+		},
+
+		"value1-1": {
+			metricName: metricName,
+			lvMap:      map[string]string{"label1": "value1-1"},
+			labelName:  "label2",
+
+			wantCounterValues: map[string]float64{"value2-0": 3.5, "value2-1": 4.5},
+		},
+
+		"value1-1-value2-0-none": {
+			metricName: metricName,
+			lvMap:      map[string]string{"label1": "value1-1", "label2": "value2-0"},
+			labelName:  "none",
+
+			wantCounterValues: map[string]float64{},
+		},
+
+		"value1-0-value2-0-one": {
+			metricName: metricName,
+			lvMap:      map[string]string{"label1": "value1-0", "label2": "value2-0"},
+			labelName:  "label2",
+
+			wantCounterValues: map[string]float64{"value2-0": 1.5},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			// CounterVec has two labels defined.
+			labels := []string{"label1", "label2"}
+			counterOpts := &metrics.CounterOpts{
+				Namespace: "namespace",
+				Name:      "metric_test_name",
+				Subsystem: "subsystem",
+				Help:      "counter help message",
+			}
+			vec := metrics.NewCounterVec(counterOpts, labels)
+			// Use local registry
+			var registry = metrics.NewKubeRegistry()
+			var gather metrics.Gatherer = registry
+			registry.MustRegister(vec)
+			// Observe two metrics with same value for label1 but different value of label2.
+			vec.WithLabelValues("value1-0", "value2-0").Add(1.5)
+			vec.WithLabelValues("value1-0", "value2-1").Add(2.5)
+			vec.WithLabelValues("value1-1", "value2-0").Add(3.5)
+			vec.WithLabelValues("value1-1", "value2-1").Add(4.5)
+
+			// The check for empty metric apparently cannot be tested: registering
+			// a NewCounterVec with no values has the affect that it doesn't get
+			// returned, leading to "not found".
+
+			counterValues, err := GetCounterValuesFromGatherer(gather, tt.metricName, tt.lvMap, tt.labelName)
+			if err != nil {
+				if tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("expected error %q, got instead: %v", tt.wantErr, err)
+				}
+				return
+			}
+			if tt.wantErr != "" {
+				t.Fatalf("expected error %q, got none", tt.wantErr)
+			}
+
+			if diff := cmp.Diff(tt.wantCounterValues, counterValues); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
 		})

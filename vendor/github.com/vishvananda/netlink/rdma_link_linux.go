@@ -77,28 +77,39 @@ func executeOneGetRdmaLink(data []byte) (*RdmaLink, error) {
 	return &link, nil
 }
 
-func execRdmaGetLink(req *nl.NetlinkRequest, name string) (*RdmaLink, error) {
+func execRdmaSetLink(req *nl.NetlinkRequest) error {
+
+	_, err := req.Execute(unix.NETLINK_RDMA, 0)
+	return err
+}
+
+// RdmaLinkList gets a list of RDMA link devices.
+// Equivalent to: `rdma dev show`
+func RdmaLinkList() ([]*RdmaLink, error) {
+	return pkgHandle.RdmaLinkList()
+}
+
+// RdmaLinkList gets a list of RDMA link devices.
+// Equivalent to: `rdma dev show`
+func (h *Handle) RdmaLinkList() ([]*RdmaLink, error) {
+	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_GET)
+	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_DUMP)
 
 	msgs, err := req.Execute(unix.NETLINK_RDMA, 0)
 	if err != nil {
 		return nil, err
 	}
+
+	var res []*RdmaLink
 	for _, m := range msgs {
 		link, err := executeOneGetRdmaLink(m)
 		if err != nil {
 			return nil, err
 		}
-		if link.Attrs.Name == name {
-			return link, nil
-		}
+		res = append(res, link)
 	}
-	return nil, fmt.Errorf("Rdma device %v not found", name)
-}
 
-func execRdmaSetLink(req *nl.NetlinkRequest) error {
-
-	_, err := req.Execute(unix.NETLINK_RDMA, 0)
-	return err
+	return res, nil
 }
 
 // RdmaLinkByName finds a link by name and returns a pointer to the object if
@@ -110,11 +121,16 @@ func RdmaLinkByName(name string) (*RdmaLink, error) {
 // RdmaLinkByName finds a link by name and returns a pointer to the object if
 // found and nil error, otherwise returns error code.
 func (h *Handle) RdmaLinkByName(name string) (*RdmaLink, error) {
-
-	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_GET)
-	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK|unix.NLM_F_DUMP)
-
-	return execRdmaGetLink(req, name)
+	links, err := h.RdmaLinkList()
+	if err != nil {
+		return nil, err
+	}
+	for _, link := range links {
+		if link.Attrs.Name == name {
+			return link, nil
+		}
+	}
+	return nil, fmt.Errorf("Rdma device %v not found", name)
 }
 
 // RdmaLinkSetName sets the name of the rdma link device. Return nil on success
@@ -261,4 +277,55 @@ func (h *Handle) RdmaLinkSetNsFd(link *RdmaLink, fd uint32) error {
 	req.AddData(data)
 
 	return execRdmaSetLink(req)
+}
+
+// RdmaLinkDel deletes an rdma link
+//
+// Similar to: rdma link delete NAME
+// REF: https://man7.org/linux/man-pages/man8/rdma-link.8.html
+func RdmaLinkDel(name string) error {
+	return pkgHandle.RdmaLinkDel(name)
+}
+
+// RdmaLinkDel deletes an rdma link.
+func (h *Handle) RdmaLinkDel(name string) error {
+	link, err := h.RdmaLinkByName(name)
+	if err != nil {
+		return err
+	}
+
+	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_DELLINK)
+	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK)
+
+	b := make([]byte, 4)
+	native.PutUint32(b, link.Attrs.Index)
+	req.AddData(nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_DEV_INDEX, b))
+
+	_, err = req.Execute(unix.NETLINK_RDMA, 0)
+	return err
+}
+
+// RdmaLinkAdd adds an rdma link for the specified type to the network device.
+// Similar to: rdma link add NAME type TYPE netdev NETDEV
+//	NAME - specifies the new name of the rdma link to add
+//	TYPE - specifies which rdma type to use.  Link types:
+//		rxe - Soft RoCE driver
+//		siw - Soft iWARP driver
+//	NETDEV - specifies the network device to which the link is bound
+//
+// REF: https://man7.org/linux/man-pages/man8/rdma-link.8.html
+func RdmaLinkAdd(linkName, linkType, netdev string) error {
+	return pkgHandle.RdmaLinkAdd(linkName, linkType, netdev)
+}
+
+// RdmaLinkAdd adds an rdma link for the specified type to the network device.
+func (h *Handle) RdmaLinkAdd(linkName string, linkType string, netdev string) error {
+	proto := getProtoField(nl.RDMA_NL_NLDEV, nl.RDMA_NLDEV_CMD_NEWLINK)
+	req := h.newNetlinkRequest(proto, unix.NLM_F_ACK)
+
+	req.AddData(nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_DEV_NAME, nl.ZeroTerminated(linkName)))
+	req.AddData(nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_LINK_TYPE, nl.ZeroTerminated(linkType)))
+	req.AddData(nl.NewRtAttr(nl.RDMA_NLDEV_ATTR_NDEV_NAME, nl.ZeroTerminated(netdev)))
+	_, err := req.Execute(unix.NETLINK_RDMA, 0)
+	return err
 }

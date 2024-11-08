@@ -114,8 +114,6 @@ func TestNewDeployment(t *testing.T) {
 }
 
 // Deployments should support roll out, roll back, and roll over.
-// TODO: drop the rollback portions of this test when extensions/v1beta1 is no longer served
-// and rollback endpoint is no longer supported.
 func TestDeploymentRollingUpdate(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)

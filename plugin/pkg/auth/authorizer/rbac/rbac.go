@@ -39,12 +39,12 @@ type RequestToRuleMapper interface {
 	// Any rule returned is still valid, since rules are deny by default.  If you can pass with the rules
 	// supplied, you do not have to fail the request.  If you cannot, you should indicate the error along
 	// with your denial.
-	RulesFor(subject user.Info, namespace string) ([]rbacv1.PolicyRule, error)
+	RulesFor(ctx context.Context, subject user.Info, namespace string) ([]rbacv1.PolicyRule, error)
 
 	// VisitRulesFor invokes visitor() with each rule that applies to a given user in a given namespace,
 	// and each error encountered resolving those rules. Rule may be nil if err is non-nil.
 	// If visitor() returns false, visiting is short-circuited.
-	VisitRulesFor(user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
+	VisitRulesFor(ctx context.Context, user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
 type RBACAuthorizer struct {
@@ -75,7 +75,7 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
-	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
+	r.authorizationRuleResolver.VisitRulesFor(ctx, requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
 	}
@@ -126,13 +126,13 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
-func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo
 		nonResourceRules []authorizer.NonResourceRuleInfo
 	)
 
-	policyRules, err := r.authorizationRuleResolver.RulesFor(user, namespace)
+	policyRules, err := r.authorizationRuleResolver.RulesFor(ctx, user, namespace)
 	for _, policyRule := range policyRules {
 		if len(policyRule.Resources) > 0 {
 			r := authorizer.DefaultResourceRuleInfo{
@@ -196,7 +196,7 @@ type RoleGetter struct {
 	Lister rbaclisters.RoleLister
 }
 
-func (g *RoleGetter) GetRole(namespace, name string) (*rbacv1.Role, error) {
+func (g *RoleGetter) GetRole(ctx context.Context, namespace, name string) (*rbacv1.Role, error) {
 	return g.Lister.Roles(namespace).Get(name)
 }
 
@@ -204,7 +204,7 @@ type RoleBindingLister struct {
 	Lister rbaclisters.RoleBindingLister
 }
 
-func (l *RoleBindingLister) ListRoleBindings(namespace string) ([]*rbacv1.RoleBinding, error) {
+func (l *RoleBindingLister) ListRoleBindings(ctx context.Context, namespace string) ([]*rbacv1.RoleBinding, error) {
 	return l.Lister.RoleBindings(namespace).List(labels.Everything())
 }
 
@@ -212,7 +212,7 @@ type ClusterRoleGetter struct {
 	Lister rbaclisters.ClusterRoleLister
 }
 
-func (g *ClusterRoleGetter) GetClusterRole(name string) (*rbacv1.ClusterRole, error) {
+func (g *ClusterRoleGetter) GetClusterRole(ctx context.Context, name string) (*rbacv1.ClusterRole, error) {
 	return g.Lister.Get(name)
 }
 
@@ -220,6 +220,6 @@ type ClusterRoleBindingLister struct {
 	Lister rbaclisters.ClusterRoleBindingLister
 }
 
-func (l *ClusterRoleBindingLister) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBinding, error) {
+func (l *ClusterRoleBindingLister) ListClusterRoleBindings(ctx context.Context) ([]*rbacv1.ClusterRoleBinding, error) {
 	return l.Lister.List(labels.Everything())
 }

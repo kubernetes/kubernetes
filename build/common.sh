@@ -97,9 +97,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.5.6
-readonly __default_go_runner_version=v2.3.1-go1.22.5-bookworm.0
-readonly __default_setcap_version=bookworm-v1.0.3
+readonly __default_distroless_iptables_version=v0.6.4
+readonly __default_go_runner_version=v2.3.1-go1.23.2-bookworm.0
+readonly __default_setcap_version=bookworm-v1.0.4
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
@@ -320,7 +320,7 @@ function kube::build::docker_delete_old_containers() {
   done
 }
 
-# Takes $1 and computes a short has for it. Useful for unique tag generation
+# Takes $1 and computes a short hash for it. Useful for unique tag generation
 function kube::build::short_hash() {
   [[ $# -eq 1 ]] || {
     kube::log::error "Internal error.  No data based to short_hash."

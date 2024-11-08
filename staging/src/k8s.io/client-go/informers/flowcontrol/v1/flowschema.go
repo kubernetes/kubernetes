@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
+	apiflowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/client-go/listers/flowcontrol/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // FlowSchemas.
 type FlowSchemaInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.FlowSchemaLister
+	Lister() flowcontrolv1.FlowSchemaLister
 }
 
 type flowSchemaInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod tim
 				return client.FlowcontrolV1().FlowSchemas().Watch(context.TODO(), options)
 			},
 		},
-		&flowcontrolv1.FlowSchema{},
+		&apiflowcontrolv1.FlowSchema{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *flowSchemaInformer) defaultInformer(client kubernetes.Interface, resync
 }
 
 func (f *flowSchemaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&flowcontrolv1.FlowSchema{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiflowcontrolv1.FlowSchema{}, f.defaultInformer)
 }
 
-func (f *flowSchemaInformer) Lister() v1.FlowSchemaLister {
-	return v1.NewFlowSchemaLister(f.Informer().GetIndexer())
+func (f *flowSchemaInformer) Lister() flowcontrolv1.FlowSchemaLister {
+	return flowcontrolv1.NewFlowSchemaLister(f.Informer().GetIndexer())
 }

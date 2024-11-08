@@ -200,8 +200,8 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 
 			ginkgo.By("killing and restarting kubelet")
 			// We want to kill the kubelet rather than a graceful restart
-			startKubelet := stopKubelet()
-			startKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
 
 			// If this test works correctly, each of these pods will exit
 			// with no issue. But if accounting breaks, pods scheduled after
@@ -309,26 +309,17 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			// As soon as the pod enters succeeded phase (detected by the watch above); kill the kubelet.
 			// This is a bit racy, but the goal is to stop the kubelet before the kubelet is able to delete the pod from the API-sever in order to repro https://issues.k8s.io/116925
 			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			restartKubelet := mustStopKubelet(ctx, f)
 
-			ginkgo.By("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
-			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 
 			ginkgo.By(fmt.Sprintf("After the kubelet is restarted, verify the pod (%s/%s) is deleted by kubelet", pod.Namespace, pod.Name))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -361,12 +352,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 				},
 			})
 			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			// Create the pod bound to the node. It will remain in the Pending
 			// phase as Kubelet is down.
@@ -379,19 +365,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 
 			// Restart Kubelet so that it proceeds with deletion
 			ginkgo.By("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
-
-			// Wait for the Kubelet to be ready.
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-				framework.ExpectNoError(err)
-				return nodes == 1
-			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrue())
+			restartKubelet(ctx)
 
 			ginkgo.By(fmt.Sprintf("After the kubelet is restarted, verify the pod (%v/%v) is deleted by kubelet", pod.Namespace, pod.Name))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -439,12 +413,7 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%v/%v)", f.Namespace.Name, pod.Name)
 
 			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
-
-			// wait until the kubelet health check will fail
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalse())
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By(fmt.Sprintf("Deleting the pod (%v/%v) to set a deletion timestamp", pod.Namespace, pod.Name))
 			err = e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
@@ -454,20 +423,15 @@ var _ = SIGDescribe("Restart", framework.WithSerial(), framework.WithSlow(), fra
 			e2enode.RemoveLabelOffNode(f.ClientSet, nodeName, nodeLabelKey)
 
 			// Restart Kubelet so that it proceeds with deletion
-			ginkgo.By("Starting the kubelet")
-			startKubelet()
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrue())
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			// Wait for the Kubelet to be ready.
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				return nodes == 1
-			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrue())
+			}, time.Minute, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 
 			ginkgo.By(fmt.Sprintf("Once Kubelet is restarted, verify the pod (%v/%v) is deleted by kubelet", pod.Namespace, pod.Name))
 			gomega.Eventually(ctx, func(ctx context.Context) error {

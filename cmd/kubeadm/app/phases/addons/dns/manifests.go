@@ -178,6 +178,11 @@ data:
            max_concurrent 1000
         }
         cache 30
+        {{- if .DNSDomain }} {
+           disable success {{ .DNSDomain }}
+           disable denial {{ .DNSDomain }}
+        }
+        {{- end }}
         loop
         reload
         loadbalance

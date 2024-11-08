@@ -19,12 +19,12 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -294,10 +294,31 @@ func TestApplyCreate(t *testing.T) {
 	handled, configMap, err := reaction(action)
 	assert.True(t, handled)
 	if err != nil {
-		t.Errorf("Failed to create a resource with apply: %v", err)
+		t.Fatalf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
+}
+
+func TestApplyNoMeta(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	reaction := ObjectReaction(o)
+	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
+	action := NewPatchActionWithOptions(cmResource, "default", "cm-1", types.ApplyPatchType, patch,
+		metav1.PatchOptions{FieldManager: "test-manager"})
+	handled, configMap, err := reaction(action)
+	assert.True(t, handled)
+	if err != nil {
+		t.Fatalf("Failed to create a resource with apply: %v", err)
+	}
+	cm := configMap.(*v1.ConfigMap)
+	assert.Equal(t, "cm-1", cm.Name)
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
 }
 
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
@@ -429,7 +450,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
-	assert.Nil(t, o.Add(node))
+	assert.NoError(t, o.Add(node))
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
@@ -445,7 +466,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
-	assert.Nil(t, o.Add(pod))
+	assert.NoError(t, o.Add(pod))
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")

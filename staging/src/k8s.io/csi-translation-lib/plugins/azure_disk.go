@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -60,7 +61,7 @@ func NewAzureDiskCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassToCSI translates InTree Azure Disk storage class parameters to CSI storage class
-func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(logger klog.Logger, sc *storage.StorageClass) (*storage.StorageClass, error) {
 	var (
 		generatedTopologies []v1.TopologySelectorTerm
 		params              = map[string]string{}
@@ -96,7 +97,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureDisk set from in-tree
 // and converts the AzureDisk source to a CSIPersistentVolumeSource
-func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
+func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureDisk == nil {
 		return nil, fmt.Errorf("volume is nil or Azure Disk not defined on volume")
 	}
@@ -140,7 +141,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 
 // TranslateInTreePVToCSI takes a PV with AzureDisk set from in-tree
 // and converts the AzureDisk source to a CSIPersistentVolumeSource
-func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.AzureDisk == nil {
 		return nil, fmt.Errorf("pv is nil or Azure Disk source not defined on pv")
 	}

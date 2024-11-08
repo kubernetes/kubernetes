@@ -22,23 +22,12 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-)
-
-const (
-	// poll is how often to Poll pods, nodes and claims.
-	poll = 2 * time.Second
-
-	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
-	// transient failures from failing tests.
-	singleCallTimeout = 5 * time.Minute
 )
 
 // CreateNamespaceOrDie creates a namespace.
@@ -57,22 +46,6 @@ func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testing.TB)
 	if err != nil {
 		t.Fatalf("Failed to delete namespace: %v", err)
 	}
-}
-
-// waitListAllNodes is a wrapper around listing nodes supporting retries.
-func waitListAllNodes(c clientset.Interface) (*v1.NodeList, error) {
-	var nodes *v1.NodeList
-	var err error
-	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}) != nil {
-		return nodes, err
-	}
-	return nodes, nil
 }
 
 // Filter filters nodes in NodeList in place, removing nodes that do not
@@ -158,7 +131,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						klog.Infof(msg)
+						klog.Info(msg)
 					}
 					return false
 				}

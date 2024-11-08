@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -47,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -99,9 +101,6 @@ type ManagerImpl struct {
 	// devicesToReuse contains devices that can be reused as they have been allocated to
 	// init containers.
 	devicesToReuse PodReusableDevices
-
-	// pendingAdmissionPod contain the pod during the admission phase
-	pendingAdmissionPod *v1.Pod
 
 	// containerMap provides a mapping from (pod, container) -> containerID
 	// for all containers in a pod. Used to detect pods running across a restart
@@ -157,7 +156,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
-		update:                make(chan resourceupdates.Update),
+		update:                make(chan resourceupdates.Update, 100),
 	}
 
 	server, err := plugin.NewServer(socketPath, manager, manager)
@@ -203,12 +202,15 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 		if filePath == m.checkpointFile() {
 			continue
 		}
-		stat, err := os.Stat(filePath)
+		// TODO: Until the bug - https://github.com/golang/go/issues/33357 is fixed, os.stat wouldn't return the
+		// right mode(socket) on windows. Hence deleting the file, without checking whether
+		// its a socket, on windows.
+		stat, err := os.Lstat(filePath)
 		if err != nil {
 			klog.ErrorS(err, "Failed to stat file", "path", filePath)
 			continue
 		}
-		if stat.IsDir() || stat.Mode()&os.ModeSocket == 0 {
+		if stat.IsDir() {
 			continue
 		}
 		err = os.RemoveAll(filePath)
@@ -277,16 +279,20 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 			// compare with old device's health and send update to the channel if needed
+			updatePodUIDFn := func(deviceID string) {
+				podUID, _ := m.podDevices.getPodAndContainerForDevice(deviceID)
+				if podUID != "" {
+					podsToUpdate.Insert(podUID)
+				}
+			}
 			if oldDev, ok := oldDevices[dev.ID]; ok {
 				if oldDev.Health != dev.Health {
-					podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-					podsToUpdate.Insert(podUID)
+					updatePodUIDFn(dev.ID)
 				}
 			} else {
 				// if this is a new device, it might have existed before and disappeared for a while
 				// but still be assigned to a Pod. In this case, we need to send an update to the channel
-				podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
-				podsToUpdate.Insert(podUID)
+				updatePodUIDFn(dev.ID)
 			}
 		}
 
@@ -302,8 +308,10 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 		if len(podsToUpdate) > 0 {
-			m.update <- resourceupdates.Update{
-				PodUIDs: podsToUpdate.UnsortedList(),
+			select {
+			case m.update <- resourceupdates.Update{PodUIDs: podsToUpdate.UnsortedList()}:
+			default:
+				klog.ErrorS(goerrors.New("device update channel is full"), "discard pods info", "podsToUpdate", podsToUpdate.UnsortedList())
 			}
 		}
 	}
@@ -316,6 +324,11 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 
 // GetWatcherHandler returns the plugin handler
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
+	return m.server
+}
+
+// GetHealthChecker returns the plugin handler
+func (m *ManagerImpl) GetHealthChecker() healthz.HealthChecker {
 	return m.server
 }
 
@@ -354,10 +367,6 @@ func (m *ManagerImpl) Stop() error {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -375,7 +384,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 				return err
 			}
-			if !types.IsRestartableInitContainer(&initContainer) {
+			if !podutil.IsRestartableInitContainer(&initContainer) {
 				m.podDevices.addContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
 			} else {
 				// If the init container is restartable, we need to keep the
@@ -538,20 +547,14 @@ func (m *ManagerImpl) getCheckpoint() (checkpoint.DeviceManagerCheckpoint, error
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices() {
+	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
-	activeAndAdmittedPods := m.activePods()
-	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
-	}
-
 	podsToBeRemoved := m.podDevices.pods()
-	for _, pod := range activeAndAdmittedPods {
+	for _, pod := range activePods {
 		podsToBeRemoved.Delete(string(pod.UID))
 	}
 	if len(podsToBeRemoved) <= 0 {
@@ -1159,13 +1162,6 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 		return false
 	}
 	return len(checkpoints) == 0
-}
-
-func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.pendingAdmissionPod = pod
 }
 
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {

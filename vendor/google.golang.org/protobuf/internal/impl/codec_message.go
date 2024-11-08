@@ -189,6 +189,9 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 	if mi.methods.Merge == nil {
 		mi.methods.Merge = mi.merge
 	}
+	if mi.methods.Equal == nil {
+		mi.methods.Equal = equal
+	}
 }
 
 // getUnknownBytes returns a *[]byte for the unknown fields.

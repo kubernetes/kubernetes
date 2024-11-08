@@ -30,8 +30,8 @@ type MessageInfo struct {
 	// Desc is the underlying message descriptor type and must be populated.
 	Desc protoreflect.MessageDescriptor
 
-	// Exporter must be provided in a purego environment in order to provide
-	// access to unexported fields.
+	// Deprecated: Exporter will be removed the next time we bump
+	// protoimpl.GenVersion. See https://github.com/golang/protobuf/issues/1640
 	Exporter exporter
 
 	// OneofWrappers is list of pointers to oneof wrapper struct types.

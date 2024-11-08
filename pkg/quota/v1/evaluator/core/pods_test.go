@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -906,7 +907,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 		usageFgEnabled  corev1.ResourceList
 		usageFgDisabled corev1.ResourceList
 	}{
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -925,8 +926,10 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceMemory: resource.MustParse("150Mi"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceMemory: resource.MustParse("150Mi"),
+								},
 							},
 						},
 					},
@@ -947,7 +950,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for CPU resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -966,8 +969,10 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceCPU: resource.MustParse("150m"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("150m"),
+								},
 							},
 						},
 					},
@@ -988,7 +993,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -1009,9 +1014,11 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
 						{
-							AllocatedResources: api.ResourceList{
-								api.ResourceCPU:    resource.MustParse("150m"),
-								api.ResourceMemory: resource.MustParse("250Mi"),
+							Resources: &api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU:    resource.MustParse("150m"),
+									api.ResourceMemory: resource.MustParse("250Mi"),
+								},
 							},
 						},
 					},
@@ -1038,7 +1045,7 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
-		"verify Max(Container.Spec.Requests, ContainerStatus.AllocatedResources==nil) for CPU and memory resource": {
+		"verify Max(Container.Spec.Requests, ContainerStatus.Resources==nil) for CPU and memory resource": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -1187,5 +1194,60 @@ func makePod(name, pcName string, resList api.ResourceList, phase api.PodPhase) 
 		Status: api.PodStatus{
 			Phase: phase,
 		},
+	}
+}
+
+func TestPodEvaluatorHandles(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	evaluator := NewPodEvaluator(nil, fakeClock)
+	testCases := []struct {
+		name  string
+		attrs admission.Attributes
+		want  bool
+	}{
+		{
+			name:  "create",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Create, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "delete",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Delete, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "connect",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "", admission.Connect, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "create-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Create, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-subresource",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "subresource", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-resize",
+			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "resize", admission.Update, nil, false, nil),
+			want:  true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := evaluator.Handles(tc.attrs)
+
+			if tc.want != actual {
+				t.Errorf("%s expected:\n%v\n, actual:\n%v", tc.name, tc.want, actual)
+			}
+		})
 	}
 }

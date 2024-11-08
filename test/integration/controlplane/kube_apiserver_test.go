@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -440,22 +439,16 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 
 	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
-	wg := sync.WaitGroup{}
 	// 1. start apiServerCount api servers
 	for i := 0; i < apiServerCount; i++ {
 		// start count api server
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
-				"--endpoint-reconciler-type", "master-count",
-				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-				"--apiserver-count", fmt.Sprintf("%v", apiServerCount),
-			}, etcd)
-			apiServerCountServers[i] = server
-		}(i)
+		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+			"--endpoint-reconciler-type", "master-count",
+			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+			"--apiserver-count", fmt.Sprintf("%v", apiServerCount),
+		}, etcd)
+		apiServerCountServers[i] = server
 	}
-	wg.Wait()
 
 	// 2. verify API Server count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
@@ -476,18 +469,14 @@ func testReconcilersAPIServerLease(t *testing.T, leaseCount int, apiServerCount 
 
 	// 3. start lease api servers
 	for i := 0; i < leaseCount; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			options := []string{
-				"--endpoint-reconciler-type", "lease",
-				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
-			}
-			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, options, etcd)
-			leaseServers[i] = server
-		}(i)
+		options := []string{
+			"--endpoint-reconciler-type", "lease",
+			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
+		}
+		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, options, etcd)
+		leaseServers[i] = server
 	}
-	wg.Wait()
+
 	defer func() {
 		for i := 0; i < leaseCount; i++ {
 			leaseServers[i].TearDownFn()

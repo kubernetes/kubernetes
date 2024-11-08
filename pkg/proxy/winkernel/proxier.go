@@ -29,8 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/Microsoft/hnslib"
+	"github.com/Microsoft/hnslib/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -73,7 +73,7 @@ type WindowsKernelCompatTester struct{}
 
 // IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
-	_, err := hcsshim.HNSListPolicyListRequest()
+	_, err := hnslib.HNSListPolicyListRequest()
 	if err != nil {
 		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
 	}
@@ -238,11 +238,11 @@ type DualStackCompatTester struct{}
 
 func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	hcnImpl := newHcnImpl()
-	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
+	// First tag of hnslib that has a proper check for dual stack support is v0.8.22 due to a bug.
 	if err := hcnImpl.Ipv6DualStackSupported(); err != nil {
 		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing
 		// to see if dual stack is supported), but the only time this can happen, at least that can be discerned, is if the host
-		// is pre-1803 and hcn didn't exist. hcsshim should truthfully return a known error if this happened that we can
+		// is pre-1803 and hcn didn't exist. hnslib should truthfully return a known error if this happened that we can
 		// check against, and the case where 'err != this known error' would be the 'this feature isn't supported' case, as is being
 		// used here. For now, seeming as how nothing before ws2019 (1809) is listed as supported for k8s we can pretty much assume
 		// any error here isn't because the query failed, it's just that dualstack simply isn't supported on the host. With all
@@ -1050,7 +1050,7 @@ func isNetworkNotFoundError(err error) bool {
 	if _, ok := err.(hcn.NetworkNotFoundError); ok {
 		return true
 	}
-	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
+	if _, ok := err.(hnslib.NetworkNotFoundError); ok {
 		return true
 	}
 	return false
@@ -1166,17 +1166,9 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
-	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
+	_ = proxier.svcPortMap.Update(proxier.serviceChanges)
+	_ = proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	deletedUDPClusterIPs := serviceUpdateResult.DeletedUDPClusterIPs
-	// merge stale services gathered from EndpointsMap.Update
-	for _, svcPortName := range endpointUpdateResult.NewlyActiveUDPServices {
-		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
-			klog.V(2).InfoS("Newly-active UDP service may have stale conntrack entries", "servicePortName", svcPortName)
-			deletedUDPClusterIPs.Insert(svcInfo.ClusterIP().String())
-		}
-	}
 	// Query HNS for endpoints and load balancers
 	queriedEndpoints, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
 	if err != nil {
@@ -1296,8 +1288,8 @@ func (proxier *Proxier) syncProxyRules() {
 			var err error
 
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
-			// Note that hcsshim.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
-			// TODO(feiskyer): add support of different endpoint ports after hcsshim.AddLoadBalancer() add that.
+			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
+			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
 			if svcInfo.targetPort == 0 {
 				svcInfo.targetPort = int(ep.port)
 			}
@@ -1713,13 +1705,6 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	if err := proxier.serviceHealthServer.SyncEndpoints(proxier.endpointsMap.LocalReadyEndpoints()); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
-	}
-
-	// Finish housekeeping.
-	// TODO: these could be made more consistent.
-	for _, svcIP := range deletedUDPClusterIPs.UnsortedList() {
-		// TODO : Check if this is required to cleanup stale services here
-		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP)
 	}
 
 	// remove stale endpoint refcount entries

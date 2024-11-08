@@ -32,8 +32,8 @@ func TestGetStat(t *testing.T) {
 	fi, err := getStat(event)
 	fiExpected, errExpected := os.Stat(event.Name)
 
-	assert.Equal(t, fi, fiExpected)
-	assert.Equal(t, err, errExpected)
+	assert.Equal(t, fiExpected, fi)
+	assert.Equal(t, errExpected, err)
 }
 
 func TestGetSocketPath(t *testing.T) {

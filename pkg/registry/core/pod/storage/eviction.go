@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -39,6 +40,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -131,6 +134,13 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 	if name != eviction.Name {
 		return nil, errors.NewBadRequest("name in URL does not match name in Eviction object")
+	}
+
+	if eviction.DeleteOptions != nil && ptr.Deref(eviction.DeleteOptions.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
+		errs := field.ErrorList{
+			field.Invalid(field.NewPath("deleteOptions").Child("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "can not be set for pod eviction, try after removing the option"),
+		}
+		return nil, errors.NewInvalid(v1Eviction.GroupKind(), name, errs)
 	}
 
 	originalDeleteOptions, err := propagateDryRun(eviction, options)

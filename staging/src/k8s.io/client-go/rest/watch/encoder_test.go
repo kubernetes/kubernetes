@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned_test
+package watch
 
 import (
 	"bytes"
 	"io"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,12 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
 // getEncoder mimics how k8s.io/client-go/rest.createSerializers creates a encoder
 func getEncoder() runtime.Encoder {
-	jsonSerializer := runtimejson.NewSerializer(runtimejson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, false)
+	jsonSerializer := runtimejson.NewSerializerWithOptions(runtimejson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, runtimejson.SerializerOptions{})
 	directCodecFactory := scheme.Codecs.WithoutConversion()
 	return directCodecFactory.EncoderForVersion(jsonSerializer, v1.SchemeGroupVersion)
 }
@@ -64,14 +63,14 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	for i, testCase := range testCases {
 		buf := &bytes.Buffer{}
 
-		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(buf, getEncoder()), getEncoder())
+		encoder := NewEncoder(streaming.NewEncoder(buf, getEncoder()), getEncoder())
 		if err := encoder.Encode(&watch.Event{Type: testCase.Type, Object: testCase.Object}); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
 
 		rc := io.NopCloser(buf)
-		decoder := restclientwatch.NewDecoder(streaming.NewDecoder(rc, getDecoder()), getDecoder())
+		decoder := NewDecoder(streaming.NewDecoder(rc, getDecoder()), getDecoder())
 		event, obj, err := decoder.Decode()
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)

@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta2
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
-	"k8s.io/client-go/kubernetes/scheme"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -90,10 +90,10 @@ func New(c rest.Interface) *FlowcontrolV1beta2Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1beta2.SchemeGroupVersion
+	gv := flowcontrolv1beta2.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

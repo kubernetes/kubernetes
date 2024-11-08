@@ -216,6 +216,37 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			wantCountFailed:       false,
 			wantAction:            &ignore,
 		},
+		"ignore rule matched on negative exit codes - needed for Windows support": {
+			podFailurePolicy: &batch.PodFailurePolicy{
+				Rules: []batch.PodFailurePolicyRule{
+					{
+						Action: batch.PodFailurePolicyActionIgnore,
+						OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+							Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+							Values:   []int32{-1073741676, -1073741510},
+						},
+					},
+				},
+			},
+			failedPod: &v1.Pod{
+				ObjectMeta: validPodObjectMeta,
+				Status: v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: -1073741510,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantJobFailureMessage: nil,
+			wantCountFailed:       false,
+			wantAction:            &ignore,
+		},
 		"FailJob rule matched for exit codes": {
 			podFailurePolicy: &batch.PodFailurePolicy{
 				Rules: []batch.PodFailurePolicyRule{

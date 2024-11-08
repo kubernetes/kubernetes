@@ -53,7 +53,7 @@ type pluginInfo struct {
 	pluginProbeFunction     probeFn
 }
 
-func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+func appendLegacyControllerProviders(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
 	pluginMigrationStatus[plugins.PortworxVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationPortworx, pluginUnregisterFeature: features.InTreePluginPortworxUnregister, pluginProbeFunction: portworx.ProbeVolumePlugins}
 	var err error
@@ -64,12 +64,4 @@ func appendAttachableLegacyProviderVolumes(logger klog.Logger, allPlugins []volu
 		}
 	}
 	return allPlugins, nil
-}
-
-func appendExpandableLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
-	return appendLegacyProviderVolumes(logger, allPlugins, featureGate)
-}
-
-func appendLegacyProviderVolumes(logger klog.Logger, allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
-	return appendAttachableLegacyProviderVolumes(logger, allPlugins, featureGate)
 }

@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	apiflowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta2 "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	flowcontrolv1beta2 "k8s.io/client-go/listers/flowcontrol/v1beta2"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // PriorityLevelConfigurations.
 type PriorityLevelConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta2.PriorityLevelConfigurationLister
+	Lister() flowcontrolv1beta2.PriorityLevelConfigurationLister
 }
 
 type priorityLevelConfigurationInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, 
 				return client.FlowcontrolV1beta2().PriorityLevelConfigurations().Watch(context.TODO(), options)
 			},
 		},
-		&flowcontrolv1beta2.PriorityLevelConfiguration{},
+		&apiflowcontrolv1beta2.PriorityLevelConfiguration{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *priorityLevelConfigurationInformer) defaultInformer(client kubernetes.I
 }
 
 func (f *priorityLevelConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&flowcontrolv1beta2.PriorityLevelConfiguration{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiflowcontrolv1beta2.PriorityLevelConfiguration{}, f.defaultInformer)
 }
 
-func (f *priorityLevelConfigurationInformer) Lister() v1beta2.PriorityLevelConfigurationLister {
-	return v1beta2.NewPriorityLevelConfigurationLister(f.Informer().GetIndexer())
+func (f *priorityLevelConfigurationInformer) Lister() flowcontrolv1beta2.PriorityLevelConfigurationLister {
+	return flowcontrolv1beta2.NewPriorityLevelConfigurationLister(f.Informer().GetIndexer())
 }

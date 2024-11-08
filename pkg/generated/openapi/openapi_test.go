@@ -18,10 +18,12 @@ package openapi
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 
+	"github.com/go-openapi/jsonreference"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -51,8 +53,16 @@ func TestOpenAPIRoundtrip(t *testing.T) {
 			delete(roundTripped.Extensions, common.ExtensionV2Schema)
 			delete(value.Schema.Extensions, common.ExtensionV2Schema)
 
-			if !reflect.DeepEqual(value.Schema, roundTripped) {
-				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", cmp.Diff(value.Schema, roundTripped))
+			opts := []cmp.Option{
+				cmpopts.EquateEmpty(),
+				// jsonreference.Ref contains unexported fields. Compare
+				// by string representation provides a consistent
+				cmp.Comparer(func(x, y jsonreference.Ref) bool {
+					return x.String() == y.String()
+				}),
+			}
+			if !cmp.Equal(value.Schema, roundTripped, opts...) {
+				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", cmp.Diff(value.Schema, roundTripped, opts...))
 				return
 			}
 		})

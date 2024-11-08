@@ -24,17 +24,19 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -185,7 +187,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
 		if !reflect.DeepEqual(expectedDefaults, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expectedDefaults, defaults))
+			t.Log(cmp.Diff(expectedDefaults, defaults))
 		}
 	})
 	t.Run("hostnet PodTemplateSpec with ports", func(t *testing.T) {
@@ -223,7 +225,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		}()
 		if !reflect.DeepEqual(expected, defaults) {
 			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-			t.Logf(cmp.Diff(expected, defaults))
+			t.Log(cmp.Diff(expected, defaults))
 		}
 	})
 }
@@ -374,7 +376,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(cmp.Diff(expectedDefaults, defaults))
+		t.Log(cmp.Diff(expectedDefaults, defaults))
 	}
 }
 
@@ -689,7 +691,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32(0),
+					Replicas: ptr.To[int32](0),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -704,7 +706,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -1260,6 +1262,9 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)
@@ -1926,7 +1931,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 	rc := &v1.ReplicationController{
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: utilpointer.Int32(3),
+			Replicas: ptr.To[int32](3),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -2339,6 +2344,29 @@ func TestSetDefaults_Volume(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			corev1.SetDefaults_Volume(tc.given)
+			if !cmp.Equal(tc.given, tc.expected) {
+				t.Errorf("expected volume %+v, but got %+v", tc.expected, tc.given)
+			}
+		})
+	}
+}
+
+func TestSetDefaults_PodLogOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLogsQuerySplitStreams, true)
+	for desc, tc := range map[string]struct {
+		given, expected *v1.PodLogOptions
+	}{
+		"defaults to All": {
+			given:    &v1.PodLogOptions{},
+			expected: &v1.PodLogOptions{Stream: ptr.To(v1.LogStreamAll)},
+		},
+		"the specified stream should not be overridden": {
+			given:    &v1.PodLogOptions{Stream: ptr.To(v1.LogStreamStdout)},
+			expected: &v1.PodLogOptions{Stream: ptr.To(v1.LogStreamStdout)},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			corev1.SetDefaults_PodLogOptions(tc.given)
 			if !cmp.Equal(tc.given, tc.expected) {
 				t.Errorf("expected volume %+v, but got %+v", tc.expected, tc.given)
 			}

@@ -184,7 +184,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance
@@ -228,7 +231,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance
@@ -314,7 +320,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance
@@ -701,7 +710,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: foo.bar.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -985,7 +994,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: foo.bar.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -1414,28 +1423,28 @@ func TestDeployedDNSAddon(t *testing.T) {
 	}{
 		{
 			name:           "default",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
 			deploymentSize: 1,
-			wantVersion:    "v1.11.1",
+			wantVersion:    "v1.11.3",
 		},
 		{
 			name:           "no dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
 			deploymentSize: 0,
 			wantVersion:    "",
 		},
 		{
 			name:           "multiple dns addon deployment",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.3",
 			deploymentSize: 2,
 			wantVersion:    "",
 			wantErr:        true,
 		},
 		{
 			name:           "with digest",
-			image:          "registry.k8s.io/coredns/coredns:v1.11.1@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.3@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
 			deploymentSize: 1,
-			wantVersion:    "v1.11.1",
+			wantVersion:    "v1.11.3",
 		},
 		{
 			name:           "without registry",
@@ -1655,7 +1664,7 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string, configMap string, configData string) *clientsetfake.Clientset {
 	if image == "" {
-		image = "registry.k8s.io/coredns/coredns:v1.11.1"
+		image = "registry.k8s.io/coredns/coredns:v1.11.3"
 	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {

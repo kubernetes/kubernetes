@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "k8s.io/api/certificates/v1alpha1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterTrustBundleLister helps list ClusterTrustBundles.
@@ -30,19 +30,19 @@ import (
 type ClusterTrustBundleLister interface {
 	// List lists all ClusterTrustBundles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterTrustBundle, err error)
+	List(selector labels.Selector) (ret []*certificatesv1alpha1.ClusterTrustBundle, err error)
 	// Get retrieves the ClusterTrustBundle from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ClusterTrustBundle, error)
+	Get(name string) (*certificatesv1alpha1.ClusterTrustBundle, error)
 	ClusterTrustBundleListerExpansion
 }
 
 // clusterTrustBundleLister implements the ClusterTrustBundleLister interface.
 type clusterTrustBundleLister struct {
-	listers.ResourceIndexer[*v1alpha1.ClusterTrustBundle]
+	listers.ResourceIndexer[*certificatesv1alpha1.ClusterTrustBundle]
 }
 
 // NewClusterTrustBundleLister returns a new ClusterTrustBundleLister.
 func NewClusterTrustBundleLister(indexer cache.Indexer) ClusterTrustBundleLister {
-	return &clusterTrustBundleLister{listers.New[*v1alpha1.ClusterTrustBundle](indexer, v1alpha1.Resource("clustertrustbundle"))}
+	return &clusterTrustBundleLister{listers.New[*certificatesv1alpha1.ClusterTrustBundle](indexer, certificatesv1alpha1.Resource("clustertrustbundle"))}
 }

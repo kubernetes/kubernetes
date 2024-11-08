@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -31,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -38,6 +41,8 @@ import (
 	podapi "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+
+	"k8s.io/utils/ptr"
 )
 
 func TestEviction(t *testing.T) {
@@ -581,30 +586,31 @@ func TestEvictionIgnorePDB(t *testing.T) {
 	}
 }
 
-func TestEvictionDryRun(t *testing.T) {
+func TestEvictionWithDeleteOptions(t *testing.T) {
 	testcases := []struct {
 		name            string
 		evictionOptions *metav1.DeleteOptions
 		requestOptions  *metav1.CreateOptions
 		pdbs            []runtime.Object
+		err             error
 	}{
 		{
-			name:            "just request-options",
+			name:            "dry run - just request-options",
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
 			evictionOptions: &metav1.DeleteOptions{},
 		},
 		{
-			name:            "just eviction-options",
+			name:            "dry run - just eviction-options",
 			requestOptions:  &metav1.CreateOptions{},
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 		},
 		{
-			name:            "both options",
+			name:            "dry run - both options",
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
 		},
 		{
-			name:            "with pdbs",
+			name:            "dry run - with pdbs",
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
 			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
@@ -612,6 +618,17 @@ func TestEvictionDryRun(t *testing.T) {
 				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
 				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 			}},
+		},
+		{
+			name:           "ignoreStoreReadErrorWithClusterBreakingPotential is set, invalid error expected",
+			requestOptions: &metav1.CreateOptions{},
+			evictionOptions: &metav1.DeleteOptions{
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+			},
+			err: apierrors.NewInvalid(v1Eviction.GroupKind(), "foo", field.ErrorList{
+				field.Invalid(field.NewPath("deleteOptions").Child("ignoreStoreReadErrorWithClusterBreakingPotential"),
+					true, "can not be set for pod eviction, try after removing the option"),
+			}),
 		},
 	}
 
@@ -633,8 +650,8 @@ func TestEvictionDryRun(t *testing.T) {
 			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: tc.evictionOptions}
 			_, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
-			if err != nil {
-				t.Fatalf("Failed to run eviction: %v", err)
+			if !cmp.Equal(tc.err, err) {
+				t.Errorf("expected error to match, diff: %s", cmp.Diff(tc.err, err))
 			}
 		})
 	}

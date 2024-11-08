@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type LimitRangesGetter interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	Create(ctx context.Context, limitRange *v1.LimitRange, opts metav1.CreateOptions) (*v1.LimitRange, error)
-	Update(ctx context.Context, limitRange *v1.LimitRange, opts metav1.UpdateOptions) (*v1.LimitRange, error)
+	Create(ctx context.Context, limitRange *corev1.LimitRange, opts metav1.CreateOptions) (*corev1.LimitRange, error)
+	Update(ctx context.Context, limitRange *corev1.LimitRange, opts metav1.UpdateOptions) (*corev1.LimitRange, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.LimitRange, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.LimitRangeList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.LimitRange, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.LimitRangeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.LimitRange, err error)
-	Apply(ctx context.Context, limitRange *corev1.LimitRangeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.LimitRange, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.LimitRange, err error)
+	Apply(ctx context.Context, limitRange *applyconfigurationscorev1.LimitRangeApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.LimitRange, err error)
 	LimitRangeExpansion
 }
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	*gentype.ClientWithListAndApply[*v1.LimitRange, *v1.LimitRangeList, *corev1.LimitRangeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.LimitRange, *corev1.LimitRangeList, *applyconfigurationscorev1.LimitRangeApplyConfiguration]
 }
 
 // newLimitRanges returns a LimitRanges
 func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
 	return &limitRanges{
-		gentype.NewClientWithListAndApply[*v1.LimitRange, *v1.LimitRangeList, *corev1.LimitRangeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.LimitRange, *corev1.LimitRangeList, *applyconfigurationscorev1.LimitRangeApplyConfiguration](
 			"limitranges",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.LimitRange { return &v1.LimitRange{} },
-			func() *v1.LimitRangeList { return &v1.LimitRangeList{} }),
+			func() *corev1.LimitRange { return &corev1.LimitRange{} },
+			func() *corev1.LimitRangeList { return &corev1.LimitRangeList{} },
+			gentype.PrefersProtobuf[*corev1.LimitRange](),
+		),
 	}
 }

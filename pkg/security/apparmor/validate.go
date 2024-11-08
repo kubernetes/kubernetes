@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/third_party/forked/libcontainer/apparmor"
 )
 
 // Whether AppArmor should be disabled by default.

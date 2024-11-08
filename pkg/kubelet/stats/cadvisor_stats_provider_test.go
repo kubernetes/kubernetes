@@ -248,7 +248,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
-	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(t)
 
@@ -531,7 +531,7 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)
 
-	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
@@ -609,10 +609,10 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 		mockRuntime := containertest.NewMockRuntime(t)
 
 		res := getTestFsInfo(1000)
-		mockCadvisor.EXPECT().ImagesFsInfo().Return(res, nil)
+		mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(res, nil)
 		mockRuntime.EXPECT().ImageFsInfo(ctx).Return(tc.response, nil)
 		if tc.callContainerFsInfo {
-			mockCadvisor.EXPECT().ContainerFsInfo().Return(res, nil)
+			mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(res, nil)
 		}
 
 		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
@@ -649,7 +649,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
@@ -680,6 +680,59 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 		mockRuntime  = containertest.NewMockRuntime(t)
 
 		seed            = 1000
+		imageFsInfo     = getTestFsInfoWithDifferentMount(seed, "image")
+		containerSeed   = 1001
+		containerFsInfo = getTestFsInfo(containerSeed)
+	)
+	imageFsInfoCRI := &runtimeapi.FilesystemUsage{
+		Timestamp:  imageFsInfo.Timestamp.Unix(),
+		FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: "images"},
+		UsedBytes:  &runtimeapi.UInt64Value{Value: imageFsInfo.Usage},
+		InodesUsed: &runtimeapi.UInt64Value{Value: *imageFsInfo.Inodes},
+	}
+	containerFsInfoCRI := &runtimeapi.FilesystemUsage{
+		Timestamp:  containerFsInfo.Timestamp.Unix(),
+		FsId:       &runtimeapi.FilesystemIdentifier{Mountpoint: "containers"},
+		UsedBytes:  &runtimeapi.UInt64Value{Value: containerFsInfo.Usage},
+		InodesUsed: &runtimeapi.UInt64Value{Value: *containerFsInfo.Inodes},
+	}
+	imageFsInfoResponse := &runtimeapi.ImageFsInfoResponse{
+		ImageFilesystems:     []*runtimeapi.FilesystemUsage{imageFsInfoCRI},
+		ContainerFilesystems: []*runtimeapi.FilesystemUsage{containerFsInfoCRI},
+	}
+
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(containerFsInfo, nil)
+	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
+
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
+	stats, containerfs, err := provider.ImageFsStats(ctx)
+	assert.NoError(err)
+
+	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
+	assert.Equal(imageFsInfo.Available, *stats.AvailableBytes)
+	assert.Equal(imageFsInfo.Capacity, *stats.CapacityBytes)
+	assert.Equal(imageFsInfo.InodesFree, stats.InodesFree)
+	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
+	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *stats.InodesUsed)
+
+	assert.Equal(containerFsInfo.Timestamp, containerfs.Time.Time)
+	assert.Equal(containerFsInfo.Available, *containerfs.AvailableBytes)
+	assert.Equal(containerFsInfo.Capacity, *containerfs.CapacityBytes)
+	assert.Equal(containerFsInfo.InodesFree, containerfs.InodesFree)
+	assert.Equal(containerFsInfo.Inodes, containerfs.Inodes)
+	assert.Equal(*containerFsInfo.Inodes-*containerFsInfo.InodesFree, *containerfs.InodesUsed)
+}
+
+func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
+	ctx := context.Background()
+	var (
+		assert       = assert.New(t)
+		mockCadvisor = cadvisortest.NewMockInterface(t)
+		mockRuntime  = containertest.NewMockRuntime(t)
+
+		seed            = 1000
 		imageFsInfo     = getTestFsInfo(seed)
 		containerSeed   = 1001
 		containerFsInfo = getTestFsInfo(containerSeed)
@@ -701,14 +754,14 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 		ContainerFilesystems: []*runtimeapi.FilesystemUsage{containerFsInfoCRI},
 	}
 
-	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().ContainerFsInfo().Return(containerFsInfo, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(containerFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
 	stats, containerfs, err := provider.ImageFsStats(ctx)
-	assert.NoError(err)
+	require.NoError(t, err, "imageFsStats should have no error")
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
 	assert.Equal(imageFsInfo.Available, *stats.AvailableBytes)
@@ -717,13 +770,12 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
 	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *stats.InodesUsed)
 
-	assert.Equal(containerFsInfo.Timestamp, containerfs.Time.Time)
-	assert.Equal(containerFsInfo.Available, *containerfs.AvailableBytes)
-	assert.Equal(containerFsInfo.Capacity, *containerfs.CapacityBytes)
-	assert.Equal(containerFsInfo.InodesFree, containerfs.InodesFree)
-	assert.Equal(containerFsInfo.Inodes, containerfs.Inodes)
-	assert.Equal(*containerFsInfo.Inodes-*containerFsInfo.InodesFree, *containerfs.InodesUsed)
-
+	assert.Equal(imageFsInfo.Timestamp, containerfs.Time.Time)
+	assert.Equal(imageFsInfo.Available, *containerfs.AvailableBytes)
+	assert.Equal(imageFsInfo.Capacity, *containerfs.CapacityBytes)
+	assert.Equal(imageFsInfo.InodesFree, containerfs.InodesFree)
+	assert.Equal(imageFsInfo.Inodes, containerfs.Inodes)
+	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *containerfs.InodesUsed)
 }
 
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
@@ -806,7 +858,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
-	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(t)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).Maybe()

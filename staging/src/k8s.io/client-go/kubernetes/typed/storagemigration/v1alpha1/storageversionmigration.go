@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
+	applyconfigurationsstoragemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,42 @@ type StorageVersionMigrationsGetter interface {
 
 // StorageVersionMigrationInterface has methods to work with StorageVersionMigration resources.
 type StorageVersionMigrationInterface interface {
-	Create(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.CreateOptions) (*v1alpha1.StorageVersionMigration, error)
-	Update(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (*v1alpha1.StorageVersionMigration, error)
+	Create(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, opts v1.CreateOptions) (*storagemigrationv1alpha1.StorageVersionMigration, error)
+	Update(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (*storagemigrationv1alpha1.StorageVersionMigration, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (*v1alpha1.StorageVersionMigration, error)
+	UpdateStatus(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (*storagemigrationv1alpha1.StorageVersionMigration, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.StorageVersionMigration, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.StorageVersionMigrationList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagemigrationv1alpha1.StorageVersionMigration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagemigrationv1alpha1.StorageVersionMigrationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersionMigration, err error)
-	Apply(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersionMigration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagemigrationv1alpha1.StorageVersionMigration, err error)
+	Apply(ctx context.Context, storageVersionMigration *applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *storagemigrationv1alpha1.StorageVersionMigration, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersionMigration, err error)
+	ApplyStatus(ctx context.Context, storageVersionMigration *applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *storagemigrationv1alpha1.StorageVersionMigration, err error)
 	StorageVersionMigrationExpansion
 }
 
 // storageVersionMigrations implements StorageVersionMigrationInterface
 type storageVersionMigrations struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.StorageVersionMigration, *v1alpha1.StorageVersionMigrationList, *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagemigrationv1alpha1.StorageVersionMigration, *storagemigrationv1alpha1.StorageVersionMigrationList, *applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationApplyConfiguration]
 }
 
 // newStorageVersionMigrations returns a StorageVersionMigrations
 func newStorageVersionMigrations(c *StoragemigrationV1alpha1Client) *storageVersionMigrations {
 	return &storageVersionMigrations{
-		gentype.NewClientWithListAndApply[*v1alpha1.StorageVersionMigration, *v1alpha1.StorageVersionMigrationList, *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagemigrationv1alpha1.StorageVersionMigration, *storagemigrationv1alpha1.StorageVersionMigrationList, *applyconfigurationsstoragemigrationv1alpha1.StorageVersionMigrationApplyConfiguration](
 			"storageversionmigrations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.StorageVersionMigration { return &v1alpha1.StorageVersionMigration{} },
-			func() *v1alpha1.StorageVersionMigrationList { return &v1alpha1.StorageVersionMigrationList{} }),
+			func() *storagemigrationv1alpha1.StorageVersionMigration {
+				return &storagemigrationv1alpha1.StorageVersionMigration{}
+			},
+			func() *storagemigrationv1alpha1.StorageVersionMigrationList {
+				return &storagemigrationv1alpha1.StorageVersionMigrationList{}
+			},
+			gentype.PrefersProtobuf[*storagemigrationv1alpha1.StorageVersionMigration](),
+		),
 	}
 }

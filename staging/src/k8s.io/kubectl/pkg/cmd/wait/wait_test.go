@@ -232,7 +232,7 @@ func createUnstructured(t *testing.T, config string) *unstructured.Unstructured 
 	t.Helper()
 	result := map[string]interface{}{}
 
-	require.False(t, strings.Contains(config, "\t"), "Yaml %s cannot contain tabs", config)
+	require.NotContains(t, config, "\t", "Yaml %s cannot contain tabs", config)
 	require.NoError(t, yaml.Unmarshal([]byte(config), &result), "Could not parse config:\n\n%s\n", config)
 
 	return &unstructured.Unstructured{

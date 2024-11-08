@@ -17,17 +17,30 @@ limitations under the License.
 package benchmark
 
 import (
-	"context"
 	"fmt"
+	"math/rand/v2"
 	"path/filepath"
+	"reflect"
 	"sync"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	"github.com/stretchr/testify/require"
+
+	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
-	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -48,9 +61,6 @@ var _ realOp = &createResourceClaimsOp{}
 var _ runnableOp = &createResourceClaimsOp{}
 
 func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
-	if op.Opcode != createResourceClaimsOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", op.Opcode, createResourceClaimsOpcode)
-	}
 	if !isValidCount(allowParameterization, op.Count, op.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", op.Count, op.CountParam)
 	}
@@ -92,7 +102,7 @@ func (op *createResourceClaimsOp) run(tCtx ktesting.TContext) {
 	var mutex sync.Mutex
 	create := func(i int) {
 		err := func() error {
-			if _, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
+			if _, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Create(tCtx, claimTemplate.DeepCopy(), metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create claim: %v", err)
 			}
 			return nil
@@ -126,20 +136,12 @@ type createResourceDriverOp struct {
 	MaxClaimsPerNodeParam string
 	// Nodes matching this glob pattern have resources managed by the driver.
 	Nodes string
-	// StructuredParameters is true if the controller that is built into the scheduler
-	// is used and the control-plane controller is not needed.
-	// Because we don't run the kubelet plugin, ResourceSlices must
-	// get created for all nodes.
-	StructuredParameters bool
 }
 
 var _ realOp = &createResourceDriverOp{}
 var _ runnableOp = &createResourceDriverOp{}
 
 func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
-	if op.Opcode != createResourceDriverOpcode {
-		return fmt.Errorf("invalid opcode %q; expected %q", op.Opcode, createResourceDriverOpcode)
-	}
 	if !isValidCount(allowParameterization, op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam) {
 		return fmt.Errorf("invalid MaxClaimsPerNode=%d / MaxClaimsPerNodeParam=%q", op.MaxClaimsPerNode, op.MaxClaimsPerNodeParam)
 	}
@@ -171,13 +173,7 @@ func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
 func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 	tCtx.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
-	// Start the controller side of the DRA test driver such that it simulates
-	// per-node resources.
-	resources := draapp.Resources{
-		DriverName:     op.DriverName,
-		NodeLocal:      true,
-		MaxAllocations: op.MaxClaimsPerNode,
-	}
+	var driverNodes []string
 
 	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 	if err != nil {
@@ -189,42 +185,21 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 			tCtx.Fatalf("matching glob pattern %q against node name %q: %v", op.Nodes, node.Name, err)
 		}
 		if match {
-			resources.Nodes = append(resources.Nodes, node.Name)
+			driverNodes = append(driverNodes, node.Name)
 		}
 	}
 
-	if op.StructuredParameters {
-		for _, nodeName := range resources.Nodes {
-			slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-			_, err := tCtx.Client().ResourceV1alpha3().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-			tCtx.ExpectNoError(err, "create node resource slice")
-		}
-		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-			err := tCtx.Client().ResourceV1alpha3().ResourceSlices().DeleteCollection(tCtx,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
-			)
-			tCtx.ExpectNoError(err, "delete node resource slices")
-		})
-		// No need for the controller.
-		return
+	for _, nodeName := range driverNodes {
+		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
+		_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create node resource slice")
 	}
-
-	controller := draapp.NewController(tCtx.Client(), resources)
-	ctx, cancel := context.WithCancel(tCtx)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), op.DriverName))
-		controller.Run(ctx, 5 /* workers */)
-	}()
-	tCtx.Cleanup(func() {
-		tCtx.Logf("stopping resource driver %q", op.DriverName)
-		// We must cancel before waiting.
-		cancel()
-		wg.Wait()
-		tCtx.Logf("stopped resource driver %q", op.DriverName)
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		err := tCtx.Client().ResourceV1beta1().ResourceSlices().DeleteCollection(tCtx,
+			metav1.DeleteOptions{},
+			metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
+		)
+		tCtx.ExpectNoError(err, "delete node resource slices")
 	})
 }
 
@@ -247,11 +222,123 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
-				Name:  fmt.Sprintf("instance-%d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("instance-%d", i),
+				Basic: &resourceapi.BasicDevice{
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model":                {StringValue: ptr.To("A100")},
+						"family":               {StringValue: ptr.To("GPU")},
+						"driverVersion":        {VersionValue: ptr.To("1.2.3")},
+						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
+					},
+					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						"memory": {Value: resource.MustParse("1Gi")},
+					},
+				},
 			},
 		)
 	}
 
 	return slice
+}
+
+// allocResourceClaimsOp defines an op where resource claims with structured
+// parameters get allocated without being associated with a pod.
+type allocResourceClaimsOp struct {
+	// Must be allocResourceClaimsOpcode.
+	Opcode operationCode
+	// Namespace where claims are to be allocated, all namespaces if empty.
+	Namespace string
+}
+
+var _ realOp = &allocResourceClaimsOp{}
+var _ runnableOp = &allocResourceClaimsOp{}
+
+func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
+	return nil
+}
+
+func (op *allocResourceClaimsOp) collectsMetrics() bool {
+	return false
+}
+func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+	return op, op.isValid(false)
+}
+
+func (op *allocResourceClaimsOp) requiredNamespaces() []string { return nil }
+
+func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
+	claims, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "list claims")
+	tCtx.Logf("allocating %d ResourceClaims", len(claims.Items))
+	tCtx = ktesting.WithCancel(tCtx)
+	defer tCtx.Cancel("allocResourceClaimsOp.run is done")
+
+	// Track cluster state.
+	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
+	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), informerFactory)
+	informerFactory.Start(tCtx.Done())
+	defer func() {
+		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
+		informerFactory.Shutdown()
+	}()
+	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
+	expectSyncedInformers := map[reflect.Type]bool{
+		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
+		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+		reflect.TypeOf(&v1.Node{}):                   true,
+	}
+	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
+	celCache := cel.NewCache(10)
+
+	// The set of nodes is assumed to be fixed at this point.
+	nodes, err := nodeLister.List(labels.Everything())
+	tCtx.ExpectNoError(err, "list nodes")
+	slices, err := draManager.ResourceSlices().List()
+	tCtx.ExpectNoError(err, "list slices")
+
+	// Allocate one claim at a time, picking nodes randomly. Each
+	// allocation is stored immediately, using the claim cache to avoid
+	// having to wait for the actual informer update.
+claims:
+	for i := range claims.Items {
+		claim := &claims.Items[i]
+		if claim.Status.Allocation != nil {
+			continue
+		}
+
+		claims, err := draManager.ResourceClaims().List()
+		tCtx.ExpectNoError(err, "list claims")
+		allocatedDevices := sets.New[structured.DeviceID]()
+		for _, claim := range claims {
+			if claim.Status.Allocation == nil {
+				continue
+			}
+			for _, result := range claim.Status.Allocation.Devices.Results {
+				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+			}
+		}
+
+		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+		tCtx.ExpectNoError(err, "create allocator")
+
+		rand.Shuffle(len(nodes), func(i, j int) {
+			nodes[i], nodes[j] = nodes[j], nodes[i]
+		})
+		for _, node := range nodes {
+			result, err := allocator.Allocate(tCtx, node)
+			tCtx.ExpectNoError(err, "allocate claim")
+			if result != nil {
+				claim = claim.DeepCopy()
+				claim.Status.Allocation = &result[0]
+				claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+				tCtx.ExpectNoError(err, "update claim status with allocation")
+				tCtx.ExpectNoError(draManager.ResourceClaims().AssumeClaimAfterAPICall(claim), "assume claim")
+				continue claims
+			}
+		}
+		tCtx.Fatalf("Could not allocate claim %d out of %d", i, len(claims))
+	}
 }

@@ -74,8 +74,8 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 					}
 				}
 			} else {
-				fmt.Println("[reset] Would remove the etcd member on this node from the etcd cluster")
-				fmt.Printf("[reset] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
+				fmt.Println("[dryrun] Would remove the etcd member on this node from the etcd cluster")
+				fmt.Printf("[dryrun] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
 			}
 		}
 		// This could happen if the phase `cleanup-node` is run before the `remove-etcd-member`.

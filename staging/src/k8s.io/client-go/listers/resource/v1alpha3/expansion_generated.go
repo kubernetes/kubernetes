@@ -22,14 +22,6 @@ package v1alpha3
 // DeviceClassLister.
 type DeviceClassListerExpansion interface{}
 
-// PodSchedulingContextListerExpansion allows custom methods to be added to
-// PodSchedulingContextLister.
-type PodSchedulingContextListerExpansion interface{}
-
-// PodSchedulingContextNamespaceListerExpansion allows custom methods to be added to
-// PodSchedulingContextNamespaceLister.
-type PodSchedulingContextNamespaceListerExpansion interface{}
-
 // ResourceClaimListerExpansion allows custom methods to be added to
 // ResourceClaimLister.
 type ResourceClaimListerExpansion interface{}

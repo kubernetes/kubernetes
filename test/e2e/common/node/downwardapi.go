@@ -110,6 +110,32 @@ var _ = SIGDescribe("Downward API", func() {
 		testDownwardAPI(ctx, f, podName, env, expectations)
 	})
 
+	/*
+	   Release: v1.32
+	   Testname: DownwardAPI, environment for hostIPs
+	   Description: Downward API MUST expose Pod and Container fields as environment variables. Specify hostIPs as environment variable in the Pod Spec are visible at runtime in the container.
+	*/
+	framework.ConformanceIt("should provide hostIPs as an env var", f.WithNodeConformance(), func(ctx context.Context) {
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
+			{
+				Name: "HOST_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("HOST_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
+		}
+
+		testDownwardAPI(ctx, f, podName, env, expectations)
+	})
+
 	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func(ctx context.Context) {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{

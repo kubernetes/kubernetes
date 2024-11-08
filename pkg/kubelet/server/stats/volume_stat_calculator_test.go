@@ -178,7 +178,7 @@ func TestNormalVolumeEvent(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 
 	event, err := WatchEvent(eventStore)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, "", event)
 }
 
@@ -206,7 +206,7 @@ func TestAbnormalVolumeEvent(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 
 	event, err := WatchEvent(eventStore)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("Warning VolumeConditionAbnormal Volume %s: The target path of the volume doesn't exist", "vol0"), event)
 }
 

@@ -12,7 +12,6 @@ go_library(
     ],
     importpath = "github.com/google/cel-go/common/stdlib",
     deps = [
-        "//checker/decls:go_default_library",
         "//common/decls:go_default_library",
         "//common/functions:go_default_library",
         "//common/operators:go_default_library",
@@ -20,6 +19,5 @@ go_library(
         "//common/types:go_default_library",
         "//common/types/ref:go_default_library",
         "//common/types/traits:go_default_library",
-        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
     ],
 )

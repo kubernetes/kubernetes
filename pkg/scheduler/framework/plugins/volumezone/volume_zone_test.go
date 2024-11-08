@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -267,9 +269,10 @@ func TestSingleZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -399,9 +402,10 @@ func TestMultiZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -524,9 +528,10 @@ func TestWithBinding(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				scLister,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  scLister,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -803,7 +808,8 @@ func BenchmarkVolumeZone(b *testing.B) {
 
 	for _, tt := range tests {
 		b.Run(tt.Name, func(b *testing.B) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(b)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			nodes := makeNodesWithTopologyZone(tt.NumNodes)
 			pl := newPluginWithListers(ctx, b, []*v1.Pod{tt.Pod}, nodes, makePVCsWithPV(tt.NumPVC), makePVsWithZoneLabel(tt.NumPV))
@@ -840,7 +846,7 @@ func newPluginWithListers(ctx context.Context, tb testing.TB, pods []*v1.Pod, no
 	for _, pv := range pvs {
 		objects = append(objects, pv)
 	}
-	return plugintesting.SetupPluginWithInformers(ctx, tb, New, &config.InterPodAffinityArgs{}, snapshot, objects)
+	return plugintesting.SetupPluginWithInformers(ctx, tb, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, objects)
 }
 
 func makePVsWithZoneLabel(num int) []*v1.PersistentVolume {

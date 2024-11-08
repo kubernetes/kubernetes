@@ -585,6 +585,14 @@ func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 		refKind := refValue.Kind()
 		switch refKind {
 		case reflect.Array, reflect.Slice:
+			if refValue.Type().Elem() == reflect.TypeOf(byte(0)) {
+				if refValue.CanAddr() {
+					return Bytes(refValue.Bytes()), true
+				}
+				tmp := reflect.New(refValue.Type())
+				tmp.Elem().Set(refValue)
+				return Bytes(tmp.Elem().Bytes()), true
+			}
 			return NewDynamicList(a, v), true
 		case reflect.Map:
 			return NewDynamicMap(a, v), true

@@ -335,7 +335,7 @@ func (assertion *AsyncAssertion) afterTimeout() <-chan time.Time {
 	if assertion.asyncType == AsyncAssertionTypeConsistently {
 		return time.After(assertion.g.DurationBundle.ConsistentlyDuration)
 	} else {
-		if assertion.ctx == nil {
+		if assertion.ctx == nil || assertion.g.DurationBundle.EnforceDefaultTimeoutsWhenUsingContexts {
 			return time.After(assertion.g.DurationBundle.EventuallyTimeout)
 		} else {
 			return nil
@@ -496,7 +496,15 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 		for _, err := range []error{actualErr, matcherErr} {
 			if pollingSignalErr, ok := AsPollingSignalError(err); ok {
 				if pollingSignalErr.IsStopTrying() {
-					fail("Told to stop trying")
+					if pollingSignalErr.IsSuccessful() {
+						if assertion.asyncType == AsyncAssertionTypeEventually {
+							fail("Told to stop trying (and ignoring call to Successfully(), as it is only relevant with Consistently)")
+						} else {
+							return true // early escape hatch for Consistently
+						}
+					} else {
+						fail("Told to stop trying")
+					}
 					return false
 				}
 				if pollingSignalErr.IsTryAgainAfter() {

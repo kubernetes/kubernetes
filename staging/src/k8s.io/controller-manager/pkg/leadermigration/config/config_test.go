@@ -83,6 +83,30 @@ controllerLeaders: []
 			},
 		},
 		{
+			name: "unknown field causes error with strict validation",
+			content: `
+apiVersion: controllermanager.config.k8s.io/v1alpha1
+kind: LeaderMigrationConfiguration
+leaderName: migration-120-to-121
+resourceLock: endpoints
+foo: bar
+controllerLeaders: []
+`,
+			expectErr: true,
+		},
+		{
+			name: "duplicate field causes error with strict validation",
+			content: `
+apiVersion: controllermanager.config.k8s.io/v1alpha1
+kind: LeaderMigrationConfiguration
+leaderName: migration-120-to-121
+resourceLock: endpoints
+resourceLock: endpoints1
+controllerLeaders: []
+`,
+			expectErr: true,
+		},
+		{
 			name: "withLeaders",
 			content: `
 apiVersion: controllermanager.config.k8s.io/v1alpha1

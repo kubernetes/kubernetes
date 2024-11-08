@@ -294,7 +294,7 @@ func NewProxier(ctx context.Context,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
-		conntrack:                conntrack.NewExec(exec),
+		conntrack:                conntrack.New(),
 		nfacct:                   nfacctRunner,
 		localDetector:            localDetector,
 		hostname:                 hostname,
@@ -1594,8 +1594,10 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.logger.Error(err, "Error syncing healthcheck endpoints")
 	}
 
-	// Finish housekeeping, clear stale conntrack entries for UDP Services
-	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
+	if endpointUpdateResult.ConntrackCleanupRequired {
+		// Finish housekeeping, clear stale conntrack entries for UDP Services
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+	}
 }
 
 func (proxier *Proxier) writeServiceToEndpointRules(natRules proxyutil.LineBuffer, svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {

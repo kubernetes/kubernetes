@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // DaemonSets.
 type DaemonSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.DaemonSetLister
+	Lister() extensionsv1beta1.DaemonSetLister
 }
 
 type daemonSetInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredDaemonSetInformer(client kubernetes.Interface, namespace string,
 				return client.ExtensionsV1beta1().DaemonSets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&extensionsv1beta1.DaemonSet{},
+		&apiextensionsv1beta1.DaemonSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *daemonSetInformer) defaultInformer(client kubernetes.Interface, resyncP
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensionsv1beta1.DaemonSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiextensionsv1beta1.DaemonSet{}, f.defaultInformer)
 }
 
-func (f *daemonSetInformer) Lister() v1beta1.DaemonSetLister {
-	return v1beta1.NewDaemonSetLister(f.Informer().GetIndexer())
+func (f *daemonSetInformer) Lister() extensionsv1beta1.DaemonSetLister {
+	return extensionsv1beta1.NewDaemonSetLister(f.Informer().GetIndexer())
 }

@@ -147,8 +147,7 @@ var (
 		"kubeproxy_iptables_ct_state_invalid_dropped_packets_total",
 		"packets dropped by iptables to work around conntrack problems",
 		nil, nil, metrics.ALPHA, "")
-	IPTablesCTStateInvalidDroppedNFAcctCounter   = "ct_state_invalid_dropped_pkts"
-	iptablesCTStateInvalidDroppedMetricCollector = newNFAcctMetricCollector(IPTablesCTStateInvalidDroppedNFAcctCounter, iptablesCTStateInvalidDroppedPacketsDescription)
+	IPTablesCTStateInvalidDroppedNFAcctCounter = "ct_state_invalid_dropped_pkts"
 
 	// IPTablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
 	// seen.
@@ -273,8 +272,7 @@ var (
 		"kubeproxy_iptables_localhost_nodeports_accepted_packets_total",
 		"Number of packets accepted on nodeports of loopback interface",
 		nil, nil, metrics.ALPHA, "")
-	LocalhostNodePortAcceptedNFAcctCounter     = "localhost_nps_accepted_pkts"
-	localhostNodePortsAcceptedMetricsCollector = newNFAcctMetricCollector(LocalhostNodePortAcceptedNFAcctCounter, localhostNodePortsAcceptedPacketsDescription)
+	LocalhostNodePortAcceptedNFAcctCounter = "localhost_nps_accepted_pkts"
 )
 
 var registerMetricsOnce sync.Once
@@ -299,9 +297,11 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 
 		switch mode {
 		case kubeproxyconfig.ProxyModeIPTables:
+			iptablesCTStateInvalidDroppedMetricCollector := newNFAcctMetricCollector(IPTablesCTStateInvalidDroppedNFAcctCounter, iptablesCTStateInvalidDroppedPacketsDescription)
 			if iptablesCTStateInvalidDroppedMetricCollector != nil {
 				legacyregistry.CustomMustRegister(iptablesCTStateInvalidDroppedMetricCollector)
 			}
+			localhostNodePortsAcceptedMetricsCollector := newNFAcctMetricCollector(LocalhostNodePortAcceptedNFAcctCounter, localhostNodePortsAcceptedPacketsDescription)
 			if localhostNodePortsAcceptedMetricsCollector != nil {
 				legacyregistry.CustomMustRegister(localhostNodePortsAcceptedMetricsCollector)
 			}

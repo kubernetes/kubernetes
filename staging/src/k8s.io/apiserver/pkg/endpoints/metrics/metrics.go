@@ -416,6 +416,33 @@ func Reset() {
 	}
 }
 
+// ResetLabelAllowLists resets the label allow lists for all metrics.
+// NOTE: This is only used for testing.
+func ResetLabelAllowLists() {
+	for _, metric := range metrics {
+		if counterVec, ok := metric.(*compbasemetrics.CounterVec); ok {
+			counterVec.ResetLabelAllowLists()
+			continue
+		}
+		if gaugeVec, ok := metric.(*compbasemetrics.GaugeVec); ok {
+			gaugeVec.ResetLabelAllowLists()
+			continue
+		}
+		if histogramVec, ok := metric.(*compbasemetrics.HistogramVec); ok {
+			histogramVec.ResetLabelAllowLists()
+			continue
+		}
+		if summaryVec, ok := metric.(*compbasemetrics.SummaryVec); ok {
+			summaryVec.ResetLabelAllowLists()
+			continue
+		}
+		if timingHistogramVec, ok := metric.(*compbasemetrics.TimingHistogramVec); ok {
+			timingHistogramVec.ResetLabelAllowLists()
+			continue
+		}
+	}
+}
+
 // UpdateInflightRequestMetrics reports concurrency metrics classified by
 // mutating vs Readonly.
 func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {

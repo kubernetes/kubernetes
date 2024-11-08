@@ -27,7 +27,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -116,43 +116,6 @@ func TestVolumeBinding(t *testing.T) {
 				podVolumeClaims: &PodVolumeClaims{
 					boundClaims: []*v1.PersistentVolumeClaim{
 						makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-					},
-					unboundClaimsDelayBinding:  []*v1.PersistentVolumeClaim{},
-					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{},
-				},
-				podVolumesByNode: map[string]*PodVolumes{},
-			},
-			wantFilterStatus: []*framework.Status{
-				nil,
-			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
-		},
-		{
-			name: "all bound with local volumes",
-			pod:  makePod("pod-a").withPVCVolume("pvc-a", "volume-a").withPVCVolume("pvc-b", "volume-b").Pod,
-			nodes: []*v1.Node{
-				makeNode("node-a").Node,
-			},
-			pvcs: []*v1.PersistentVolumeClaim{
-				makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-				makePVC("pvc-b", waitSC.Name).withBoundPV("pv-b").PersistentVolumeClaim,
-			},
-			pvs: []*v1.PersistentVolume{
-				makePV("pv-a", waitSC.Name).withPhase(v1.VolumeBound).withNodeAffinity(map[string][]string{
-					v1.LabelHostname: {"node-a"},
-				}).PersistentVolume,
-				makePV("pv-b", waitSC.Name).withPhase(v1.VolumeBound).withNodeAffinity(map[string][]string{
-					v1.LabelHostname: {"node-a"},
-				}).PersistentVolume,
-			},
-			wantPreFilterResult: &framework.PreFilterResult{
-				NodeNames: sets.New("node-a"),
-			},
-			wantStateAfterPreFilter: &stateData{
-				podVolumeClaims: &PodVolumeClaims{
-					boundClaims: []*v1.PersistentVolumeClaim{
-						makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
-						makePVC("pvc-b", waitSC.Name).withBoundPV("pv-b").PersistentVolumeClaim,
 					},
 					unboundClaimsDelayBinding:  []*v1.PersistentVolumeClaim{},
 					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{},
@@ -1403,6 +1366,191 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 			qhint, err := pl.isSchedulableAfterCSIStorageCapacityChange(logger, item.pod, item.oldCap, item.newCap)
 			if (err != nil) != item.wantErr {
 				t.Errorf("error is unexpectedly returned or not returned from isSchedulableAfterCSIStorageCapacityChange. wantErr: %v actual error: %q", item.wantErr, err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
+	table := []struct {
+		name   string
+		pod    *v1.Pod
+		newObj interface{}
+		oldObj interface{}
+		err    bool
+		expect framework.QueueingHint
+	}{
+		{
+			name: "pod has no CSIDriver",
+			pod:  makePod("pod-a").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name:   "unexpected objects are passed",
+			pod:    makePod("pod-a").Pod,
+			newObj: new(struct{}),
+			oldObj: new(struct{}),
+			err:    true,
+			expect: framework.Queue,
+		},
+		{
+			name: "driver name in pod and csidriver name are different",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(false),
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "original StorageCapacity is nil",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "original StorageCapacity is false",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(false),
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(false),
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "modified StorageCapacity is nil",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "modified StorageCapacity is true",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+
+		{
+			name: "modified StorageCapacity is false",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(false),
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: ptr.To(true),
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := pl.isSchedulableAfterCSIDriverChange(logger, item.pod, item.oldObj, item.newObj)
+			if (err != nil) != item.err {
+				t.Errorf("isSchedulableAfterCSINodeChange failed - got: %q", err)
 			}
 			if qhint != item.expect {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)

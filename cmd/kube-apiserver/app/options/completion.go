@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -45,27 +46,27 @@ type CompletedOptions struct {
 
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
-func (opts *ServerRunOptions) Complete() (CompletedOptions, error) {
-	if opts == nil {
+func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, error) {
+	if s == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
 
-	// process opts.ServiceClusterIPRange from list to Primary and Secondary
+	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
-	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(opts.ServiceClusterIPRanges)
+	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(s.ServiceClusterIPRanges)
 	if err != nil {
 		return CompletedOptions{}, err
 	}
-	controlplane, err := opts.Options.Complete([]string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
+	controlplane, err := s.Options.Complete(ctx, []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
 	if err != nil {
 		return CompletedOptions{}, err
 	}
 
 	completed := completedOptions{
 		CompletedOptions: controlplane,
-		CloudProvider:    opts.CloudProvider,
+		CloudProvider:    s.CloudProvider,
 
-		Extra: opts.Extra,
+		Extra: s.Extra,
 	}
 
 	completed.PrimaryServiceClusterIPRange = primaryServiceIPRange

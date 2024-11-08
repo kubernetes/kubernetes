@@ -99,7 +99,7 @@ func NewFakeStaticPodWaiter(errsToReturn map[string]error) apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+func (w *fakeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error {
 	return nil
 }
 
@@ -111,11 +111,6 @@ func (w *fakeWaiter) WaitForAPI() error {
 // WaitForPodsWithLabel just returns an error if set from errsToReturn
 func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 	return w.errsToReturn[waitForPodsWithLabel]
-}
-
-// WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForPodToDisappear(podName string) error {
-	return nil
 }
 
 // SetTimeout is a no-op; we don't use it in this implementation
@@ -792,7 +787,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			// Setup up basic requities
+			// Setup up basic requisites
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
 

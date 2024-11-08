@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientset "k8s.io/client-go/kubernetes"
@@ -42,9 +41,11 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -75,7 +76,7 @@ type Options struct {
 	Master string
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
-	ComponentGlobalsRegistry utilversion.ComponentGlobalsRegistry
+	ComponentGlobalsRegistry featuregate.ComponentGlobalsRegistry
 
 	// Flags hold the parsed CLI flags.
 	Flags *cliflag.NamedFlagSets
@@ -84,10 +85,10 @@ type Options struct {
 // NewOptions returns default scheduler app options.
 func NewOptions() *Options {
 	// make sure DefaultKubeComponent is registered in the DefaultComponentGlobalsRegistry.
-	if utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent) == nil {
+	if featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent) == nil {
 		featureGate := utilfeature.DefaultMutableFeatureGate
 		effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-		utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
+		utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 	}
 	o := &Options{
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
@@ -107,7 +108,7 @@ func NewOptions() *Options {
 		},
 		Metrics:                  metrics.NewOptions(),
 		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
+		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -279,8 +280,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
 
-	// TODO(#125980): remove in 1.32
-	effectiveVersion := o.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
+	effectiveVersion := o.ComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
 	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
 		errs = append(errs, err)
 	}

@@ -51,12 +51,12 @@ CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
-# if true, limited swap is being used instead of unlimited swap (default)
+# if true, limited swap is being used instead of no swap (default)
 LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.5.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.6.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -94,9 +94,12 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
+EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
+TOPOLOGY_MANAGER_POLICY=${TOPOLOGY_MANAGER_POLICY:-""}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
+LEADER_ELECT=${LEADER_ELECT:-false}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
@@ -166,6 +169,7 @@ function usage {
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
             echo "Example 4: FEATURE_GATES=CPUManagerPolicyOptions=true \\"
+            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
             echo "           CPUMANAGER_POLICY=\"static\" \\"
             echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
@@ -632,6 +636,7 @@ EOF
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --feature-gates="${FEATURE_GATES}" \
+      --emulated-version="${EMULATED_VERSION}" \
       --external-hostname="${EXTERNAL_HOSTNAME}" \
       --requestheader-username-headers=X-Remote-User \
       --requestheader-group-headers=X-Remote-Group \
@@ -692,13 +697,14 @@ function start_controller_manager {
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
+      --emulated-version="${EMULATED_VERSION}" \
       "${cloud_config_arg[@]}" \
       --authentication-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
-      --leader-elect=false \
+      --leader-elect="${LEADER_ELECT}" \
       --cert-dir="${CERT_DIR}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
@@ -726,7 +732,7 @@ function start_cloud_controller_manager {
       --configure-cloud-routes="${CONFIGURE_CLOUD_ROUTES}" \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
-      --leader-elect=false \
+      --leader-elect="${LEADER_ELECT}" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CLOUD_CTLRMGR_LOG}" 2>&1 &
     export CLOUD_CTLRMGR_PID=$!
 }
@@ -799,12 +805,14 @@ function wait_coredns_available(){
     exit 1
   fi
 
-  # bump log level
-  echo "6" | sudo tee /proc/sys/kernel/printk
+  if [[ "${ENABLE_DAEMON}" = false ]]; then
+    # bump log level
+    echo "6" | sudo tee /proc/sys/kernel/printk
 
-  # loop through and grab all things in dmesg
-  dmesg > "${LOG_DIR}/dmesg.log"
-  dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    # loop through and grab all things in dmesg
+    dmesg > "${LOG_DIR}/dmesg.log"
+    dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+  fi
 }
 
 function start_kubelet {
@@ -940,6 +948,11 @@ EOF
         parse_feature_gates "${FEATURE_GATES}"
       fi
 
+      # topology maanager policy
+      if [[ -n ${TOPOLOGY_MANAGER_POLICY} ]]; then
+        echo "topologyManagerPolicy: \"${TOPOLOGY_MANAGER_POLICY}\""
+      fi
+
       # cpumanager policy
       if [[ -n ${CPUMANAGER_POLICY} ]]; then
         echo "cpuManagerPolicy: \"${CPUMANAGER_POLICY}\""
@@ -1019,12 +1032,13 @@ kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
 leaderElection:
-  leaderElect: false
+  leaderElect: ${LEADER_ELECT}
 EOF
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
+      --emulated-version="${EMULATED_VERSION}" \
       --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &

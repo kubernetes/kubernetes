@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	apiappsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/apps/v1"
+	appsv1 "k8s.io/client-go/listers/apps/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Deployments.
 type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.DeploymentLister
+	Lister() appsv1.DeploymentLister
 }
 
 type deploymentInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 				return client.AppsV1().Deployments(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1.Deployment{},
+		&apiappsv1.Deployment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resync
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1.Deployment{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1.Deployment{}, f.defaultInformer)
 }
 
-func (f *deploymentInformer) Lister() v1.DeploymentLister {
-	return v1.NewDeploymentLister(f.Informer().GetIndexer())
+func (f *deploymentInformer) Lister() appsv1.DeploymentLister {
+	return appsv1.NewDeploymentLister(f.Informer().GetIndexer())
 }

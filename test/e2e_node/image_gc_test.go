@@ -50,8 +50,8 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 		_, is, err = getCRIClient()
 		framework.ExpectNoError(err)
 	})
-	ginkgo.AfterEach(func() {
-		framework.ExpectNoError(PrePullAllImages())
+	ginkgo.AfterEach(func(ctx context.Context) {
+		framework.ExpectNoError(PrePullAllImages(ctx))
 	})
 	ginkgo.Context("when ImageMaximumGCAge is set", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -94,8 +94,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
-			restartKubelet(true)
-			waitForKubeletToStart(ctx, f)
+			restartKubelet(ctx, true)
 
 			// Wait until the maxAge of the image after the kubelet is restarted to ensure it doesn't
 			// GC too early.

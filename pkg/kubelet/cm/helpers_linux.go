@@ -28,8 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -118,19 +117,18 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScaling)
-	// sum requests and limits.
-	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
+func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+	reqs := resource.PodRequests(allocatedPod, resource.PodResourcesOptions{
+		// pod is already configured to the allocated resources, and we explicitly don't want to use
+		// the actual resources if we're instantiating a resize.
+		UseStatusResources: false,
 	})
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
 
-	limits := resource.PodLimits(pod, resource.PodResourcesOptions{
-		InPlacePodVerticalScalingEnabled: inPlacePodVerticalScalingEnabled,
-		ContainerFn: func(res v1.ResourceList, containerType podutil.ContainerType) {
+	limits := resource.PodLimits(allocatedPod, resource.PodResourcesOptions{
+		ContainerFn: func(res v1.ResourceList, containerType resource.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false
 			}
@@ -165,7 +163,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 	}
 
 	// determine the qos class
-	qosClass := v1qos.GetPodQOS(pod)
+	qosClass := v1qos.GetPodQOS(allocatedPod)
 
 	// build the result
 	result := &ResourceConfig{}

@@ -10,5 +10,6 @@
   "propagationPolicy": "propagationPolicyValue",
   "dryRun": [
     "dryRunValue"
-  ]
+  ],
+  "ignoreStoreReadErrorWithClusterBreakingPotential": true
 }

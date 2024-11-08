@@ -29,7 +29,6 @@ const (
 
 	// CronJobScheduledTimestampAnnotation is the scheduled timestamp annotation for the Job.
 	// It records the original/expected scheduled timestamp for the running job, represented in RFC3339.
-	// The CronJob controller adds this annotation if the CronJobsScheduledAnnotation feature gate (beta in 1.28) is enabled.
 	CronJobScheduledTimestampAnnotation = labelPrefix + "cronjob-scheduled-timestamp"
 
 	JobCompletionIndexAnnotation = labelPrefix + "job-completion-index"
@@ -480,8 +479,8 @@ type JobSpec struct {
 	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
 	// This field is immutable.
 	//
-	// This field is alpha-level. The job controller accepts setting the field
-	// when the feature gate JobManagedBy is enabled (disabled by default).
+	// This field is beta-level. The job controller accepts setting the field
+	// when the feature gate JobManagedBy is enabled (enabled by default).
 	// +optional
 	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
 }

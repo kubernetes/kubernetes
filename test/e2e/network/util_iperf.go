@@ -80,12 +80,13 @@ func (i *IPerfResults) ToTSV() string {
 // NewIPerf parses an IPerf CSV output line into an IPerfCSVResult.
 func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	if len(csvLine) == 0 {
-		return nil, fmt.Errorf("No iperf output received in csv line")
+		return nil, fmt.Errorf("no iperf output received in csv line")
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
-	if len(slice) != 9 {
-		return nil, fmt.Errorf("Incorrect fields in the output: %v (%v out of 9)", slice, len(slice))
+	// iperf 2.19+ reports 15 fields, before it was just 9
+	if len(slice) != 15 {
+		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
 	}
 	i := IPerfCSVResult{}
 	i.date = slice.get(0)
@@ -127,17 +128,19 @@ type IPerf2EnhancedCSVResults struct {
 
 // ParseIPerf2EnhancedResultsFromCSV parses results from iperf2 when given the -e (--enhancedreports)
 // and `--reportstyle C` options.
-// Example output:
+// Example output for version < 2.19 (agnhost < 2.53):
 // 20201210141800.884,10.244.2.24,47880,10.96.114.79,6789,3,0.0-1.0,1677852672,13422821376
 // 20201210141801.881,10.244.2.24,47880,10.96.114.79,6789,3,1.0-2.0,1980760064,15846080512
 // 20201210141802.883,10.244.2.24,47880,10.96.114.79,6789,3,2.0-3.0,1886650368,15093202944
-// 20201210141803.882,10.244.2.24,47880,10.96.114.79,6789,3,3.0-4.0,2035417088,16283336704
-// 20201210141804.879,10.244.2.24,47880,10.96.114.79,6789,3,4.0-5.0,1922957312,15383658496
-// 20201210141805.881,10.244.2.24,47880,10.96.114.79,6789,3,5.0-6.0,2095316992,16762535936
-// 20201210141806.882,10.244.2.24,47880,10.96.114.79,6789,3,6.0-7.0,1741291520,13930332160
-// 20201210141807.879,10.244.2.24,47880,10.96.114.79,6789,3,7.0-8.0,1862926336,14903410688
-// 20201210141808.878,10.244.2.24,47880,10.96.114.79,6789,3,8.0-9.0,1821245440,14569963520
-// 20201210141809.849,10.244.2.24,47880,10.96.114.79,6789,3,0.0-10.0,18752208896,15052492511
+// Example output with version >= 2.19 (agnhost >= 2.53)
+// +0000:20240908113035.128,192.168.9.3,58256,192.168.9.4,5001,1,0.0-1.0,5220466748,41763733984,-1,-1,-1,-1,0,0
+// +0000:20240908113036.128,192.168.9.3,58256,192.168.9.4,5001,1,1.0-2.0,5127667712,41021341696,-1,-1,-1,-1,0,0
+// +0000:20240908113037.128,192.168.9.3,58256,192.168.9.4,5001,1,2.0-3.0,5127405568,41019244544,-1,-1,-1,-1,0,0
+// +0000:20240908113038.128,192.168.9.3,58256,192.168.9.4,5001,1,3.0-4.0,5173018624,41384148992,-1,-1,-1,-1,0,0
+// +0000:20240908113039.128,192.168.9.3,58256,192.168.9.4,5001,1,4.0-5.0,5245894656,41967157248,-1,-1,-1,-1,0,0
+// +0000:20240908113040.128,192.168.9.3,58256,192.168.9.4,5001,1,5.0-6.0,5213257728,41706061824,-1,-1,-1,-1,0,0
+// +0000:20240908113041.128,192.168.9.3,58256,192.168.9.4,5001,1,6.0-7.0,5113118720,40904949760,-1,-1,-1,-1,0,0
+// +0000:20240908113042.128,192.168.9.3,58256,192.168.9.4,5001,1,7.0-8.0,5242748928,41941991424,-1,-1,-1,-1,0,0
 func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults, error) {
 	var parsedResults []*IPerfCSVResult
 	for _, line := range strings.Split(output, "\n") {
@@ -147,7 +150,7 @@ func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults
 		}
 		parsedResults = append(parsedResults, parsed)
 	}
-	if parsedResults == nil || len(parsedResults) == 0 {
+	if len(parsedResults) == 0 {
 		return nil, fmt.Errorf("no results parsed from iperf2 output")
 	}
 	// format:
