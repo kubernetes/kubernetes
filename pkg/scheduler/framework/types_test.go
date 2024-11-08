@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
@@ -1513,12 +1514,264 @@ func TestFitError_Error(t *testing.T) {
 	}
 }
 
+var (
+	cpu500m       = resource.MustParse("500m")
+	mem500M       = resource.MustParse("500Mi")
+	cpu700m       = resource.MustParse("700m")
+	mem800M       = resource.MustParse("800Mi")
+	cpu1200m      = resource.MustParse("1200m")
+	mem1200M      = resource.MustParse("1200Mi")
+	restartAlways = v1.ContainerRestartPolicyAlways
+)
+
+func TestCalculateResources(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		containers               []v1.Container
+		podResources             *v1.ResourceRequirements
+		podLevelResourcesEnabled bool
+		expectedResource         Resource
+		expectedNon0CPU          int64
+		expectedNon0Mem          int64
+		initContainers           []v1.Container
+	}{
+		{
+			name:             "requestless container",
+			containers:       []v1.Container{{}},
+			expectedResource: Resource{},
+			expectedNon0CPU:  schedutil.DefaultMilliCPURequest,
+			expectedNon0Mem:  schedutil.DefaultMemoryRequest,
+		},
+		{
+			name: "1X container with requests",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue(),
+				Memory:   mem500M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: mem500M.Value(),
+		},
+		{
+			name: "2X container with requests",
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu700m,
+							v1.ResourceMemory: mem800M,
+						},
+					},
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+				Memory:   mem500M.Value() + mem800M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
+			expectedNon0Mem: mem500M.Value() + mem800M.Value(),
+		},
+		{
+			name:                     "1X container and 1X init container with pod-level requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu1200m,
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu1200m.MilliValue(),
+				Memory:   mem1200M.Value(),
+			},
+			expectedNon0CPU: cpu1200m.MilliValue(),
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container and 1X sidecar container with pod-level requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+					RestartPolicy: &restartAlways,
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    cpu1200m,
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu1200m.MilliValue(),
+				Memory:   mem1200M.Value(),
+			},
+			expectedNon0CPU: cpu1200m.MilliValue(),
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container with pod-level memory requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: Resource{
+				Memory: mem1200M.Value(),
+			},
+			expectedNon0CPU: schedutil.DefaultMilliCPURequest,
+			expectedNon0Mem: mem1200M.Value(),
+		},
+		{
+			name:                     "1X container with pod-level cpu requests",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: cpu500m,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU: cpu500m.MilliValue(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: schedutil.DefaultMemoryRequest,
+		},
+		{
+			name:                     "1X container unsupported resources and pod-level supported resources",
+			podLevelResourcesEnabled: true,
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: mem500M,
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: mem800M,
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: cpu500m,
+				},
+			},
+			expectedResource: Resource{
+				MilliCPU:         cpu500m.MilliValue(),
+				EphemeralStorage: mem800M.Value(),
+			},
+			expectedNon0CPU: cpu500m.MilliValue(),
+			expectedNon0Mem: schedutil.DefaultMemoryRequest,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:      tc.podResources,
+					Containers:     tc.containers,
+					InitContainers: tc.initContainers,
+				},
+			}
+			res, non0CPU, non0Mem := calculateResource(pod)
+			if !reflect.DeepEqual(res, tc.expectedResource) {
+				t.Errorf("Test: %s expected resource: %+v, got: %+v", tc.name, tc.expectedResource, res)
+			}
+
+			if non0CPU != tc.expectedNon0CPU {
+				t.Errorf("Test: %s expected non0CPU: %d, got: %d", tc.name, tc.expectedNon0CPU, non0CPU)
+			}
+
+			if non0Mem != tc.expectedNon0Mem {
+				t.Errorf("Test: %s expected non0Mem: %d, got: %d", tc.name, tc.expectedNon0Mem, non0Mem)
+			}
+		})
+	}
+}
+
 func TestCalculatePodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	cpu500m := resource.MustParse("500m")
-	mem500M := resource.MustParse("500Mi")
-	cpu700m := resource.MustParse("700m")
-	mem800M := resource.MustParse("800Mi")
 	testpod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "pod_resize_test",

@@ -22,7 +22,9 @@ package kuberuntime
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 
 	resourcehelper "k8s.io/component-helpers/resource"
 )
@@ -44,6 +46,8 @@ func (m *kubeGenericRuntimeManager) convertOverheadToLinuxResources(pod *v1.Pod)
 func (m *kubeGenericRuntimeManager) calculateSandboxResources(pod *v1.Pod) *runtimeapi.LinuxContainerResources {
 	opts := resourcehelper.PodResourcesOptions{
 		ExcludeOverhead: true,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
 	lim := resourcehelper.PodLimits(pod, opts)

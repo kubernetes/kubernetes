@@ -22,15 +22,19 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestComputePodQOS(t *testing.T) {
 	testCases := []struct {
-		pod      *v1.Pod
-		expected v1.PodQOSClass
+		pod                      *v1.Pod
+		expected                 v1.PodQOSClass
+		podLevelResourcesEnabled bool
 	}{
 		{
 			pod: newPod("guaranteed", []v1.Container{
@@ -126,8 +130,76 @@ func TestComputePodQOS(t *testing.T) {
 				}),
 			expected: v1.PodQOSBurstable,
 		},
+		{
+			pod: newPodWithResources(
+				"guaranteed-with-pod-level-resources",
+				[]v1.Container{
+					newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				},
+				getResourceRequirements(getResourceList("10m", "100Mi"), getResourceList("10m", "100Mi")),
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"guaranteed-with-pod-and-container-level-resources",
+				[]v1.Container{
+					newContainer("burstable", getResourceList("3m", "10Mi"), getResourceList("5m", "20Mi")),
+				},
+				getResourceRequirements(getResourceList("10m", "100Mi"), getResourceList("10m", "100Mi")),
+			),
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"burstable-with-pod-level-resources",
+				[]v1.Container{
+					newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+				},
+				getResourceRequirements(getResourceList("10m", "10Mi"), getResourceList("20m", "50Mi")),
+			),
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"burstable-with-pod-and-container-level-resources",
+				[]v1.Container{
+					newContainer("burstable", getResourceList("5m", "10Mi"), getResourceList("5m", "10Mi")),
+				},
+				getResourceRequirements(getResourceList("10m", "10Mi"), getResourceList("20m", "50Mi")),
+			),
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"burstable-with-pod-and-container-level-requests",
+				[]v1.Container{
+					newContainer("burstable", getResourceList("5m", "10Mi"), getResourceList("", "")),
+				},
+				getResourceRequirements(getResourceList("10m", "10Mi"), getResourceList("", "")),
+			),
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			pod: newPodWithResources(
+				"burstable-with-pod-and-container-level-resources-2",
+				[]v1.Container{
+					newContainer("burstable", getResourceList("5m", "10Mi"), getResourceList("", "")),
+					newContainer("guaranteed", getResourceList("5m", "10Mi"), getResourceList("5m", "10Mi")),
+				},
+				getResourceRequirements(getResourceList("10m", "10Mi"), getResourceList("5m", "")),
+			),
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+		},
 	}
 	for id, testCase := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
 		if actual := ComputePodQOS(testCase.pod); testCase.expected != actual {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
@@ -158,17 +230,17 @@ func addResource(rName, value string, rl v1.ResourceList) v1.ResourceList {
 	return rl
 }
 
-func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
+func getResourceRequirements(requests, limits v1.ResourceList) *v1.ResourceRequirements {
 	res := v1.ResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
-	return res
+	return &res
 }
 
 func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
 	return v1.Container{
 		Name:      name,
-		Resources: getResourceRequirements(requests, limits),
+		Resources: *(getResourceRequirements(requests, limits)),
 	}
 }
 
@@ -181,6 +253,14 @@ func newPod(name string, containers []v1.Container) *v1.Pod {
 			Containers: containers,
 		},
 	}
+}
+
+func newPodWithResources(name string, containers []v1.Container, podResources *v1.ResourceRequirements) *v1.Pod {
+	pod := newPod(name, containers)
+	if podResources != nil {
+		pod.Spec.Resources = podResources
+	}
+	return pod
 }
 
 func newPodWithInitContainers(name string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {

@@ -277,6 +277,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
 
+	// owner: sig-node
+	// Marks a test for for pod-level resources feature that requires
+	// PodLevelResources feature gate to be enabled.
+	PodLevelResources = framework.WithFeature(framework.ValidFeatures.Add("PodLevelResources"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodLifecycleSleepAction = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepAction"))
 

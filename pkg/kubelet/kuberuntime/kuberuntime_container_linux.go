@@ -35,6 +35,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
@@ -94,6 +95,34 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	return lc, nil
 }
 
+// getCPULimit returns the memory limit for the container to be used to calculate
+// Linux Container Resources.
+func getCPULimit(pod *v1.Pod, container *v1.Container) *resource.Quantity {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// When container-level CPU limit is not set, the pod-level
+		// limit is used in the calculation for components relying on linux resource limits
+		// to be set.
+		if container.Resources.Limits.Cpu().IsZero() {
+			return pod.Spec.Resources.Limits.Cpu()
+		}
+	}
+	return container.Resources.Limits.Cpu()
+}
+
+// getMemoryLimit returns the memory limit for the container to be used to calculate
+// Linux Container Resources.
+func getMemoryLimit(pod *v1.Pod, container *v1.Container) *resource.Quantity {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// When container-level memory limit is not set, the pod-level
+		// limit is used in the calculation for components relying on linux resource limits
+		// to be set.
+		if container.Resources.Limits.Memory().IsZero() {
+			return pod.Spec.Resources.Limits.Memory()
+		}
+	}
+	return container.Resources.Limits.Memory()
+}
+
 // generateLinuxContainerResources generates linux container resources config for runtime
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
 	// set linux container resources
@@ -101,7 +130,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+
+	memoryLimit := getMemoryLimit(pod, container)
+	cpuLimit := getCPULimit(pod, container)
+	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit)
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))

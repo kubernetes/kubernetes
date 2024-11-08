@@ -918,6 +918,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: PodLevelResources
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: PodLifecycleSleepAction
   versionedSpecs:
   - default: false

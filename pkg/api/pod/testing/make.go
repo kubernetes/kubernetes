@@ -72,6 +72,12 @@ func SetResourceVersion(rv string) Tweak {
 	}
 }
 
+func SetPodResources(resources *api.ResourceRequirements) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.Resources = resources
+	}
+}
+
 func SetContainers(containers ...api.Container) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.Containers = containers

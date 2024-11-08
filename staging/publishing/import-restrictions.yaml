@@ -13,6 +13,7 @@
   - k8s.io/utils/ptr
   - k8s.io/utils/net
   - k8s.io/klog
+  - k8s.io/component-helpers/resource
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.

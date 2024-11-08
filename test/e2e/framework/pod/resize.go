@@ -243,22 +243,10 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo)
 	return utilerrors.NewAggregate(errs)
 }
 
-// isPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
-// TODO: Deduplicate this function with NPD cluster e2e test:
-// https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func isPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
-	cmd := "mount -t cgroup2"
-	out, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
-	if err != nil {
-		return false
-	}
-	return len(out) != 0
-}
-
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 	if podOnCgroupv2Node == nil {
-		value := isPodOnCgroupv2Node(f, pod)
+		value := IsPodOnCgroupv2Node(f, pod)
 		podOnCgroupv2Node = &value
 	}
 	cgroupMemLimit := Cgroupv2MemLimit
@@ -269,21 +257,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 		cgroupCPULimit = CgroupCPUQuota
 		cgroupCPURequest = CgroupCPUShares
 	}
-	verifyCgroupValue := func(cName, cgPath, expectedCgValue string) error {
-		cmd := fmt.Sprintf("head -n 1 %s", cgPath)
-		framework.Logf("Namespace %s Pod %s Container %s - looking for cgroup value %s in path %s",
-			pod.Namespace, pod.Name, cName, expectedCgValue, cgPath)
-		cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
-		if err != nil {
-			return fmt.Errorf("failed to read cgroup %q for container %s: %w", cgPath, cName, err)
-		}
-		cgValue = strings.Trim(cgValue, "\n")
-		if cgValue != expectedCgValue {
-			return fmt.Errorf("container %s cgroup %q doesn't match expected: got %q want %q",
-				cName, cgPath, cgValue, expectedCgValue)
-		}
-		return nil
-	}
+
 	var errs []error
 	for _, ci := range tcInfo {
 		if ci.Resources == nil {
@@ -320,10 +294,10 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
 			}
 			if expectedMemLimitString != "0" {
-				errs = append(errs, verifyCgroupValue(ci.Name, cgroupMemLimit, expectedMemLimitString))
+				errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
 			}
-			errs = append(errs, verifyCgroupValue(ci.Name, cgroupCPULimit, expectedCPULimitString))
-			errs = append(errs, verifyCgroupValue(ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimitString))
+			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
 		}
 	}
 	return utilerrors.NewAggregate(errs)
