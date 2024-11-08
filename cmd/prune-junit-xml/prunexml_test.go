@@ -96,6 +96,18 @@ func TestPruneTESTS(t *testing.T) {
 			<failure message="Failed" type="">FailureContent</failure>
 		</testcase>
 	</testsuite>
+	<testsuite tests="3" failures="2" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery2" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000"></testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestSchedulerInformers" time="-0.000000">
+			<failure message="FailedA" type="">FailureContentA</failure>
+		</testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestSchedulerInformers2" time="-0.000000">
+			<failure message="FailedB" type="">FailureContentB</failure>
+		</testcase>
+	</testsuite>
 </testsuites>`
 
 	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
@@ -111,7 +123,15 @@ func TestPruneTESTS(t *testing.T) {
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
 		<testcase classname="k8s.io/kubernetes/test/integration" name="apimachinery" time="30.050000">
-			<failure message="Failed;" type="">FailureContent;</failure>
+			<failure message="Failed" type="">FailureContent</failure>
+		</testcase>
+	</testsuite>
+	<testsuite tests="3" failures="2" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery2" timestamp="">
+		<properties>
+			<property name="go.version" value="go1.18 linux/amd64"></property>
+		</properties>
+		<testcase classname="k8s.io/kubernetes/test/integration" name="apimachinery2" time="30.050000">
+			<failure message="FailedA; FailedB" type="">FailureContentA; FailureContentB</failure>
 		</testcase>
 	</testsuite>
 </testsuites>`

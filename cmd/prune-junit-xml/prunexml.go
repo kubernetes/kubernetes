@@ -139,9 +139,9 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 			// The top level testcase element in a JUnit xml file does not have the / character.
 			if testcase.Failure != nil {
 				failflag = true
-				updatedTestcaseFailure.Message = updatedTestcaseFailure.Message + testcase.Failure.Message + ";"
-				updatedTestcaseFailure.Contents = updatedTestcaseFailure.Contents + testcase.Failure.Contents + ";"
-				updatedTestcaseFailure.Type = updatedTestcaseFailure.Type + testcase.Failure.Type
+				updatedTestcaseFailure.Message = joinTexts(updatedTestcaseFailure.Message, testcase.Failure.Message)
+				updatedTestcaseFailure.Contents = joinTexts(updatedTestcaseFailure.Contents, testcase.Failure.Contents)
+				updatedTestcaseFailure.Type = joinTexts(updatedTestcaseFailure.Type, testcase.Failure.Type)
 			}
 		}
 		if failflag {
@@ -151,6 +151,18 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 		updatedTestsuites = append(updatedTestsuites, suite)
 	}
 	suites.Suites = updatedTestsuites
+}
+
+// joinTexts returns "<a>; <b>" if both are non-empty,
+// otherwise just the non-empty string, if there is one.
+func joinTexts(a, b string) string {
+	if a == "" {
+		return b
+	}
+	if b == "" {
+		return a
+	}
+	return a + "; " + b
 }
 
 func fetchXML(xmlReader io.Reader) (*junitxml.JUnitTestSuites, error) {
