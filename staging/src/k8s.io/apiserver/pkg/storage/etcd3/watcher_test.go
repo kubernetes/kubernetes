@@ -112,6 +112,12 @@ func TestProgressNotify(t *testing.T) {
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
 
+func TestWatchWithUnsafeDelete(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+}
+
 // TestWatchDispatchBookmarkEvents makes sure that
 // setting allowWatchBookmarks query param against
 // etcd implementation doesn't have any effect.

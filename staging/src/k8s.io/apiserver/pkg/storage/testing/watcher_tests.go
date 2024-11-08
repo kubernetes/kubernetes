@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -405,6 +406,61 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckEventType(t, w, watch.Error)
+}
+
+func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+	key := computePodKey(obj)
+
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
+		t.Fatalf("failed to create object in the store: %v", err)
+	}
+
+	// Compute the initial resource version from which we can start watching later.
+	list := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	if err := store.GetList(ctx, "/pods", storageOpts, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Now trigger watch error by injecting failing transformer.
+	revertTransformer := store.CorruptTransformer()
+	defer revertTransformer()
+
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	// normal deletetion should fail
+	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err == nil {
+		t.Fatalf("Expected normal Delete to fail")
+	}
+	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{IgnoreStoreReadError: true}); err != nil {
+		t.Fatalf("Expected unsafe Delete to succeed, but got: %v", err)
+	}
+
+	testCheckResultFunc(t, w, func(got watch.Event) {
+		if want, got := watch.Error, got.Type; want != got {
+			t.Errorf("Expected event type: %q, but got: %q", want, got)
+		}
+		switch v := got.Object.(type) {
+		case *metav1.Status:
+			if want, got := metav1.StatusReasonStoreReadError, v.Reason; want != got {
+				t.Errorf("Expected reason: %q, but got: %q", want, got)
+			}
+			if want := "saw a DELETED event, but object data is corrupt"; !strings.Contains(v.Message, want) {
+				t.Errorf("Expected Message to contain: %q, but got: %q", want, v.Message)
+			}
+		default:
+			t.Errorf("expected an metav1 Status object, but got: %v", got.Object)
+		}
+	})
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {

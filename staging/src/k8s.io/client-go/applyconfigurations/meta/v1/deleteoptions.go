@@ -25,12 +25,13 @@ import (
 // DeleteOptionsApplyConfiguration represents a declarative configuration of the DeleteOptions type for use
 // with apply.
 type DeleteOptionsApplyConfiguration struct {
-	TypeMetaApplyConfiguration `json:",inline"`
-	GracePeriodSeconds         *int64                           `json:"gracePeriodSeconds,omitempty"`
-	Preconditions              *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
-	OrphanDependents           *bool                            `json:"orphanDependents,omitempty"`
-	PropagationPolicy          *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
-	DryRun                     []string                         `json:"dryRun,omitempty"`
+	TypeMetaApplyConfiguration                       `json:",inline"`
+	GracePeriodSeconds                               *int64                           `json:"gracePeriodSeconds,omitempty"`
+	Preconditions                                    *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
+	OrphanDependents                                 *bool                            `json:"orphanDependents,omitempty"`
+	PropagationPolicy                                *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
+	DryRun                                           []string                         `json:"dryRun,omitempty"`
+	IgnoreStoreReadErrorWithClusterBreakingPotential *bool                            `json:"ignoreStoreReadErrorWithClusterBreakingPotential,omitempty"`
 }
 
 // DeleteOptionsApplyConfiguration constructs a declarative configuration of the DeleteOptions type for use with
@@ -97,5 +98,13 @@ func (b *DeleteOptionsApplyConfiguration) WithDryRun(values ...string) *DeleteOp
 	for i := range values {
 		b.DryRun = append(b.DryRun, values[i])
 	}
+	return b
+}
+
+// WithIgnoreStoreReadErrorWithClusterBreakingPotential sets the IgnoreStoreReadErrorWithClusterBreakingPotential field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the IgnoreStoreReadErrorWithClusterBreakingPotential field is set to the value of the last call.
+func (b *DeleteOptionsApplyConfiguration) WithIgnoreStoreReadErrorWithClusterBreakingPotential(value bool) *DeleteOptionsApplyConfiguration {
+	b.IgnoreStoreReadErrorWithClusterBreakingPotential = &value
 	return b
 }

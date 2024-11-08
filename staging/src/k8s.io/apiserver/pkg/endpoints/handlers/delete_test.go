@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,17 +26,24 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/admission"
 	auditapis "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type mockCodecs struct {
@@ -272,4 +280,249 @@ func (n *fakeSerializer) EncoderForVersion(serializer runtime.Encoder, gv runtim
 }
 func (n *fakeSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	return n.serializer
+}
+
+func TestAuthorizeUnsafeDelete(t *testing.T) {
+	const verbWant = "unsafe-delete-ignore-read-errors"
+	tests := []struct {
+		name    string
+		reqInfo *request.RequestInfo
+		attr    admission.Attributes
+		authz   authorizer.Authorizer
+		err     func(admission.Attributes) error
+	}{
+		{
+			name:  "operation is not delete, admit",
+			attr:  newAttributes(attributes{operation: admission.Update}),
+			authz: nil, // Authorize should not be invoked
+		},
+		{
+			name: "feature enabled, delete, operation option is nil, admit",
+			attr: newAttributes(attributes{
+				operation:        admission.Delete,
+				operationOptions: nil,
+			}),
+			authz: nil, // Authorize should not be invoked
+		},
+		{
+			name: "delete, operation option is not a match, forbid",
+			attr: newAttributes(attributes{
+				operation:        admission.Delete,
+				operationOptions: &metav1.PatchOptions{},
+			}),
+			authz: nil, // Authorize should not be invoked
+			err: func(admission.Attributes) error {
+				return errors.NewInternalError(fmt.Errorf("expected an option of type: %T, but got: %T", &metav1.DeleteOptions{}, &metav1.PatchOptions{}))
+			},
+		},
+		{
+			name: "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is nil, admit",
+			attr: newAttributes(attributes{
+				operation: admission.Delete,
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: nil,
+				},
+			}),
+			authz: nil, // Authorize should not be invoked
+		},
+		{
+			name: "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is false, admit",
+			attr: newAttributes(attributes{
+				operation: admission.Delete,
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](false),
+				},
+			}),
+			authz: nil, // Authorize should not be invoked
+		},
+		{
+			name:    "feature enabled, delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, no RequestInfo in request context, forbid",
+			reqInfo: nil,
+			attr: newAttributes(attributes{
+				operation: admission.Delete,
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: nil,
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("no RequestInfo found in the context"))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, subresource request, forbid",
+			reqInfo: &request.RequestInfo{IsResourceRequest: true},
+			attr: newAttributes(attributes{
+				operation:   admission.Delete,
+				subresource: "foo",
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: nil,
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("ignoreStoreReadErrorWithClusterBreakingPotential delete option is not allowed on a subresource or non-resource request"))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, subresource request, forbid",
+			reqInfo: &request.RequestInfo{IsResourceRequest: false},
+			attr: newAttributes(attributes{
+				operation:   admission.Delete,
+				subresource: "",
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: nil,
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("ignoreStoreReadErrorWithClusterBreakingPotential delete option is not allowed on a subresource or non-resource request"))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, authorizer returns error, forbid",
+			reqInfo: &request.RequestInfo{IsResourceRequest: true},
+			attr: newAttributes(attributes{
+				subresource: "",
+				operation:   admission.Delete,
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: &fakeAuthorizer{err: fmt.Errorf("unexpected error")},
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("error while checking permission for %q, %w", verbWant, fmt.Errorf("unexpected error")))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, user does not have permission, forbid",
+			reqInfo: &request.RequestInfo{IsResourceRequest: true},
+			attr: newAttributes(attributes{
+				operation:   admission.Delete,
+				subresource: "",
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: &fakeAuthorizer{
+				decision: authorizer.DecisionDeny,
+				reason:   "does not have permission",
+			},
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", verbWant, "does not have permission"))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, authorizer gives no opinion, forbid",
+			reqInfo: &request.RequestInfo{IsResourceRequest: true},
+			attr: newAttributes(attributes{
+				operation:   admission.Delete,
+				subresource: "",
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+			}),
+			authz: &fakeAuthorizer{
+				decision: authorizer.DecisionNoOpinion,
+				reason:   "no opinion",
+			},
+			err: func(attr admission.Attributes) error {
+				return admission.NewForbidden(attr, fmt.Errorf("not permitted to do %q, reason: %s", verbWant, "no opinion"))
+			},
+		},
+		{
+			name:    "delete, IgnoreStoreReadErrorWithClusterBreakingPotential is true, user has permission, admit",
+			reqInfo: &request.RequestInfo{IsResourceRequest: true},
+			attr: newAttributes(attributes{
+				operation:   admission.Delete,
+				subresource: "",
+				operationOptions: &metav1.DeleteOptions{
+					IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+				},
+				userInfo: &user.DefaultInfo{Name: "foo"},
+			}),
+			authz: &fakeAuthorizer{
+				decision: authorizer.DecisionAllow,
+				reason:   "permitted",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var want error
+			if test.err != nil {
+				want = test.err(test.attr)
+			}
+
+			ctx := context.Background()
+			if test.reqInfo != nil {
+				ctx = request.WithRequestInfo(ctx, test.reqInfo)
+			}
+
+			// wrap the attributes so we can access the annotations set during admission
+			attrs := &fakeAttributes{Attributes: test.attr}
+			got := authorizeUnsafeDelete(ctx, attrs, test.authz)
+			switch {
+			case want != nil:
+				if got == nil || want.Error() != got.Error() {
+					t.Errorf("expected error: %v, but got: %v", want, got)
+				}
+			default:
+				if got != nil {
+					t.Errorf("expected no error, but got: %v", got)
+				}
+			}
+		})
+	}
+}
+
+// attributes of interest for this test
+type attributes struct {
+	operation        admission.Operation
+	operationOptions runtime.Object
+	userInfo         user.Info
+	subresource      string
+}
+
+func newAttributes(attr attributes) admission.Attributes {
+	return admission.NewAttributesRecord(
+		nil,                           // this plugin should never inspect the object
+		nil,                           // old object, this plugin should never inspect it
+		schema.GroupVersionKind{},     // this plugin should never inspect kind
+		"",                            // namespace, leave it empty, this plugin only passes it along to the authorizer
+		"",                            // name, leave it empty, this plugin only passes it along to the authorizer
+		schema.GroupVersionResource{}, // resource, leave it empty, this plugin only passes it along to the authorizer
+		attr.subresource,
+		attr.operation,
+		attr.operationOptions,
+		false, // dryRun, this plugin should never inspect this attribute
+		attr.userInfo)
+}
+
+type fakeAttributes struct {
+	admission.Attributes
+	annotations map[string]string
+}
+
+func (f *fakeAttributes) AddAnnotation(key, value string) error {
+	if err := f.Attributes.AddAnnotation(key, value); err != nil {
+		return err
+	}
+
+	if len(f.annotations) == 0 {
+		f.annotations = map[string]string{}
+	}
+	f.annotations[key] = value
+	return nil
+}
+
+type fakeAuthorizer struct {
+	decision authorizer.Decision
+	reason   string
+	err      error
+}
+
+func (authorizer fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	return authorizer.decision, authorizer.reason, authorizer.err
 }

@@ -2147,6 +2147,11 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
+type InterfaceWithCorruptTransformer interface {
+	storage.Interface
+	CorruptTransformer() func()
+}
+
 func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
 	nextPod := func(index uint32) (string, *example.Pod) {
 		obj := &example.Pod{
