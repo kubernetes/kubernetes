@@ -32,7 +32,7 @@ import (
 )
 
 // FakeClient represents a fake client
-type FakeClient[T runtime.Object] struct {
+type FakeClient[T objectWithMeta] struct {
 	*testing.Fake
 	ns        string
 	resource  schema.GroupVersionResource
@@ -41,26 +41,26 @@ type FakeClient[T runtime.Object] struct {
 }
 
 // FakeClientWithList represents a fake client with support for lists.
-type FakeClientWithList[T runtime.Object, L runtime.Object] struct {
+type FakeClientWithList[T objectWithMeta, L runtime.Object] struct {
 	*FakeClient[T]
 	alsoFakeLister[T, L]
 }
 
 // FakeClientWithApply represents a fake client with support for apply declarative configurations.
-type FakeClientWithApply[T runtime.Object, C namedObject] struct {
+type FakeClientWithApply[T objectWithMeta, C namedObject] struct {
 	*FakeClient[T]
 	alsoFakeApplier[T, C]
 }
 
 // FakeClientWithListAndApply represents a fake client with support for lists and apply declarative configurations.
-type FakeClientWithListAndApply[T runtime.Object, L runtime.Object, C namedObject] struct {
+type FakeClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject] struct {
 	*FakeClient[T]
 	alsoFakeLister[T, L]
 	alsoFakeApplier[T, C]
 }
 
 // Helper types for composition
-type alsoFakeLister[T runtime.Object, L runtime.Object] struct {
+type alsoFakeLister[T objectWithMeta, L runtime.Object] struct {
 	client       *FakeClient[T]
 	newList      func() L
 	copyListMeta func(L, L)
@@ -68,20 +68,20 @@ type alsoFakeLister[T runtime.Object, L runtime.Object] struct {
 	setItems     func(L, []T)
 }
 
-type alsoFakeApplier[T runtime.Object, C namedObject] struct {
+type alsoFakeApplier[T objectWithMeta, C namedObject] struct {
 	client *FakeClient[T]
 }
 
 // NewFakeClient constructs a fake client, namespaced or not, with no support for lists or apply.
 // Non-namespaced clients are constructed by passing an empty namespace ("").
-func NewFakeClient[T runtime.Object](
+func NewFakeClient[T objectWithMeta](
 	fake *testing.Fake, namespace string, resource schema.GroupVersionResource, kind schema.GroupVersionKind, emptyObjectCreator func() T,
 ) *FakeClient[T] {
 	return &FakeClient[T]{fake, namespace, resource, kind, emptyObjectCreator}
 }
 
 // NewFakeClientWithList constructs a namespaced client with support for lists.
-func NewFakeClientWithList[T runtime.Object, L runtime.Object](
+func NewFakeClientWithList[T objectWithMeta, L runtime.Object](
 	fake *testing.Fake, namespace string, resource schema.GroupVersionResource, kind schema.GroupVersionKind, emptyObjectCreator func() T,
 	emptyListCreator func() L, listMetaCopier func(L, L), itemGetter func(L) []T, itemSetter func(L, []T),
 ) *FakeClientWithList[T, L] {
@@ -93,7 +93,7 @@ func NewFakeClientWithList[T runtime.Object, L runtime.Object](
 }
 
 // NewFakeClientWithApply constructs a namespaced client with support for apply declarative configurations.
-func NewFakeClientWithApply[T runtime.Object, C namedObject](
+func NewFakeClientWithApply[T objectWithMeta, C namedObject](
 	fake *testing.Fake, namespace string, resource schema.GroupVersionResource, kind schema.GroupVersionKind, emptyObjectCreator func() T,
 ) *FakeClientWithApply[T, C] {
 	fakeClient := NewFakeClient[T](fake, namespace, resource, kind, emptyObjectCreator)
@@ -104,7 +104,7 @@ func NewFakeClientWithApply[T runtime.Object, C namedObject](
 }
 
 // NewFakeClientWithListAndApply constructs a client with support for lists and applying declarative configurations.
-func NewFakeClientWithListAndApply[T runtime.Object, L runtime.Object, C namedObject](
+func NewFakeClientWithListAndApply[T objectWithMeta, L runtime.Object, C namedObject](
 	fake *testing.Fake, namespace string, resource schema.GroupVersionResource, kind schema.GroupVersionKind, emptyObjectCreator func() T,
 	emptyListCreator func() L, listMetaCopier func(L, L), itemGetter func(L) []T, itemSetter func(L, []T),
 ) *FakeClientWithListAndApply[T, L, C] {
