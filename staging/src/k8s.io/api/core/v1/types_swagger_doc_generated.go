@@ -802,6 +802,7 @@ func (GCEPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_GRPCAction = map[string]string{
+	"":        "GRPCAction specifies an action involving a GRPC service.",
 	"port":    "Port number of the gRPC service. Number must be in the range 1 to 65535.",
 	"service": "Service is the name of the service to place in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).\n\nIf this is not specified, the default behavior is defined by gRPC.",
 }
@@ -967,10 +968,10 @@ func (Lifecycle) SwaggerDoc() map[string]string {
 
 var map_LifecycleHandler = map[string]string{
 	"":          "LifecycleHandler defines a specific action that should be taken in a lifecycle hook. One and only one of the fields, except TCPSocket must be specified.",
-	"exec":      "Exec specifies the action to take.",
-	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.",
-	"sleep":     "Sleep represents the duration that the container should sleep before being terminated.",
+	"exec":      "Exec specifies a command to execute in the container.",
+	"httpGet":   "HTTPGet specifies an HTTP GET request to perform.",
+	"tcpSocket": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for backward compatibility. There is no validation of this field and lifecycle hooks will fail at runtime when it is specified.",
+	"sleep":     "Sleep represents a duration that the container should sleep.",
 }
 
 func (LifecycleHandler) SwaggerDoc() map[string]string {
@@ -1104,9 +1105,12 @@ func (Namespace) SwaggerDoc() map[string]string {
 }
 
 var map_NamespaceCondition = map[string]string{
-	"":       "NamespaceCondition contains details about state of namespace.",
-	"type":   "Type of namespace controller condition.",
-	"status": "Status of the condition, one of True, False, Unknown.",
+	"":                   "NamespaceCondition contains details about state of namespace.",
+	"type":               "Type of namespace controller condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
 }
 
 func (NamespaceCondition) SwaggerDoc() map[string]string {
@@ -1398,6 +1402,8 @@ func (PersistentVolumeClaim) SwaggerDoc() map[string]string {
 
 var map_PersistentVolumeClaimCondition = map[string]string{
 	"":                   "PersistentVolumeClaimCondition contains details about state of pvc",
+	"type":               "Type is the type of the condition. More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about",
+	"status":             "Status is the status of the condition. Can be True, False, Unknown. More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required",
 	"lastProbeTime":      "lastProbeTime is the time we probed the condition.",
 	"lastTransitionTime": "lastTransitionTime is the time the condition transitioned from one status to another.",
 	"reason":             "reason is a unique, this should be a short, machine understandable string that gives the reason for condition's last transition. If it reports \"Resizing\" that means the underlying persistent volume is being resized.",
@@ -1634,8 +1640,9 @@ func (PodDNSConfig) SwaggerDoc() map[string]string {
 }
 
 var map_PodDNSConfigOption = map[string]string{
-	"":     "PodDNSConfigOption defines DNS resolver options of a pod.",
-	"name": "Required.",
+	"":      "PodDNSConfigOption defines DNS resolver options of a pod.",
+	"name":  "Name is this DNS resolver option's name. Required.",
+	"value": "Value is this DNS resolver option's value.",
 }
 
 func (PodDNSConfigOption) SwaggerDoc() map[string]string {
@@ -1901,6 +1908,7 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PortStatus = map[string]string{
+	"":         "PortStatus represents the error condition of a service port",
 	"port":     "Port is the port number of the service port of which status is recorded here",
 	"protocol": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
 	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
@@ -1968,10 +1976,10 @@ func (Probe) SwaggerDoc() map[string]string {
 
 var map_ProbeHandler = map[string]string{
 	"":          "ProbeHandler defines a specific action that should be taken in a probe. One and only one of the fields must be specified.",
-	"exec":      "Exec specifies the action to take.",
-	"httpGet":   "HTTPGet specifies the http request to perform.",
-	"tcpSocket": "TCPSocket specifies an action involving a TCP port.",
-	"grpc":      "GRPC specifies an action involving a GRPC port.",
+	"exec":      "Exec specifies a command to execute in the container.",
+	"httpGet":   "HTTPGet specifies an HTTP GET request to perform.",
+	"tcpSocket": "TCPSocket specifies a connection to a TCP port.",
+	"grpc":      "GRPC specifies a GRPC HealthCheckRequest.",
 }
 
 func (ProbeHandler) SwaggerDoc() map[string]string {
@@ -2190,6 +2198,7 @@ func (ResourceRequirements) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceStatus = map[string]string{
+	"":          "ResourceStatus represents the status of a single resource allocated to a Pod.",
 	"name":      "Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec. For DRA resources, the value must be \"claim:<claim_name>/<request>\". When this status is reported about a container, the \"claim_name\" and \"request\" must match one of the claims of this container.",
 	"resources": "List of unique resources health. Each element in the list contains an unique resource ID and its health. At a minimum, for the lifetime of a Pod, resource ID must uniquely identify the resource allocated to the Pod on the Node. If other Pod on the same Node reports the status with the same resource ID, it must be the same resource they share. See ResourceID type definition for a specific format it has in various use cases.",
 }
@@ -2630,6 +2639,7 @@ func (TypedLocalObjectReference) SwaggerDoc() map[string]string {
 }
 
 var map_TypedObjectReference = map[string]string{
+	"":          "TypedObjectReference contains enough information to let you locate the typed referenced object",
 	"apiGroup":  "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
 	"kind":      "Kind is the type of resource being referenced",
 	"name":      "Name is the name of resource being referenced",

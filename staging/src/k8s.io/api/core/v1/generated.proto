@@ -1869,6 +1869,7 @@ message GCEPersistentDiskVolumeSource {
   optional bool readOnly = 4;
 }
 
+// GRPCAction specifies an action involving a GRPC service.
 message GRPCAction {
   // Port number of the gRPC service. Number must be in the range 1 to 65535.
   optional int32 port = 1;
@@ -2202,21 +2203,21 @@ message Lifecycle {
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
 // hook. One and only one of the fields, except TCPSocket must be specified.
 message LifecycleHandler {
-  // Exec specifies the action to take.
+  // Exec specifies a command to execute in the container.
   // +optional
   optional ExecAction exec = 1;
 
-  // HTTPGet specifies the http request to perform.
+  // HTTPGet specifies an HTTP GET request to perform.
   // +optional
   optional HTTPGetAction httpGet = 2;
 
   // Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
-  // for the backward compatibility. There are no validation of this field and
-  // lifecycle hooks will fail in runtime when tcp handler is specified.
+  // for backward compatibility. There is no validation of this field and
+  // lifecycle hooks will fail at runtime when it is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
 
-  // Sleep represents the duration that the container should sleep before being terminated.
+  // Sleep represents a duration that the container should sleep.
   // +featureGate=PodLifecycleSleepAction
   // +optional
   optional SleepAction sleep = 4;
@@ -2447,12 +2448,15 @@ message NamespaceCondition {
   // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
+  // Last time the condition transitioned from one status to another.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
+  // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
   optional string reason = 5;
 
+  // Human-readable message indicating details about last transition.
   // +optional
   optional string message = 6;
 }
@@ -3010,8 +3014,13 @@ message PersistentVolumeClaim {
 
 // PersistentVolumeClaimCondition contains details about state of pvc
 message PersistentVolumeClaimCondition {
+  // Type is the type of the condition.
+  // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
   optional string type = 1;
 
+  // Status is the status of the condition.
+  // Can be True, False, Unknown.
+  // More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
   optional string status = 2;
 
   // lastProbeTime is the time we probed the condition.
@@ -3743,9 +3752,11 @@ message PodDNSConfig {
 
 // PodDNSConfigOption defines DNS resolver options of a pod.
 message PodDNSConfigOption {
+  // Name is this DNS resolver option's name.
   // Required.
   optional string name = 1;
 
+  // Value is this DNS resolver option's value.
   // +optional
   optional string value = 2;
 }
@@ -4659,6 +4670,7 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
+// PortStatus represents the error condition of a service port
 message PortStatus {
   // Port is the port number of the service port of which status is recorded here
   optional int32 port = 1;
@@ -4783,19 +4795,19 @@ message Probe {
 // ProbeHandler defines a specific action that should be taken in a probe.
 // One and only one of the fields must be specified.
 message ProbeHandler {
-  // Exec specifies the action to take.
+  // Exec specifies a command to execute in the container.
   // +optional
   optional ExecAction exec = 1;
 
-  // HTTPGet specifies the http request to perform.
+  // HTTPGet specifies an HTTP GET request to perform.
   // +optional
   optional HTTPGetAction httpGet = 2;
 
-  // TCPSocket specifies an action involving a TCP port.
+  // TCPSocket specifies a connection to a TCP port.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
 
-  // GRPC specifies an action involving a GRPC port.
+  // GRPC specifies a GRPC HealthCheckRequest.
   // +optional
   optional GRPCAction grpc = 4;
 }
@@ -5233,6 +5245,7 @@ message ResourceRequirements {
   repeated ResourceClaim claims = 3;
 }
 
+// ResourceStatus represents the status of a single resource allocated to a Pod.
 message ResourceStatus {
   // Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec.
   // For DRA resources, the value must be "claim:<claim_name>/<request>".
@@ -6444,6 +6457,7 @@ message TypedLocalObjectReference {
   optional string name = 3;
 }
 
+// TypedObjectReference contains enough information to let you locate the typed referenced object
 message TypedObjectReference {
   // APIGroup is the group for the resource being referenced.
   // If APIGroup is not specified, the specified Kind must be in the core API group.

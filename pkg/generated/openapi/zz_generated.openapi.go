@@ -23517,7 +23517,8 @@ func schema_k8sio_api_core_v1_GRPCAction(ref common.ReferenceCallback) common.Op
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "GRPCAction specifies an action involving a GRPC service.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"port": {
 						SchemaProps: spec.SchemaProps{
@@ -24165,25 +24166,25 @@ func schema_k8sio_api_core_v1_LifecycleHandler(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"exec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Exec specifies the action to take.",
+							Description: "Exec specifies a command to execute in the container.",
 							Ref:         ref("k8s.io/api/core/v1.ExecAction"),
 						},
 					},
 					"httpGet": {
 						SchemaProps: spec.SchemaProps{
-							Description: "HTTPGet specifies the http request to perform.",
+							Description: "HTTPGet specifies an HTTP GET request to perform.",
 							Ref:         ref("k8s.io/api/core/v1.HTTPGetAction"),
 						},
 					},
 					"tcpSocket": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified.",
+							Description: "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for backward compatibility. There is no validation of this field and lifecycle hooks will fail at runtime when it is specified.",
 							Ref:         ref("k8s.io/api/core/v1.TCPSocketAction"),
 						},
 					},
 					"sleep": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Sleep represents the duration that the container should sleep before being terminated.",
+							Description: "Sleep represents a duration that the container should sleep.",
 							Ref:         ref("k8s.io/api/core/v1.SleepAction"),
 						},
 					},
@@ -24804,19 +24805,22 @@ func schema_k8sio_api_core_v1_NamespaceCondition(ref common.ReferenceCallback) c
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Description: "Last time the condition transitioned from one status to another.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "Unique, one-word, CamelCase reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "Human-readable message indicating details about last transition.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -26125,16 +26129,18 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "Type is the type of the condition. More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
+							Description: "Status is the status of the condition. Can be True, False, Unknown. More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"lastProbeTime": {
@@ -27477,15 +27483,16 @@ func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Required.",
+							Description: "Name is this DNS resolver option's name. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "Value is this DNS resolver option's value.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -28996,7 +29003,8 @@ func schema_k8sio_api_core_v1_PortStatus(ref common.ReferenceCallback) common.Op
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "PortStatus represents the error condition of a service port",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"port": {
 						SchemaProps: spec.SchemaProps{
@@ -29148,25 +29156,25 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 				Properties: map[string]spec.Schema{
 					"exec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Exec specifies the action to take.",
+							Description: "Exec specifies a command to execute in the container.",
 							Ref:         ref("k8s.io/api/core/v1.ExecAction"),
 						},
 					},
 					"httpGet": {
 						SchemaProps: spec.SchemaProps{
-							Description: "HTTPGet specifies the http request to perform.",
+							Description: "HTTPGet specifies an HTTP GET request to perform.",
 							Ref:         ref("k8s.io/api/core/v1.HTTPGetAction"),
 						},
 					},
 					"tcpSocket": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TCPSocket specifies an action involving a TCP port.",
+							Description: "TCPSocket specifies a connection to a TCP port.",
 							Ref:         ref("k8s.io/api/core/v1.TCPSocketAction"),
 						},
 					},
 					"grpc": {
 						SchemaProps: spec.SchemaProps{
-							Description: "GRPC specifies an action involving a GRPC port.",
+							Description: "GRPC specifies a GRPC HealthCheckRequest.",
 							Ref:         ref("k8s.io/api/core/v1.GRPCAction"),
 						},
 					},
@@ -29229,25 +29237,25 @@ func schema_k8sio_api_core_v1_ProbeHandler(ref common.ReferenceCallback) common.
 				Properties: map[string]spec.Schema{
 					"exec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Exec specifies the action to take.",
+							Description: "Exec specifies a command to execute in the container.",
 							Ref:         ref("k8s.io/api/core/v1.ExecAction"),
 						},
 					},
 					"httpGet": {
 						SchemaProps: spec.SchemaProps{
-							Description: "HTTPGet specifies the http request to perform.",
+							Description: "HTTPGet specifies an HTTP GET request to perform.",
 							Ref:         ref("k8s.io/api/core/v1.HTTPGetAction"),
 						},
 					},
 					"tcpSocket": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TCPSocket specifies an action involving a TCP port.",
+							Description: "TCPSocket specifies a connection to a TCP port.",
 							Ref:         ref("k8s.io/api/core/v1.TCPSocketAction"),
 						},
 					},
 					"grpc": {
 						SchemaProps: spec.SchemaProps{
-							Description: "GRPC specifies an action involving a GRPC port.",
+							Description: "GRPC specifies a GRPC HealthCheckRequest.",
 							Ref:         ref("k8s.io/api/core/v1.GRPCAction"),
 						},
 					},
@@ -30240,7 +30248,8 @@ func schema_k8sio_api_core_v1_ResourceStatus(ref common.ReferenceCallback) commo
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "ResourceStatus represents the status of a single resource allocated to a Pod.",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
@@ -32273,7 +32282,8 @@ func schema_k8sio_api_core_v1_TypedObjectReference(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "TypedObjectReference contains enough information to let you locate the typed referenced object",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"apiGroup": {
 						SchemaProps: spec.SchemaProps{

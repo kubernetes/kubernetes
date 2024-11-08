@@ -630,6 +630,7 @@ type PersistentVolumeClaimSpec struct {
 	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,9,opt,name=volumeAttributesClassName"`
 }
 
+// TypedObjectReference contains enough information to let you locate the typed referenced object
 type TypedObjectReference struct {
 	// APIGroup is the group for the resource being referenced.
 	// If APIGroup is not specified, the specified Kind must be in the core API group.
@@ -736,8 +737,13 @@ type ModifyVolumeStatus struct {
 
 // PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimCondition struct {
-	Type   PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
-	Status ConditionStatus                    `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+	// Type is the type of the condition.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about
+	Type PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	// More info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required
+	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// lastProbeTime is the time we probed the condition.
 	// +optional
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
@@ -2524,6 +2530,7 @@ type TCPSocketAction struct {
 	Host string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 
+// GRPCAction specifies an action involving a GRPC service.
 type GRPCAction struct {
 	// Port number of the gRPC service. Number must be in the range 1 to 65535.
 	Port int32 `json:"port" protobuf:"bytes,1,opt,name=port"`
@@ -2939,17 +2946,16 @@ type Container struct {
 // ProbeHandler defines a specific action that should be taken in a probe.
 // One and only one of the fields must be specified.
 type ProbeHandler struct {
-	// Exec specifies the action to take.
+	// Exec specifies a command to execute in the container.
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
-	// HTTPGet specifies the http request to perform.
+	// HTTPGet specifies an HTTP GET request to perform.
 	// +optional
 	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
-	// TCPSocket specifies an action involving a TCP port.
+	// TCPSocket specifies a connection to a TCP port.
 	// +optional
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
-
-	// GRPC specifies an action involving a GRPC port.
+	// GRPC specifies a GRPC HealthCheckRequest.
 	// +optional
 	GRPC *GRPCAction `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
 }
@@ -2957,18 +2963,18 @@ type ProbeHandler struct {
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
 // hook. One and only one of the fields, except TCPSocket must be specified.
 type LifecycleHandler struct {
-	// Exec specifies the action to take.
+	// Exec specifies a command to execute in the container.
 	// +optional
 	Exec *ExecAction `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
-	// HTTPGet specifies the http request to perform.
+	// HTTPGet specifies an HTTP GET request to perform.
 	// +optional
 	HTTPGet *HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
 	// Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept
-	// for the backward compatibility. There are no validation of this field and
-	// lifecycle hooks will fail in runtime when tcp handler is specified.
+	// for backward compatibility. There is no validation of this field and
+	// lifecycle hooks will fail at runtime when it is specified.
 	// +optional
 	TCPSocket *TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
-	// Sleep represents the duration that the container should sleep before being terminated.
+	// Sleep represents a duration that the container should sleep.
 	// +featureGate=PodLifecycleSleepAction
 	// +optional
 	Sleep *SleepAction `json:"sleep,omitempty" protobuf:"bytes,4,opt,name=sleep"`
@@ -3150,6 +3156,7 @@ type ContainerStatus struct {
 	AllocatedResourcesStatus []ResourceStatus `json:"allocatedResourcesStatus,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,14,rep,name=allocatedResourcesStatus"`
 }
 
+// ResourceStatus represents the status of a single resource allocated to a Pod.
 type ResourceStatus struct {
 	// Name of the resource. Must be unique within the pod and in case of non-DRA resource, match one of the resources from the pod spec.
 	// For DRA resources, the value must be "claim:<claim_name>/<request>".
@@ -4605,8 +4612,10 @@ type PodDNSConfig struct {
 
 // PodDNSConfigOption defines DNS resolver options of a pod.
 type PodDNSConfigOption struct {
+	// Name is this DNS resolver option's name.
 	// Required.
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// Value is this DNS resolver option's value.
 	// +optional
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
@@ -6570,10 +6579,13 @@ type NamespaceCondition struct {
 	Type NamespaceConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=NamespaceConditionType"`
 	// Status of the condition, one of True, False, Unknown.
 	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+	// Last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	// Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
@@ -7886,7 +7898,6 @@ const (
 )
 
 // PortStatus represents the error condition of a service port
-
 type PortStatus struct {
 	// Port is the port number of the service port of which status is recorded here
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
