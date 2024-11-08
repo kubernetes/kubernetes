@@ -3825,6 +3825,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -3851,10 +3852,9 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                string
-		pod                 *v1.Pod
-		hasSidecarContainer bool
-		oldStatus           *v1.PodStatus
+		name      string
+		pod       *v1.Pod
+		oldStatus *v1.PodStatus
 	}{
 		{
 			name: "custom resource in ResourcesAllocated, resize should be null",
@@ -3919,8 +3919,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			},
 		},
 		{
-			name:                "custom resource in ResourcesAllocated in case of restartable init containers, resize should be null",
-			hasSidecarContainer: true,
+			name: "custom resource in ResourcesAllocated in case of restartable init containers, resize should be null",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "1234560",
@@ -3952,8 +3951,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			},
 		},
 		{
-			name:                "cpu/memory resource in ResourcesAllocated in case of restartable init containers, resize should be null",
-			hasSidecarContainer: true,
+			name: "cpu/memory resource in ResourcesAllocated in case of restartable init containers, resize should be null",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       "1234560",
@@ -3987,7 +3985,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, test.hasSidecarContainer)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet

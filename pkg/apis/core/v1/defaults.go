@@ -183,8 +183,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-			(obj.Spec.Containers[i].Resources.Requests != nil || obj.Spec.Containers[i].Resources.Limits != nil) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			// For normal containers, set resize restart policy to default value (NotRequired), if not specified..
 			setDefaultResizePolicy(&obj.Spec.Containers[i])
 		}
@@ -201,12 +200,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-			isRestartableInitContainer := false
-			c := obj.Spec.InitContainers[i]
-			if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
-				isRestartableInitContainer = true
-			}
-			if isRestartableInitContainer && (c.Resources.Requests != nil || c.Resources.Limits != nil) {
+			if obj.Spec.InitContainers[i].RestartPolicy != nil && *obj.Spec.InitContainers[i].RestartPolicy == v1.ContainerRestartPolicyAlways {
 				// For restartable init containers, set resize restart policy to default value (NotRequired), if not specified.
 				setDefaultResizePolicy(&obj.Spec.InitContainers[i])
 			}
@@ -232,6 +226,9 @@ func SetDefaults_Pod(obj *v1.Pod) {
 
 // setDefaultResizePolicy set resize restart policy to default value (NotRequired), if not specified.
 func setDefaultResizePolicy(obj *v1.Container) {
+	if obj.Resources.Requests == nil && obj.Resources.Limits == nil {
+		return
+	}
 	resizePolicySpecified := make(map[v1.ResourceName]bool)
 	for _, p := range obj.ResizePolicy {
 		resizePolicySpecified[p.ResourceName] = true

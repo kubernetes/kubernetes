@@ -98,12 +98,11 @@ func (cr *ContainerResources) ResourceRequirements() *v1.ResourceRequirements {
 }
 
 type ResizableContainerInfo struct {
-	Name                 string
-	Resources            *ContainerResources
-	CPUPolicy            *v1.ResourceResizeRestartPolicy
-	MemPolicy            *v1.ResourceResizeRestartPolicy
-	RestartCount         int32
-	IsRestartableInitCtr bool
+	Name         string
+	Resources    *ContainerResources
+	CPUPolicy    *v1.ResourceResizeRestartPolicy
+	MemPolicy    *v1.ResourceResizeRestartPolicy
+	RestartCount int32
 }
 
 type containerPatch struct {
@@ -201,7 +200,6 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-
 	for i, wantCtr := range wantCtrs {
 		gotCtr := &gotPod.Spec.Containers[i]
 		ctr := makeResizableContainer(wantCtr)
@@ -213,7 +211,6 @@ func VerifyPodResizePolicy(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 func VerifyPodResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 	gomega.Expect(gotPod.Spec.Containers).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-
 	for i, wantCtr := range wantCtrs {
 		gotCtr := &gotPod.Spec.Containers[i]
 		ctr := makeResizableContainer(wantCtr)
@@ -226,11 +223,11 @@ func VerifyPodStatusResources(gotPod *v1.Pod, wantCtrs []ResizableContainerInfo)
 	ginkgo.GinkgoHelper()
 
 	var errs []error
+
 	if len(gotPod.Status.ContainerStatuses) != len(wantCtrs) {
 		return fmt.Errorf("expectation length mismatch: got %d statuses, want %d",
 			len(gotPod.Status.ContainerStatuses), len(wantCtrs))
 	}
-
 	for i, wantCtr := range wantCtrs {
 		gotCtrStatus := &gotPod.Status.ContainerStatuses[i]
 		ctr := makeResizableContainer(wantCtr)
@@ -387,6 +384,7 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 		cPatch.Resources.Requests.Memory = container.Resources.MemReq
 		cPatch.Resources.Limits.CPU = container.Resources.CPULim
 		cPatch.Resources.Limits.Memory = container.Resources.MemLim
+
 		patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
 	}
 
