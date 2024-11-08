@@ -24,6 +24,7 @@ import (
 	"net/http/httputil"
 	gopath "path"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -43,10 +44,13 @@ import (
 	unionauthz "k8s.io/apiserver/pkg/authorization/union"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -1035,5 +1039,113 @@ func TestRBACContextContamination(t *testing.T) {
 			t.Errorf("req %d: expected %v, got %v", j, r.expected, decision)
 		}
 
+	}
+}
+
+func TestMonitoringURLs(t *testing.T) {
+	type request struct {
+		path          string
+		wantBodyRegex string
+	}
+
+	tests := []struct {
+		name     string
+		requests []request
+	}{
+		{
+			name: "monitoring endpoints",
+			requests: []request{
+				{
+					path:          "/metrics",
+					wantBodyRegex: `# HELP \w+`,
+				},
+				{
+					path:          "/metrics/slis",
+					wantBodyRegex: `kubernetes_healthcheck\{\w+`,
+				},
+				{
+					path:          "/livez",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/readyz",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/healthz",
+					wantBodyRegex: `^ok$`,
+				},
+				{
+					path:          "/statusz",
+					wantBodyRegex: `kube-apiserver statusz`,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+			tCtx := ktesting.Init(t)
+
+			// Create a user with the system:monitoring role
+			monitoringUser := "monitoring-user"
+			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				monitoringUser: {Name: monitoringUser, Groups: []string{"system:monitoring"}},
+			})))
+
+			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Authorization.Modes = []string{"RBAC"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator
+				},
+			})
+			defer tearDownFn()
+
+			transport, err := restclient.TransportFor(kubeConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			for _, r := range tc.requests {
+				req, err := http.NewRequest(http.MethodGet, kubeConfig.Host+r.path, nil)
+				if r.path == "/statusz" {
+					req.Header.Set("Accept", "text/plain")
+				}
+				if err != nil {
+					t.Fatalf("failed to create request: %v", err)
+				}
+
+				resp, err := clientForToken(monitoringUser, transport).Do(req)
+				if err != nil {
+					t.Errorf("failed to make request to %s: %v", r, err)
+					continue
+				}
+				defer func() {
+					_ = resp.Body.Close()
+				}()
+
+				if resp.StatusCode != http.StatusOK {
+					t.Fatalf("request to %s: expected %q got %q", r, statusCode(http.StatusOK), statusCode(resp.StatusCode))
+				}
+
+				parsedBytes, err := io.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
+
+				parsedStr := string(parsedBytes)
+				matched, err := regexp.MatchString(r.wantBodyRegex, parsedStr)
+				if err != nil {
+					t.Fatalf("invalid regex: %v", err)
+				}
+
+				if !matched {
+					t.Errorf("request to %s: response body does not match expected pattern", r.path)
+				}
+			}
+		})
 	}
 }

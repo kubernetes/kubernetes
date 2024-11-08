@@ -208,6 +208,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: ComponentStatusz
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: ConcurrentWatchObjectDecode
   versionedSpecs:
   - default: false
