@@ -1092,7 +1092,8 @@ func inPlacePodVerticalScalingInUse(podSpec *api.PodSpec) bool {
 		return false
 	}
 	var inUse bool
-	VisitContainers(podSpec, Containers, func(c *api.Container, containerType ContainerType) bool {
+	containersMask := Containers | InitContainers
+	VisitContainers(podSpec, containersMask, func(c *api.Container, containerType ContainerType) bool {
 		if len(c.ResizePolicy) > 0 {
 			inUse = true
 			return false
@@ -1297,7 +1298,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 		if c.Name != oldPod.Spec.Containers[i].Name {
 			return // Update is invalid (container mismatch): let validation handle it.
 		}
-		if c.Resources.Requests == nil || cmp.Equal(oldPod.Spec.Containers[i].Resources, c.Resources) {
+		if apiequality.Semantic.DeepEqual(oldPod.Spec.Containers[i].Resources, c.Resources) {
 			continue
 		}
 		newPod.Status.Resize = api.PodResizeStatusProposed
@@ -1310,7 +1311,7 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 				if c.Name != oldPod.Spec.InitContainers[i].Name {
 					return // Update is invalid (container mismatch): let validation handle it.
 				}
-				if c.Resources.Requests == nil || cmp.Equal(oldPod.Spec.InitContainers[i].Resources, c.Resources) {
+				if apiequality.Semantic.DeepEqual(oldPod.Spec.InitContainers[i].Resources, c.Resources) {
 					continue
 				}
 				newPod.Status.Resize = api.PodResizeStatusProposed
