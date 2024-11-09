@@ -567,6 +567,24 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
+			name: "Burstable QoS pod, one container with cpu & memory requests - increase cpu request",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", MemReq: "500Mi"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"300m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m", MemReq: "500Mi"},
+				},
+			},
+		},
+		{
 			name: "Burstable QoS pod, one container with cpu requests - resize with equivalent request",
 			containers: []e2epod.ResizableContainerInfo{
 				{
@@ -773,6 +791,102 @@ func doPodResizeTests(f *framework.Framework) {
 					CPUPolicy:    &doRestart,
 					MemPolicy:    &doRestart,
 					RestartCount: 1,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, mixed containers - scale up cpu and memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"200m","memory":"200Mi"},"limits":{"cpu":"200m","memory":"200Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, mixed containers - add requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c2", "resources":{"requests":{"cpu":"100m","memory":"100Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, mixed containers - add limits",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", MemReq: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c2", "resources":{"limits":{"cpu":"200m","memory":"200Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "100Mi", MemLim: "100Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
 				},
 			},
 		},
