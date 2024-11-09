@@ -36,14 +36,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status/state"
@@ -2095,12 +2092,12 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 					Name: "c1-init",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
-							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+							v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
 						},
 						Limits: v1.ResourceList{
-							v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+							v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
 						},
 					},
 				},
@@ -2161,7 +2158,6 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			pod := test.pod.DeepCopy()
 			allocatedPod, updated := updatePodFromAllocation(pod, test.allocs)
 
