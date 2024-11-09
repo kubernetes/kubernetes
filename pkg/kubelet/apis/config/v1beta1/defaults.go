@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,8 +25,10 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
@@ -39,6 +42,8 @@ const (
 	DefaultPodLogsDir            = "/var/log/pods"
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.9
+	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
+	MaxContainerBackOff = 300 * time.Second
 )
 
 var (
@@ -53,6 +58,19 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
+
+	// TODO(lauralorenz): Reasses conditional feature gating on defaults. Here
+	// we 1) copy the gates to a local var, unilaterally merge it with the gate
+	// config while being defaulted. Alternatively we could unilaterally set the
+	// default value, later check the gate and wipe it if needed, like API
+	// strategy does for gate-disabled fields. Meanwhile, KubeletConfiguration
+	// is increasingly dynamic and the configured gates may change depending on
+	// when this is called. See also validation.go.
+	localFeatureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	if err := localFeatureGate.SetFromMap(obj.FeatureGates); err != nil {
+		panic(fmt.Sprintf("failed to merge global and in-flight KubeletConfiguration while setting defaults, error: %v", err))
+	}
+
 	if obj.EnableServer == nil {
 		obj.EnableServer = ptr.To(true)
 	}
@@ -285,5 +303,11 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.PodLogsDir == "" {
 		obj.PodLogsDir = DefaultPodLogsDir
+	}
+
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
+		}
 	}
 }

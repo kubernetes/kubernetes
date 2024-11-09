@@ -46,6 +46,12 @@ var (
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
+	// TODO(lauralorenz): Reasses / confirm interpretation of feature gates
+	// depending on where we are in merging dynamic KubeletConfiguration when
+	// this is called. Here we copy the gates to a local var, and unilaterally
+	// merge it with the current gate config to test. See also defaults.go which
+	// intersects with this assumption.
+
 	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
 	localFeatureGate := featureGate.DeepCopy()
@@ -204,6 +210,17 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
+	}
+
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaxContainerRestartPeriod must be set"))
+		}
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaxContainerRestartPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaxContainerRestartPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaxContainerRestartPeriod.Seconds()))
+		}
+	} else if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set"))
 	}
 
 	// Check for mutually exclusive keys before the main validation loop
