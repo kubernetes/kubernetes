@@ -1791,19 +1791,31 @@ func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontaine
 
 			// Only compare resizeable resources, and only compare resources that are explicitly configured.
 			if hasCPUReq {
-				// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
-				if !cpuReq.Equal(*cs.Resources.CPURequest) &&
+				if cs.Resources.CPURequest == nil {
+					if !cpuReq.IsZero() {
+						return false
+					}
+				} else if !cpuReq.Equal(*cs.Resources.CPURequest) &&
 					(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
+					// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
 					return false
 				}
 			}
 			if hasCPULim {
-				if !cpuLim.Equal(*cs.Resources.CPULimit) {
+				if cs.Resources.CPULimit == nil {
+					if !cpuLim.IsZero() {
+						return false
+					}
+				} else if !cpuLim.Equal(*cs.Resources.CPULimit) {
 					return false
 				}
 			}
 			if hasMemLim {
-				if !memLim.Equal(*cs.Resources.MemoryLimit) {
+				if cs.Resources.MemoryLimit == nil {
+					if !memLim.IsZero() {
+						return false
+					}
+				} else if !memLim.Equal(*cs.Resources.MemoryLimit) {
 					return false
 				}
 			}

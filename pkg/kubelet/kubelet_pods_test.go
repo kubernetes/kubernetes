@@ -6797,6 +6797,38 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
 		},
 		expectMatch: true,
+	}, {
+		name: "nil status resources: cpu request mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{},
+		expectMatch:     false,
+	}, {
+		name: "nil status resources: cpu limit mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
+		},
+		expectMatch: false,
+	}, {
+		name: "nil status resources: memory limit mismatch",
+		allocatedResources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("100M"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{},
+		expectMatch:     false,
 	}}
 
 	for _, test := range tests {

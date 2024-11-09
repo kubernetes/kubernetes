@@ -584,8 +584,10 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		cpuRequest:    container.Resources.Requests.Cpu().MilliValue(),
 	}
 
-	// Default current values to the desired values so that a resize isn't triggered for missing values.
-	currentResources := desiredResources
+	currentResources := containerResources{
+		// memoryRequest isn't set by the runtime, so default it to the desired.
+		memoryRequest: desiredResources.memoryRequest,
+	}
 	if kubeContainerStatus.Resources.MemoryLimit != nil {
 		currentResources.memoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
 	}
@@ -839,16 +841,21 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 			}
 			switch resourceName {
 			case v1.ResourceMemory:
-				return status.Resources.MemoryLimit.Equal(*container.Resources.Limits.Memory())
+				actualLimit := nonNilQuantity(status.Resources.MemoryLimit)
+				return actualLimit.Equal(*container.Resources.Limits.Memory())
 			case v1.ResourceCPU:
-				if !status.Resources.CPULimit.Equal(*container.Resources.Limits.Cpu()) {
+				actualLimit := nonNilQuantity(status.Resources.CPULimit)
+				actualRequest := nonNilQuantity(status.Resources.CPURequest)
+				desiredLimit := container.Resources.Limits.Cpu()
+				desiredRequest := container.Resources.Requests.Cpu()
+				if !actualLimit.Equal(*desiredLimit) {
 					return false // limits don't match
-				} else if status.Resources.CPURequest.Equal(*container.Resources.Requests.Cpu()) {
+				} else if actualRequest.Equal(*desiredRequest) {
 					return true // requests & limits both match
 				}
 				// Consider requests equal if both are at or below MinShares.
-				return status.Resources.CPURequest.MilliValue() <= cm.MinShares &&
-					container.Resources.Requests.Cpu().MilliValue() <= cm.MinShares
+				return actualRequest.MilliValue() <= cm.MinShares &&
+					desiredRequest.MilliValue() <= cm.MinShares
 			default:
 				return true // Shouldn't happen.
 			}
@@ -868,6 +875,15 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 		}
 	}
 	return nil
+}
+
+// nonNilQuantity returns a non-nil quantity. If the input is non-nil, it is returned. Otherwise a
+// pointer to the zero value is returned.
+func nonNilQuantity(q *resource.Quantity) *resource.Quantity {
+	if q != nil {
+		return q
+	}
+	return &resource.Quantity{}
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
