@@ -2584,9 +2584,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 
 func TestHandlePodResourcesResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	cpu1m := resource.MustParse("1m")
 	cpu2m := resource.MustParse("2m")
@@ -2651,6 +2653,28 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	testPod2.UID = "2222"
 	testPod2.Name = "pod2"
 	testPod2.Namespace = "ns2"
+	testPod2.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{
+			{
+				Name:  "c1-init",
+				Image: "i1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+				RestartPolicy: &containerRestartPolicyAlways,
+			},
+		},
+	}
+	testPod2.Status = v1.PodStatus{
+		Phase: v1.PodRunning,
+		InitContainerStatuses: []v1.ContainerStatus{
+			{
+				Name:               "c1-init",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			},
+		},
+	}
 	testPod3 := testPod1.DeepCopy()
 	testPod3.UID = "3333"
 	testPod3.Name = "pod3"
@@ -2842,72 +2866,115 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			oldGOOS := goos
-			defer func() { goos = oldGOOS }()
-			if tt.goos != "" {
-				goos = tt.goos
-			}
-			kubelet.statusManager = status.NewFakeManager()
-
-			originalPod := testPod1.DeepCopy()
-			originalPod.Spec.Containers[0].Resources.Requests = tt.originalRequests
-			originalPod.Spec.Containers[0].Resources.Limits = tt.originalLimits
-			kubelet.podManager.UpdatePod(originalPod)
-
-			newPod := originalPod.DeepCopy()
-			newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
-			newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
-
-			if !tt.newResourcesAllocated {
-				require.NoError(t, kubelet.statusManager.SetPodAllocation(originalPod))
-			} else {
-				require.NoError(t, kubelet.statusManager.SetPodAllocation(newPod))
-			}
-
-			podStatus := &kubecontainer.PodStatus{
-				ID:                originalPod.UID,
-				Name:              originalPod.Name,
-				Namespace:         originalPod.Namespace,
-				ContainerStatuses: make([]*kubecontainer.Status, len(originalPod.Spec.Containers)),
-			}
-			for i, c := range originalPod.Spec.Containers {
-				podStatus.ContainerStatuses[i] = &kubecontainer.Status{
-					Name:  c.Name,
-					State: kubecontainer.ContainerStateRunning,
-					Resources: &kubecontainer.ContainerResources{
-						CPURequest:  c.Resources.Requests.Cpu(),
-						CPULimit:    c.Resources.Limits.Cpu(),
-						MemoryLimit: c.Resources.Limits.Memory(),
-					},
+		for _, isSidecarContainer := range []bool{false, true} {
+			t.Run(tt.name, func(t *testing.T) {
+				oldGOOS := goos
+				defer func() { goos = oldGOOS }()
+				if tt.goos != "" {
+					goos = tt.goos
 				}
-			}
+				kubelet.statusManager = status.NewFakeManager()
 
-			now := kubelet.clock.Now()
-			// Put the container in backoff so we can confirm backoff is reset.
-			backoffKey := kuberuntime.GetStableKey(originalPod, &originalPod.Spec.Containers[0])
-			kubelet.backOff.Next(backoffKey, now)
+				var originalPod *v1.Pod
+				if isSidecarContainer {
+					originalPod = testPod2.DeepCopy()
+					originalPod.Spec.InitContainers[0].Resources.Requests = tt.originalRequests
+					originalPod.Spec.InitContainers[0].Resources.Limits = tt.originalLimits
+				} else {
+					originalPod = testPod1.DeepCopy()
+					originalPod.Spec.Containers[0].Resources.Requests = tt.originalRequests
+					originalPod.Spec.Containers[0].Resources.Limits = tt.originalLimits
+				}
 
-			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
-			require.NoError(t, err)
-			assert.Equal(t, tt.expectedAllocatedReqs, updatedPod.Spec.Containers[0].Resources.Requests, "updated pod spec requests")
-			assert.Equal(t, tt.expectedAllocatedLims, updatedPod.Spec.Containers[0].Resources.Limits, "updated pod spec limits")
+				kubelet.podManager.UpdatePod(originalPod)
 
-			alloc, found := kubelet.statusManager.GetContainerResourceAllocation(string(newPod.UID), newPod.Spec.Containers[0].Name)
-			require.True(t, found, "container allocation")
-			assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
-			assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
+				newPod := originalPod.DeepCopy()
 
-			resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
-			assert.Equal(t, tt.expectedResize, resizeStatus)
+				if isSidecarContainer {
+					newPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
+					newPod.Spec.InitContainers[0].Resources.Limits = tt.newLimits
+				} else {
+					newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
+					newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
+				}
 
-			isInBackoff := kubelet.backOff.IsInBackOffSince(backoffKey, now)
-			if tt.expectBackoffReset {
-				assert.False(t, isInBackoff, "container backoff should be reset")
-			} else {
-				assert.True(t, isInBackoff, "container backoff should not be reset")
-			}
-		})
+				if !tt.newResourcesAllocated {
+					require.NoError(t, kubelet.statusManager.SetPodAllocation(originalPod))
+				} else {
+					require.NoError(t, kubelet.statusManager.SetPodAllocation(newPod))
+				}
+
+				podStatus := &kubecontainer.PodStatus{
+					ID:        originalPod.UID,
+					Name:      originalPod.Name,
+					Namespace: originalPod.Namespace,
+				}
+
+				setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+					podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+						Name:  c.Name,
+						State: kubecontainer.ContainerStateRunning,
+						Resources: &kubecontainer.ContainerResources{
+							CPURequest:  c.Resources.Requests.Cpu(),
+							CPULimit:    c.Resources.Limits.Cpu(),
+							MemoryLimit: c.Resources.Limits.Memory(),
+						},
+					}
+				}
+
+				if isSidecarContainer {
+					podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.InitContainers))
+					for i, c := range originalPod.Spec.InitContainers {
+						setContainerStatus(podStatus, &c, i)
+					}
+				} else {
+					podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
+					for i, c := range originalPod.Spec.Containers {
+						setContainerStatus(podStatus, &c, i)
+					}
+				}
+
+				now := kubelet.clock.Now()
+				// Put the container in backoff so we can confirm backoff is reset.
+				var backoffKey string
+				if isSidecarContainer {
+					backoffKey = kuberuntime.GetStableKey(originalPod, &originalPod.Spec.InitContainers[0])
+				} else {
+					backoffKey = kuberuntime.GetStableKey(originalPod, &originalPod.Spec.Containers[0])
+				}
+				kubelet.backOff.Next(backoffKey, now)
+
+				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+				require.NoError(t, err)
+
+				var updatedPodCtr v1.Container
+				var newPodCtr v1.Container
+				if isSidecarContainer {
+					updatedPodCtr = updatedPod.Spec.InitContainers[0]
+					newPodCtr = newPod.Spec.InitContainers[0]
+				} else {
+					updatedPodCtr = updatedPod.Spec.Containers[0]
+					newPodCtr = newPod.Spec.Containers[0]
+				}
+				assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
+				assert.Equal(t, tt.expectedAllocatedLims, updatedPodCtr.Resources.Limits, "updated pod spec limits")
+
+				alloc, found := kubelet.statusManager.GetContainerResourceAllocation(string(newPod.UID), newPodCtr.Name)
+				require.True(t, found, "container allocation")
+				assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
+				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
+
+				resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
+				assert.Equal(t, tt.expectedResize, resizeStatus)
+
+				isInBackoff := kubelet.backOff.IsInBackOffSince(backoffKey, now)
+				if tt.expectBackoffReset {
+					assert.False(t, isInBackoff, "container backoff should be reset")
+				} else {
+					assert.True(t, isInBackoff, "container backoff should not be reset")
+				}
+			})
+		}
 	}
 }
 

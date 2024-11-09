@@ -286,15 +286,15 @@ func TestPodRequestsAndLimitsWithoutOverhead(t *testing.T) {
 func TestPodResourceRequests(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
-		description         string
-		options             PodResourcesOptions
-		overhead            v1.ResourceList
-		podResizeStatus     v1.PodResizeStatus
-		initContainers      []v1.Container
-		initContainerStatus []v1.ContainerStatus
-		containers          []v1.Container
-		containerStatus     []v1.ContainerStatus
-		expectedRequests    v1.ResourceList
+		description           string
+		options               PodResourcesOptions
+		overhead              v1.ResourceList
+		podResizeStatus       v1.PodResizeStatus
+		initContainers        []v1.Container
+		initContainerStatuses []v1.ContainerStatus
+		containers            []v1.Container
+		containerStatus       []v1.ContainerStatus
+		expectedRequests      v1.ResourceList
 	}{
 		{
 			description: "nil options, larger init container",
@@ -481,14 +481,6 @@ func TestPodResourceRequests(t *testing.T) {
 					},
 				},
 			},
-			initContainerStatus: []v1.ContainerStatus{
-				{
-					Name: "restartable-init-1",
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU: resource.MustParse("2"),
-					},
-				},
-			},
 		},
 		{
 			description: "resized, infeasible, but don't use status",
@@ -510,6 +502,92 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized, restartable init container, infeasible",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			podResizeStatus: v1.PodResizeStatusInfeasible,
+			options:         PodResourcesOptions{UseStatusResources: true},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized, restartable init container, no resize status",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized, restartable init container, infeasible, but don't use status",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			podResizeStatus: v1.PodResizeStatusInfeasible,
+			options:         PodResourcesOptions{UseStatusResources: false},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("2"),
@@ -710,7 +788,7 @@ func TestPodResourceRequests(t *testing.T) {
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatus,
-					InitContainerStatuses: tc.initContainerStatus,
+					InitContainerStatuses: tc.initContainerStatuses,
 					Resize:                tc.podResizeStatus,
 				},
 			}
@@ -758,13 +836,14 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 func TestPodResourceLimits(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
-		description       string
-		options           PodResourcesOptions
-		overhead          v1.ResourceList
-		initContainers    []v1.Container
-		containers        []v1.Container
-		containerStatuses []v1.ContainerStatus
-		expectedLimits    v1.ResourceList
+		description           string
+		options               PodResourcesOptions
+		overhead              v1.ResourceList
+		initContainers        []v1.Container
+		initContainerStatuses []v1.ContainerStatus
+		containers            []v1.Container
+		containerStatuses     []v1.ContainerStatus
+		expectedLimits        v1.ResourceList
 	}{
 		{
 			description: "nil options, larger init container",
@@ -1217,6 +1296,90 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "pod scaled up with restartable init containers",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod scaled down with restartable init containers",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "pod scaled down with restartable init containers, don't use status",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			options: PodResourcesOptions{UseStatusResources: false},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "restartable-init-1",
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1227,7 +1390,8 @@ func TestPodResourceLimits(t *testing.T) {
 					Overhead:       tc.overhead,
 				},
 				Status: v1.PodStatus{
-					ContainerStatuses: tc.containerStatuses,
+					ContainerStatuses:     tc.containerStatuses,
+					InitContainerStatuses: tc.initContainerStatuses,
 				},
 			}
 			limits := PodLimits(p, tc.options)
