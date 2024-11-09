@@ -262,69 +262,40 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 	return updatePodFromAllocation(pod, allocs)
 }
 
-/* func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
-	allocated, found := allocs[string(pod.UID)]
-	if !found {
-		return pod, false
-	}
-
-	updated := false
-	updateContainerResources := func(c *v1.Container) {
-		if cAlloc, ok := allocated[c.Name]; ok {
-			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
-				if !updated {
-					pod = pod.DeepCopy()
-					updated = true
-				}
-				c.Resources = *cAlloc.DeepCopy()
-			}
-		}
-	}
-
-	for i := range pod.Spec.Containers {
-		updateContainerResources(&pod.Spec.Containers[i])
-	}
-	for i := range pod.Spec.InitContainers {
-		updateContainerResources(&pod.Spec.InitContainers[i])
-	}
-	return pod, updated
-} */
-
-// TODO(vibansal): Refactor this function to something above commented code.
 func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
 	allocated, found := allocs[string(pod.UID)]
 	if !found {
 		return pod, false
 	}
+
 	updated := false
+	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
+		if cAlloc, ok := allocated[c.Name]; ok {
+			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
+				// Allocation differs from pod spec, retrieve the allocation
+				if !updated {
+					// If this is the first update to be performed, copy the pod
+					pod = pod.DeepCopy()
+					updated = true
+				}
+				return cAlloc, true
+			}
+		}
+		return v1.ResourceRequirements{}, false
+	}
+
 	for i, c := range pod.Spec.Containers {
-		if cAlloc, ok := allocated[c.Name]; ok {
-			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
-				// Allocation differs from pod spec, update
-				if !updated {
-					// If this is the first update, copy the pod
-					pod = pod.DeepCopy()
-					updated = true
-				}
-				pod.Spec.Containers[i].Resources = cAlloc
-			}
+		if cAlloc, found := containerAlloc(c); found {
+			// Allocation differs from pod spec, update
+			pod.Spec.Containers[i].Resources = cAlloc
 		}
 	}
-
 	for i, c := range pod.Spec.InitContainers {
-		if cAlloc, ok := allocated[c.Name]; ok {
-			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
-				// Allocation differs from pod spec, update
-				if !updated {
-					// If this is the first update, copy the pod
-					pod = pod.DeepCopy()
-					updated = true
-				}
-				pod.Spec.InitContainers[i].Resources = cAlloc
-			}
+		if cAlloc, found := containerAlloc(c); found {
+			// Allocation differs from pod spec, update
+			pod.Spec.InitContainers[i].Resources = cAlloc
 		}
 	}
-
 	return pod, updated
 }
 
