@@ -565,7 +565,6 @@ func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
 func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
 	var container v1.Container
-
 	if isRestartableInitContainer {
 		container = pod.Spec.InitContainers[containerIdx]
 	} else {
@@ -1406,7 +1405,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	}
 
-	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] or podContainerChanges.InitContainersToUpdate[CPU,Memory] lists, invoke UpdateContainerResources
+	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if IsInPlacePodVerticalScalingAllowed(pod) {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
 			m.doPodResizeAction(pod, podContainerChanges, &result)

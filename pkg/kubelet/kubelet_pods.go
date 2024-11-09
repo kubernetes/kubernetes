@@ -1803,37 +1803,36 @@ func allocatedContainerResourcesMatchStatus(allocatedPod *v1.Pod, c *v1.Containe
 			}
 		}
 
-			// Only compare resizeable resources, and only compare resources that are explicitly configured.
-			if hasCPUReq {
-				if cs.Resources.CPURequest == nil {
-					if !cpuReq.IsZero() {
-						return false
-					}
-				} else if !cpuReq.Equal(*cs.Resources.CPURequest) &&
-					(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
-					// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
+		// Only compare resizeable resources, and only compare resources that are explicitly configured.
+		if hasCPUReq {
+			if cs.Resources.CPURequest == nil {
+				if !cpuReq.IsZero() {
 					return false
 				}
+			} else if !cpuReq.Equal(*cs.Resources.CPURequest) &&
+				(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
+				// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
+				return false
 			}
-			if hasCPULim {
-				if cs.Resources.CPULimit == nil {
-					if !cpuLim.IsZero() {
-						return false
-					}
-				} else if !cpuLim.Equal(*cs.Resources.CPULimit) &&
-					(cpuLim.MilliValue() > cm.MinMilliCPULimit || cs.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit) {
-					// If both allocated & status CPU limits are at or below the minimum limit, then they are considered equal.
+		}
+		if hasCPULim {
+			if cs.Resources.CPULimit == nil {
+				if !cpuLim.IsZero() {
 					return false
 				}
+			} else if !cpuLim.Equal(*cs.Resources.CPULimit) &&
+				(cpuLim.MilliValue() > cm.MinMilliCPULimit || cs.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit) {
+				// If both allocated & status CPU limits are at or below the minimum limit, then they are considered equal.
+				return false
 			}
-			if hasMemLim {
-				if cs.Resources.MemoryLimit == nil {
-					if !memLim.IsZero() {
-						return false
-					}
-				} else if !memLim.Equal(*cs.Resources.MemoryLimit) {
+		}
+		if hasMemLim {
+			if cs.Resources.MemoryLimit == nil {
+				if !memLim.IsZero() {
 					return false
 				}
+			} else if !memLim.Equal(*cs.Resources.MemoryLimit) {
+				return false
 			}
 		}
 	}

@@ -3822,7 +3822,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -3831,7 +3830,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	CPU1AndMem1GAndStorage2G[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
 	CPU1AndMem1GAndStorage2GAndCustomResource := CPU1AndMem1GAndStorage2G.DeepCopy()
 	CPU1AndMem1GAndStorage2GAndCustomResource["unknown-resource"] = resource.MustParse("1")
-	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	testKubecontainerPodStatus := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
@@ -3905,70 +3903,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name:               testContainerName,
-							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
-							AllocatedResources: CPU1AndMem1GAndStorage2G,
-						},
-					},
-					Resize: "InProgress",
-				},
-			},
-		},
-		{
-			name: "custom resource in ResourcesAllocated in case of restartable init containers, resize should be null",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					UID:       "1234560",
-					Name:      "foo0",
-					Namespace: "bar0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "machine",
-					InitContainers: []v1.Container{
-						{
-							Name:          testContainerName,
-							Image:         "img",
-							Resources:     v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2GAndCustomResource, Requests: CPU1AndMem1GAndStorage2GAndCustomResource},
-							RestartPolicy: &containerRestartPolicyAlways,
-						},
-					},
-					RestartPolicy: v1.RestartPolicyAlways,
-				},
-				Status: v1.PodStatus{
-					InitContainerStatuses: []v1.ContainerStatus{
-						{
-							Name:               testContainerName,
-							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
-							AllocatedResources: CPU1AndMem1GAndStorage2GAndCustomResource,
-						},
-					},
-					Resize: "InProgress",
-				},
-			},
-		},
-		{
-			name: "cpu/memory resource in ResourcesAllocated in case of restartable init containers, resize should be null",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					UID:       "1234560",
-					Name:      "foo0",
-					Namespace: "bar0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "machine",
-					InitContainers: []v1.Container{
-						{
-							Name:          testContainerName,
-							Image:         "img",
-							Resources:     v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
-							RestartPolicy: &containerRestartPolicyAlways,
-						},
-					},
-					RestartPolicy: v1.RestartPolicyAlways,
-				},
-				Status: v1.PodStatus{
-					InitContainerStatuses: []v1.ContainerStatus{
 						{
 							Name:               testContainerName,
 							Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
@@ -6737,6 +6671,8 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 }
 
 func TestAllocatedResourcesMatchStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	tests := []struct {
 		name               string
 		allocatedResources v1.ResourceRequirements
@@ -6951,6 +6887,11 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 						Name:      "c",
 						Resources: test.allocatedResources,
 					}},
+					InitContainers: []v1.Container{{
+						Name:          "c1-init",
+						Resources:     test.allocatedResources,
+						RestartPolicy: &containerRestartPolicyAlways,
+					}},
 				},
 			}
 			state := kubecontainer.ContainerStateRunning
@@ -6965,9 +6906,13 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 						State:     state,
 						Resources: test.statusResources,
 					},
+					{
+						Name:      "c1-init",
+						State:     state,
+						Resources: test.statusResources,
+					},
 				},
 			}
-
 			match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
 			assert.Equal(t, test.expectMatch, match)
 		})
