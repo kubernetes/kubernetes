@@ -991,6 +991,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
+	if IsInPlacePodVerticalScalingAllowed(pod) {
+		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
+	}
+
 	// Check initialization progress.
 	// TODO: Remove this code path as logically it is the subset of the next
 	// code path.
@@ -1026,10 +1030,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// containers.
 			return changes
 		}
-	}
-
-	if IsInPlacePodVerticalScalingAllowed(pod) {
-		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
 	// Number of running containers to keep.
