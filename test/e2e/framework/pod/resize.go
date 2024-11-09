@@ -222,38 +222,38 @@ func separateContainerStatuses(tcInfo []ResizableContainerInfo) ([]v1.ContainerS
 func VerifyPodResizePolicy(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 
-	wantInitCtrs, wantCtrs := separateContainers(wantInfo)
-	verifyPodContainersResizePolicy(gotPod.Spec.InitContainers, wantInitCtrs)
-	verifyPodContainersResizePolicy(gotPod.Spec.Containers, wantCtrs)
-}
-
-func verifyPodContainersResizePolicy(gotCtrs []v1.Container, wantCtrs []v1.Container) {
-	ginkgo.GinkgoHelper()
+	gotCtrs := append(append([]v1.Container{}, gotPod.Spec.Containers...), gotPod.Spec.InitContainers...)
+	var wantCtrs []v1.Container
+	for _, ci := range wantInfo {
+		wantCtrs = append(wantCtrs, makeResizableContainer(ci))
+	}
 	gomega.Expect(gotCtrs).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-
-	for i, wantCtr := range wantCtrs {
-		gotCtr := gotCtrs[i]
-		gomega.Expect(gotCtr.Name).To(gomega.Equal(wantCtr.Name))
-		gomega.Expect(gotCtr.ResizePolicy).To(gomega.Equal(wantCtr.ResizePolicy))
+	for _, wantCtr := range wantCtrs {
+		for _, gotCtr := range gotCtrs {
+			if wantCtr.Name != gotCtr.Name {
+				continue
+			}
+			gomega.Expect(v1.Container{Name: gotCtr.Name, ResizePolicy: gotCtr.ResizePolicy}).To(gomega.Equal(v1.Container{Name: wantCtr.Name, ResizePolicy: wantCtr.ResizePolicy}))
+		}
 	}
 }
 
 func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 
-	wantInitCtrs, wantCtrs := separateContainers(wantInfo)
-	verifyPodContainersResources(gotPod.Spec.InitContainers, wantInitCtrs)
-	verifyPodContainersResources(gotPod.Spec.Containers, wantCtrs)
-}
-
-func verifyPodContainersResources(gotCtrs []v1.Container, wantCtrs []v1.Container) {
-	ginkgo.GinkgoHelper()
+	gotCtrs := append(append([]v1.Container{}, gotPod.Spec.Containers...), gotPod.Spec.InitContainers...)
+	var wantCtrs []v1.Container
+	for _, ci := range wantInfo {
+		wantCtrs = append(wantCtrs, makeResizableContainer(ci))
+	}
 	gomega.Expect(gotCtrs).To(gomega.HaveLen(len(wantCtrs)), "number of containers in pod spec should match")
-
-	for i, wantCtr := range wantCtrs {
-		gotCtr := gotCtrs[i]
-		gomega.Expect(gotCtr.Name).To(gomega.Equal(wantCtr.Name))
-		gomega.Expect(gotCtr.Resources).To(gomega.Equal(wantCtr.Resources))
+	for _, wantCtr := range wantCtrs {
+		for _, gotCtr := range gotCtrs {
+			if wantCtr.Name != gotCtr.Name {
+				continue
+			}
+			gomega.Expect(v1.Container{Name: gotCtr.Name, Resources: gotCtr.Resources}).To(gomega.Equal(v1.Container{Name: wantCtr.Name, Resources: wantCtr.Resources}))
+		}
 	}
 }
 

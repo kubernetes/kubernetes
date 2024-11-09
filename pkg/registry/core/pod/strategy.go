@@ -289,7 +289,7 @@ var ResizeStrategy = podResizeStrategy{
 	),
 }
 
-// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources, ResizePolicy, and certain metadata
+// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources, ResizePolicy and certain metadata
 func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	pod := dropPodUpdates(newPod, oldPod)
 
