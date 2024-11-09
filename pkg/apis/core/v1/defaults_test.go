@@ -3186,20 +3186,23 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 		for _, isSidecarContainer := range []bool{true, false} {
 			t.Run(desc, func(t *testing.T) {
 				testPod := v1.Pod{}
+				testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
+				initCtr := *tc.testContainer.DeepCopy()
 				if isSidecarContainer {
-					tc.testContainer.RestartPolicy = &restartAlways
-					testPod.Spec.InitContainers = append(testPod.Spec.InitContainers, tc.testContainer)
-				} else {
-					testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
+					initCtr.RestartPolicy = &restartAlways
 				}
+				testPod.Spec.InitContainers = append(testPod.Spec.InitContainers, initCtr)
+
 				output := roundTrip(t, runtime.Object(&testPod))
 				pod2 := output.(*v1.Pod)
-				if isSidecarContainer {
-					if !cmp.Equal(pod2.Spec.InitContainers[0].ResizePolicy, tc.expectedResizePolicy) {
-						t.Errorf("expected resize policy %+v, but got %+v for restartable init containers", tc.expectedResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy)
-					}
-				} else if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
-					t.Errorf("expected resize policy %+v, but got %+v for normal containers", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
+				if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
+					t.Errorf("expected resize policy %+v, but got %+v for regular containers", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
+				}
+				if isSidecarContainer && !cmp.Equal(pod2.Spec.InitContainers[0].ResizePolicy, tc.expectedResizePolicy) {
+					t.Errorf("expected resize policy %+v, but got %+v for restartable init containers", tc.expectedResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy)
+				}
+				if !isSidecarContainer && !cmp.Equal(testPod.Spec.InitContainers[0].ResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy) {
+					t.Errorf("expected resize policy %+v, but got %+v for normal init containers", testPod.Spec.InitContainers[0].ResizePolicy, pod2.Spec.InitContainers[0].ResizePolicy)
 				}
 			})
 		}
