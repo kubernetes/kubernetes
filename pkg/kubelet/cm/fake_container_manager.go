@@ -294,8 +294,10 @@ func (cm *FakeContainerManager) UnprepareDynamicResources(context.Context, *v1.P
 func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
 func (cm *FakeContainerManager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 }
+
 func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 	return nil
 }
@@ -306,4 +308,21 @@ func (cm *FakeContainerManager) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.
 
 func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	return false
+}
+
+func (cm *FakeContainerManager) AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool) {
+	switch res {
+	case v1.ResourceCPU:
+		if cm.nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) {
+			return ResourceAllocationModeExclusive, true
+		}
+		return ResourceAllocationModeShared, true
+	case v1.ResourceMemory:
+		if cm.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) {
+			return ResourceAllocationModeExclusive, true
+		}
+		return ResourceAllocationModeShared, true
+	default:
+		return ResourceAllocationModeShared, false
+	}
 }

@@ -37,6 +37,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -126,7 +127,8 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorderLogger
+	recorder        record.EventRecorderLogger
+	resourceManager cm.ResourceManager
 }
 
 func NewManager(checkpointDirectory string,
@@ -137,6 +139,7 @@ func NewManager(checkpointDirectory string,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 	logger klog.Logger,
+	resourceManager cm.ResourceManager,
 ) Manager {
 	return &manager{
 		allocated: newStateImpl(logger, checkpointDirectory, allocatedPodsStateFile),
@@ -145,11 +148,12 @@ func NewManager(checkpointDirectory string,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:          time.NewTicker(initialRetryDelay),
+		triggerPodSync:  triggerPodSync,
+		getActivePods:   getActivePods,
+		getPodByUID:     getPodByUID,
+		recorder:        recorder,
+		resourceManager: resourceManager,
 	}
 }
 

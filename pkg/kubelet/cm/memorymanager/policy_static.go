@@ -424,6 +424,11 @@ func memoryBlocksToString(blocks []state.Block) string {
 	return "[" + repr + "]"
 }
 
+// CanAllocateExclusively returns true if the policy can allocate exclusively memory blocks
+func (p *staticPolicy) CanAllocateExclusively() bool {
+	return true
+}
+
 // Allocate call is idempotent
 func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	// allocate the memory only for guaranteed pods
