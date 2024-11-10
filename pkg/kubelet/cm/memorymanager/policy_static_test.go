@@ -134,7 +134,7 @@ type testStaticPolicy struct {
 	initContainersReusableMemory reusableMemory
 }
 
-func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
+func initStaticPolicyTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(hint)
@@ -180,7 +180,7 @@ func TestStaticPolicyNew(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			_, _, err := initTests(t, &testCase, nil, nil)
+			_, _, err := initStaticPolicyTests(t, &testCase, nil, nil)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("The actual error: %v is different from the expected one: %v", err, testCase.expectedError)
 			}
@@ -201,7 +201,7 @@ func TestStaticPolicyName(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _, err := initTests(t, &testCase, nil, nil)
+			p, _, err := initStaticPolicyTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1148,7 +1148,7 @@ func TestStaticPolicyStart(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Logf("[Start] %s", testCase.description)
-			p, s, err := initTests(t, &testCase, nil, nil)
+			p, s, err := initStaticPolicyTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -2009,7 +2009,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
-			p, s, err := initTests(t, &testCase, testCase.topologyHint, nil)
+			p, s, err := initStaticPolicyTests(t, &testCase, testCase.topologyHint, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -2732,7 +2732,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			klog.InfoS("TestStaticPolicyAllocateWithInitContainers", "name", testCase.description)
-			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
+			p, s, err := initStaticPolicyTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -3065,7 +3065,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			klog.InfoS("TestStaticPolicyAllocateWithRestartableInitContainers", "name", testCase.description)
-			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
+			p, s, err := initStaticPolicyTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -3339,7 +3339,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, s, err := initTests(t, &testCase, nil, nil)
+			p, s, err := initStaticPolicyTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -3730,7 +3730,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, s, err := initTests(t, &testCase, nil, nil)
+			p, s, err := initStaticPolicyTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -4087,6 +4087,30 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			if isAffinityViolatingNUMAAllocations(tc.machineState, tc.topologyHint.NUMANodeAffinity) != tc.isViolationExpected {
 				t.Errorf("isAffinityViolatingNUMAAllocations with affinity %v expected to return %t, got %t", tc.topologyHint.NUMANodeAffinity.GetBits(), tc.isViolationExpected, !tc.isViolationExpected)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyCanAllocateExclusively(t *testing.T) {
+	testCases := []testStaticPolicy{
+		{
+			description: "should always return true",
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb, // random legit value to make initialization pass
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, _, err := initStaticPolicyTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !p.CanAllocateExclusively() {
+				t.Errorf("memory manager static policy should always be able to allocate exclusively")
 			}
 		})
 	}
