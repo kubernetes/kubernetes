@@ -2050,7 +2050,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets := kl.getPullSecretsForPod(pod)
+	pullSecrets, failedPullSecretNames := kl.getPullSecretsForPod(pod)
 
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod)
@@ -2065,6 +2065,16 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
+		// If we have any image pull errors, report any failed pull secrets
+		if len(failedPullSecretNames) > 0 {
+			for _, r := range result.SyncResults {
+				if errors.Is(r.Error, images.ErrImagePull) {
+					kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets: %v", failedPullSecretNames)
+					break
+				}
+			}
+		}
+
 		// Do not return error if the only failures were pods in backoff
 		for _, r := range result.SyncResults {
 			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
