@@ -136,7 +136,8 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorder
+	recorder        record.EventRecorder
+	resourceManager cm.ResourceManager
 }
 
 func NewManager(
@@ -149,6 +150,7 @@ func NewManager(
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorder,
+	resourceManager cm.ResourceManager,
 ) Manager {
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
@@ -162,11 +164,12 @@ func NewManager(
 		nodeConfig:              nodeConfig,
 		nodeAllocatableAbsolute: nodeAllocatableAbsolute,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:          time.NewTicker(initialRetryDelay),
+		triggerPodSync:  triggerPodSync,
+		getActivePods:   getActivePods,
+		getPodByUID:     getPodByUID,
+		recorder:        recorder,
+		resourceManager: resourceManager,
 	}
 }
 
@@ -711,7 +714,7 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) &&
-			m.nodeConfig.CPUManagerPolicy == string(cpumanager.PolicyStatic) &&
+			m.resourceManager.CanAllocateExclusively(v1.ResourceCPU) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceCPU) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"%s\"", string(cpumanager.PolicyStatic))
 			logger.V(3).Info(msg, "pod", format.Pod(pod))
@@ -719,7 +722,7 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 			return false, v1.PodReasonInfeasible, msg
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveMemory) &&
-			m.nodeConfig.MemoryManagerPolicy == string(memorymanager.PolicyTypeStatic) &&
+			m.resourceManager.CanAllocateExclusively(v1.ResourceMemory) &&
 			m.guaranteedPodResourceResizeRequired(pod, v1.ResourceMemory) {
 			msg := fmt.Sprintf("Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"%s\"", string(memorymanager.PolicyTypeStatic))
 			logger.V(3).Info(msg, "pod", format.Pod(pod))

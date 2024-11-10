@@ -98,6 +98,10 @@ func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) CanAllocateExclusively(res v1.ResourceName) bool {
+	return false
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager(logger logr.Logger) Manager {
 	logger = klog.LoggerWithName(logger, "cpu.fake")
