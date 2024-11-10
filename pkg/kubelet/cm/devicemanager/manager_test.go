@@ -2028,3 +2028,56 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 		}, u)
 	}
 }
+
+func TestCanAllocateExclusively(t *testing.T) {
+	socketDir, socketName, _, err := tmpSocketDir()
+	topologyStore := topologymanager.NewFakeManager()
+	require.NoError(t, err)
+	defer func() {
+		_ = os.RemoveAll(socketDir)
+	}()
+	testManager, err := newManagerImpl(socketName, nil, topologyStore)
+	if err != nil {
+		t.Fatalf("cannot create manager for socket %q: %v", socketName, err)
+	}
+
+	resourceName1 := "vendor1.com/resource1"
+	resource1Devs := []pluginapi.Device{
+		{ID: "R1Device1", Health: pluginapi.Healthy},
+		{ID: "R1Device2", Health: pluginapi.Healthy},
+	}
+	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
+
+	resourceName2 := "example.com/device"
+	resource2Devs := []pluginapi.Device{
+		{ID: "R2Device1", Health: pluginapi.Unhealthy},
+	}
+	testManager.genericDeviceUpdateCallback(resourceName2, resource2Devs)
+
+	type testcase struct {
+		resource string
+		expected bool
+	}
+	testcases := []testcase{
+		{
+			resource: resourceName1,
+			expected: true,
+		},
+		{
+			resource: "unknown",
+			expected: false,
+		},
+		{
+			resource: resourceName2,
+			expected: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.resource, func(t *testing.T) {
+			got := testManager.CanAllocateExclusively(v1.ResourceName(tc.resource))
+			if got != tc.expected {
+				t.Errorf("exclusive allocation for %q: got %v expected %v", tc.resource, got, tc.expected)
+			}
+		})
+	}
+}
