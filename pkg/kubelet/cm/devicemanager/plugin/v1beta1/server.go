@@ -24,13 +24,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"google.golang.org/grpc"
 
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -38,6 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+)
+
+const (
+	retryInterval = 1 * time.Second
+	maxServeFails = 5
 )
 
 // Server interface provides methods for Device plugin registration server.
@@ -53,15 +58,17 @@ type server struct {
 	socketName string
 	socketDir  string
 	mutex      sync.Mutex
-	backoff    wait.Backoff
 	wg         sync.WaitGroup
+	ctx        context.Context
+	cancel     context.CancelFunc
 	grpc       *grpc.Server
 	rhandler   RegistrationHandler
 	chandler   ClientHandler
 	clients    map[string]Client
 
 	// isStarted indicates whether the service has started successfully.
-	isStarted bool
+	isStarted        bool
+	exceptionMonitor atomic.Value
 }
 
 // NewServer returns an initialized device plugin registration server.
@@ -79,12 +86,6 @@ func NewServer(socketPath string, rh RegistrationHandler, ch ClientHandler) (Ser
 		rhandler:   rh,
 		chandler:   ch,
 		clients:    make(map[string]Client),
-		backoff: wait.Backoff{
-			Duration: 500 * time.Millisecond,
-			Factor:   2,
-			Jitter:   0.2,
-			Steps:    5,
-		},
 	}
 
 	return s, nil
@@ -112,37 +113,83 @@ func (s *server) Start() error {
 		return err
 	}
 
-	ln, err := net.Listen("unix", s.SocketPath())
-	if err != nil {
-		klog.ErrorS(err, "Failed to listen to socket while starting device plugin registry")
-		return err
-	}
-
-	s.wg.Add(1)
 	s.grpc = grpc.NewServer([]grpc.ServerOption{}...)
 
 	api.RegisterRegistrationServer(s.grpc, s)
-	go func() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.wg.Add(1)
+	go func(ctx context.Context) {
 		defer s.wg.Done()
-		s.setHealthy()
-		if err := s.serveWithRetry(ln); err != nil {
-			s.setUnhealthy()
-			klog.ErrorS(err, "Failed to serve device plugin registration grpc server after maximum retries", "maxRetries", s.backoff.Steps)
-		}
-	}()
+		s.serveWithRetry(ctx)
+	}(s.ctx)
 
 	return nil
 }
 
 // serveWithRetry serves the gRPC server with retry.
-func (s *server) serveWithRetry(ln net.Listener) error {
-	return wait.ExponentialBackoff(s.backoff, func() (bool, error) {
-		if err := s.grpc.Serve(ln); err != nil {
-			klog.V(2).InfoS("Error while serving device plugin registration grpc server, retrying...", "error", err)
-			return false, nil
+func (s *server) serveWithRetry(ctx context.Context) {
+	for {
+		s.setHealthy()
+		serveErrCh := make(chan error)
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			err := s.serve()
+			serveErrCh <- err
+			s.setUnhealthy()
+		}()
+
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-serveErrCh:
+			close(serveErrCh)
+			time.Sleep(retryInterval)
+			klog.ErrorS(err, "Failed to serve device plugin registration grpc server, retrying...")
 		}
-		return true, nil
-	})
+	}
+}
+
+func (s *server) serve() error {
+	ln, err := s.listen()
+	if err != nil {
+		klog.ErrorS(err, "Failed to listen to socket while starting device plugin registry", "socket", s.socketDir)
+		return err
+	}
+	if err := s.grpc.Serve(ln); err != nil {
+		s.grpc.Stop()
+		ln.Close()
+		klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+		return err
+	}
+	return nil
+}
+
+func (s *server) listen() (net.Listener, error) {
+	if err := s.cleanupSocket(); err != nil {
+		return nil, fmt.Errorf("failed to remove existing socket: %v", err)
+	}
+	return net.Listen("unix", s.SocketPath())
+}
+
+func (s *server) isFileExist() bool {
+	if _, err := os.Stat(s.SocketPath()); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+		klog.V(2).InfoS("Failed to get socket file", "error", err)
+	}
+	return true
+}
+
+func (s *server) cleanupSocket() error {
+	if !s.isFileExist() {
+		return nil
+	}
+	if err := os.Remove(s.SocketPath()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *server) Stop() error {
@@ -160,6 +207,7 @@ func (s *server) Stop() error {
 	}
 
 	s.grpc.Stop()
+	s.cancel()
 	s.wg.Wait()
 	s.grpc = nil
 	// During kubelet termination, we do not need the registration server,
@@ -227,10 +275,21 @@ func (s *server) Name() string {
 }
 
 func (s *server) Check(_ *http.Request) error {
-	if s.isStarted {
-		return nil
+	exceptionTime := s.latestExceptionTime()
+	duration := maxServeFails * retryInterval
+	if !s.isStarted && time.Now().After(exceptionTime.Add(duration)) {
+		return fmt.Errorf("device plugin registration gRPC server failed and no device plugins can register")
 	}
-	return fmt.Errorf("device plugin registration gRPC server failed and no device plugins can register")
+	return nil
+}
+
+// latestExceptionTime returns the time of the last GRPC server exception.
+func (s *server) latestExceptionTime() time.Time {
+	val := s.exceptionMonitor.Load()
+	if val == nil {
+		return time.Time{}
+	}
+	return val.(time.Time)
 }
 
 // setHealthy sets the health status of the gRPC server.
@@ -241,4 +300,5 @@ func (s *server) setHealthy() {
 // setUnhealthy sets the health status of the gRPC server to unhealthy.
 func (s *server) setUnhealthy() {
 	s.isStarted = false
+	s.exceptionMonitor.Store(time.Now())
 }
