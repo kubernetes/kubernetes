@@ -48,6 +48,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -1139,4 +1140,15 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logge
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 	return cm.resourceUpdates
+}
+
+func (cm *containerManagerImpl) AllocationMode(res v1.ResourceName) ResourceAllocationMode {
+	// run from the cheapest to the most expensive
+	if cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res) {
+		return ResourceAllocationModeExclusive
+	}
+	if res == v1.ResourceCPU || res == v1.ResourceMemory || v1helper.IsHugePageResourceName(res) {
+		return ResourceAllocationModeShared
+	}
+	return ResourceAllocationModeUnsupported
 }

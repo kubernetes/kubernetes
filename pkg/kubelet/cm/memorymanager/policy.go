@@ -49,4 +49,7 @@ type Policy interface {
 	AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) error
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory(s state.State) []state.Block
+	// CanAllocateExclusively reports whether this policy supports exclusive memory
+	// assignment for eligible workloads, regardless of available capacity.
+	CanAllocateExclusively() bool
 }

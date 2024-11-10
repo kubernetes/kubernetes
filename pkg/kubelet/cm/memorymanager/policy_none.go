@@ -79,3 +79,8 @@ func (p *none) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.
 func (p *none) GetAllocatableMemory(_ state.State) []state.Block {
 	return []state.Block{}
 }
+
+// CanAllocateExclusively reports whether the policy supports exclusive memory assignment.
+func (p *none) CanAllocateExclusively() bool {
+	return false
+}

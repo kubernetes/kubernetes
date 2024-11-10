@@ -97,6 +97,10 @@ type Manager interface {
 
 	// Updates returns a channel that receives an Update when the device changed its status.
 	Updates() <-chan resourceupdates.Update
+
+	// CanAllocateExclusively reports whether the manager knows the device resource
+	// and supports exclusive assignment of its device IDs, regardless of free or healthy capacity.
+	CanAllocateExclusively(res v1.ResourceName) bool
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
