@@ -67,6 +67,66 @@ func (_m *MockContainerManager) EXPECT() *MockContainerManager_Expecter {
 	return &MockContainerManager_Expecter{mock: &_m.Mock}
 }
 
+// AllocationMode provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) AllocationMode(res v1.ResourceName) (cm.ResourceAllocationMode, bool) {
+	ret := _mock.Called(res)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AllocationMode")
+	}
+
+	var r0 cm.ResourceAllocationMode
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(v1.ResourceName) (cm.ResourceAllocationMode, bool)); ok {
+		return returnFunc(res)
+	}
+	if returnFunc, ok := ret.Get(0).(func(v1.ResourceName) cm.ResourceAllocationMode); ok {
+		r0 = returnFunc(res)
+	} else {
+		r0 = ret.Get(0).(cm.ResourceAllocationMode)
+	}
+	if returnFunc, ok := ret.Get(1).(func(v1.ResourceName) bool); ok {
+		r1 = returnFunc(res)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockContainerManager_AllocationMode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AllocationMode'
+type MockContainerManager_AllocationMode_Call struct {
+	*mock.Call
+}
+
+// AllocationMode is a helper method to define mock.On call
+//   - res v1.ResourceName
+func (_e *MockContainerManager_Expecter) AllocationMode(res interface{}) *MockContainerManager_AllocationMode_Call {
+	return &MockContainerManager_AllocationMode_Call{Call: _e.mock.On("AllocationMode", res)}
+}
+
+func (_c *MockContainerManager_AllocationMode_Call) Run(run func(res v1.ResourceName)) *MockContainerManager_AllocationMode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 v1.ResourceName
+		if args[0] != nil {
+			arg0 = args[0].(v1.ResourceName)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_AllocationMode_Call) Return(resourceAllocationMode cm.ResourceAllocationMode, b bool) *MockContainerManager_AllocationMode_Call {
+	_c.Call.Return(resourceAllocationMode, b)
+	return _c
+}
+
+func (_c *MockContainerManager_AllocationMode_Call) RunAndReturn(run func(res v1.ResourceName) (cm.ResourceAllocationMode, bool)) *MockContainerManager_AllocationMode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ContainerHasExclusiveCPUs provides a mock function for the type MockContainerManager
 func (_mock *MockContainerManager) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
 	ret := _mock.Called(pod, container)

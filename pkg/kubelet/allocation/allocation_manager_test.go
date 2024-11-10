@@ -947,7 +947,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"static\"",
+					Message: "Resize is infeasible for Guaranteed Pods when CPU allocation mode is exclusive",
 				},
 			},
 		},
@@ -967,7 +967,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Resize is infeasible for Guaranteed Pods alongside Memory Manager policy \"Static\"",
+					Message: "Resize is infeasible for Guaranteed Pods when memory allocation mode is exclusive",
 				},
 			},
 		},
@@ -987,7 +987,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 					Type:    v1.PodResizePending,
 					Status:  "True",
 					Reason:  "Infeasible",
-					Message: "Resize is infeasible for Guaranteed Pods alongside CPU Manager policy \"static\"",
+					Message: "Resize is infeasible for Guaranteed Pods when CPU allocation mode is exclusive",
 				},
 			},
 		},
@@ -2463,7 +2463,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	}
 
 	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager, logger)
+	resizeHandler := NewPodResizesAdmitHandler(containerManager, containerManager, runtime, allocationManager, logger)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
 }

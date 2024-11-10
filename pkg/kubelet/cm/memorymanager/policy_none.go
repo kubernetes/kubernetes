@@ -76,3 +76,8 @@ func (p *none) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod) error {
 func (p *none) GetAllocatableMemory(s state.State) []state.Block {
 	return []state.Block{}
 }
+
+// CanAllocateExclusively returns true if the policy can allocate exclusively memory blocks
+func (p *none) CanAllocateExclusively() bool {
+	return false
+}

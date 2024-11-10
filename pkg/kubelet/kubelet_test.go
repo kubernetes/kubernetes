@@ -404,7 +404,7 @@ func newTestKubeletWithImageList(
 	kubelet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}
 	handlers = append(handlers, evictionAdmitHandler)
-	handlers = append(handlers, allocation.NewPodResizesAdmitHandler(kubelet.containerManager, fakeRuntime, kubelet.allocationManager, logger))
+	handlers = append(handlers, allocation.NewPodResizesAdmitHandler(kubelet.containerManager, kubelet.containerManager, fakeRuntime, kubelet.allocationManager, logger))
 
 	// setup shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{

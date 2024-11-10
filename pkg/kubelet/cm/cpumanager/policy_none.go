@@ -79,3 +79,7 @@ func (p *nonePolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) erro
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) CanAllocateExclusively() bool {
+	return false
+}

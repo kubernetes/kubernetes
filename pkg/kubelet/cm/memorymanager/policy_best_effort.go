@@ -85,3 +85,8 @@ func (p *bestEffortPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v
 	// Pod-level resources are not supported on Windows.
 	return nil
 }
+
+// CanAllocateExclusively returns true if the policy can allocate exclusively memory blocks
+func (p *bestEffortPolicy) CanAllocateExclusively() bool {
+	return false
+}
