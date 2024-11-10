@@ -323,7 +323,7 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 			invalidMetricsCount++
 			continue
 		}
-		if replicas == 0 || replicaCountProposal > replicas {
+		if replicaCountProposal > replicas {
 			timestamp = timestampProposal
 			replicas = replicaCountProposal
 			metric = metricNameProposal
