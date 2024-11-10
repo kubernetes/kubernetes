@@ -103,3 +103,10 @@ func TestNonePolicyOptions(t *testing.T) {
 		t.Errorf("NewNonePolicy with (any) options failure. expected error but got none")
 	}
 }
+
+func TestNonePolicyCanAllocateExclusively(t *testing.T) {
+	policy := &nonePolicy{}
+	if policy.CanAllocateExclusively() {
+		t.Errorf("None policy must never allocate resource exclusively")
+	}
+}

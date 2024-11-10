@@ -4091,3 +4091,27 @@ func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
 		})
 	}
 }
+
+func TestStaticPolicyCanAllocateExclusively(t *testing.T) {
+	testCases := []testStaticPolicy{
+		{
+			description: "should always return true",
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb, // random legit value to make initialization pass
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, _, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !p.CanAllocateExclusively() {
+				t.Errorf("memory manager static policy should always be able to allocate exclusively")
+			}
+		})
+	}
+}
