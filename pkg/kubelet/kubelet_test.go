@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -441,6 +442,59 @@ func newTestPods(count int) []*v1.Pod {
 	return pods
 }
 
+func createDNSConfigurer() *dns.Configurer {
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      "testNode",
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	return dns.NewConfigurer(recorder, nodeRef, nil, nil, "TEST", "")
+}
+
+func createGenericRuntimeManager(kubelet *Kubelet, kubeCfg kubeletconfiginternal.KubeletConfiguration, runtimeSvc internalapi.RuntimeService, imageSvc internalapi.ImageManagerService, tracerProvider oteltrace.TracerProvider) (kuberuntime.KubeGenericRuntime, []images.PostImageGCHook, error) {
+	return kuberuntime.NewKubeGenericRuntimeManager(
+		kubelet.recorder,
+		kubelet.livenessManager,
+		kubelet.readinessManager,
+		kubelet.startupManager,
+		kubelet.rootDirectory,
+		kubelet.podLogsDirectory,
+		kubelet.machineInfo,
+		kubelet.podWorkers,
+		kubelet.os,
+		kubelet,
+		nil,
+		kubelet.crashLoopBackOff,
+		kubeCfg.SerializeImagePulls,
+		kubeCfg.MaxParallelImagePulls,
+		float32(kubeCfg.RegistryPullQPS),
+		int(kubeCfg.RegistryBurst),
+		string(kubeletconfiginternal.NeverVerify),
+		nil,
+		"",
+		"",
+		nil,
+		kubeCfg.CPUCFSQuota,
+		kubeCfg.CPUCFSQuotaPeriod,
+		runtimeSvc,
+		imageSvc,
+		kubelet.containerManager,
+		kubelet.containerLogManager,
+		kubelet.runtimeClassManager,
+		kubelet.allocationManager,
+		false,
+		kubeCfg.MemorySwap.SwapBehavior,
+		kubelet.containerManager.GetNodeAllocatableAbsolute,
+		*kubeCfg.MemoryThrottlingFactor,
+		kubeletutil.NewPodStartupLatencyTracker(),
+		tracerProvider,
+		token.NewManager(kubelet.kubeClient),
+		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
+	)
+}
+
 func TestSyncLoopAbort(t *testing.T) {
 	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -803,15 +857,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = createDNSConfigurer()
 
 	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
 	pods := []*v1.Pod{
@@ -853,15 +899,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		},
 	}}
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = createDNSConfigurer()
 
 	// default NodeName in test is 127.0.0.1
 	pods := []*v1.Pod{
@@ -896,15 +934,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = createDNSConfigurer()
 
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}}),
@@ -966,15 +996,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 			}
 			kl.nodeLister = testNodeLister{nodes: nodes}
 
-			recorder := record.NewFakeRecorder(20)
-			nodeRef := &v1.ObjectReference{
-				Kind:      "Node",
-				Name:      "testNode",
-				UID:       types.UID("testNode"),
-				Namespace: "",
-			}
-			testClusterDNSDomain := "TEST"
-			kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+			kl.dnsConfigurer = createDNSConfigurer()
 
 			pod := podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: test.podSelector})
 
@@ -1001,15 +1023,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = createDNSConfigurer()
 
 	spec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
@@ -1099,15 +1113,7 @@ func TestHandlePluginResources(t *testing.T) {
 	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
 	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = createDNSConfigurer()
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.
@@ -3307,6 +3313,75 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 	checkPodStatus(t, kl, pod, v1.PodFailed)
 }
 
+func TestPullErrorReportsMissingSecrets(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets: [missing]"
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Replace the recorder so we can inspect the events
+	fakeRecorder := record.NewFakeRecorder(10)
+	kubelet.recorder = fakeRecorder
+
+	// Replace the secret manager with one that will return a not found
+	kubelet.secretManager = secret.NewFakeManagerWithSecrets([]*v1.Secret{})
+
+	// Fake a runtime that will get as far as the image pull
+	kubelet.dnsConfigurer = createDNSConfigurer()
+
+	kubeCfg := kubeletconfiginternal.KubeletConfiguration{
+		MemoryThrottlingFactor: ptr.To[float64](0),
+	}
+
+	tracerProvider := noopoteltrace.NewTracerProvider()
+
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+	}()
+	runtimeSvc := createRemoteRuntimeService(endpoint, t, tracerProvider)
+	kubelet.runtimeService = runtimeSvc
+
+	fakeRuntime.ImageService.InjectError("PullImage", errors.New("Test pull failed"))
+	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tracerProvider, &logger)
+	require.NoError(t, err)
+
+	kubelet.containerRuntime, _, err = createGenericRuntimeManager(kubelet, kubeCfg, runtimeSvc, imageSvc, tracerProvider)
+	require.NoError(t, err)
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		ImagePullSecrets: []v1.LocalObjectReference{
+			{
+				Name: "missing",
+			},
+		},
+		Containers: []v1.Container{
+			{
+				Name:            "bar",
+				Image:           "missing:latest",
+				ImagePullPolicy: v1.PullAlways,
+			},
+		},
+		EnableServiceLinks: ptr.To(false),
+	})
+	_, err = kubelet.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	require.ErrorContains(t, err, "ErrImagePull", "Image pull must fail for missing pull secret event to be emitted")
+
+	events := make([]string, 0, 10)
+	for done := false; !done; {
+		select {
+		case event := <-fakeRecorder.Events:
+			events = append(events, event)
+		default:
+			done = true
+		}
+	}
+	assert.Contains(t, events, expectedEvent)
+}
+
 func TestSyncLabels(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -3635,16 +3710,9 @@ func TestSyncPodSpans(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	kubelet := testKubelet.kubelet
 
-	recorder := record.NewFakeRecorder(20)
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      "testNode",
-		UID:       types.UID("testNode"),
-		Namespace: "",
-	}
-	kubelet.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, "TEST", "")
+	kubelet.dnsConfigurer = createDNSConfigurer()
 
-	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+	kubeCfg := kubeletconfiginternal.KubeletConfiguration{
 		SyncFrequency: metav1.Duration{Duration: time.Minute},
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
 		ContainerLogMaxSize:                       "10Mi",
@@ -3653,63 +3721,25 @@ func TestSyncPodSpans(t *testing.T) {
 	}
 
 	exp := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(
+	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(exp),
 	)
-	kubelet.tracer = tp.Tracer(instrumentationScope)
+	kubelet.tracer = tracerProvider.Tracer(instrumentationScope)
 
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
 	defer func() {
 		fakeRuntime.Stop()
 	}()
-	runtimeSvc := createRemoteRuntimeService(endpoint, t, tp)
+	runtimeSvc := createRemoteRuntimeService(endpoint, t, tracerProvider)
 	kubelet.runtimeService = runtimeSvc
 
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
 	logger := klog.Background()
-	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
+	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tracerProvider, &logger)
 	assert.NoError(t, err)
 
-	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
-		kubelet.recorder,
-		kubelet.livenessManager,
-		kubelet.readinessManager,
-		kubelet.startupManager,
-		kubelet.rootDirectory,
-		kubelet.podLogsDirectory,
-		kubelet.machineInfo,
-		kubelet.podWorkers,
-		kubelet.os,
-		kubelet,
-		nil,
-		kubelet.crashLoopBackOff,
-		kubeCfg.SerializeImagePulls,
-		kubeCfg.MaxParallelImagePulls,
-		float32(kubeCfg.RegistryPullQPS),
-		int(kubeCfg.RegistryBurst),
-		string(kubeletconfiginternal.NeverVerify),
-		nil,
-		"",
-		"",
-		nil,
-		kubeCfg.CPUCFSQuota,
-		kubeCfg.CPUCFSQuotaPeriod,
-		runtimeSvc,
-		imageSvc,
-		kubelet.containerManager,
-		kubelet.containerLogManager,
-		kubelet.runtimeClassManager,
-		kubelet.allocationManager,
-		false,
-		kubeCfg.MemorySwap.SwapBehavior,
-		kubelet.containerManager.GetNodeAllocatableAbsolute,
-		*kubeCfg.MemoryThrottlingFactor,
-		kubeletutil.NewPodStartupLatencyTracker(),
-		tp,
-		token.NewManager(kubelet.kubeClient),
-		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
-	)
+	kubelet.containerRuntime, _, err = createGenericRuntimeManager(kubelet, kubeCfg, runtimeSvc, imageSvc, tracerProvider)
 	assert.NoError(t, err)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
