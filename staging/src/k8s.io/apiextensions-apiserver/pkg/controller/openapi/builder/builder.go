@@ -623,7 +623,7 @@ func buildSelectableFields(crd *apiextensionsv1.CustomResourceDefinition, versio
 			break
 		}
 	}
-	if specVersion == nil && len(specVersion.SelectableFields) == 0 {
+	if specVersion == nil || len(specVersion.SelectableFields) == 0 {
 		return nil
 	}
 	selectableFields := make([]any, len(specVersion.SelectableFields))
