@@ -218,28 +218,35 @@ func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 // because of the fact that the backoff time is calculated based on podInfo.Attempts,
 // which doesn't get changed until the pod's scheduling is retried.
 func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
-	if podInfo.Attempts == 0 {
-		// Don't store backoff expiration if the duration is 0
-		// to correctly handle isPodBackingoff, if pod should skip backoff, when it wasn't tried at all.
+	count := podInfo.UnschedulableCount
+	if podInfo.ConsecutiveErrorsCount > 0 {
+		// This Pod has experienced an error status at the last scheduling cycle,
+		// and we should consider the error count for the backoff duration.
+		count = podInfo.ConsecutiveErrorsCount
+	}
+
+	if count == 0 {
+		// When the Pod hasn't experienced any scheduling attempts,
+		// they don't have to get a backoff.
 		return time.Time{}
 	}
+
 	if podInfo.BackoffExpiration.IsZero() {
-		duration := bq.calculateBackoffDuration(podInfo)
+		duration := bq.calculateBackoffDuration(count)
 		podInfo.BackoffExpiration = bq.alignToWindow(podInfo.Timestamp.Add(duration))
 	}
+
 	return podInfo.BackoffExpiration
 }
 
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
-func (bq *backoffQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInfo) time.Duration {
-	if podInfo.Attempts == 0 {
-		// When the Pod hasn't experienced any scheduling attempts,
-		// they aren't obliged to get a backoff penalty at all.
+func (bq *backoffQueue) calculateBackoffDuration(count int) time.Duration {
+	if count == 0 {
 		return 0
 	}
 
-	shift := podInfo.Attempts - 1
+	shift := count - 1
 	if bq.podInitialBackoff > bq.podMaxBackoff>>shift {
 		return bq.podMaxBackoff
 	}

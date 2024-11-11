@@ -463,7 +463,10 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleStat
 func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	rp.numUnreserveCalled++
 	if rp.pluginInvokeEventChan != nil {
-		rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}
+		select {
+		case <-ctx.Done():
+		case rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}:
+		}
 	}
 }
 
@@ -522,7 +525,10 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 
 	bp.numBindCalled++
 	if bp.pluginInvokeEventChan != nil {
-		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
+		select {
+		case <-ctx.Done():
+		case bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}:
+		}
 	}
 	if bp.bindStatus.IsSuccess() {
 		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
@@ -550,7 +556,10 @@ func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleSt
 
 	pp.numPostBindCalled++
 	if pp.pluginInvokeEventChan != nil {
-		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
+		select {
+		case <-ctx.Done():
+		case pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}:
+		}
 	}
 }
 
