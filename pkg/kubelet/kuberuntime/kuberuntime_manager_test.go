@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
@@ -47,6 +49,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	cmtesting "k8s.io/kubernetes/pkg/kubelet/cm/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
@@ -2824,5 +2828,199 @@ func TestGetImageVolumes(t *testing.T) {
 			require.NoError(t, err, desc)
 		}
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
+	}
+}
+
+func TestDoPodResizeAction(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	m.cpuCFSQuota = true // Enforce CPU Limits
+
+	for _, tc := range []struct {
+		testName                  string
+		currentResources          containerResources
+		desiredResources          containerResources
+		updatedResources          []v1.ResourceName
+		otherContainersHaveLimits bool
+		expectedError             string
+		expectPodCgroupUpdates    int
+	}{
+		{
+			testName: "Increase cpu and memory requests and limits, with computed pod limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    3, // cpu req, cpu lim, mem lim
+		},
+		{
+			testName: "Increase cpu and memory requests and limits, without computed pod limits",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			// If some containers don't have limits, pod level limits are not applied
+			otherContainersHaveLimits: false,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    1, // cpu req, cpu lim, mem lim
+		},
+		{
+			testName: "Increase cpu and memory requests only",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 200,
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 150, cpuLimit: 200,
+				memoryRequest: 150, memoryLimit: 200,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU},
+			expectPodCgroupUpdates: 1, // cpu req
+		},
+		{
+			testName: "Resize memory request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 200,
+			},
+			// Memory request resize doesn't generate an update action.
+			updatedResources: []v1.ResourceName{},
+		},
+		{
+			testName: "Resize cpu request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    200,
+				memoryRequest: 100,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU},
+			expectPodCgroupUpdates: 1, // cpu req
+		},
+		{
+			testName: "Add limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			updatedResources:       []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates: 0,
+		},
+		{
+			testName: "Add limits and pod limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    2, // cpu lim, memory lim
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			mockCM := cmtesting.NewMockContainerManager(t)
+			m.containerManager = mockCM
+			mockPCM := cmtesting.NewMockPodContainerManager(t)
+			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceMemory).Return(&cm.ResourceConfig{
+				Memory: ptr.To(tc.currentResources.memoryLimit),
+			}, nil).Maybe()
+			mockPCM.EXPECT().GetPodCgroupMemoryUsage(mock.Anything).Return(0, nil).Maybe()
+			// Set up mock pod cgroup config
+			podCPURequest := tc.currentResources.cpuRequest
+			podCPULimit := tc.currentResources.cpuLimit
+			if tc.otherContainersHaveLimits {
+				podCPURequest += 200
+				podCPULimit += 200
+			}
+			mockPCM.EXPECT().GetPodCgroupConfig(mock.Anything, v1.ResourceCPU).Return(&cm.ResourceConfig{
+				CPUShares: ptr.To(cm.MilliCPUToShares(podCPURequest)),
+				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
+			}, nil).Maybe()
+			if tc.expectPodCgroupUpdates > 0 {
+				mockPCM.EXPECT().SetPodCgroupConfig(mock.Anything, mock.Anything).Return(nil).Times(tc.expectPodCgroupUpdates)
+			}
+
+			pod, kps := makeBasePodAndStatus()
+			// pod spec and allocated resources are already updated as desired when doPodResizeAction() is called.
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuRequest, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
+				},
+			}
+			if tc.otherContainersHaveLimits {
+				resourceList := v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100M"),
+				}
+				resources := v1.ResourceRequirements{
+					Requests: resourceList,
+					Limits:   resourceList,
+				}
+				pod.Spec.Containers[1].Resources = resources
+				pod.Spec.Containers[2].Resources = resources
+			}
+
+			updateInfo := containerToUpdateInfo{
+				apiContainerIdx:           0,
+				kubeContainerID:           kps.ContainerStatuses[0].ID,
+				desiredContainerResources: tc.desiredResources,
+				currentContainerResources: &tc.currentResources,
+			}
+			containersToUpdate := make(map[v1.ResourceName][]containerToUpdateInfo)
+			for _, r := range tc.updatedResources {
+				containersToUpdate[r] = []containerToUpdateInfo{updateInfo}
+			}
+
+			syncResult := &kubecontainer.PodSyncResult{}
+			actions := podActions{
+				ContainersToUpdate: containersToUpdate,
+			}
+			m.doPodResizeAction(pod, actions, syncResult)
+
+			if tc.expectedError != "" {
+				require.Error(t, syncResult.Error())
+				require.EqualError(t, syncResult.Error(), tc.expectedError)
+			} else {
+				require.NoError(t, syncResult.Error())
+			}
+
+			mock.AssertExpectationsForObjects(t, mockPCM)
+		})
 	}
 }
