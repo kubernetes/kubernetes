@@ -209,8 +209,8 @@ func TestListTypes(t *testing.T) {
 	}
 
 	t.Logf("Updating again with invalid values, eventually successfully due to ratcheting logic")
-	err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err = fooClient.Update(context.TODO(), modifiedInstance, metav1.UpdateOptions{})
+	err = wait.PollUntilContextTimeout(context.Background(), time.Microsecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err = fooClient.Update(ctx, modifiedInstance, metav1.UpdateOptions{})
 		if err == nil {
 			return true, err
 		}

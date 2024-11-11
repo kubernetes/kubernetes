@@ -88,11 +88,11 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	{
 		t.Logf("patch of handler version v1beta1 (non-storage version) should succeed")
 		i := 0
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta1.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err = noxuNamespacedResourceClientV1beta1.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			if err != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
@@ -111,11 +111,11 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		t.Logf("patch of handler version v1beta2 (storage version) should fail")
 		i := 0
 		noxuNamespacedResourceClientV1beta2 := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1beta2") // use the storage version v1beta2
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta2.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			_, err = noxuNamespacedResourceClientV1beta2.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
 			assert.Error(t, err)
 
 			// work around "grpc: the client connection is closing" error

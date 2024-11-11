@@ -316,8 +316,8 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	addDefault("v1beta2", "c", "C")
 
 	t.Logf("wait until GET sees 'c' in both status and spec")
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		obj, err := fooClient.Get(ctx, foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -333,7 +333,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "c"}, {"status", "a"}, {"status", "b"}, {"status", "c"}})
 
 	t.Logf("wait until GET sees 'c' in both status and spec of cached get")
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{ResourceVersion: "0"})
 		if err != nil {
 			return false, err
@@ -409,8 +409,8 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	t.Logf("Add 'c' default to the REST version, remove it from the storage version, and wait until GET no longer sees it in both status and spec")
 	addDefault("v1beta1", "c", "C")
 	removeDefault("v1beta2", "c")
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		obj, err := fooClient.Get(ctx, foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -434,8 +434,8 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	removeDefault("v1beta1", "a")
 	removeDefault("v1beta1", "b")
 	removeDefault("v1beta1", "c")
-	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		obj, err := fooClient.Get(ctx, foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

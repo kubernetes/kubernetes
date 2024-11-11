@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -297,7 +298,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 	}
 
 	// initially sync all group versions to make sure we serve complete discovery
-	if err := wait.PollImmediateUntil(time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextCancel(context.Background(), time.Second, true, func(ctx context.Context) (bool, error) {
 		crds, err := c.crdLister.List(labels.Everything())
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to initially list CRDs: %v", err))
@@ -313,10 +314,11 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 			}
 		}
 		return true, nil
-	}, stopCh); err == wait.ErrWaitTimeout {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for discovery endpoint to initialize"))
-		return
-	} else if err != nil {
+	}); err != nil {
+		if err == context.DeadlineExceeded {
+			utilruntime.HandleError(fmt.Errorf("timed out waiting for initial discovery sync"))
+			return
+		}
 		panic(fmt.Errorf("unexpected error: %v", err))
 	}
 	close(synchedCh)
