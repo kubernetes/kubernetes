@@ -868,7 +868,14 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.Logf("AutomountServiceAccountToken: %v", *updatedServiceAccount.AutomountServiceAccountToken)
 	})
 
-	ginkgo.It("should create a serviceAccountToken and ensure a successful TokenReview", func(ctx context.Context) {
+	/*
+		Release: v1.32
+		Testname: ServiceAccount, create and review token
+		Description: Creating a ServiceAccount MUST succeed. Creating a ServiceAccountToken
+		MUST succeed. The token MUST not be empty. Creating a TokenReview MUST succeed.
+		The TokenReview MUST be authenticated without any errors.
+	*/
+	framework.ConformanceIt("should create a serviceAccountToken and ensure a successful TokenReview", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		saClient := f.ClientSet.CoreV1().ServiceAccounts(ns)
 		saName := "e2e-sa-" + utilrand.String(5)
