@@ -52,10 +52,9 @@ func (f *fakeClientHandler) PluginListAndWatchReceiver(pluginName string, respon
 
 // mockGRPCServer is a mock gRPC server for testing.
 type mockGRPCServer struct {
-	grpc            *grpc.Server
-	serveError      error
-	failureCount    int
-	serveFuncCalled int
+	grpc         *grpc.Server
+	serveError   error
+	failureCount int
 }
 
 func (m *mockGRPCServer) Serve(lis net.Listener) error {
@@ -68,7 +67,7 @@ func (m *mockGRPCServer) Serve(lis net.Listener) error {
 	if m.serveError != nil && m.failureCount > 0 {
 		// Simulate a gRPC serve failure by closing the listen socket.
 		fmt.Println("close called")
-		lis.Close()
+		_ = lis.Close()
 	}
 	select {
 	case err := <-serveErrCh:
@@ -93,10 +92,6 @@ func (m *mockGRPCServer) GetServiceInfo() map[string]grpc.ServiceInfo {
 
 func (m *mockGRPCServer) Stop() {
 	m.grpc.Stop()
-}
-
-func (m *mockGRPCServer) getServeFuncCalled() int {
-	return m.serveFuncCalled
 }
 
 func TestServeWithRetry(t *testing.T) {
@@ -132,7 +127,9 @@ func TestServeWithRetry(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create temp dir: %v", err)
 			}
-			defer os.RemoveAll(socketDir)
+			defer func(path string) {
+				_ = os.RemoveAll(path)
+			}(socketDir)
 			socketName := "test.sock"
 			socketPath := filepath.Join(socketDir, socketName)
 
@@ -153,8 +150,10 @@ func TestServeWithRetry(t *testing.T) {
 				t.Fatalf("Failed to create server: %v", err)
 			}
 
-			s.Start()
-			defer s.Stop()
+			_ = s.Start()
+			defer func(s Server) {
+				_ = s.Stop()
+			}(s)
 
 			// Wait for a moment to ensure the health check is effective.
 			time.Sleep(maxServeFails * retryInterval)
