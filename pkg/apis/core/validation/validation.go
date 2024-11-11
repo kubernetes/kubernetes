@@ -3543,7 +3543,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 			}
 		}
 
-		if len(ctr.ResizePolicy) > 0 {
+		if !opts.AllowSidecarResizePolicy && len(ctr.ResizePolicy) > 0 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("resizePolicy"), ctr.ResizePolicy, "must not be set for init containers"))
 		}
 	}
@@ -4051,6 +4051,8 @@ type PodValidationOptions struct {
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
 	PodLevelResourcesEnabled bool
+	// Allow sidecar containers resize policy for backward compatibility
+	AllowSidecarResizePolicy bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

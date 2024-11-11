@@ -4036,3 +4036,171 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAllowSidecarResizePolicy(t *testing.T) {
+	restartPolicyAlways := api.ContainerRestartPolicyAlways
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "old pod spec is nil",
+			wantOption: false,
+		},
+		{
+			name: "one sidecar container + one regular init container, no resize policy set on any of them",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+					},
+					{
+						Name:  "c1-init",
+						Image: "image",
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "one sidecar container + one regular init container, resize policy set on regular init container",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+					},
+					{
+						Name:  "c1-init",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "one sidecar container + one regular init container, resize policy set on sidecar container",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+					{
+						Name:  "c1-init",
+						Image: "image",
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "one sidecar container + one regular init container, resize policy set on both of them",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+					{
+						Name:  "c1-init",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "two sidecar containers, resize policy set on one of them",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:          "c1-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+					{
+						Name:          "c2-restartable-init",
+						Image:         "image",
+						RestartPolicy: &restartPolicyAlways,
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name: "two regular init containers, resize policy set on both of them",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name:  "c1-init",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+					{
+						Name:  "c2-init",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "two non-init containers, resize policy set on both of them",
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "image",
+						ResizePolicy: []api.ContainerResizePolicy{
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowSidecarResizePolicy {
+				t.Errorf("Got AllowSidecarResizePolicy=%t, want %t", gotOptions.AllowSidecarResizePolicy, tc.wantOption)
+			}
+		})
+	}
+}
