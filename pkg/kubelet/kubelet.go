@@ -2024,9 +2024,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// If we have any image pull errors, report any failed pull secrets
-		for _, r := range result.SyncResults {
-			if r.Error == images.ErrImagePull {
-				if len(failedPullSecrets) > 0 {
+		if len(failedPullSecrets) > 0 {
+			for _, r := range result.SyncResults {
+				if r.Error == images.ErrImagePull {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets: %v", failedPullSecrets)
 				}
 			}
