@@ -346,8 +346,8 @@ github.com/google/go-cmp/cmp/internal/value
 ## explicit; go 1.12
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
-# github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
-## explicit; go 1.19
+# github.com/google/pprof v0.0.0-20240827171923-fa2c70bbbfe5
+## explicit; go 1.22
 github.com/google/pprof/profile
 # github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 ## explicit; go 1.13
@@ -463,7 +463,7 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.17.2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240806135314-3946b2b7b2a8
+# github.com/onsi/ginkgo/v2 v2.20.2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241008152707-25bf9f14db44
 ## explicit; go 1.20
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -540,6 +540,19 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalkdir
+# github.com/openshift-eng/openshift-tests-extension v0.0.0-20241028125658-76ee2532d0bf
+## explicit; go 1.22.0
+github.com/openshift-eng/openshift-tests-extension/pkg/cmd
+github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdinfo
+github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdlist
+github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdrun
+github.com/openshift-eng/openshift-tests-extension/pkg/cmd/cmdupdate
+github.com/openshift-eng/openshift-tests-extension/pkg/dbtime
+github.com/openshift-eng/openshift-tests-extension/pkg/extension
+github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests
+github.com/openshift-eng/openshift-tests-extension/pkg/flags
+github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo
+github.com/openshift-eng/openshift-tests-extension/pkg/version
 # github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
 ## explicit; go 1.22.0
 github.com/openshift/api/apiserver/v1
@@ -1083,7 +1096,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices
-# golang.org/x/mod v0.17.0
+# golang.org/x/mod v0.20.0
 ## explicit; go 1.18
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
@@ -1104,7 +1117,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.21.0
+# golang.org/x/oauth2 v0.22.0
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
@@ -1159,7 +1172,7 @@ golang.org/x/text/width
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
+# golang.org/x/tools v0.24.0
 ## explicit; go 1.19
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/cmd/stringer
@@ -1168,7 +1181,6 @@ golang.org/x/tools/cover
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
-golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
 golang.org/x/tools/go/types/objectpath
 golang.org/x/tools/imports
@@ -1190,17 +1202,17 @@ golang.org/x/tools/internal/versions
 # google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d
 ## explicit; go 1.19
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157
-## explicit; go 1.20
+# google.golang.org/genproto/googleapis/api v0.0.0-20240930140551-af27646dc61f
+## explicit; go 1.21
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094
-## explicit; go 1.20
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20240924160255-9d4c2d233b61
+## explicit; go 1.21
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.65.0
+# google.golang.org/grpc v1.67.0
 ## explicit; go 1.21
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -1219,7 +1231,9 @@ google.golang.org/grpc/credentials/insecure
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/gzip
 google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/experimental/stats
 google.golang.org/grpc/grpclog
+google.golang.org/grpc/grpclog/internal
 google.golang.org/grpc/health
 google.golang.org/grpc/health/grpc_health_v1
 google.golang.org/grpc/internal
@@ -1243,11 +1257,13 @@ google.golang.org/grpc/internal/resolver/dns/internal
 google.golang.org/grpc/internal/resolver/passthrough
 google.golang.org/grpc/internal/resolver/unix
 google.golang.org/grpc/internal/serviceconfig
+google.golang.org/grpc/internal/stats
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/internal/transport/networktype
 google.golang.org/grpc/keepalive
+google.golang.org/grpc/mem
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
 google.golang.org/grpc/resolver
@@ -1569,4 +1585,4 @@ sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
 # github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2
-# github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240806135314-3946b2b7b2a8
+# github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241008152707-25bf9f14db44

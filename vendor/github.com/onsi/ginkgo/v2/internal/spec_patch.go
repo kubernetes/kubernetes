@@ -11,3 +11,12 @@ func (s Spec) CodeLocations() []types.CodeLocation {
 func (s Spec) AppendText(text string) {
 	s.Nodes[len(s.Nodes)-1].Text += text
 }
+
+func (s Spec) Labels() []string {
+	var labels []string
+	for _, n := range s.Nodes {
+		labels = append(labels, n.Labels...)
+	}
+
+	return labels
+}

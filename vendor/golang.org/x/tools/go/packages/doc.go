@@ -198,14 +198,6 @@ Instead, ssadump no longer requests the runtime package,
 but seeks it among the dependencies of the user-specified packages,
 and emits an error if it is not found.
 
-Overlays: The Overlay field in the Config allows providing alternate contents
-for Go source files, by providing a mapping from file path to contents.
-go/packages will pull in new imports added in overlay files when go/packages
-is run in LoadImports mode or greater.
-Overlay support for the go list driver isn't complete yet: if the file doesn't
-exist on disk, it will only be recognized in an overlay if it is a non-test file
-and the package would be reported even without the overlay.
-
 Questions & Tasks
 
 - Add GOARCH/GOOS?

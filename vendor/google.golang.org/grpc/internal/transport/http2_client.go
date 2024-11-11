@@ -47,6 +47,7 @@ import (
 	isyscall "google.golang.org/grpc/internal/syscall"
 	"google.golang.org/grpc/internal/transport/networktype"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/resolver"
@@ -58,6 +59,8 @@ import (
 // initiated (equal to the number of http2Clients created). Must be accessed
 // atomically.
 var clientConnectionCounter uint64
+
+var goAwayLoopyWriterTimeout = 5 * time.Second
 
 var metadataFromOutgoingContextRaw = internal.FromOutgoingContextRaw.(func(context.Context) (metadata.MD, [][]string, bool))
 
@@ -144,7 +147,7 @@ type http2Client struct {
 
 	onClose func(GoAwayReason)
 
-	bufferPool *bufferPool
+	bufferPool mem.BufferPool
 
 	connectionID uint64
 	logger       *grpclog.PrefixLogger
@@ -229,7 +232,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		}
 	}(conn)
 
-	// The following defer and goroutine monitor the connectCtx for cancelation
+	// The following defer and goroutine monitor the connectCtx for cancellation
 	// and deadline.  On context expiration, the connection is hard closed and
 	// this function will naturally fail as a result.  Otherwise, the defer
 	// waits for the goroutine to exit to prevent the context from being
@@ -346,7 +349,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		streamQuota:           defaultMaxStreamsClient,
 		streamsQuotaAvailable: make(chan struct{}, 1),
 		keepaliveEnabled:      keepaliveEnabled,
-		bufferPool:            newBufferPool(),
+		bufferPool:            opts.BufferPool,
 		onClose:               onClose,
 	}
 	var czSecurity credentials.ChannelzSecurityValue
@@ -463,7 +466,7 @@ func newHTTP2Client(connectCtx, ctx context.Context, addr resolver.Address, opts
 		return nil, err
 	}
 	go func() {
-		t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger, t.outgoingGoAwayHandler)
+		t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger, t.outgoingGoAwayHandler, t.bufferPool)
 		if err := t.loopy.run(); !isIOError(err) {
 			// Immediately close the connection, as the loopy writer returns
 			// when there are no more active streams and we were draining (the
@@ -504,7 +507,6 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 			closeStream: func(err error) {
 				t.CloseStream(s, err)
 			},
-			freeBuffer: t.bufferPool.put,
 		},
 		windowHandler: func(n int) {
 			t.updateWindow(s, uint32(n))
@@ -770,7 +772,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (*Stream,
 	hdr := &headerFrame{
 		hf:        headerFields,
 		endStream: false,
-		initStream: func(id uint32) error {
+		initStream: func(uint32) error {
 			t.mu.Lock()
 			// TODO: handle transport closure in loopy instead and remove this
 			// initStream is never called when transport is draining.
@@ -983,6 +985,7 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 // only once on a transport. Once it is called, the transport should not be
 // accessed anymore.
 func (t *http2Client) Close(err error) {
+	t.conn.SetWriteDeadline(time.Now().Add(time.Second * 10))
 	t.mu.Lock()
 	// Make sure we only close once.
 	if t.state == closing {
@@ -1006,10 +1009,20 @@ func (t *http2Client) Close(err error) {
 		t.kpDormancyCond.Signal()
 	}
 	t.mu.Unlock()
+
 	// Per HTTP/2 spec, a GOAWAY frame must be sent before closing the
-	// connection. See https://httpwg.org/specs/rfc7540.html#GOAWAY.
+	// connection. See https://httpwg.org/specs/rfc7540.html#GOAWAY. It
+	// also waits for loopyWriter to be closed with a timer to avoid the
+	// long blocking in case the connection is blackholed, i.e. TCP is
+	// just stuck.
 	t.controlBuf.put(&goAway{code: http2.ErrCodeNo, debugData: []byte("client transport shutdown"), closeConn: err})
-	<-t.writerDone
+	timer := time.NewTimer(goAwayLoopyWriterTimeout)
+	defer timer.Stop()
+	select {
+	case <-t.writerDone: // success
+	case <-timer.C:
+		t.logger.Infof("Failed to write a GOAWAY frame as part of connection close after %s. Giving up and closing the transport.", goAwayLoopyWriterTimeout)
+	}
 	t.cancel()
 	t.conn.Close()
 	channelz.RemoveEntry(t.channelz.ID)
@@ -1065,27 +1078,36 @@ func (t *http2Client) GracefulClose() {
 
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
-func (t *http2Client) Write(s *Stream, hdr []byte, data []byte, opts *Options) error {
+func (t *http2Client) Write(s *Stream, hdr []byte, data mem.BufferSlice, opts *Options) error {
+	reader := data.Reader()
+
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
+			_ = reader.Close()
 			return errStreamDone
 		}
 	} else if s.getState() != streamActive {
+		_ = reader.Close()
 		return errStreamDone
 	}
 	df := &dataFrame{
 		streamID:  s.id,
 		endStream: opts.Last,
 		h:         hdr,
-		d:         data,
+		reader:    reader,
 	}
-	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
-		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
+	if hdr != nil || df.reader.Remaining() != 0 { // If it's not an empty data frame, check quota.
+		if err := s.wq.get(int32(len(hdr) + df.reader.Remaining())); err != nil {
+			_ = reader.Close()
 			return err
 		}
 	}
-	return t.controlBuf.put(df)
+	if err := t.controlBuf.put(df); err != nil {
+		_ = reader.Close()
+		return err
+	}
+	return nil
 }
 
 func (t *http2Client) getStream(f http2.Frame) *Stream {
@@ -1190,10 +1212,13 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 		// guarantee f.Data() is consumed before the arrival of next frame.
 		// Can this copy be eliminated?
 		if len(f.Data()) > 0 {
-			buffer := t.bufferPool.get()
-			buffer.Reset()
-			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+			pool := t.bufferPool
+			if pool == nil {
+				// Note that this is only supposed to be nil in tests. Otherwise, stream is
+				// always initialized with a BufferPool.
+				pool = mem.DefaultBufferPool()
+			}
+			s.write(recvMsg{buffer: mem.Copy(f.Data(), pool)})
 		}
 	}
 	// The server has closed the stream without sending trailers.  Record that
@@ -1222,7 +1247,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	if statusCode == codes.Canceled {
 		if d, ok := s.ctx.Deadline(); ok && !d.After(time.Now()) {
 			// Our deadline was already exceeded, and that was likely the cause
-			// of this cancelation.  Alter the status code accordingly.
+			// of this cancellation.  Alter the status code accordingly.
 			statusCode = codes.DeadlineExceeded
 		}
 	}
@@ -1307,7 +1332,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 	id := f.LastStreamID
 	if id > 0 && id%2 == 0 {
 		t.mu.Unlock()
-		t.Close(connectionErrorf(true, nil, "received goaway with non-zero even-numbered numbered stream id: %v", id))
+		t.Close(connectionErrorf(true, nil, "received goaway with non-zero even-numbered stream id: %v", id))
 		return
 	}
 	// A client can receive multiple GoAways from the server (see
@@ -1642,11 +1667,10 @@ func (t *http2Client) reader(errCh chan<- error) {
 					t.closeStream(s, status.Error(code, msg), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue
-			} else {
-				// Transport error.
-				t.Close(connectionErrorf(true, err, "error reading from server: %v", err))
-				return
 			}
+			// Transport error.
+			t.Close(connectionErrorf(true, err, "error reading from server: %v", err))
+			return
 		}
 		switch frame := frame.(type) {
 		case *http2.MetaHeadersFrame:
@@ -1669,13 +1693,6 @@ func (t *http2Client) reader(errCh chan<- error) {
 			}
 		}
 	}
-}
-
-func minTime(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // keepalive running in a separate goroutine makes sure the connection is alive by sending pings.
@@ -1745,7 +1762,7 @@ func (t *http2Client) keepalive() {
 			// timeoutLeft. This will ensure that we wait only for kp.Time
 			// before sending out the next ping (for cases where the ping is
 			// acked).
-			sleepDuration := minTime(t.kp.Time, timeoutLeft)
+			sleepDuration := min(t.kp.Time, timeoutLeft)
 			timeoutLeft -= sleepDuration
 			timer.Reset(sleepDuration)
 		case <-t.ctx.Done():

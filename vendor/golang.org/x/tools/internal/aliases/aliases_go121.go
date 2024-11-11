@@ -15,10 +15,14 @@ import (
 // It will never be created by go/types.
 type Alias struct{}
 
-func (*Alias) String() string         { panic("unreachable") }
-func (*Alias) Underlying() types.Type { panic("unreachable") }
-func (*Alias) Obj() *types.TypeName   { panic("unreachable") }
-func Rhs(alias *Alias) types.Type     { panic("unreachable") }
+func (*Alias) String() string                                { panic("unreachable") }
+func (*Alias) Underlying() types.Type                        { panic("unreachable") }
+func (*Alias) Obj() *types.TypeName                          { panic("unreachable") }
+func Rhs(alias *Alias) types.Type                            { panic("unreachable") }
+func TypeParams(alias *Alias) *types.TypeParamList           { panic("unreachable") }
+func SetTypeParams(alias *Alias, tparams []*types.TypeParam) { panic("unreachable") }
+func TypeArgs(alias *Alias) *types.TypeList                  { panic("unreachable") }
+func Origin(alias *Alias) *Alias                             { panic("unreachable") }
 
 // Unalias returns the type t for go <=1.21.
 func Unalias(t types.Type) types.Type { return t }

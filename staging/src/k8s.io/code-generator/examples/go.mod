@@ -35,7 +35,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
+	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
@@ -59,4 +59,4 @@ replace (
 
 replace github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2
 
-replace github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240806135314-3946b2b7b2a8
+replace github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241008152707-25bf9f14db44

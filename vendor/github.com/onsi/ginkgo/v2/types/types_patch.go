@@ -4,4 +4,5 @@ type TestSpec interface {
 	CodeLocations() []CodeLocation
 	Text() string
 	AppendText(text string)
+	Labels() []string
 }
