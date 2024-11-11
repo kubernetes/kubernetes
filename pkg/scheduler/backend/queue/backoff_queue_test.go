@@ -43,28 +43,35 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 			name:                   "no backoff",
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     32 * time.Nanosecond,
-			podInfo:                &framework.QueuedPodInfo{Attempts: 0},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 0},
 			want:                   0,
 		},
 		{
-			name:                   "normal",
+			name:                   "backoff by UnschedulableCount",
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     32 * time.Nanosecond,
-			podInfo:                &framework.QueuedPodInfo{Attempts: 16},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16},
+			want:                   32 * time.Nanosecond,
+		},
+		{
+			name:                   "backoff is calculated with ConsecutiveErrorsCount",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     32 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 5, ConsecutiveErrorsCount: 16},
 			want:                   32 * time.Nanosecond,
 		},
 		{
 			name:                   "overflow_32bit",
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     math.MaxInt32 * time.Nanosecond,
-			podInfo:                &framework.QueuedPodInfo{Attempts: 32},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 32},
 			want:                   math.MaxInt32 * time.Nanosecond,
 		},
 		{
 			name:                   "overflow_64bit",
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     math.MaxInt64 * time.Nanosecond,
-			podInfo:                &framework.QueuedPodInfo{Attempts: 64},
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 64},
 			want:                   math.MaxInt64 * time.Nanosecond,
 		},
 	}
@@ -182,6 +189,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now(),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		{
@@ -190,6 +198,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now().Add(-time.Second),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		{
@@ -198,6 +207,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		{
@@ -206,6 +216,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		{
@@ -214,6 +225,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		{
@@ -222,6 +234,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			},
 			Timestamp:            fakeClock.Now().Add(-3 * time.Second),
 			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 	}
