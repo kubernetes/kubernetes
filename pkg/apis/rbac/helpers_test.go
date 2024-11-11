@@ -160,6 +160,48 @@ func TestResourceMatches(t *testing.T) {
 			requestedSubresource:      "other/segment",
 			expected:                  false,
 		},
+		{
+			name:                      "matches resource/* pattern with subresource",
+			ruleResources:             []string{"foo/*"},
+			combinedRequestedResource: "foo/status",
+			requestedSubresource:      "status",
+			expected:                  true,
+		},
+		{
+			name:                      "does not match resource/* pattern without subresource",
+			ruleResources:             []string{"foo/*"},
+			combinedRequestedResource: "foo",
+			requestedSubresource:      "",
+			expected:                  false,
+		},
+		{
+			name:                      "does not match resource/* pattern with different resource",
+			ruleResources:             []string{"bar/*"},
+			combinedRequestedResource: "foo/status",
+			requestedSubresource:      "status",
+			expected:                  false,
+		},
+		{
+			name:                      "matches resource/* pattern with deeper subresource",
+			ruleResources:             []string{"foo/*"},
+			combinedRequestedResource: "foo/subresource/extra",
+			requestedSubresource:      "subresource/extra",
+			expected:                  true,
+		},
+		{
+			name:                      "matches resource/* with multiple resources",
+			ruleResources:             []string{"foo/*", "bar/*"},
+			combinedRequestedResource: "bar/status",
+			requestedSubresource:      "status",
+			expected:                  true,
+		},
+		{
+			name:                      "does not match when resource names differ",
+			ruleResources:             []string{"baz/*"},
+			combinedRequestedResource: "foo/status",
+			requestedSubresource:      "status",
+			expected:                  false,
+		},
 	}
 
 	for _, tc := range tests {

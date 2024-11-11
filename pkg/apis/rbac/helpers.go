@@ -48,6 +48,13 @@ func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubre
 			return true
 
 		}
+		// if the rule isn't in the "resource/*" format, then we don't match and continue
+		if strings.HasSuffix(ruleResource, "/*") {
+			ruleResourcePrefix := strings.TrimSuffix(ruleResource, "/*")
+			if strings.HasPrefix(combinedRequestedResource, ruleResourcePrefix+"/") {
+				return true
+			}			
+		}		
 	}
 
 	return false
