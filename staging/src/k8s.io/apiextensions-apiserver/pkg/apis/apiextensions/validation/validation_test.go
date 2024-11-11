@@ -11002,7 +11002,7 @@ func TestValidateCustomResourceDefinitionStoredVersions(t *testing.T) {
 			storageVersion: "v1",
 			storedVersions: []string{"v1alpha", "v1beta1", "v1"},
 			errors: []validationMatch{
-				invalidIndex(0, "status", "storedVersions").contains("Invalid value: \"v1alpha\": must appear in spec.versions"),
+				invalidIndex(0, "status", "storedVersions").contains("Invalid value: \"v1alpha\": missing from spec.versions"),
 			},
 		},
 		{
