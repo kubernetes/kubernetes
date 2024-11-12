@@ -65,8 +65,8 @@ import (
 )
 
 const (
-	NodePrepareResourcesMethod   = "/v1beta1.DRAPlugin/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/v1beta1.DRAPlugin/NodeUnprepareResources"
+	NodePrepareResourcesMethod   = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodeUnprepareResources"
 )
 
 type Nodes struct {
