@@ -114,6 +114,7 @@ func (e *Runner) AppendPhase(t Phase) {
 	e.AppendPhases(t)
 }
 
+// AppendPhases adds the given phases to the ordered sequence of phases managed by the runner.
 func (e *Runner) AppendPhases(phases ...Phase) {
 	e.Phases = append(e.Phases, phases...)
 }
