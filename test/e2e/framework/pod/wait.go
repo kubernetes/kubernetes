@@ -37,6 +37,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
+	podv1util "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/format"
@@ -869,11 +870,14 @@ func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, name
 	})
 }
 
-// WaitForContainerRestartedNTimes waits for a container in the Pod to have restarted N times
-func WaitForContainerRestartedNTimes(ctx context.Context, c clientset.Interface, namespace string, podName string, timeout time.Duration, target int) error {
+// WaitForContainerRestartedNTimes waits for the given normal container in the Pod to have restarted N times
+func WaitForContainerRestartedNTimes(ctx context.Context, c clientset.Interface, namespace string, podName string, containerName string, timeout time.Duration, target int) error {
 	conditionDesc := fmt.Sprintf("A container in pod %s restarted at least %d times", podName, target)
 	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
-		r, _ := podutils.MaxContainerRestarts(pod)
-		return r >= target, nil
+		cs, found := podv1util.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		if !found {
+			return false, fmt.Errorf("could not find container %s in  pod %s", containerName, podName)
+		}
+		return cs.RestartCount >= int32(target), nil
 	})
 }
