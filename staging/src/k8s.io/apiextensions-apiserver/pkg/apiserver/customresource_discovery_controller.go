@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -315,7 +316,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 		}
 		return true, nil
 	}); err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.Canceled) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for initial discovery sync"))
 			return
 		}
