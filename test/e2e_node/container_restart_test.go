@@ -21,8 +21,10 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	podv1util "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -97,7 +99,7 @@ func doTest(ctx context.Context, f *framework.Framework, targetRestarts int, con
 
 	// Hard wait 30 seconds for targetRestarts in the best case; longer timeout later will handle if infra was slow.
 	time.Sleep(30 * time.Second)
-	podErr = e2epod.WaitForContainerRestartedNTimes(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName, 5*time.Minute, targetRestarts)
+	podErr = waitForContainerRestartedNTimes(ctx, f, f.Namespace.Name, pod.Name, containerName, 5*time.Minute, targetRestarts)
 	gomega.Expect(podErr).ShouldNot(gomega.HaveOccurred(), "Expected container to repeatedly back off container failures")
 
 	r, err := extractObservedBackoff(ctx, f, pod.Name, containerName)
@@ -139,4 +141,15 @@ func newFailAlwaysPod() *v1.Pod {
 		},
 	}
 	return pod
+}
+
+func waitForContainerRestartedNTimes(ctx context.Context, f *framework.Framework, namespace string, podName string, containerName string, timeout time.Duration, target int) error {
+	conditionDesc := fmt.Sprintf("A container in pod %s restarted at least %d times", podName, target)
+	return e2epod.WaitForPodCondition(ctx, f.ClientSet, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		cs, found := podv1util.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
+		if !found {
+			return false, fmt.Errorf("could not find container %s in  pod %s", containerName, podName)
+		}
+		return cs.RestartCount >= int32(target), nil
+	})
 }
