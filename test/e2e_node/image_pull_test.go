@@ -259,7 +259,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 
 		// Wait for ~60s worth of backoffs to occur so we can confirm the backoff growth.
 		podErr = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, 1*time.Minute)
-		gomega.Expect(podErr).To(gomega.HaveOccurred(), "Expected container not to start from repeadedly backing off image pulls")
+		gomega.Expect(podErr).To(gomega.HaveOccurred(), "Expected container not to start from repeatedly backing off image pulls")
 
 		e, err := getImagePullAttempts(ctx, f, pod.Name)
 		framework.ExpectNoError(err)
