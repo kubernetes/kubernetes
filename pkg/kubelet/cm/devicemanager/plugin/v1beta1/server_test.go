@@ -43,11 +43,11 @@ func (f *fakeClientHandler) PluginConnected(pluginName string, plugin DevicePlug
 }
 
 func (f *fakeClientHandler) PluginDisconnected(pluginName string) {
-	return
+
 }
 
 func (f *fakeClientHandler) PluginListAndWatchReceiver(pluginName string, response *api.ListAndWatchResponse) {
-	return
+
 }
 
 // mockGRPCServer is a mock gRPC server for testing.
@@ -69,13 +69,11 @@ func (m *mockGRPCServer) Serve(lis net.Listener) error {
 		fmt.Println("close called")
 		_ = lis.Close()
 	}
-	select {
-	case err := <-serveErrCh:
-		if err != nil {
-			m.failureCount--
-		}
-		return err
+	err := <-serveErrCh
+	if err != nil {
+		m.failureCount--
 	}
+	return err
 }
 
 func (m *mockGRPCServer) RegisterService(sd *grpc.ServiceDesc, ss any) {
