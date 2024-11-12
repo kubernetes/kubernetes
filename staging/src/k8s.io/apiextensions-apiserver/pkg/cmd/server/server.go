@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 )
 
 func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command {
@@ -34,7 +34,7 @@ func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command
 		Short: "Launch an API extensions API server",
 		Long:  "Launch an API extensions API server",
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			return utilversion.DefaultComponentGlobalsRegistry.Set()
+			return featuregate.DefaultComponentGlobalsRegistry.Set()
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {

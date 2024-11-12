@@ -127,20 +127,48 @@ var nilBuffer = &emptyBuffer{}
 // elements of the byte or uint16 array, and continue. The underlying storage is an rune array
 // containing any Unicode character.
 func NewBuffer(data string) Buffer {
+	buf, _ := newBuffer(data, false)
+	return buf
+}
+
+// NewBufferAndLineOffsets returns an efficient implementation of Buffer for the given text based on
+// the ranges of the encoded code points contained within, as well as returning the line offsets.
+//
+// Code points are represented as an array of byte, uint16, or rune. This approach ensures that
+// each index represents a code point by itself without needing to use an array of rune. At first
+// we assume all code points are less than or equal to '\u007f'. If this holds true, the
+// underlying storage is a byte array containing only ASCII characters. If we encountered a code
+// point above this range but less than or equal to '\uffff' we allocate a uint16 array, copy the
+// elements of previous byte array to the uint16 array, and continue. If this holds true, the
+// underlying storage is a uint16 array containing only Unicode characters in the Basic Multilingual
+// Plane. If we encounter a code point above '\uffff' we allocate an rune array, copy the previous
+// elements of the byte or uint16 array, and continue. The underlying storage is an rune array
+// containing any Unicode character.
+func NewBufferAndLineOffsets(data string) (Buffer, []int32) {
+	return newBuffer(data, true)
+}
+
+func newBuffer(data string, lines bool) (Buffer, []int32) {
 	if len(data) == 0 {
-		return nilBuffer
+		return nilBuffer, []int32{0}
 	}
 	var (
-		idx   = 0
-		buf8  = make([]byte, 0, len(data))
+		idx         = 0
+		off   int32 = 0
+		buf8        = make([]byte, 0, len(data))
 		buf16 []uint16
 		buf32 []rune
+		offs  []int32
 	)
 	for idx < len(data) {
 		r, s := utf8.DecodeRuneInString(data[idx:])
 		idx += s
+		if lines && r == '\n' {
+			offs = append(offs, off+1)
+		}
 		if r < utf8.RuneSelf {
 			buf8 = append(buf8, byte(r))
+			off++
 			continue
 		}
 		if r <= 0xffff {
@@ -150,6 +178,7 @@ func NewBuffer(data string) Buffer {
 			}
 			buf8 = nil
 			buf16 = append(buf16, uint16(r))
+			off++
 			goto copy16
 		}
 		buf32 = make([]rune, len(buf8), len(data))
@@ -158,17 +187,25 @@ func NewBuffer(data string) Buffer {
 		}
 		buf8 = nil
 		buf32 = append(buf32, r)
+		off++
 		goto copy32
+	}
+	if lines {
+		offs = append(offs, off+1)
 	}
 	return &asciiBuffer{
 		arr: buf8,
-	}
+	}, offs
 copy16:
 	for idx < len(data) {
 		r, s := utf8.DecodeRuneInString(data[idx:])
 		idx += s
+		if lines && r == '\n' {
+			offs = append(offs, off+1)
+		}
 		if r <= 0xffff {
 			buf16 = append(buf16, uint16(r))
+			off++
 			continue
 		}
 		buf32 = make([]rune, len(buf16), len(data))
@@ -177,18 +214,29 @@ copy16:
 		}
 		buf16 = nil
 		buf32 = append(buf32, r)
+		off++
 		goto copy32
+	}
+	if lines {
+		offs = append(offs, off+1)
 	}
 	return &basicBuffer{
 		arr: buf16,
-	}
+	}, offs
 copy32:
 	for idx < len(data) {
 		r, s := utf8.DecodeRuneInString(data[idx:])
 		idx += s
+		if lines && r == '\n' {
+			offs = append(offs, off+1)
+		}
 		buf32 = append(buf32, r)
+		off++
+	}
+	if lines {
+		offs = append(offs, off+1)
 	}
 	return &supplementalBuffer{
 		arr: buf32,
-	}
+	}, offs
 }

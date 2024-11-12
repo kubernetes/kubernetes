@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/coordination/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // LeaseLister helps list Leases.
@@ -30,7 +30,7 @@ import (
 type LeaseLister interface {
 	// List lists all Leases in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.Lease, err error)
+	List(selector labels.Selector) (ret []*coordinationv1beta1.Lease, err error)
 	// Leases returns an object that can list and get Leases.
 	Leases(namespace string) LeaseNamespaceLister
 	LeaseListerExpansion
@@ -38,17 +38,17 @@ type LeaseLister interface {
 
 // leaseLister implements the LeaseLister interface.
 type leaseLister struct {
-	listers.ResourceIndexer[*v1beta1.Lease]
+	listers.ResourceIndexer[*coordinationv1beta1.Lease]
 }
 
 // NewLeaseLister returns a new LeaseLister.
 func NewLeaseLister(indexer cache.Indexer) LeaseLister {
-	return &leaseLister{listers.New[*v1beta1.Lease](indexer, v1beta1.Resource("lease"))}
+	return &leaseLister{listers.New[*coordinationv1beta1.Lease](indexer, coordinationv1beta1.Resource("lease"))}
 }
 
 // Leases returns an object that can list and get Leases.
 func (s *leaseLister) Leases(namespace string) LeaseNamespaceLister {
-	return leaseNamespaceLister{listers.NewNamespaced[*v1beta1.Lease](s.ResourceIndexer, namespace)}
+	return leaseNamespaceLister{listers.NewNamespaced[*coordinationv1beta1.Lease](s.ResourceIndexer, namespace)}
 }
 
 // LeaseNamespaceLister helps list and get Leases.
@@ -56,15 +56,15 @@ func (s *leaseLister) Leases(namespace string) LeaseNamespaceLister {
 type LeaseNamespaceLister interface {
 	// List lists all Leases in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.Lease, err error)
+	List(selector labels.Selector) (ret []*coordinationv1beta1.Lease, err error)
 	// Get retrieves the Lease from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.Lease, error)
+	Get(name string) (*coordinationv1beta1.Lease, error)
 	LeaseNamespaceListerExpansion
 }
 
 // leaseNamespaceLister implements the LeaseNamespaceLister
 // interface.
 type leaseNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.Lease]
+	listers.ResourceIndexer[*coordinationv1beta1.Lease]
 }

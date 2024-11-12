@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -37,16 +38,16 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), feature.WatchList, func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested by informers when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -66,13 +67,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 			nil,
 		)
 
-		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []v1.Secret
-		for i := 1; i <= 5; i++ {
-			secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		ginkgo.By("Starting the secret informer")
 		go secretInformer.Run(stopCh)
@@ -99,13 +94,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 	ginkgo.It("should be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
-		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []v1.Secret
-		for i := 1; i <= 5; i++ {
-			secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedKubeClient, err := kubernetes.NewForConfig(clientConfig)
@@ -127,18 +116,105 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
-		var expectedSecrets []unstructured.Unstructured
-		for i := 1; i <= 5; i++ {
-			unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
-			framework.ExpectNoError(err)
-			secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			expectedSecrets = append(expectedSecrets, *secret)
-		}
+		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
 
 		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedDynamicClient, err := dynamic.NewForConfig(clientConfig)
 		framework.ExpectNoError(err)
+
+		ginkgo.By("Streaming secrets from the server")
+		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying if the secret list was properly streamed")
+		streamedSecrets := secretList.Items
+		gomega.Expect(cmp.Equal(expectedSecrets, streamedSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+		gomega.Expect(secretList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("SecretList")))
+
+		ginkgo.By("Verifying if expected requests were sent to the server")
+		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientFor(secretList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+	})
+	ginkgo.It("should be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		metaClient, err := metadata.NewForConfig(f.ClientConfig())
+		framework.ExpectNoError(err)
+		expectedMetaSecrets := []metav1.PartialObjectMetadata{}
+		for _, addedSecret := range addWellKnownSecrets(ctx, f) {
+			addedSecretMeta, err := metaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Get(ctx, addedSecret.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			expectedMetaSecrets = append(expectedMetaSecrets, *addedSecretMeta)
+		}
+
+		rt, clientConfig := clientConfigWithRoundTripper(f)
+		wrappedMetaClient, err := metadata.NewForConfig(clientConfig)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Streaming secrets metadata from the server")
+		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying if the secret meta list was properly streamed")
+		streamedMetaSecrets := secretMetaList.Items
+		gomega.Expect(cmp.Equal(expectedMetaSecrets, streamedMetaSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+
+		ginkgo.By("Verifying if expected requests were sent to the server")
+		expectedRequestMadeByMetaClient := getExpectedRequestMadeByClientFor(secretMetaList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByMetaClient))
+	})
+
+	// Validates unsupported Accept headers in WatchList.
+	// Sets AcceptContentType to "application/json;as=Table", which the API doesn't support, returning a 406 error.
+	// After the 406, the client falls back to a regular list request.
+	ginkgo.It("doesn't support receiving resources as Tables", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+		_ = addWellKnownUnstructuredSecrets(ctx, f)
+
+		rt, clientConfig := clientConfigWithRoundTripper(f)
+		modifiedClientConfig := dynamic.ConfigFor(clientConfig)
+		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
+			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
+		}, ",")
+		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
+		restClient, err := rest.RESTClientFor(modifiedClientConfig)
+		framework.ExpectNoError(err)
+		wrappedDynamicClient := dynamic.New(restClient)
+
+		// note that the client in case of an error (406) will fall back
+		// to a standard list request thus the overall call passes
+		ginkgo.By("Streaming secrets as Table from the server")
+		secretTable, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(secretTable.GetObjectKind().GroupVersionKind()).To(gomega.Equal(metav1.SchemeGroupVersion.WithKind("Table")))
+
+		ginkgo.By("Verifying if expected response was sent by the server")
+		gomega.Expect(rt.actualResponseStatuses[0]).To(gomega.Equal("406 Not Acceptable"))
+		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientWhenFallbackToListFor(secretTable.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+
+	})
+
+	// Sets AcceptContentType to both "application/json;as=Table" and "application/json".
+	// Unlike the previous test, no 406 error occurs, as the API falls back to "application/json" and returns a valid response.
+	ginkgo.It("falls backs to supported content type when when receiving resources as Tables was requested", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
+
+		rt, clientConfig := clientConfigWithRoundTripper(f)
+		modifiedClientConfig := dynamic.ConfigFor(clientConfig)
+		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
+			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
+			"application/json",
+		}, ",")
+		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
+		restClient, err := rest.RESTClientFor(modifiedClientConfig)
+		framework.ExpectNoError(err)
+		wrappedDynamicClient := dynamic.New(restClient)
 
 		ginkgo.By("Streaming secrets from the server")
 		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
@@ -155,13 +231,18 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 })
 
 type roundTripper struct {
-	actualRequests []string
-	delegate       http.RoundTripper
+	actualRequests         []string
+	actualResponseStatuses []string
+	delegate               http.RoundTripper
 }
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	r.actualRequests = append(r.actualRequests, req.URL.RawQuery)
-	return r.delegate.RoundTrip(req)
+	rsp, err := r.delegate.RoundTrip(req)
+	if rsp != nil {
+		r.actualResponseStatuses = append(r.actualResponseStatuses, rsp.Status)
+	}
+	return rsp, err
 }
 
 func (r *roundTripper) Wrap(delegate http.RoundTripper) http.RoundTripper {
@@ -192,16 +273,56 @@ func verifyStore(ctx context.Context, expectedSecrets []v1.Secret, store cache.S
 	framework.ExpectNoError(err)
 }
 
+// corresponds to a streaming request made by the client to stream the secrets
+const expectedStreamingRequestMadeByClient string = "allowWatchBookmarks=true&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true"
+
 func getExpectedRequestMadeByClientFor(rv string) []string {
 	expectedRequestMadeByClient := []string{
-		// corresponds to a streaming request made by the client to stream the secrets
-		"allowWatchBookmarks=true&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true",
+		expectedStreamingRequestMadeByClient,
 	}
 	if consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
 		// corresponds to a standard list request made by the consistency detector build in into the client
 		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
 	}
 	return expectedRequestMadeByClient
+}
+
+func getExpectedRequestMadeByClientWhenFallbackToListFor(rv string) []string {
+	expectedRequestMadeByClient := []string{
+		expectedStreamingRequestMadeByClient,
+		// corresponds to a list request made by the client
+		"",
+	}
+	if consistencydetector.IsDataConsistencyDetectionForListEnabled() {
+		// corresponds to a standard list request made by the consistency detector build in into the client
+		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
+	}
+	return expectedRequestMadeByClient
+}
+
+func addWellKnownSecrets(ctx context.Context, f *framework.Framework) []v1.Secret {
+	ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+	var secrets []v1.Secret
+	for i := 1; i <= 5; i++ {
+		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		secrets = append(secrets, *secret)
+	}
+	return secrets
+}
+
+// addWellKnownUnstructuredSecrets exists because secrets from addWellKnownSecrets
+// don't have type info and cannot be converted.
+func addWellKnownUnstructuredSecrets(ctx context.Context, f *framework.Framework) []unstructured.Unstructured {
+	var secrets []unstructured.Unstructured
+	for i := 1; i <= 5; i++ {
+		unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
+		framework.ExpectNoError(err)
+		secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		secrets = append(secrets, *secret)
+	}
+	return secrets
 }
 
 type byName []v1.Secret

@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -126,15 +127,19 @@ type OIDCAuthenticationOptions struct {
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles         []string
-	Lookup           bool
-	Issuers          []string
-	JWKSURI          string
-	MaxExpiration    time.Duration
-	ExtendExpiration bool
+	KeyFiles              []string
+	Lookup                bool
+	Issuers               []string
+	JWKSURI               string
+	MaxExpiration         time.Duration
+	ExtendExpiration      bool
+	IsTokenSignerExternal bool
 	// OptionalTokenGetter is a function that returns a service account token getter.
 	// If not set, the default token getter will be used.
 	OptionalTokenGetter func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
+	// ExternalPublicKeysGetter gets set if `--service-account-signing-endpoint` is passed.
+	// ExternalPublicKeysGetter is mutually exclusive with KeyFiles.
+	ExternalPublicKeysGetter serviceaccount.PublicKeysGetter
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -198,7 +203,11 @@ func (o *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 
 // WithOIDC set default value for OIDC authentication
 func (o *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
-	o.OIDC = &OIDCAuthenticationOptions{areFlagsConfigured: func() bool { return false }}
+	o.OIDC = &OIDCAuthenticationOptions{
+		areFlagsConfigured: func() bool { return false },
+		UsernameClaim:      "sub",
+		SigningAlgs:        []string{"RS256"},
+	}
 	return o
 }
 
@@ -269,8 +278,8 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		if len(o.ServiceAccounts.Issuers) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
-		if len(o.ServiceAccounts.KeyFiles) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+		if len(o.ServiceAccounts.KeyFiles) == 0 && o.ServiceAccounts.ExternalPublicKeysGetter == nil {
+			allErrors = append(allErrors, errors.New("either `--service-account-key-file` or `--service-account-signing-endpoint` must be set"))
 		}
 
 		// Validate the JWKS URI when it is explicitly set.
@@ -348,33 +357,33 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"The URL of the OpenID issuer, only HTTPS scheme will be accepted. "+
 			"If set, it will be used to verify the OIDC JSON Web Token (JWT).")
 
-		fs.StringVar(&o.OIDC.ClientID, oidcClientIDFlag, o.OIDC.ClientID,
+		fs.StringVar(&o.OIDC.ClientID, oidcClientIDFlag, o.OIDC.ClientID, ""+
 			"The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set.")
 
 		fs.StringVar(&o.OIDC.CAFile, oidcCAFileFlag, o.OIDC.CAFile, ""+
 			"If set, the OpenID server's certificate will be verified by one of the authorities "+
 			"in the oidc-ca-file, otherwise the host's root CA set will be used.")
 
-		fs.StringVar(&o.OIDC.UsernameClaim, oidcUsernameClaimFlag, "sub", ""+
+		fs.StringVar(&o.OIDC.UsernameClaim, oidcUsernameClaimFlag, o.OIDC.UsernameClaim, ""+
 			"The OpenID claim to use as the user name. Note that claims other than the default ('sub') "+
 			"is not guaranteed to be unique and immutable. This flag is experimental, please see "+
 			"the authentication documentation for further details.")
 
-		fs.StringVar(&o.OIDC.UsernamePrefix, oidcUsernamePrefixFlag, "", ""+
+		fs.StringVar(&o.OIDC.UsernamePrefix, oidcUsernamePrefixFlag, o.OIDC.UsernamePrefix, ""+
 			"If provided, all usernames will be prefixed with this value. If not provided, "+
 			"username claims other than 'email' are prefixed by the issuer URL to avoid "+
 			"clashes. To skip any prefixing, provide the value '-'.")
 
-		fs.StringVar(&o.OIDC.GroupsClaim, oidcGroupsClaimFlag, "", ""+
+		fs.StringVar(&o.OIDC.GroupsClaim, oidcGroupsClaimFlag, o.OIDC.GroupsClaim, ""+
 			"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
 			"The claim value is expected to be a string or array of strings. This flag is experimental, "+
 			"please see the authentication documentation for further details.")
 
-		fs.StringVar(&o.OIDC.GroupsPrefix, oidcGroupsPrefixFlag, "", ""+
+		fs.StringVar(&o.OIDC.GroupsPrefix, oidcGroupsPrefixFlag, o.OIDC.GroupsPrefix, ""+
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
-		fs.StringSliceVar(&o.OIDC.SigningAlgs, oidcSigningAlgsFlag, []string{"RS256"}, ""+
+		fs.StringSliceVar(&o.OIDC.SigningAlgs, oidcSigningAlgsFlag, o.OIDC.SigningAlgs, ""+
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
 			"supported 'alg' header values are: RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
@@ -574,7 +583,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		}
 	}
 
-	if err := apiservervalidation.ValidateAuthenticationConfiguration(ret.AuthenticationConfig, ret.ServiceAccountIssuers).ToAggregate(); err != nil {
+	if err := apiservervalidation.ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), ret.AuthenticationConfig, ret.ServiceAccountIssuers).ToAggregate(); err != nil {
 		return kubeauthenticator.Config{}, err
 	}
 
@@ -591,7 +600,11 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		if len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
 			ret.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
 		}
-		if len(o.ServiceAccounts.KeyFiles) > 0 {
+
+		switch {
+		case len(o.ServiceAccounts.KeyFiles) > 0 && o.ServiceAccounts.ExternalPublicKeysGetter != nil:
+			return kubeauthenticator.Config{}, fmt.Errorf("cannot set mutually exclusive flags `--service-account-key-file` and `--service-account-signing-endpoint` at the same time")
+		case len(o.ServiceAccounts.KeyFiles) > 0:
 			allPublicKeys := []interface{}{}
 			for _, keyfile := range o.ServiceAccounts.KeyFiles {
 				publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -605,7 +618,10 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 				return kubeauthenticator.Config{}, fmt.Errorf("failed to set up public service account keys: %w", err)
 			}
 			ret.ServiceAccountPublicKeysGetter = keysGetter
+		case o.ServiceAccounts.ExternalPublicKeysGetter != nil:
+			ret.ServiceAccountPublicKeysGetter = o.ServiceAccounts.ExternalPublicKeysGetter
 		}
+
 		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
 	}
@@ -756,7 +772,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 					return
 				}
 
-				validationErrs := apiservervalidation.ValidateAuthenticationConfiguration(authConfig, authenticatorConfig.ServiceAccountIssuers)
+				validationErrs := apiservervalidation.ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), authConfig, authenticatorConfig.ServiceAccountIssuers)
 				if !reflect.DeepEqual(originalFileAnonymousConfig, authConfig.Anonymous) {
 					validationErrs = append(validationErrs, field.Forbidden(field.NewPath("anonymous"), "changed from initial configuration file"))
 				}

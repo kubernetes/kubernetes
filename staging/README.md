@@ -23,6 +23,7 @@ Repositories currently staged here:
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/dynamic-resource-allocation`](https://github.com/kubernetes/dynamic-resource-allocation)
 - [`k8s.io/endpointslice`](https://github.com/kubernetes/endpointslice)
+- [`k8s.io/externaljwt`](https://github.com/kubernetes/externaljwt)
 - [`k8s.io/kms`](https://github.com/kubernetes/kms)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
@@ -87,12 +88,9 @@ import (
   ./hack/update-vendor.sh
 ```
 
-8. Run [`./hack/update-go-workspace.sh`](/hack/update-go-workspace.sh) to add
-   the module to the workspace.
-
 ### Creating the published repository
 
-1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)
+1. Create an [issue](https://github.com/kubernetes/org/issues/new?assignees=&labels=area%2Fgithub-repo&projects=&template=repo-create.yml&title=REQUEST%3A+%3CCreate+or+Migrate%3E+%3Cgithub+repo%3E)
 in the `kubernetes/org` repo to request creation of the respective published
 repository in the Kubernetes org. The published repository **must** have an
 initial empty commit. It also needs specific access rules and branch settings.

@@ -63,7 +63,7 @@ func toStringSlice(ps *uint16) []string {
 	return r
 }
 
-// Config retrieves service s configuration paramteres.
+// Config retrieves service s configuration parameters.
 func (s *Service) Config() (Config, error) {
 	var p *windows.QUERY_SERVICE_CONFIG
 	n := uint32(1024)

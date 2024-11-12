@@ -69,8 +69,8 @@ import (
 	fakecertificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	fakecoordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1/fake"
-	coordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
-	fakecoordinationv1alpha1 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1/fake"
+	coordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
+	fakecoordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2/fake"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -117,6 +117,8 @@ import (
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
 	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
 	fakeresourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3/fake"
+	resourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1"
+	fakeresourcev1beta1 "k8s.io/client-go/kubernetes/typed/resource/v1beta1/fake"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	fakeschedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1/fake"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
@@ -325,9 +327,9 @@ func (c *Clientset) CertificatesV1alpha1() certificatesv1alpha1.CertificatesV1al
 	return &fakecertificatesv1alpha1.FakeCertificatesV1alpha1{Fake: &c.Fake}
 }
 
-// CoordinationV1alpha1 retrieves the CoordinationV1alpha1Client
-func (c *Clientset) CoordinationV1alpha1() coordinationv1alpha1.CoordinationV1alpha1Interface {
-	return &fakecoordinationv1alpha1.FakeCoordinationV1alpha1{Fake: &c.Fake}
+// CoordinationV1alpha2 retrieves the CoordinationV1alpha2Client
+func (c *Clientset) CoordinationV1alpha2() coordinationv1alpha2.CoordinationV1alpha2Interface {
+	return &fakecoordinationv1alpha2.FakeCoordinationV1alpha2{Fake: &c.Fake}
 }
 
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
@@ -443,6 +445,11 @@ func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
 func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return &fakerbacv1alpha1.FakeRbacV1alpha1{Fake: &c.Fake}
+}
+
+// ResourceV1beta1 retrieves the ResourceV1beta1Client
+func (c *Clientset) ResourceV1beta1() resourcev1beta1.ResourceV1beta1Interface {
+	return &fakeresourcev1beta1.FakeResourceV1beta1{Fake: &c.Fake}
 }
 
 // ResourceV1alpha3 retrieves the ResourceV1alpha3Client

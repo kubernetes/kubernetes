@@ -206,7 +206,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.TooLong(specPath.Child("signerName"), maxLengthSignerName+".toolong", len(maxLengthSignerName)),
+				field.TooLong(specPath.Child("signerName"), "" /*unused*/, len(maxLengthSignerName)),
 			},
 		},
 		"signerName with a fqdn greater than 253 characters should be rejected": {
@@ -220,7 +220,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.TooLong(specPath.Child("signerName"), fmt.Sprintf("%s.extra", maxLengthFQDN), len(maxLengthFQDN)),
+				field.TooLong(specPath.Child("signerName"), "" /*unused*/, len(maxLengthFQDN)),
 			},
 		},
 		"signerName can have a longer path if the domain component is less than the max length": {
@@ -1137,7 +1137,7 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "trustBundle"), fmt.Sprintf("<value omitted, len %d>", len(badTooBigBundle)), core.MaxSecretSize),
+				field.TooLong(field.NewPath("spec", "trustBundle"), "" /*unused*/, core.MaxSecretSize),
 			},
 		},
 		{

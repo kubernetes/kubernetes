@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
 	"strconv"
 	"time"
 
@@ -112,11 +113,14 @@ func (r *RestartDaemonConfig) waitUp(ctx context.Context) {
 			"curl -s -o %v -I -w \"%%{http_code}\" http://localhost:%v/healthz", nullDev, r.healthzPort)
 
 	}
+
 	err := wait.PollUntilContextTimeout(ctx, r.pollInterval, r.pollTimeout, false, func(ctx context.Context) (bool, error) {
+
 		result, err := e2essh.NodeExec(ctx, r.nodeName, healthzCheck, framework.TestContext.Provider)
 		if err != nil {
 			return false, err
 		}
+		e2essh.LogResult(result)
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
@@ -274,49 +278,69 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
-		restarter := NewRestartConfig(
-			framework.APIAddress(), "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
-		restarter.restart(ctx)
+		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
-		// The intent is to ensure the replication controller manager has observed and reported status of
-		// the replication controller at least once since the manager restarted, so that we can determine
-		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
-		// to the same size achieves this, because the scale operation advances the RC's sequence number
-		// and awaits it to be observed and reported back in the RC's status.
-		e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)
+		// checks if there is at least one control-plane node
+		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
 
-		// Only check the keys, the pods can be different if the kubelet updated it.
-		// TODO: Can it really?
-		existingKeys := sets.NewString()
-		newKeys := sets.NewString()
-		for _, k := range existingPods.ListKeys() {
-			existingKeys.Insert(k)
-		}
-		for _, k := range newPods.ListKeys() {
-			newKeys.Insert(k)
-		}
-		if len(newKeys.List()) != len(existingKeys.List()) ||
-			!newKeys.IsSuperset(existingKeys) {
-			framework.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
+		for i := range nodes.Items {
+
+			ips := framework.GetNodeExternalIPs(&nodes.Items[i])
+			gomega.Expect(ips).NotTo(gomega.BeEmpty(), "at least one external ip should exist.")
+
+			restarter := NewRestartConfig(
+				ips[0], "kube-controller", ports.KubeControllerManagerPort, restartPollInterval, restartTimeout, true)
+			restarter.restart(ctx)
+
+			// The intent is to ensure the replication controller manager has observed and reported status of
+			// the replication controller at least once since the manager restarted, so that we can determine
+			// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
+			// to the same size achieves this, because the scale operation advances the RC's sequence number
+			// and awaits it to be observed and reported back in the RC's status.
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true))
+
+			// Only check the keys, the pods can be different if the kubelet updated it.
+			// TODO: Can it really?
+			existingKeys := sets.NewString()
+			newKeys := sets.NewString()
+			for _, k := range existingPods.ListKeys() {
+				existingKeys.Insert(k)
+			}
+			for _, k := range newPods.ListKeys() {
+				newKeys.Insert(k)
+			}
+			if len(newKeys.List()) != len(existingKeys.List()) ||
+				!newKeys.IsSuperset(existingKeys) {
+				framework.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
+			}
 		}
 	})
 
 	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func(ctx context.Context) {
-
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
-		restarter := NewRestartConfig(
-			framework.APIAddress(), "kube-scheduler", kubeschedulerconfig.DefaultKubeSchedulerPort, restartPollInterval, restartTimeout, true)
+		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
-		// Create pods while the scheduler is down and make sure the scheduler picks them up by
-		// scaling the rc to the same size.
-		restarter.waitUp(ctx)
-		restarter.kill(ctx)
-		// This is best effort to try and create pods while the scheduler is down,
-		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
-		restarter.waitUp(ctx)
-		framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+		// checks if there is at least one control-plane node
+		gomega.Expect(nodes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist.", framework.ControlPlaneLabel)
+
+		for i := range nodes.Items {
+			ips := framework.GetNodeExternalIPs(&nodes.Items[i])
+			gomega.Expect(ips).NotTo(gomega.BeEmpty(), "at least one external ip should exist.")
+
+			restarter := NewRestartConfig(
+				ips[0], "kube-scheduler", kubeschedulerconfig.DefaultKubeSchedulerPort, restartPollInterval, restartTimeout, true)
+
+			// Create pods while the scheduler is down and make sure the scheduler picks them up by
+			// scaling the rc to the same size.
+			restarter.waitUp(ctx)
+			restarter.kill(ctx)
+			// This is best effort to try and create pods while the scheduler is down,
+			// since we don't know exactly when it is restarted after the kill signal.
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
+			restarter.waitUp(ctx)
+			framework.ExpectNoError(e2erc.ScaleRC(ctx, f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+		}
 	})
 
 	ginkgo.It("Kubelet should not restart containers across restart", func(ctx context.Context) {
@@ -331,7 +355,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kubelet", ports.KubeletReadOnlyPort, restartPollInterval, restartTimeout, false)
+				ip, "kubelet", ports.KubeletHealthzPort, restartPollInterval, restartTimeout, false)
 			restarter.restart(ctx)
 		}
 		postRestarts, badNodes := getContainerRestarts(ctx, f.ClientSet, ns, labelSelector)

@@ -59,19 +59,26 @@ func (pl *TaintToleration) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	clusterEventWithHint := []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+	if pl.enableSchedulingQueueHint {
+		return []framework.ClusterEventWithHint{
+			// When the QueueingHint feature is enabled, preCheck is eliminated and we don't need additional UpdateNodeLabel.
+			{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+			// When the QueueingHint feature is enabled,
+			// the scheduling queue uses Pod/Update Queueing Hint
+			// to determine whether a Pod's update makes the Pod schedulable or not.
+			// https://github.com/kubernetes/kubernetes/pull/122234
+			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+		}, nil
 	}
-	if !pl.enableSchedulingQueueHint {
-		return clusterEventWithHint, nil
-	}
-	// When the QueueingHint feature is enabled,
-	// the scheduling queue uses Pod/Update Queueing Hint
-	// to determine whether a Pod's update makes the Pod schedulable or not.
-	// https://github.com/kubernetes/kubernetes/pull/122234
-	clusterEventWithHint = append(clusterEventWithHint,
-		framework.ClusterEventWithHint{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange})
-	return clusterEventWithHint, nil
+
+	return []framework.ClusterEventWithHint{
+		// A note about UpdateNodeLabel event:
+		// Ideally, it's supposed to register only Add | UpdateNodeTaint because UpdateNodeLabel will never change the result from this plugin.
+		// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+		// See: https://github.com/kubernetes/kubernetes/issues/109437
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		// No need to register the Pod event; the update to the unschedulable Pods already triggers the scheduling retry when QHint is disabled.
+	}, nil
 }
 
 // isSchedulableAfterNodeChange is invoked for all node events reported by
@@ -210,25 +217,20 @@ func New(_ context.Context, _ runtime.Object, h framework.Handle, fts feature.Fe
 	}, nil
 }
 
-// isSchedulableAfterPodChange is invoked whenever a pod changed. It checks whether
-// that change made a previously unschedulable pod schedulable.
-// When an unscheduled Pod, which was rejected by TaintToleration, is updated to have a new toleration,
-// it may make the Pod schedulable.
-func (pl *TaintToleration) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
+// isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
+func (pl *TaintToleration) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
 
-	if pod.UID == modifiedPod.UID &&
-		len(originalPod.Spec.Tolerations) != len(modifiedPod.Spec.Tolerations) {
-		// An unscheduled Pod got a new toleration.
-		// Due to API validation, the user can add, but cannot modify or remove tolerations.
-		// So, it's enough to just check the length of tolerations to notice the update.
-		// And, any updates in tolerations could make Pod schedulable.
-		logger.V(5).Info("a new toleration is added for the Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
+	if pod.UID == modifiedPod.UID {
+		// The updated Pod is the unschedulable Pod.
+		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
 		return framework.Queue, nil
 	}
+
+	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
 
 	return framework.QueueSkip, nil
 }

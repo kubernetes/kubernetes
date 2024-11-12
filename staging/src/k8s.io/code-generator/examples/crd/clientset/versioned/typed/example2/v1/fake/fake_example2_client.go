@@ -29,7 +29,7 @@ type FakeSecondExampleV1 struct {
 }
 
 func (c *FakeSecondExampleV1) TestTypes(namespace string) v1.TestTypeInterface {
-	return &FakeTestTypes{c, namespace}
+	return newFakeTestTypes(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

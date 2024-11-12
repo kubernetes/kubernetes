@@ -15,6 +15,38 @@ var L4ProtoMap = map[uint8]string{
 	17: "udp",
 }
 
+// From https://git.netfilter.org/libnetfilter_conntrack/tree/include/libnetfilter_conntrack/libnetfilter_conntrack_tcp.h
+//	 enum tcp_state {
+//		TCP_CONNTRACK_NONE,
+//		TCP_CONNTRACK_SYN_SENT,
+//		TCP_CONNTRACK_SYN_RECV,
+//		TCP_CONNTRACK_ESTABLISHED,
+//		TCP_CONNTRACK_FIN_WAIT,
+//		TCP_CONNTRACK_CLOSE_WAIT,
+//		TCP_CONNTRACK_LAST_ACK,
+//		TCP_CONNTRACK_TIME_WAIT,
+//		TCP_CONNTRACK_CLOSE,
+//		TCP_CONNTRACK_LISTEN,		/* obsolete */
+//	#define TCP_CONNTRACK_SYN_SENT2		TCP_CONNTRACK_LISTEN
+//		TCP_CONNTRACK_MAX,
+//		TCP_CONNTRACK_IGNORE
+//	 };
+const (
+		TCP_CONNTRACK_NONE = 0
+		TCP_CONNTRACK_SYN_SENT = 1
+		TCP_CONNTRACK_SYN_RECV = 2
+		TCP_CONNTRACK_ESTABLISHED = 3
+		TCP_CONNTRACK_FIN_WAIT = 4
+		TCP_CONNTRACK_CLOSE_WAIT = 5
+		TCP_CONNTRACK_LAST_ACK = 6
+		TCP_CONNTRACK_TIME_WAIT = 7
+		TCP_CONNTRACK_CLOSE = 8
+		TCP_CONNTRACK_LISTEN = 9
+		TCP_CONNTRACK_SYN_SENT2 = 9
+		TCP_CONNTRACK_MAX = 10
+		TCP_CONNTRACK_IGNORE = 11
+)
+
 // All the following constants are coming from:
 // https://github.com/torvalds/linux/blob/master/include/uapi/linux/netfilter/nfnetlink_conntrack.h
 
@@ -31,6 +63,7 @@ var L4ProtoMap = map[uint8]string{
 // 	IPCTNL_MSG_MAX
 // };
 const (
+	IPCTNL_MSG_CT_NEW = 0
 	IPCTNL_MSG_CT_GET    = 1
 	IPCTNL_MSG_CT_DELETE = 2
 )
@@ -40,9 +73,11 @@ const (
 	NFNETLINK_V0 = 0
 )
 
-// #define NLA_F_NESTED (1 << 15)
 const (
-	NLA_F_NESTED = (1 << 15)
+	NLA_F_NESTED        uint16 = (1 << 15) // #define NLA_F_NESTED (1 << 15)
+	NLA_F_NET_BYTEORDER uint16 = (1 << 14) // #define NLA_F_NESTED (1 << 14)
+	NLA_TYPE_MASK              = ^(NLA_F_NESTED | NLA_F_NET_BYTEORDER)
+	NLA_ALIGNTO         uint16 = 4 // #define NLA_ALIGNTO 4
 )
 
 // enum ctattr_type {
@@ -86,7 +121,10 @@ const (
 	CTA_COUNTERS_REPLY = 10
 	CTA_USE            = 11
 	CTA_ID             = 12
+	CTA_ZONE           = 18
 	CTA_TIMESTAMP      = 20
+	CTA_LABELS         = 22
+	CTA_LABELS_MASK    = 23
 )
 
 // enum ctattr_tuple {
@@ -147,7 +185,10 @@ const (
 // };
 // #define CTA_PROTOINFO_MAX (__CTA_PROTOINFO_MAX - 1)
 const (
+	CTA_PROTOINFO_UNSPEC = 0
 	CTA_PROTOINFO_TCP = 1
+	CTA_PROTOINFO_DCCP = 2
+	CTA_PROTOINFO_SCTP = 3
 )
 
 // enum ctattr_protoinfo_tcp {

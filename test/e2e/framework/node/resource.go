@@ -128,7 +128,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						framework.Logf(msg)
+						framework.Logf("%s", msg)
 					}
 					return false
 				}
@@ -495,6 +495,16 @@ func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
 	return false
 }
 
+// GetNodeHeartbeatTime returns the timestamp of the last status update of the node.
+func GetNodeHeartbeatTime(node *v1.Node) metav1.Time {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady {
+			return condition.LastHeartbeatTime
+		}
+	}
+	return metav1.Time{}
+}
+
 // PodNodePairs return podNode pairs for all pods in a namespace
 func PodNodePairs(ctx context.Context, c clientset.Interface, ns string) ([]PodNode, error) {
 	var result []PodNode
@@ -822,6 +832,6 @@ func verifyThatTaintIsGone(ctx context.Context, c clientset.Interface, nodeName 
 	// TODO use wrapper methods in expect.go after removing core e2e dependency on node
 	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred())
 	if taintExists(nodeUpdated.Spec.Taints, taint) {
-		framework.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
+		framework.Fail("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }

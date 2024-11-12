@@ -20,7 +20,7 @@ nodes:
           v: "5"
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha3=true"
+          runtime-config: "resource.k8s.io/v1beta1=true"
   - |
     kind: InitConfiguration
     nodeRegistration:
@@ -40,5 +40,9 @@ nodes:
     nodeRegistration:
       kubeletExtraArgs:
         v: "5"
+# Feature gates must be the last entry in this YAML.
+# Some Prow jobs add more feature gates with
+#
+#    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true

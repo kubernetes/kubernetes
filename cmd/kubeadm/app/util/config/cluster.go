@@ -20,12 +20,15 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
+	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
@@ -33,15 +36,20 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
+	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -50,8 +58,9 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
-	printer.Printf("[%s] Reading configuration from the cluster...\n", logPrefix)
-	printer.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	_, _ = printer.Printf("[%s] Reading configuration from the %q ConfigMap in namespace %q...\n",
+		logPrefix, constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
@@ -111,7 +120,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	if !newControlPlane {
 		// gets the nodeRegistration for the current from the node object
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
-		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
+		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration, &initcfg.ClusterConfiguration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 		// gets the APIEndpoint for the current node
@@ -122,23 +131,75 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	return initcfg, nil
 }
 
-// GetNodeRegistration returns the nodeRegistration for the current node
-func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
-	// gets the name of the current node
-	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigFile)
+// GetNodeName uses 3 different approaches for getting the node name.
+// First it attempts to construct a client from the given kubeconfig file
+// and get the SelfSubjectReview review for it - i.e. like "kubectl auth whoami".
+// If that fails it attempt to parse the kubeconfig client certificate subject.
+// Finally, it falls back to using the host name, which might not always be correct
+// due to node name overrides.
+func GetNodeName(kubeconfigFile string) (string, error) {
+	var (
+		nodeName string
+		err      error
+	)
+	if kubeconfigFile != "" {
+		client, err := kubeconfig.ClientSetFromFile(kubeconfigFile)
+		if err == nil {
+			nodeName, err = getNodeNameFromSSR(client)
+			if err == nil {
+				return nodeName, nil
+			}
+		}
+		nodeName, err = getNodeNameFromKubeletConfig(kubeconfigFile)
+		if err == nil {
+			return nodeName, nil
+		}
+	}
+	nodeName, err = nodeutil.GetHostname("")
 	if err != nil {
-		return errors.Wrap(err, "failed to get node name from kubelet config")
+		return "", errors.Wrapf(err, "could not get node name")
+	}
+	return nodeName, nil
+}
+
+// GetNodeRegistration returns the nodeRegistration for the current node
+func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions, clusterCfg *kubeadmapi.ClusterConfiguration) error {
+	// gets the name of the current node
+	nodeName, err := GetNodeName(kubeconfigFile)
+	if err != nil {
+		return err
 	}
 
 	// gets the corresponding node and retrieves attributes stored there.
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
-	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
-	if !ok {
-		return errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+	var (
+		criSocket              string
+		ok                     bool
+		missingAnnotationError = errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+	)
+	if features.Enabled(clusterCfg.FeatureGates, features.NodeLocalCRISocket) {
+		_, err = os.Stat(filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName))
+		if os.IsNotExist(err) {
+			criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
+			if !ok {
+				return missingAnnotationError
+			}
+		} else {
+			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+			if err != nil {
+				return errors.Wrapf(err, "node %q does not have a kubelet instance configuration", nodeName)
+			}
+			criSocket = kubeletConfig.ContainerRuntimeEndpoint
+		}
+	} else {
+		criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
+		if !ok {
+			return missingAnnotationError
+		}
 	}
 
 	// returns the nodeRegistration attributes
@@ -193,6 +254,22 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 
 	// gets the node name from the certificate common name
 	return strings.TrimPrefix(cert.Subject.CommonName, constants.NodesUserPrefix), nil
+}
+
+// getNodeNameFromSSR reads the node name from the SelfSubjectReview for a given client.
+// If the kubelet.conf is passed as fileName it can be used to retrieve the node name.
+func getNodeNameFromSSR(client clientset.Interface) (string, error) {
+	ssr, err := client.AuthenticationV1().SelfSubjectReviews().
+		Create(context.Background(), &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	user := ssr.Status.UserInfo.Username
+	if !strings.HasPrefix(user, constants.NodesUserPrefix) {
+		return "", errors.Errorf("%q is not a node client, must have %q prefix in the name",
+			user, constants.NodesUserPrefix)
+	}
+	return strings.TrimPrefix(user, constants.NodesUserPrefix), nil
 }
 
 func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
@@ -252,4 +329,21 @@ func getRawAPIEndpointFromPodAnnotationWithoutRetry(ctx context.Context, client 
 		return apiServerEndpoint, nil
 	}
 	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
+}
+
+// readKubeletConfig reads a KubeletConfiguration from the specified file.
+func readKubeletConfig(kubeletDir, fileName string) (*kubeletconfig.KubeletConfiguration, error) {
+	kubeletFile := path.Join(kubeletDir, fileName)
+
+	data, err := os.ReadFile(kubeletFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not read kubelet configuration file %q", kubeletFile)
+	}
+
+	var config kubeletconfig.KubeletConfiguration
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, errors.Wrapf(err, "could not parse kubelet configuration file %q", kubeletFile)
+	}
+
+	return &config, nil
 }

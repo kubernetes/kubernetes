@@ -179,24 +179,6 @@ func (o containerOutputList) StartsBefore(lhs, rhs string) error {
 	return nil
 }
 
-// DoesntStartAfter returns an error if lhs started after rhs
-func (o containerOutputList) DoesntStartAfter(lhs, rhs string) error {
-	rhsStart := o.findIndex(rhs, "Starting", 0)
-
-	if rhsStart == -1 {
-		return fmt.Errorf("couldn't find that %s ever started, got\n%v", rhs, o)
-	}
-
-	// this works even for the same names (restart case)
-	lhsStart := o.findIndex(lhs, "Started", rhsStart+1)
-
-	if lhsStart != -1 {
-		return fmt.Errorf("expected %s to not start after %s, got\n%v", lhs, rhs, o)
-	}
-
-	return nil
-}
-
 // ExitsBefore returns an error if lhs did not end before rhs
 func (o containerOutputList) ExitsBefore(lhs, rhs string) error {
 	lhsExit := o.findIndex(lhs, "Exiting", 0)

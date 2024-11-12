@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -112,15 +115,219 @@ func TestResourceClaimIsForPod(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := IsForPod(tc.pod, tc.claim)
 			if tc.expectedError == "" {
-				if err != nil {
-					t.Errorf("expected no error, got %v", err)
-				}
+				require.NoError(t, err)
 			} else {
-				if err == nil {
-					t.Errorf("expected error %q, got nil", tc.expectedError)
-				} else if tc.expectedError != err.Error() {
-					t.Errorf("expected error %q, got %v", tc.expectedError, err)
-				}
+				require.Error(t, err)
+				require.EqualError(t, err, tc.expectedError)
+			}
+		})
+	}
+}
+
+func TestIsReservedForPod(t *testing.T) {
+	uid := 0
+	newUID := func() types.UID {
+		uid++
+		return types.UID(fmt.Sprintf("%d", uid))
+	}
+
+	podNotReserved := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podNotReserved",
+			UID:       newUID(),
+		},
+	}
+	podReserved := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podReserved",
+			UID:       newUID(),
+		},
+	}
+	podOtherReserved := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "podOtherReserved",
+			UID:       newUID(),
+		},
+	}
+
+	claimNoReservation := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimNoReservation",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{},
+	}
+
+	claimWithReservation := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithReservation",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					UID: podReserved.UID,
+				},
+			},
+		},
+	}
+
+	claimWithMultipleReservations := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "claimWithMultipleReservations",
+			UID:       newUID(),
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					UID: podReserved.UID,
+				},
+				{
+					UID: podOtherReserved.UID,
+				},
+			},
+		},
+	}
+
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		claim          *resourceapi.ResourceClaim
+		expectedResult bool
+	}{
+		"not-reserved": {
+			pod:            podNotReserved,
+			claim:          claimNoReservation,
+			expectedResult: false,
+		},
+		"reserved-for-pod": {
+			pod:            podReserved,
+			claim:          claimWithReservation,
+			expectedResult: true,
+		},
+		"reserved-for-other-pod": {
+			pod:            podNotReserved,
+			claim:          claimWithReservation,
+			expectedResult: false,
+		},
+		"multiple-reservations-including-pod": {
+			pod:            podReserved,
+			claim:          claimWithMultipleReservations,
+			expectedResult: true,
+		},
+		"multiple-reservations-excluding-pod": {
+			pod:            podNotReserved,
+			claim:          claimWithMultipleReservations,
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			result := IsReservedForPod(tc.pod, tc.claim)
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
+}
+
+func TestName(t *testing.T) {
+	testcases := map[string]struct {
+		pod           *v1.Pod
+		podClaim      *v1.PodResourceClaim
+		expectedName  *string
+		expectedCheck bool
+		expectedError error
+	}{
+		"resource-claim-name-set": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				ResourceClaimName: func() *string { s := "existing-claim"; return &s }(),
+			},
+			expectedName:  func() *string { s := "existing-claim"; return &s }(),
+			expectedCheck: false,
+			expectedError: nil,
+		},
+		"resource-claim-template-name-set-and-status-found": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{
+							Name:              "template-claim",
+							ResourceClaimName: func() *string { s := "created-claim"; return &s }(),
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                      "template-claim",
+				ResourceClaimTemplateName: func() *string { s := "template-claim-template"; return &s }(),
+			},
+			expectedName:  func() *string { s := "created-claim"; return &s }(),
+			expectedCheck: true,
+			expectedError: nil,
+		},
+		"resource-claim-template-name-set-but-status-not-found": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{
+							Name:              "other-claim",
+							ResourceClaimName: func() *string { s := "other-created-claim"; return &s }(),
+						},
+					},
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name:                      "template-claim",
+				ResourceClaimTemplateName: func() *string { s := "template-claim-template"; return &s }(),
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf(`pod "default/test-pod": %w`, ErrClaimNotFound),
+		},
+		"neither-resource-claim-name-nor-template-name-set": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "test-pod",
+				},
+			},
+			podClaim: &v1.PodResourceClaim{
+				Name: "invalid-claim",
+			},
+			expectedName:  nil,
+			expectedCheck: false,
+			expectedError: fmt.Errorf(`pod "default/test-pod", spec.resourceClaim "invalid-claim": %w`, ErrAPIUnsupported),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			name, check, err := Name(tc.pod, tc.podClaim)
+			if tc.expectedError == nil {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedName, name)
+				assert.Equal(t, tc.expectedCheck, check)
+			} else {
+				require.EqualError(t, err, tc.expectedError.Error())
 			}
 		})
 	}

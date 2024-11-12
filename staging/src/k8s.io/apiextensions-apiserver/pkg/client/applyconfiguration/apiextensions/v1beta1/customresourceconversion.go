@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 // CustomResourceConversionApplyConfiguration represents a declarative configuration of the CustomResourceConversion type for use
 // with apply.
 type CustomResourceConversionApplyConfiguration struct {
-	Strategy                 *v1beta1.ConversionStrategyType        `json:"strategy,omitempty"`
-	WebhookClientConfig      *WebhookClientConfigApplyConfiguration `json:"webhookClientConfig,omitempty"`
-	ConversionReviewVersions []string                               `json:"conversionReviewVersions,omitempty"`
+	Strategy                 *apiextensionsv1beta1.ConversionStrategyType `json:"strategy,omitempty"`
+	WebhookClientConfig      *WebhookClientConfigApplyConfiguration       `json:"webhookClientConfig,omitempty"`
+	ConversionReviewVersions []string                                     `json:"conversionReviewVersions,omitempty"`
 }
 
 // CustomResourceConversionApplyConfiguration constructs a declarative configuration of the CustomResourceConversion type for use with
@@ -39,7 +39,7 @@ func CustomResourceConversion() *CustomResourceConversionApplyConfiguration {
 // WithStrategy sets the Strategy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Strategy field is set to the value of the last call.
-func (b *CustomResourceConversionApplyConfiguration) WithStrategy(value v1beta1.ConversionStrategyType) *CustomResourceConversionApplyConfiguration {
+func (b *CustomResourceConversionApplyConfiguration) WithStrategy(value apiextensionsv1beta1.ConversionStrategyType) *CustomResourceConversionApplyConfiguration {
 	b.Strategy = &value
 	return b
 }

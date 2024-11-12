@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	"net/http"
+	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	v1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
-	"k8s.io/code-generator/examples/apiserver/clientset/versioned/scheme"
+	example3iov1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
+	scheme "k8s.io/code-generator/examples/apiserver/clientset/versioned/scheme"
 )
 
 type ThirdExampleV1Interface interface {
@@ -85,10 +85,10 @@ func New(c rest.Interface) *ThirdExampleV1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+	gv := example3iov1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

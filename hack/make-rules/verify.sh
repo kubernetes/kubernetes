@@ -14,12 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Indirect calls through kube::util::run-in aren't interpreted
+# shellcheck disable=SC2317
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
+kube::golang::setup_env
 
 # If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
 if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
@@ -142,7 +147,7 @@ function run-cmd {
     juLog -output="${output}" -class="verify" -name="${testname}" -fail="^ERROR: " "$@"
     tr=$?
   fi
-  return ${tr}
+  return "${tr}"
 }
 
 # Collect Failed tests in this Array , initialize it to nil
@@ -164,6 +169,10 @@ function run-checks {
   local t
   for t in ${pattern}
   do
+    if [ "$t" = "$pattern" ]; then
+      # The pattern didn't match any files
+      continue
+    fi
     local check_name
     check_name="$(basename "${t}")"
     if [[ -n ${WHAT:-} ]]; then
@@ -190,7 +199,7 @@ function run-checks {
     else
       echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
       ret=1
-      FAILED_TESTS+=("${t}")
+      FAILED_TESTS+=("${PWD}/${t}")
     fi
   done
 }
@@ -220,9 +229,20 @@ if ${QUICK} ; then
   echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
+shopt -s globstar
+export API_KNOWN_VIOLATIONS_DIR="${KUBE_ROOT}"/api/api-rules
 ret=0
-run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python3
+# Modules are discovered by looking for go.mod rather than asking go
+# to ensure that modules that aren't part of the workspace and/or are
+# not dependencies are checked too.
+# . and staging are listed explicitly here to avoid _output
+for module in ./go.mod ./staging/**/go.mod; do
+  module="${module%/go.mod}"
+  if [ -d "$module/hack" ]; then
+    kube::util::run-in "$module" run-checks "hack/verify-*.sh" bash
+    kube::util::run-in "$module" run-checks "hack/verify-*.py" python3
+  fi
+done
 missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then

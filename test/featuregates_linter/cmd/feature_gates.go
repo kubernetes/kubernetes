@@ -29,9 +29,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 var (
@@ -96,19 +96,23 @@ func NewUpdateFeatureListCommand() *cobra.Command {
 
 func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 	if err := verifyOrUpdateFeatureList(k8RootPath, unversionedFeatureListFile, false, false); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to verify feature list: \n%s", err)
+		os.Exit(1)
 	}
 	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, false, true); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to verify versioned feature list: \n%s", err)
+		os.Exit(1)
 	}
 }
 
 func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 	if err := verifyOrUpdateFeatureList(k8RootPath, unversionedFeatureListFile, true, false); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to update feature list: \n%s", err)
+		os.Exit(1)
 	}
 	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, true, true); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Failed to update versioned feature list: \n%s", err)
+		os.Exit(1)
 	}
 }
 
@@ -167,7 +171,11 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, update, version
 	}
 
 	if diff := cmp.Diff(featureList, baseFeatureList); diff != "" {
-		return fmt.Errorf("detected diff in unversioned feature list, diff: \n%s", diff)
+		if versioned {
+			return fmt.Errorf("detected diff in versioned feature list (%s), diff: \n%s", versionedFeatureListFile, diff)
+		} else {
+			return fmt.Errorf("detected diff in unversioned feature list (%s), diff: \n%s", unversionedFeatureListFile, diff)
+		}
 	}
 	return nil
 }

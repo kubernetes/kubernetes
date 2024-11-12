@@ -23,7 +23,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -32,12 +32,14 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*v1alpha1.VolumeAttachment)) })
-	scheme.AddTypeDefaultingFunc(&v1alpha1.VolumeAttachmentList{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachmentList(obj.(*v1alpha1.VolumeAttachmentList)) })
+	scheme.AddTypeDefaultingFunc(&storagev1alpha1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*storagev1alpha1.VolumeAttachment)) })
+	scheme.AddTypeDefaultingFunc(&storagev1alpha1.VolumeAttachmentList{}, func(obj interface{}) {
+		SetObjectDefaults_VolumeAttachmentList(obj.(*storagev1alpha1.VolumeAttachmentList))
+	})
 	return nil
 }
 
-func SetObjectDefaults_VolumeAttachment(in *v1alpha1.VolumeAttachment) {
+func SetObjectDefaults_VolumeAttachment(in *storagev1alpha1.VolumeAttachment) {
 	if in.Spec.Source.InlineVolumeSpec != nil {
 		corev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath != nil {
@@ -88,7 +90,7 @@ func SetObjectDefaults_VolumeAttachment(in *v1alpha1.VolumeAttachment) {
 	}
 }
 
-func SetObjectDefaults_VolumeAttachmentList(in *v1alpha1.VolumeAttachmentList) {
+func SetObjectDefaults_VolumeAttachmentList(in *storagev1alpha1.VolumeAttachmentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_VolumeAttachment(a)

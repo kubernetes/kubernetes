@@ -131,6 +131,16 @@ func (se StreamError) writeFrame(ctx writeContext) error {
 
 func (se StreamError) staysWithinBuffer(max int) bool { return frameHeaderLen+4 <= max }
 
+type writePing struct {
+	data [8]byte
+}
+
+func (w writePing) writeFrame(ctx writeContext) error {
+	return ctx.Framer().WritePing(false, w.data)
+}
+
+func (w writePing) staysWithinBuffer(max int) bool { return frameHeaderLen+len(w.data) <= max }
+
 type writePingAck struct{ pf *PingFrame }
 
 func (w writePingAck) writeFrame(ctx writeContext) error {

@@ -93,7 +93,8 @@ func (s *ProxyServer) platformSetup(ctx context.Context) error {
 		logger.Info("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
 	}
 
-	err := s.setupConntrack(ctx)
+	ct := &realConntracker{}
+	err := s.setupConntrack(ctx, ct)
 	if err != nil {
 		return err
 	}
@@ -334,9 +335,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 	return proxier, nil
 }
 
-func (s *ProxyServer) setupConntrack(ctx context.Context) error {
-	ct := &realConntracker{}
-
+func (s *ProxyServer) setupConntrack(ctx context.Context, ct Conntracker) error {
 	max, err := getConntrackMax(ctx, s.Config.Linux.Conntrack)
 	if err != nil {
 		return err

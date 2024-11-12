@@ -86,6 +86,17 @@ issues:
       text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
       path-except: cmd/kubeadm
 
+    # The unused linter that comes from staticcheck currently does not handle types which implement
+    # a generic interface. The linter incorrectly reports the implementations of unexported
+    # interface methods as unused. See https://github.com/dominikh/go-tools/issues/1294.
+    # Rather than exporting the interface methods, which makes the error go away but changes the
+    # semantics of the code, we ignore this error for affected files.
+    # This can be removed when the staticcheck implementation of this rule is fixed, which may
+    # depend on https://github.com/golang/go/issues/63982.
+    - linters:
+        - unused
+      path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
+
     {{- if not .Hints}}
 
     # The following issues were deemed "might be worth fixing, needs to be
@@ -150,6 +161,9 @@ linters:
     - stylecheck
     - testifylint
     - unused
+  {{- if not .Base }}
+    - usestdlibvars
+  {{- end}}
   {{- if .Strict}}
   disable:
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
@@ -210,15 +224,11 @@ linters-settings: # please keep this alphabetized
   {{- end}}
   testifylint:
     enable-all: true
-    {{- if .Base}}
+    {{- if not .Hints }}
     disable:  # TODO: remove each disabled rule and fix it
-      - blank-import
-      - compares
-      - error-is-as
-      - error-nil
-      - expected-actual
+      {{- if .Base }}
       - float-compare
       - go-require
-      - nil-compare
+      {{- end}}
       - require-error
     {{- end}}

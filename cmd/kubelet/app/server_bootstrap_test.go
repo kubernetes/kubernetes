@@ -73,12 +73,14 @@ func Test_buildClientCertificateManager(t *testing.T) {
 	defer s.Close()
 
 	config1 := &restclient.Config{
-		UserAgent: "FirstClient",
-		Host:      s.URL,
+		UserAgent:     "FirstClient",
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{ContentType: runtime.ContentTypeJSON},
 	}
 	config2 := &restclient.Config{
-		UserAgent: "SecondClient",
-		Host:      s.URL,
+		UserAgent:     "SecondClient",
+		Host:          s.URL,
+		ContentConfig: restclient.ContentConfig{ContentType: runtime.ContentTypeJSON},
 	}
 
 	nodeName := types.NodeName("test")

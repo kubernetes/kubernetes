@@ -129,7 +129,7 @@ func createTestQOSContainerManager() (*qosContainerManagerImpl, error) {
 
 func TestQoSContainerCgroup(t *testing.T) {
 	m, err := createTestQOSContainerManager()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	qosConfigs := map[v1.PodQOSClass]*CgroupConfig{
 		v1.PodQOSGuaranteed: {

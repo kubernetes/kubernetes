@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -3065,19 +3066,21 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 		"nil pv": {
 			oldPvc: nil,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       false,
 			},
 		},
 		"invaild apiGroup in dataSource allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
 		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
+				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
@@ -3085,7 +3088,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       true,
 			},
 		},
@@ -3093,7 +3096,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: false,
+				EnableRecoverFromExpansionFailure: true,
 				EnableVolumeAttributesClass:       true,
 			},
 		},
@@ -5378,19 +5381,14 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 		}, {
-			name: "feature disabled",
+			name: "no volume source",
 			vol: core.Volume{
-				Name: "image-volume",
-				VolumeSource: core.VolumeSource{
-					Image: &core.ImageVolumeSource{
-						Reference:  "quay.io/my/artifact:v1",
-						PullPolicy: "IfNotPresent",
-					},
-				},
+				Name:         "volume",
+				VolumeSource: core.VolumeSource{},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: false},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype:  field.ErrorTypeRequired,
 				field:  "field[0]",
@@ -5407,7 +5405,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "name",
@@ -5423,7 +5421,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: true},
+			opts: PodValidationOptions{ResourceIsPod: true},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "image.reference",
@@ -5439,7 +5437,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: false},
+			opts: PodValidationOptions{ResourceIsPod: false},
 		}, {
 			name: "image volume with wrong pullPolicy",
 			vol: core.Volume{
@@ -5451,7 +5449,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeNotSupported,
 				field: "image.pullPolicy",
@@ -5760,7 +5758,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateContainerResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -7066,7 +7064,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		}}}},
 		{Name: "image-volume", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
-	opts := PodValidationOptions{AllowImageVolumeSource: true}
+	opts := PodValidationOptions{}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), opts)
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
@@ -7449,7 +7447,7 @@ func TestValidateProbe(t *testing.T) {
 	}
 
 	for _, p := range successCases {
-		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -7461,7 +7459,7 @@ func TestValidateProbe(t *testing.T) {
 		errorCases = append(errorCases, probe)
 	}
 	for _, p := range errorCases {
-		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateProbe(p, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %v", p)
 		}
 	}
@@ -7567,7 +7565,7 @@ func Test_validateProbe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := validateProbe(tt.args.probe, defaultGracePeriod, tt.args.fldPath)
+			got := validateProbe(tt.args.probe, defaultGracePeriod, tt.args.fldPath, PodValidationOptions{})
 			if len(got) != len(tt.want) {
 				t.Errorf("validateProbe() = %v, want %v", got, tt.want)
 				return
@@ -7592,7 +7590,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
 	}
 	for _, h := range successCases {
-		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -7607,7 +7605,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 	}
 	for _, h := range errorCases {
-		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateHandler(handlerFromProbe(&h), defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %#v", h)
 		}
 	}
@@ -7797,14 +7795,7 @@ func TestValidateResizePolicy(t *testing.T) {
 	}
 }
 
-func getResourceLimits(cpu, memory string) core.ResourceList {
-	res := core.ResourceList{}
-	res[core.ResourceCPU] = resource.MustParse(cpu)
-	res[core.ResourceMemory] = resource.MustParse(memory)
-	return res
-}
-
-func getResources(cpu, memory, storage string) core.ResourceList {
+func getResources(cpu, memory, ephemeralStorage, persistentStorage string) core.ResourceList {
 	res := core.ResourceList{}
 	if cpu != "" {
 		res[core.ResourceCPU] = resource.MustParse(cpu)
@@ -7812,8 +7803,11 @@ func getResources(cpu, memory, storage string) core.ResourceList {
 	if memory != "" {
 		res[core.ResourceMemory] = resource.MustParse(memory)
 	}
-	if storage != "" {
-		res[core.ResourceEphemeralStorage] = resource.MustParse(storage)
+	if ephemeralStorage != "" {
+		res[core.ResourceEphemeralStorage] = resource.MustParse(ephemeralStorage)
+	}
+	if persistentStorage != "" {
+		res[core.ResourceStorage] = resource.MustParse(persistentStorage)
 	}
 	return res
 }
@@ -8327,7 +8321,8 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
@@ -8530,7 +8525,8 @@ func TestValidateContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
@@ -8945,7 +8941,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits: getResourceLimits("-10", "0"),
+				Limits: getResources("-10", "0", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8958,7 +8954,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Requests: getResourceLimits("-10", "0"),
+				Requests: getResources("-10", "0", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8971,7 +8967,7 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits: getResourceLimits("0", "-10"),
+				Limits: getResources("0", "-10", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8984,8 +8980,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResourceLimits("5", "3"),
-				Requests: getResourceLimits("6", "3"),
+				Limits:   getResources("5", "3", "", ""),
+				Requests: getResources("6", "3", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9016,8 +9012,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResourceLimits("5", "3"),
-				Requests: getResourceLimits("6", "3"),
+				Limits:   getResources("5", "3", "", ""),
+				Requests: getResources("6", "3", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9030,8 +9026,8 @@ func TestValidateContainers(t *testing.T) {
 			Name:  "abc-123",
 			Image: "image",
 			Resources: core.ResourceRequirements{
-				Limits:   getResourceLimits("5", "3"),
-				Requests: getResourceLimits("5", "4"),
+				Limits:   getResources("5", "3", "", ""),
+				Requests: getResources("5", "4", "", ""),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9155,7 +9151,8 @@ func TestValidateContainers(t *testing.T) {
 
 func TestValidateInitContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
@@ -9233,7 +9230,8 @@ func TestValidateInitContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
@@ -11926,7 +11924,7 @@ func TestValidatePod(t *testing.T) {
 			),
 		},
 		"too long AppArmor localhost profile": {
-			expectedError: "Too long: may not be longer than 4095",
+			expectedError: "Too long: may not be more than 4095 bytes",
 			spec: *podtest.MakePod("123",
 				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
@@ -12301,7 +12299,6 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -12315,10 +12312,10 @@ func TestValidatePodUpdate(t *testing.T) {
 	)
 
 	tests := []struct {
-		new  core.Pod
-		old  core.Pod
-		err  string
 		test string
+		old  core.Pod
+		new  core.Pod
+		err  string
 	}{
 		{new: *podtest.MakePod(""), old: *podtest.MakePod(""), err: "", test: "nothing"}, {
 			new:  *podtest.MakePod("foo"),
@@ -12484,43 +12481,43 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("200m", "0", "1Gi"),
+						Limits: getResources("200m", "0", "1Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "0", "1Gi"),
+						Limits: getResources("100m", "0", "1Gi", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "cpu limit change",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResourceLimits("100m", "100Mi"),
+						Limits: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResourceLimits("100m", "200Mi"),
+						Limits: getResources("100m", "200Mi", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "memory limit change",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "100Mi", "1Gi"),
+						Limits: getResources("100m", "100Mi", "1Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "100Mi", "2Gi"),
+						Limits: getResources("100m", "100Mi", "2Gi", ""),
 					}))),
 			),
 			err:  "Forbidden: pod updates may not change fields other than",
@@ -12529,43 +12526,43 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("100m", "0"),
+						Requests: getResources("100m", "0", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("200m", "0"),
+						Requests: getResources("200m", "0", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "cpu request change",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("0", "200Mi"),
+						Requests: getResources("0", "200Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("0", "100Mi"),
+						Requests: getResources("0", "100Mi", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "memory request change",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResources("100m", "0", "2Gi"),
+						Requests: getResources("100m", "0", "2Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResources("100m", "0", "1Gi"),
+						Requests: getResources("100m", "0", "1Gi", ""),
 					}))),
 			),
 			err:  "Forbidden: pod updates may not change fields other than",
@@ -12574,154 +12571,154 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("200m", "400Mi", "1Gi"),
-						Requests: getResources("200m", "400Mi", "1Gi"),
+						Limits:   getResources("200m", "400Mi", "1Gi", ""),
+						Requests: getResources("200m", "400Mi", "1Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("100m", "100Mi", "1Gi"),
-						Requests: getResources("100m", "100Mi", "1Gi"),
+						Limits:   getResources("100m", "100Mi", "1Gi", ""),
+						Requests: getResources("100m", "100Mi", "1Gi", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, guaranteed -> guaranteed",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("200m", "200Mi", "2Gi"),
-						Requests: getResources("100m", "100Mi", "1Gi"),
+						Limits:   getResources("200m", "200Mi", "2Gi", ""),
+						Requests: getResources("100m", "100Mi", "1Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("400m", "400Mi", "2Gi"),
-						Requests: getResources("200m", "200Mi", "1Gi"),
+						Limits:   getResources("400m", "400Mi", "2Gi", ""),
+						Requests: getResources("200m", "200Mi", "1Gi", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("200m", "200Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("200m", "200Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("100m", "100Mi"),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("100m", "100Mi"),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("200m", "200Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("200m", "200Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, remove limits",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("400m", "", "1Gi"),
-						Requests: getResources("300m", "", "1Gi"),
+						Limits:   getResources("400m", "", "1Gi", ""),
+						Requests: getResources("300m", "", "1Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("200m", "500Mi", "1Gi"),
+						Limits: getResources("200m", "500Mi", "1Gi", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("400m", "500Mi", "2Gi"),
+						Limits: getResources("400m", "500Mi", "2Gi", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResources("200m", "300Mi", "2Gi"),
-						Requests: getResourceLimits("100m", "200Mi"),
+						Limits:   getResources("200m", "300Mi", "2Gi", ""),
+						Requests: getResources("100m", "200Mi", "", ""),
 					}))),
 			),
-			err:  "",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS unchanged, burstable -> burstable, remove requests",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("200m", "200Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("200m", "200Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("100m", "100Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("100m", "100Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, guaranteed -> burstable",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("100m", "100Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("100m", "100Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Requests: getResourceLimits("100m", "100Mi"),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, burstable -> guaranteed",
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("200m", "200Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("200m", "200Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
 			old:  *podtest.MakePod("pod"),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, besteffort -> burstable",
 		}, {
 			new: *podtest.MakePod("pod"),
 			old: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits:   getResourceLimits("200m", "200Mi"),
-						Requests: getResourceLimits("100m", "100Mi"),
+						Limits:   getResources("200m", "200Mi", "", ""),
+						Requests: getResources("100m", "100Mi", "", ""),
 					}))),
 			),
-			err:  "Pod QoS is immutable",
+			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "Pod QoS change, burstable -> besteffort",
 		}, {
 			new: *podtest.MakePod("pod",
@@ -13672,7 +13669,41 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "pod updates may not change fields other than",
 			test: "the podAntiAffinity cannot be updated on gated pods",
 		},
+		{
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "0", "1Gi", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "0", "1Gi", ""),
+					}))),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "cpu limit change with pod-level resources",
+		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "200Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err:  "pod updates may not change fields other than",
+			test: "memory limit change with pod-level resources",
+		},
 	}
+
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
@@ -14454,6 +14485,32 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		"",
 		"restartable init container can restart if RestartPolicyAlways",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSBurstable,
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSGuaranteed,
+			}),
+		),
+		"tatus.qosClass: Invalid value: \"Burstable\": field is immutable",
+		"qosClass can not be changed",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSBurstable,
+			}),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				QOSClass: core.PodQOSBurstable,
+			}),
+		),
+		"",
+		"qosClass no change",
 	},
 	}
 
@@ -14512,7 +14569,8 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 	// Some tests use Windows host pods as an example of fields that might
 	// conflict between an ephemeral container and the rest of the pod.
-	capabilities.SetForTests(capabilities.Capabilities{
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 	makeWindowsHostPod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
@@ -18618,6 +18676,260 @@ func TestValidateServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestValidatePodResourceConsistency(t *testing.T) {
+	path := field.NewPath("resources")
+	tests := []struct {
+		name           string
+		podResources   core.ResourceRequirements
+		containers     []core.Container
+		expectedErrors []string
+	}{{
+		name: "aggregate container requests less than pod requests",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("4"),
+						core.ResourceMemory: resource.MustParse("3Mi"),
+					},
+				},
+			},
+		},
+	}, {
+		name: "aggregate container requests equal to pod requests",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			},
+		},
+	}, {
+		name: "aggregate container requests greater than pod requests",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("6"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("8"),
+						core.ResourceMemory: resource.MustParse("3Mi"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{"must be greater than or equal to aggregate container requests"},
+	}, {
+		name: "aggregate container limits less than pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("4"),
+						core.ResourceMemory: resource.MustParse("3Mi"),
+					},
+				},
+			},
+		},
+	}, {
+		name: "aggregate container limits equal to pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			},
+		},
+	}, {
+		name: "aggregate container limits greater than pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("5"),
+						core.ResourceMemory: resource.MustParse("5Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("6"),
+						core.ResourceMemory: resource.MustParse("9Mi"),
+					},
+				},
+			},
+		},
+	}, {
+		name: "indivdual container limits greater than pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("11"),
+						core.ResourceMemory: resource.MustParse("12Mi"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{
+			"must be less than or equal to pod limits",
+			"must be less than or equal to pod limits",
+		},
+	},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := core.PodSpec{
+				Resources:  &tc.podResources,
+				Containers: tc.containers,
+			}
+			errs := validatePodResourceConsistency(&spec, path)
+			if len(errs) != len(tc.expectedErrors) {
+				t.Errorf("expected %d errors, got %d errors, got errors: %v", len(tc.expectedErrors), len(errs), errs)
+			}
+
+			for _, expectedErr := range tc.expectedErrors {
+				expectedErrExists := false
+				for _, gotErr := range errs {
+					if strings.Contains(gotErr.Error(), expectedErr) {
+						expectedErrExists = true
+						break
+					}
+				}
+
+				if !expectedErrExists {
+					t.Errorf("expected: %v, got errors: %v", expectedErr, errs)
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePodResourceNames(t *testing.T) {
+	table := []struct {
+		input           core.ResourceName
+		expectedFailure bool
+	}{
+		{"memory", false},
+		{"cpu", false},
+		{"storage", true},
+		{"requests.cpu", true},
+		{"requests.memory", true},
+		{"requests.storage", true},
+		{"limits.cpu", true},
+		{"limits.memory", true},
+		{"limits.storage", true},
+		{"network", true},
+		{"disk", true},
+		{"", true},
+		{".", true},
+		{"..", true},
+		{"my.favorite.app.co/12345", true},
+		{"my.favorite.app.co/_12345", true},
+		{"my.favorite.app.co/12345_", true},
+		{"kubernetes.io/..", true},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 64)), true},
+		{core.ResourceName("kubernetes.io/" + strings.Repeat("a", 64)), true},
+		{core.ResourceName("kubernetes.io/" + core.ResourceCPU), true},
+		{core.ResourceName("kubernetes.io/" + core.ResourceMemory), true},
+		{"kubernetes.io//", true},
+		{"kubernetes.io", true},
+		{"kubernetes.io/will/not/work/", true},
+	}
+	for _, item := range table {
+		errs := validatePodResourceName(item.input, field.NewPath("field"))
+		if len(errs) != 0 && !item.expectedFailure {
+			t.Errorf("expected no failure for input %q, got: %v", item.input, errs)
+		}
+
+		if len(errs) == 0 && item.expectedFailure {
+			t.Errorf("expected failure for input %q", item.input)
+		}
+	}
+}
+
 func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
 		input   core.ResourceName
@@ -18663,33 +18975,6 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
-func getResourceList(cpu, memory string) core.ResourceList {
-	res := core.ResourceList{}
-	if cpu != "" {
-		res[core.ResourceCPU] = resource.MustParse(cpu)
-	}
-	if memory != "" {
-		res[core.ResourceMemory] = resource.MustParse(memory)
-	}
-	return res
-}
-
-func getStorageResourceList(storage string) core.ResourceList {
-	res := core.ResourceList{}
-	if storage != "" {
-		res[core.ResourceStorage] = resource.MustParse(storage)
-	}
-	return res
-}
-
-func getLocalStorageResourceList(ephemeralStorage string) core.ResourceList {
-	res := core.ResourceList{}
-	if ephemeralStorage != "" {
-		res[core.ResourceEphemeralStorage] = resource.MustParse(ephemeralStorage)
-	}
-	return res
-}
-
 func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -18699,16 +18984,16 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type:                 core.LimitTypePod,
-				Max:                  getLocalStorageResourceList("10000Mi"),
-				Min:                  getLocalStorageResourceList("100Mi"),
-				MaxLimitRequestRatio: getLocalStorageResourceList(""),
+				Max:                  getResources("", "", "10000Mi", ""),
+				Min:                  getResources("", "", "100Mi", ""),
+				MaxLimitRequestRatio: getResources("", "", "", ""),
 			}, {
 				Type:                 core.LimitTypeContainer,
-				Max:                  getLocalStorageResourceList("10000Mi"),
-				Min:                  getLocalStorageResourceList("100Mi"),
-				Default:              getLocalStorageResourceList("500Mi"),
-				DefaultRequest:       getLocalStorageResourceList("200Mi"),
-				MaxLimitRequestRatio: getLocalStorageResourceList(""),
+				Max:                  getResources("", "", "10000Mi", ""),
+				Min:                  getResources("", "", "100Mi", ""),
+				Default:              getResources("", "", "500Mi", ""),
+				DefaultRequest:       getResources("", "", "200Mi", ""),
+				MaxLimitRequestRatio: getResources("", "", "", ""),
 			}},
 		},
 	},
@@ -18731,20 +19016,20 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type:                 core.LimitTypePod,
-				Max:                  getResourceList("100m", "10000Mi"),
-				Min:                  getResourceList("5m", "100Mi"),
-				MaxLimitRequestRatio: getResourceList("10", ""),
+				Max:                  getResources("100m", "10000Mi", "", ""),
+				Min:                  getResources("5m", "100Mi", "", ""),
+				MaxLimitRequestRatio: getResources("10", "", "", ""),
 			}, {
 				Type:                 core.LimitTypeContainer,
-				Max:                  getResourceList("100m", "10000Mi"),
-				Min:                  getResourceList("5m", "100Mi"),
-				Default:              getResourceList("50m", "500Mi"),
-				DefaultRequest:       getResourceList("10m", "200Mi"),
-				MaxLimitRequestRatio: getResourceList("10", ""),
+				Max:                  getResources("100m", "10000Mi", "", ""),
+				Min:                  getResources("5m", "100Mi", "", ""),
+				Default:              getResources("50m", "500Mi", "", ""),
+				DefaultRequest:       getResources("10m", "200Mi", "", ""),
+				MaxLimitRequestRatio: getResources("10", "", "", ""),
 			}, {
 				Type: core.LimitTypePersistentVolumeClaim,
-				Max:  getStorageResourceList("10Gi"),
-				Min:  getStorageResourceList("5Gi"),
+				Max:  getResources("", "", "", "10Gi"),
+				Min:  getResources("", "", "", "5Gi"),
 			}},
 		},
 	}, {
@@ -18752,7 +19037,7 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type: core.LimitTypePersistentVolumeClaim,
-				Min:  getStorageResourceList("5Gi"),
+				Min:  getResources("", "", "", "5Gi"),
 			}},
 		},
 	}, {
@@ -18760,7 +19045,7 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type: core.LimitTypePersistentVolumeClaim,
-				Max:  getStorageResourceList("10Gi"),
+				Max:  getResources("", "", "", "10Gi"),
 			}},
 		},
 	}, {
@@ -18768,11 +19053,11 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type:                 core.LimitTypeContainer,
-				Max:                  getResourceList("100m", "10000T"),
-				Min:                  getResourceList("5m", "100Mi"),
-				Default:              getResourceList("50m", "500Mi"),
-				DefaultRequest:       getResourceList("10m", "200Mi"),
-				MaxLimitRequestRatio: getResourceList("10", ""),
+				Max:                  getResources("100m", "10000T", "", ""),
+				Min:                  getResources("5m", "100Mi", "", ""),
+				Default:              getResources("50m", "500Mi", "", ""),
+				DefaultRequest:       getResources("10m", "200Mi", "", ""),
+				MaxLimitRequestRatio: getResources("10", "", "", ""),
 			}},
 		},
 	}, {
@@ -18780,11 +19065,11 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type:                 "thirdparty.com/foo",
-				Max:                  getResourceList("100m", "10000T"),
-				Min:                  getResourceList("5m", "100Mi"),
-				Default:              getResourceList("50m", "500Mi"),
-				DefaultRequest:       getResourceList("10m", "200Mi"),
-				MaxLimitRequestRatio: getResourceList("10", ""),
+				Max:                  getResources("100m", "10000T", "", ""),
+				Min:                  getResources("5m", "100Mi", "", ""),
+				Default:              getResources("50m", "500Mi", "", ""),
+				DefaultRequest:       getResources("10m", "200Mi", "", ""),
+				MaxLimitRequestRatio: getResources("10", "", "", ""),
 			}},
 		},
 	}, {
@@ -18792,11 +19077,11 @@ func TestValidateLimitRange(t *testing.T) {
 		spec: core.LimitRangeSpec{
 			Limits: []core.LimitRangeItem{{
 				Type:                 "thirdparty.com/foo",
-				Max:                  getStorageResourceList("10000T"),
-				Min:                  getStorageResourceList("100Mi"),
-				Default:              getStorageResourceList("500Mi"),
-				DefaultRequest:       getStorageResourceList("200Mi"),
-				MaxLimitRequestRatio: getStorageResourceList(""),
+				Max:                  getResources("", "", "", "10000T"),
+				Min:                  getResources("", "", "", "100Mi"),
+				Default:              getResources("", "", "", "500Mi"),
+				DefaultRequest:       getResources("", "", "", "200Mi"),
+				MaxLimitRequestRatio: getResources("", "", "", ""),
 			}},
 		},
 	},
@@ -18833,11 +19118,11 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type: core.LimitTypePod,
-					Max:  getResourceList("100m", "10000m"),
-					Min:  getResourceList("0m", "100m"),
+					Max:  getResources("100m", "10000m", "", ""),
+					Min:  getResources("0m", "100m", "", ""),
 				}, {
 					Type: core.LimitTypePod,
-					Min:  getResourceList("0m", "100m"),
+					Min:  getResources("0m", "100m", "", ""),
 				}},
 			}},
 			"",
@@ -18846,9 +19131,9 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:    core.LimitTypePod,
-					Max:     getResourceList("100m", "10000m"),
-					Min:     getResourceList("0m", "100m"),
-					Default: getResourceList("10m", "100m"),
+					Max:     getResources("100m", "10000m", "", ""),
+					Min:     getResources("0m", "100m", "", ""),
+					Default: getResources("10m", "100m", "", ""),
 				}},
 			}},
 			"may not be specified when `type` is 'Pod'",
@@ -18857,9 +19142,9 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:           core.LimitTypePod,
-					Max:            getResourceList("100m", "10000m"),
-					Min:            getResourceList("0m", "100m"),
-					DefaultRequest: getResourceList("10m", "100m"),
+					Max:            getResources("100m", "10000m", "", ""),
+					Min:            getResources("0m", "100m", "", ""),
+					DefaultRequest: getResources("10m", "100m", "", ""),
 				}},
 			}},
 			"may not be specified when `type` is 'Pod'",
@@ -18868,8 +19153,8 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type: core.LimitTypePod,
-					Max:  getResourceList("10m", ""),
-					Min:  getResourceList("100m", ""),
+					Max:  getResources("10m", "", "", ""),
+					Min:  getResources("100m", "", "", ""),
 				}},
 			}},
 			"min value 100m is greater than max value 10m",
@@ -18878,9 +19163,9 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:    core.LimitTypeContainer,
-					Max:     getResourceList("1", ""),
-					Min:     getResourceList("100m", ""),
-					Default: getResourceList("2000m", ""),
+					Max:     getResources("1", "", "", ""),
+					Min:     getResources("100m", "", "", ""),
+					Default: getResources("2000m", "", "", ""),
 				}},
 			}},
 			"default value 2 is greater than max value 1",
@@ -18889,9 +19174,9 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:           core.LimitTypeContainer,
-					Max:            getResourceList("1", ""),
-					Min:            getResourceList("100m", ""),
-					DefaultRequest: getResourceList("2000m", ""),
+					Max:            getResources("1", "", "", ""),
+					Min:            getResources("100m", "", "", ""),
+					DefaultRequest: getResources("2000m", "", "", ""),
 				}},
 			}},
 			"default request value 2 is greater than max value 1",
@@ -18900,10 +19185,10 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:           core.LimitTypeContainer,
-					Max:            getResourceList("2", ""),
-					Min:            getResourceList("100m", ""),
-					Default:        getResourceList("500m", ""),
-					DefaultRequest: getResourceList("800m", ""),
+					Max:            getResources("2", "", "", ""),
+					Min:            getResources("100m", "", "", ""),
+					Default:        getResources("500m", "", "", ""),
+					DefaultRequest: getResources("800m", "", "", ""),
 				}},
 			}},
 			"default request value 800m is greater than default limit value 500m",
@@ -18912,7 +19197,7 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:                 core.LimitTypePod,
-					MaxLimitRequestRatio: getResourceList("800m", ""),
+					MaxLimitRequestRatio: getResources("800m", "", "", ""),
 				}},
 			}},
 			"ratio 800m is less than 1",
@@ -18921,9 +19206,9 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:                 core.LimitTypeContainer,
-					Max:                  getResourceList("", "2Gi"),
-					Min:                  getResourceList("", "512Mi"),
-					MaxLimitRequestRatio: getResourceList("", "10"),
+					Max:                  getResources("", "2Gi", "", ""),
+					Min:                  getResources("", "512Mi", "", ""),
+					MaxLimitRequestRatio: getResources("", "10", "", ""),
 				}},
 			}},
 			"ratio 10 is greater than max/min = 4.000000",
@@ -18932,11 +19217,11 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type:                 "foo",
-					Max:                  getStorageResourceList("10000T"),
-					Min:                  getStorageResourceList("100Mi"),
-					Default:              getStorageResourceList("500Mi"),
-					DefaultRequest:       getStorageResourceList("200Mi"),
-					MaxLimitRequestRatio: getStorageResourceList(""),
+					Max:                  getResources("", "", "", "10000T"),
+					Min:                  getResources("", "", "", "100Mi"),
+					Default:              getResources("", "", "", "500Mi"),
+					DefaultRequest:       getResources("", "", "", "200Mi"),
+					MaxLimitRequestRatio: getResources("", "", "", ""),
 				}},
 			}},
 			"must be a standard limit type or fully qualified",
@@ -18953,8 +19238,8 @@ func TestValidateLimitRange(t *testing.T) {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
 					Type: core.LimitTypePersistentVolumeClaim,
-					Min:  getStorageResourceList("10Gi"),
-					Max:  getStorageResourceList("1Gi"),
+					Min:  getResources("", "", "", "10Gi"),
+					Max:  getResources("", "", "", "1Gi"),
 				}},
 			}},
 			"min value 10Gi is greater than max value 1Gi",
@@ -20556,6 +20841,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.RunAsGroup",
 		"SecurityContext.RunAsUser",
 		"SecurityContext.SELinuxOptions",
+		"SecurityContext.SELinuxChangePolicy",
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
@@ -20657,6 +20943,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ResourceClaims[*].Name",
 		"ResourceClaims[*].ResourceClaimName",
 		"ResourceClaims[*].ResourceClaimTemplateName",
+		"Resources",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
@@ -21000,7 +21287,8 @@ func TestValidateSecurityContext(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		capabilities.SetForTests(capabilities.Capabilities{
+		capabilities.ResetForTest()
+		capabilities.Initialize(capabilities.Capabilities{
 			AllowPrivileged: v.capAllowPriv,
 		})
 		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
@@ -21022,29 +21310,79 @@ func TestValidPodLogOptions(t *testing.T) {
 	negative := int64(-1)
 	zero := int64(0)
 	positive := int64(1)
+	stdoutStream := core.LogStreamStdout
+	stderrStream := core.LogStreamStderr
+	allStream := core.LogStreamAll
+	invalidStream := "invalid"
 	tests := []struct {
-		opt  core.PodLogOptions
-		errs int
+		opt                  core.PodLogOptions
+		errs                 int
+		allowStreamSelection bool
 	}{
-		{core.PodLogOptions{}, 0},
-		{core.PodLogOptions{Previous: true}, 0},
-		{core.PodLogOptions{Follow: true}, 0},
-		{core.PodLogOptions{TailLines: &zero}, 0},
-		{core.PodLogOptions{TailLines: &negative}, 1},
-		{core.PodLogOptions{TailLines: &positive}, 0},
-		{core.PodLogOptions{LimitBytes: &zero}, 1},
-		{core.PodLogOptions{LimitBytes: &negative}, 1},
-		{core.PodLogOptions{LimitBytes: &positive}, 0},
-		{core.PodLogOptions{SinceSeconds: &negative}, 1},
-		{core.PodLogOptions{SinceSeconds: &positive}, 0},
-		{core.PodLogOptions{SinceSeconds: &zero}, 1},
-		{core.PodLogOptions{SinceTime: &now}, 0},
+		{core.PodLogOptions{}, 0, false},
+		{core.PodLogOptions{Previous: true}, 0, false},
+		{core.PodLogOptions{Follow: true}, 0, false},
+		{core.PodLogOptions{TailLines: &zero}, 0, false},
+		{core.PodLogOptions{TailLines: &negative}, 1, false},
+		{core.PodLogOptions{TailLines: &positive}, 0, false},
+		{core.PodLogOptions{LimitBytes: &zero}, 1, false},
+		{core.PodLogOptions{LimitBytes: &negative}, 1, false},
+		{core.PodLogOptions{LimitBytes: &positive}, 0, false},
+		{core.PodLogOptions{SinceSeconds: &negative}, 1, false},
+		{core.PodLogOptions{SinceSeconds: &positive}, 0, false},
+		{core.PodLogOptions{SinceSeconds: &zero}, 1, false},
+		{core.PodLogOptions{SinceTime: &now}, 0, false},
+		{
+			opt: core.PodLogOptions{
+				Stream: &stdoutStream,
+			},
+			allowStreamSelection: false,
+			errs:                 1,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream: &stdoutStream,
+			},
+			allowStreamSelection: true,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream: &invalidStream,
+			},
+			allowStreamSelection: true,
+			errs:                 1,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:    &stderrStream,
+				TailLines: &positive,
+			},
+			allowStreamSelection: true,
+			errs:                 1,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:    &allStream,
+				TailLines: &positive,
+			},
+			allowStreamSelection: true,
+		},
+		{
+			opt: core.PodLogOptions{
+				Stream:     &stdoutStream,
+				LimitBytes: &positive,
+				SinceTime:  &now,
+			},
+			allowStreamSelection: true,
+		},
 	}
 	for i, test := range tests {
-		errs := ValidatePodLogOptions(&test.opt)
-		if test.errs != len(errs) {
-			t.Errorf("%d: Unexpected errors: %v", i, errs)
-		}
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			errs := ValidatePodLogOptions(&test.opt, test.allowStreamSelection)
+			if test.errs != len(errs) {
+				t.Errorf("%d: Unexpected errors: %v", i, errs)
+			}
+		})
 	}
 }
 
@@ -21988,15 +22326,15 @@ func TestCrossNamespaceSource(t *testing.T) {
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(nil, "UnsupportedKind", &goodNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with invalid namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with invalid namespace specified",
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &badNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with nil namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with nil namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, nil, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with empty namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with empty namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &emptyNS, goodName, false),
 	}, {
@@ -23032,10 +23370,14 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 
 func TestValidateResourceRequirements(t *testing.T) {
 	path := field.NewPath("resources")
+	// TODO(ndixita): refactor the tests to check the expected errors are equal to
+	// got errors.
 	tests := []struct {
 		name         string
 		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		validateFn   func(requirements *core.ResourceRequirements,
+			podClaimNames sets.Set[string], fldPath *field.Path,
+			opts PodValidationOptions) field.ErrorList
 	}{{
 		name: "limits and requests of hugepage resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23048,7 +23390,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		validateFn: ValidateContainerResourceRequirements,
 	}, {
 		name: "limits and requests of memory resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23059,7 +23401,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceMemory: resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		validateFn: ValidateContainerResourceRequirements,
 	}, {
 		name: "limits and requests of cpu resource are equal",
 		requirements: core.ResourceRequirements{
@@ -23070,13 +23412,36 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceCPU: resource.MustParse("10"),
 			},
 		},
-		opts: PodValidationOptions{},
+		validateFn: ValidateContainerResourceRequirements,
 	},
+		{
+			name: "limits and requests of memory resource are equal",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "limits and requests of cpu resource are equal",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceCPU: resource.MustParse("10"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, nil, path, tc.opts); len(errs) != 0 {
+			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("unexpected errors: %v", errs)
 			}
 		})
@@ -23085,7 +23450,9 @@ func TestValidateResourceRequirements(t *testing.T) {
 	errTests := []struct {
 		name         string
 		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		validateFn   func(requirements *core.ResourceRequirements,
+			podClaimNames sets.Set[string], fldPath *field.Path,
+			opts PodValidationOptions) field.ErrorList
 	}{{
 		name: "hugepage resource without cpu or memory",
 		requirements: core.ResourceRequirements{
@@ -23096,13 +23463,69 @@ func TestValidateResourceRequirements(t *testing.T) {
 				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
 			},
 		},
-		opts: PodValidationOptions{},
+		validateFn: ValidateContainerResourceRequirements,
+	}, {
+		name: "pod resource with hugepages",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
+		name: "pod resource with ephemeral-storage",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
+		name: "pod resource with unsupported prefixed resources",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
+		name: "pod resource with unsupported native resources",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
 	},
+		{
+			name: "pod resource with unsupported empty native resource name",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetes.io/"): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetes.io"): resource.MustParse("2"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		},
 	}
 
 	for _, tc := range errTests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, nil, path, tc.opts); len(errs) == 0 {
+			if errs := tc.validateFn(&tc.requirements, nil, path, PodValidationOptions{}); len(errs) == 0 {
 				t.Error("expected errors")
 			}
 		})
@@ -23653,8 +24076,8 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-
-			capabilities.SetForTests(capabilities.Capabilities{
+			capabilities.ResetForTest()
+			capabilities.Initialize(capabilities.Capabilities{
 				AllowPrivileged: testCase.allowPrivileged,
 			})
 
@@ -23731,43 +24154,8 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Profile %s should be valid", test.profile)
 		} else {
-			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
+			assert.Errorf(t, err, "Profile %s should not be valid", test.profile)
 		}
-	}
-}
-
-func TestValidateDownwardAPIHostIPs(t *testing.T) {
-	testCases := []struct {
-		name           string
-		expectError    bool
-		featureEnabled bool
-		fieldSel       *core.ObjectFieldSelector
-	}{
-		{
-			name:           "has no hostIPs field, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIP"},
-		},
-		{
-			name:           "has hostIPs field, featuregate enabled",
-			expectError:    false,
-			featureEnabled: true,
-			fieldSel:       &core.ObjectFieldSelector{FieldPath: "status.hostIPs"},
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)
-
-			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
-			if testCase.expectError && len(errs) == 0 {
-				t.Errorf("Unexpected success")
-			}
-			if !testCase.expectError && len(errs) != 0 {
-				t.Errorf("Unexpected error(s): %v", errs)
-			}
-		})
 	}
 }
 
@@ -24138,6 +24526,9 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
 			status := core.LoadBalancerStatus{}
@@ -24157,43 +24548,109 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 func TestValidateSleepAction(t *testing.T) {
 	fldPath := field.NewPath("root")
 	getInvalidStr := func(gracePeriod int64) string {
-		return fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d)", gracePeriod)
+		return fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d). Enable AllowPodLifecycleSleepActionZeroValue feature gate for zero sleep.", gracePeriod)
+	}
+
+	getInvalidStrWithZeroValueEnabled := func(gracePeriod int64) string {
+		return fmt.Sprintf("must be non-negative and less than terminationGracePeriodSeconds (%d)", gracePeriod)
 	}
 
 	testCases := []struct {
-		name        string
-		action      *core.SleepAction
-		gracePeriod int64
-		expectErr   field.ErrorList
+		name             string
+		action           *core.SleepAction
+		gracePeriod      int64
+		zeroValueEnabled bool
+		expectErr        field.ErrorList
 	}{
 		{
 			name: "valid setting",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 30,
+			gracePeriod:      30,
+			zeroValueEnabled: false,
 		},
 		{
 			name: "negative seconds",
 			action: &core.SleepAction{
 				Seconds: -1,
 			},
-			gracePeriod: 30,
-			expectErr:   field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
 		},
 		{
 			name: "longer than gracePeriod",
 			action: &core.SleepAction{
 				Seconds: 5,
 			},
-			gracePeriod: 3,
-			expectErr:   field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+			gracePeriod:      3,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(3))},
+		},
+		{
+			name: "sleep duration of zero with zero value feature gate disabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, 0, getInvalidStr(30))},
+		},
+		{
+			name: "sleep duration of zero with zero value feature gate enabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: true,
+		},
+		{
+			name: "invalid sleep duration (negative value) with zero value disabled",
+			action: &core.SleepAction{
+				Seconds: -1,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStr(30))},
+		},
+		{
+			name: "invalid sleep duration (negative value) with zero value enabled",
+			action: &core.SleepAction{
+				Seconds: -1,
+			},
+			gracePeriod:      30,
+			zeroValueEnabled: true,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, -1, getInvalidStrWithZeroValueEnabled(30))},
+		},
+		{
+			name: "zero grace period duration with zero value enabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			gracePeriod:      0,
+			zeroValueEnabled: true,
+		},
+		{
+			name: "nil grace period with zero value disabled",
+			action: &core.SleepAction{
+				Seconds: 5,
+			},
+			zeroValueEnabled: false,
+			expectErr:        field.ErrorList{field.Invalid(fldPath, 5, getInvalidStr(0))},
+		},
+		{
+			name: "nil grace period with zero value enabled",
+			action: &core.SleepAction{
+				Seconds: 0,
+			},
+			zeroValueEnabled: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath)
+			errs := validateSleepAction(tc.action, &tc.gracePeriod, fldPath, PodValidationOptions{AllowPodLifecycleSleepActionZeroValue: tc.zeroValueEnabled})
 
 			if len(tc.expectErr) > 0 && len(errs) == 0 {
 				t.Errorf("Unexpected success")
@@ -24203,6 +24660,172 @@ func TestValidateSleepAction(t *testing.T) {
 				if tc.expectErr[0].Error() != errs[0].Error() {
 					t.Errorf("Unexpected error(s): %v", errs)
 				}
+			}
+		})
+	}
+}
+
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		dnsConfig      *core.PodDNSConfig
+	}{
+		{
+			name:           "beginswith underscore, contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate enabled",
+			expectError:    false,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate enabled",
+			expectError:    true,
+			featureEnabled: true,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+		{
+			name:           "begins with underscore, contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+		},
+		{
+			name:           "contains underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"abc_d.example.com"}},
+		},
+		{
+			name:           "is dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"."}},
+		},
+		{
+			name:           "two dots, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".."}},
+		},
+		{
+			name:           "underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"_."}},
+		},
+		{
+			name:           "dash and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"-."}},
+		},
+		{
+			name:           "two underscore and dot, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"__."}},
+		},
+		{
+			name:           "dot and two underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{".__"}},
+		},
+		{
+			name:           "dot and underscore, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"._"}},
+		},
+		{
+			name:           "lot of underscores, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"____________"}},
+		},
+		{
+			name:           "a regular name, featuregate disabled",
+			expectError:    false,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"example.com"}},
+		},
+		{
+			name:           "unicode character, featuregate disabled",
+			expectError:    true,
+			featureEnabled: false,
+			dnsConfig:      &core.PodDNSConfig{Searches: []string{"☃.example.com"}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errs := validatePodDNSConfig(testCase.dnsConfig, nil, nil, PodValidationOptions{AllowRelaxedDNSSearchValidation: testCase.featureEnabled})
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
 	}
@@ -24616,7 +25239,109 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				},
 			},
 			wantFieldErrors: field.ErrorList{
-				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(1).Child("name"), core.ResourceName("test.device/test2"), "must match one of the container's resource requirements"),
+				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(1).Child("name"), core.ResourceName("test.device/test2"), "must match one of the container's resource requests"),
+			},
+		},
+
+		"allow claims and request that are in spec": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Claims: []core.ResourceClaim{
+							{
+								Name:    "claim.name",
+								Request: "request.name",
+							},
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "claim:claim.name/request.name",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "driver/pool/device-name",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+
+		"allow claims that are in spec without the request": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Claims: []core.ResourceClaim{
+							{
+								Name: "claim.name",
+							},
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "claim:claim.name",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "driver/pool/device-name",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+
+		"don't allow claims that are not in spec": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Claims: []core.ResourceClaim{
+							{
+								Name: "other-claim.name",
+							},
+						},
+						Requests: core.ResourceList{
+							"claim.name": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "claim:claim.name",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "driver/pool/device-name",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("name"), core.ResourceName("claim:claim.name"), "must match one of the container's resource claims in a format 'claim:<claimName>/<request>' or 'claim:<claimName>' if request is empty"),
 			},
 		},
 
@@ -24659,5 +25384,521 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestValidateSELinuxChangePolicy(t *testing.T) {
+	tests := []struct {
+		name               string
+		pod                *core.Pod
+		allowOnlyRecursive bool
+		wantErrs           field.ErrorList
+	}{
+		{
+			name: "nil is valid",
+			pod: podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{
+				SELinuxChangePolicy: nil,
+			})),
+			allowOnlyRecursive: false,
+			wantErrs:           nil,
+		},
+		{
+			name: "Recursive is always valid",
+			pod: podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{
+				SELinuxChangePolicy: ptr.To(core.SELinuxChangePolicyRecursive),
+			})),
+			allowOnlyRecursive: false,
+			wantErrs:           nil,
+		},
+		{
+			name: "MountOption is not valid when AllowOnlyRecursiveSELinuxChangePolicy",
+			pod: podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{
+				SELinuxChangePolicy: ptr.To(core.SELinuxChangePolicyMountOption),
+			})),
+			allowOnlyRecursive: true,
+			wantErrs: field.ErrorList{
+				field.NotSupported(
+					field.NewPath("spec", "securityContext", "seLinuxChangePolicy"),
+					core.PodSELinuxChangePolicy("MountOption"),
+					[]string{"Recursive"}),
+			},
+		},
+		{
+			name: "MountOption is valid when not AllowOnlyRecursiveSELinuxChangePolicy",
+			pod: podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{
+				SELinuxChangePolicy: ptr.To(core.SELinuxChangePolicyMountOption),
+			})),
+			allowOnlyRecursive: false,
+			wantErrs:           nil,
+		},
+		{
+			name: "invalid value",
+			pod: podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{
+				SELinuxChangePolicy: ptr.To(core.PodSELinuxChangePolicy("InvalidValue")),
+			})),
+			allowOnlyRecursive: false,
+			wantErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "securityContext", "seLinuxChangePolicy"),
+					core.PodSELinuxChangePolicy("InvalidValue"),
+					[]string{"MountOption", "Recursive"}),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := PodValidationOptions{
+				AllowOnlyRecursiveSELinuxChangePolicy: tc.allowOnlyRecursive,
+			}
+			errs := ValidatePodSpec(&tc.pod.Spec, &tc.pod.ObjectMeta, field.NewPath("spec"), opts)
+			if len(errs) == 0 {
+				errs = nil
+			}
+			if diff := cmp.Diff(tc.wantErrs, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+
+		})
+	}
+}
+
+func TestValidatePodResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+
+	mkPod := func(req, lim core.ResourceList, tweaks ...podtest.Tweak) *core.Pod {
+		return podtest.MakePod("pod", append(tweaks,
+			podtest.SetContainers(
+				podtest.MakeContainer(
+					"container",
+					podtest.SetContainerResources(
+						core.ResourceRequirements{
+							Requests: req,
+							Limits:   lim,
+						},
+					),
+				),
+			),
+		)...)
+	}
+
+	mkPodWithInitContainers := func(req, lim core.ResourceList, restartPolicy core.ContainerRestartPolicy, tweaks ...podtest.Tweak) *core.Pod {
+		return podtest.MakePod("pod", append(tweaks,
+			podtest.SetInitContainers(
+				podtest.MakeContainer(
+					"container",
+					podtest.SetContainerResources(
+						core.ResourceRequirements{
+							Requests: req,
+							Limits:   lim,
+						},
+					),
+					podtest.SetContainerRestartPolicy(restartPolicy),
+				),
+			),
+		)...)
+	}
+
+	tests := []struct {
+		test string
+		old  *core.Pod
+		new  *core.Pod
+		err  string
+	}{
+		{
+			test: "pod-level resources with container cpu limit change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		}, {
+			test: "pod-level resources with container memory limit change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "200Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "pod-level resources with container cpu request change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "200Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("200m", "200Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		}, {
+			test: "pod-level resources with container memory request change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "200Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "pod-level resources with pod-level memory limit change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "100Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "pod-level resources with pod-level memory request change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "100Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "pod-level resources with pod-level cpu limit change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "pod-level resources with pod-level cpu request change",
+			new: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("100m", "200Mi", "", "")}),
+			),
+			old: podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Requests: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
+			),
+			err: "pods with pod-level resources cannot be resized",
+		},
+		{
+			test: "cpu limit change",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", "")),
+			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err:  "",
+		}, {
+			test: "memory limit change",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			err:  "",
+		}, {
+			test: "storage limit change",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", "")),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "cpu request change",
+			old:  mkPod(getResources("200m", "0", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("100m", "0", "", ""), core.ResourceList{}),
+			err:  "",
+		}, {
+			test: "memory request change",
+			old:  mkPod(getResources("0", "100Mi", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("0", "200Mi", "", ""), core.ResourceList{}),
+			err:  "",
+		}, {
+			test: "storage request change",
+			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}),
+			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "Pod QoS unchanged, guaranteed -> guaranteed",
+			old:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("100m", "100Mi", "1Gi", "")),
+			new:  mkPod(getResources("200m", "400Mi", "1Gi", ""), getResources("200m", "400Mi", "1Gi", "")),
+			err:  "",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable",
+			old:  mkPod(getResources("200m", "200Mi", "1Gi", ""), getResources("400m", "400Mi", "2Gi", "")),
+			new:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("200m", "200Mi", "2Gi", "")),
+			err:  "",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, add limits",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			err:  "",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, add requests",
+			old:  mkPod(core.ResourceList{}, getResources("200m", "500Mi", "1Gi", "")),
+			new:  mkPod(getResources("300m", "", "", ""), getResources("400m", "500Mi", "1Gi", "")),
+			err:  "",
+		}, {
+			test: "Pod QoS change, guaranteed -> burstable",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			err:  "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test: "Pod QoS change, burstable -> guaranteed",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "100Mi", "", "")),
+			err:  "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test: "Pod QoS change, besteffort -> burstable",
+			old:  mkPod(core.ResourceList{}, core.ResourceList{}),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			err:  "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test: "Pod QoS change, burstable -> besteffort",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, core.ResourceList{}),
+			err:  "Pod QOS Class may not change as a result of resizing",
+		}, {
+			test: "windows pod, no resource change",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
+			err:  "Forbidden: windows pods cannot be resized",
+		}, {
+			test: "windows pod, resource change",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
+			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", ""), podtest.SetOS(core.Windows)),
+			err:  "Forbidden: windows pods cannot be resized",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu limit",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("", "100Mi", "", "")),
+			err:  "spec.containers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove memory limit",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "", "", "")),
+			err:  "spec.containers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu request",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("", "100Mi", "", ""), core.ResourceList{}),
+			err:  "spec.containers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove memory request",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
+			new:  mkPod(getResources("100m", "", "", ""), core.ResourceList{}),
+			err:  "spec.containers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory limits",
+			old:  mkPod(getResources("100m", "", "", ""), getResources("100m", "100Mi", "", "")),
+			new:  mkPod(getResources("100m", "", "", ""), core.ResourceList{}),
+			err:  "spec.containers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
+			old:  mkPod(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "", "", "")),
+			err:  "spec.containers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu limit",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove memory limit",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu request",
+			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("", "100Mi", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove memory request",
+			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("100m", "", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory limits",
+			old:  mkPodWithInitContainers(getResources("100m", "", "", ""), getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("100m", "", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.limits: Forbidden: resource limits cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
+			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "spec.initContainers[0].resources.requests: Forbidden: resource requests cannot be removed",
+		}, {
+			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
+			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", ""), ""),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), ""),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		},
+		{
+			test: "Pod with nil Resource field in Status",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   nil,
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "Forbidden: Pod running on node without support for resize",
+		},
+		{
+			test: "Pod with non-nil Resources field in Status",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   &core.ResourceRequirements{},
+					State: core.ContainerState{
+						Running: &core.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
+		{
+			test: "Pod without running containers",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
+		{
+			test: "Pod with containers which are not running yet",
+			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
+				ContainerStatuses: []core.ContainerStatus{{
+					ContainerID: "docker://numbers",
+					Image:       "nginx:alpine",
+					Name:        "main",
+					Ready:       true,
+					Started:     proto.Bool(true),
+					Resources:   &core.ResourceRequirements{},
+					State: core.ContainerState{
+						Waiting: &core.ContainerStateWaiting{
+							Reason: "PodInitializing",
+						},
+					},
+				}},
+			})),
+			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
+			err: "",
+		},
+	}
+
+	for _, test := range tests {
+		test.new.ObjectMeta.ResourceVersion = "1"
+		test.old.ObjectMeta.ResourceVersion = "1"
+
+		// set required fields if old and new match and have no opinion on the value
+		if test.new.Name == "" && test.old.Name == "" {
+			test.new.Name = "name"
+			test.old.Name = "name"
+		}
+		if test.new.Namespace == "" && test.old.Namespace == "" {
+			test.new.Namespace = "namespace"
+			test.old.Namespace = "namespace"
+		}
+		if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
+			test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+			test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+		}
+		if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
+			test.new.Spec.DNSPolicy = core.DNSClusterFirst
+			test.old.Spec.DNSPolicy = core.DNSClusterFirst
+		}
+		if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
+			test.new.Spec.RestartPolicy = "Always"
+			test.old.Spec.RestartPolicy = "Always"
+		}
+
+		errs := ValidatePodResize(test.new, test.old, PodValidationOptions{})
+		if test.err == "" {
+			if len(errs) != 0 {
+				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			}
+		} else {
+			if len(errs) == 0 {
+				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+			}
+		}
 	}
 }

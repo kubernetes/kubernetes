@@ -437,6 +437,31 @@ func TestCacheInvalidation(t *testing.T) {
 	fakeClient.ClearActions()
 }
 
+func TestResourceContentExpired(t *testing.T) {
+	fakeClient := &fake.Clientset{}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
+	manager := newCacheBasedSecretManager(store)
+
+	// Create a pod with some secrets.
+	s1 := secretsToAttach{
+		imagePullSecretNames: []string{"s1"},
+		containerEnvSecrets: []envSecrets{
+			{envVarNames: []string{"s1"}, envFromNames: []string{"s10"}},
+			{envVarNames: []string{"s2"}},
+		},
+	}
+
+	// emulate a requested resource content that has expired from the server
+	manager.RegisterPod(podWithSecrets("dummy-ns", "dummy-name", s1))
+	fakeClient.PrependReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+		return true, &v1.Secret{}, apierrors.NewResourceExpired("expired")
+	})
+	// should fail to fetch the latest object
+	_, err := manager.GetObject("dummy-ns", "s1")
+	assert.Error(t, err)
+}
+
 func TestRegisterIdempotence(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClock := testingclock.NewFakeClock(time.Now())

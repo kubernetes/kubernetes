@@ -1,0 +1,43 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.types;
+
+option go_package = "github.com/containerd/containerd/api/types;types";
+
+// Mount describes mounts for a container.
+//
+// This type is the lingua franca of ContainerD. All services provide mounts
+// to be used with the container at creation time.
+//
+// The Mount type follows the structure of the mount syscall, including a type,
+// source, target and options.
+message Mount {
+	// Type defines the nature of the mount.
+	string type = 1;
+
+	// Source specifies the name of the mount. Depending on mount type, this
+	// may be a volume name or a host path, or even ignored.
+	string source = 2;
+
+	// Target path in container
+	string target = 3;
+
+	// Options specifies zero or more fstab style mount options.
+	repeated string options = 4;
+}

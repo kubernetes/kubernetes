@@ -75,7 +75,7 @@ func runCleanupNode(c workflow.RunData) error {
 				klog.Warningln("[reset] Please ensure kubelet is stopped manually")
 			}
 		} else {
-			fmt.Println("[reset] Would stop the kubelet service")
+			fmt.Println("[dryrun] Would stop the kubelet service")
 		}
 	}
 
@@ -96,7 +96,7 @@ func runCleanupNode(c workflow.RunData) error {
 			dirsToClean = append(dirsToClean, kubeletRunDirectory)
 		}
 	} else {
-		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+		fmt.Printf("[dryrun] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	}
 
 	if !r.DryRun() {
@@ -105,7 +105,7 @@ func runCleanupNode(c workflow.RunData) error {
 			klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 		}
 	} else {
-		fmt.Println("[reset] Would remove Kubernetes-managed containers")
+		fmt.Println("[dryrun] Would remove Kubernetes-managed containers")
 	}
 
 	// Remove contents from the config and pki directories
@@ -115,7 +115,7 @@ func runCleanupNode(c workflow.RunData) error {
 
 	dirsToClean = append(dirsToClean, certsDir)
 	if r.CleanupTmpDir() {
-		tempDir := path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)
+		tempDir := path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDir)
 		dirsToClean = append(dirsToClean, tempDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, dirsToClean, r.DryRun())
@@ -127,7 +127,7 @@ func runCleanupNode(c workflow.RunData) error {
 				klog.Warningf("[reset] Failed to remove users and groups: %v\n", err)
 			}
 		} else {
-			fmt.Println("[reset] Would remove users and groups created for rootless control-plane")
+			fmt.Println("[dryrun] Would remove users and groups created for rootless control-plane")
 		}
 	}
 
@@ -156,7 +156,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 			}
 		}
 	} else {
-		fmt.Printf("[reset] Would delete contents of directories: %v\n", dirsToClean)
+		fmt.Printf("[dryrun] Would delete contents of directories: %v\n", dirsToClean)
 	}
 
 	filesToClean := []string{
@@ -176,7 +176,7 @@ func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 			}
 		}
 	} else {
-		fmt.Printf("[reset] Would delete files: %v\n", filesToClean)
+		fmt.Printf("[dryrun] Would delete files: %v\n", filesToClean)
 	}
 }
 

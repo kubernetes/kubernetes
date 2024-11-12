@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/flowcontrol/v1"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 )
 
 // SubjectApplyConfiguration represents a declarative configuration of the Subject type for use
 // with apply.
 type SubjectApplyConfiguration struct {
-	Kind           *v1.SubjectKind                          `json:"kind,omitempty"`
+	Kind           *flowcontrolv1.SubjectKind               `json:"kind,omitempty"`
 	User           *UserSubjectApplyConfiguration           `json:"user,omitempty"`
 	Group          *GroupSubjectApplyConfiguration          `json:"group,omitempty"`
 	ServiceAccount *ServiceAccountSubjectApplyConfiguration `json:"serviceAccount,omitempty"`
@@ -40,7 +40,7 @@ func Subject() *SubjectApplyConfiguration {
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *SubjectApplyConfiguration) WithKind(value v1.SubjectKind) *SubjectApplyConfiguration {
+func (b *SubjectApplyConfiguration) WithKind(value flowcontrolv1.SubjectKind) *SubjectApplyConfiguration {
 	b.Kind = &value
 	return b
 }

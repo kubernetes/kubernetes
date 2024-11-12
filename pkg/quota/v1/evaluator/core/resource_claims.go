@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,7 +29,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
-	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1alpha3"
+	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1beta1"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -68,14 +68,11 @@ func (p *claimEvaluator) GroupResource() schema.GroupResource {
 
 // Handles returns true if the evaluator should handle the specified operation.
 func (p *claimEvaluator) Handles(a admission.Attributes) bool {
+	if a.GetSubresource() != "" {
+		return false
+	}
 	op := a.GetOperation()
-	if op == admission.Create {
-		return true
-	}
-	if op == admission.Update {
-		return true
-	}
-	return false
+	return admission.Create == op || admission.Update == op
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -152,7 +149,7 @@ func toExternalResourceClaimOrError(obj runtime.Object) (*resourceapi.ResourceCl
 	case *resourceapi.ResourceClaim:
 		claim = t
 	case *resourceinternal.ResourceClaim:
-		if err := resourceversioned.Convert_resource_ResourceClaim_To_v1alpha3_ResourceClaim(t, claim, nil); err != nil {
+		if err := resourceversioned.Convert_resource_ResourceClaim_To_v1beta1_ResourceClaim(t, claim, nil); err != nil {
 			return nil, err
 		}
 	default:

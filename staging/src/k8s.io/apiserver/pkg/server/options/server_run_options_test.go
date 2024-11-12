@@ -26,12 +26,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
+	utilversion "k8s.io/component-base/version"
 	netutils "k8s.io/utils/net"
 )
 
 func TestServerRunOptionsValidate(t *testing.T) {
-	testRegistry := utilversion.NewComponentGlobalsRegistry()
+	testRegistry := featuregate.NewComponentGlobalsRegistry()
 	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 	effectiveVersion := utilversion.NewEffectiveVersion("1.30")
 	effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 32))
@@ -54,7 +55,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--max-requests-inflight can not be negative value",
 		},
@@ -69,7 +70,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--max-mutating-requests-inflight can not be negative value",
 		},
@@ -84,7 +85,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--request-timeout can not be negative value",
 		},
@@ -99,7 +100,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           -1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--min-request-timeout can not be negative value",
 		},
@@ -114,7 +115,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       -10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value",
 		},
@@ -129,7 +130,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         -10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "ServerRunOptions.MaxRequestBodyBytes can not be negative value",
 		},
@@ -145,7 +146,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				LivezGracePeriod:            -time.Second,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--livez-grace-period can not be a negative value",
 		},
@@ -161,7 +162,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				ShutdownDelayDuration:       -time.Second,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--shutdown-delay-duration can not be negative value",
 		},
@@ -177,7 +178,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
 		},
@@ -210,7 +211,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    featuregate.DefaultComponentGlobalsRegistry,
 			},
 		},
 	}

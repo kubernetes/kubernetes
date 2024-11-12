@@ -76,12 +76,7 @@ var supportedLimitResponseType = sets.NewString(
 )
 
 // PriorityLevelValidationOptions holds the validation options for a priority level object
-type PriorityLevelValidationOptions struct {
-	// AllowZeroLimitedNominalConcurrencyShares, if true, indicates that we allow
-	// a zero value for the 'nominalConcurrencyShares' field of the 'limited'
-	// section of a priority level.
-	AllowZeroLimitedNominalConcurrencyShares bool
-}
+type PriorityLevelValidationOptions struct{}
 
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
@@ -429,14 +424,8 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
 func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if opts.AllowZeroLimitedNominalConcurrencyShares {
-		if lplc.NominalConcurrencyShares < 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
-		}
-	} else {
-		if lplc.NominalConcurrencyShares <= 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
-		}
+	if lplc.NominalConcurrencyShares < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
 

@@ -751,6 +751,7 @@ func TestValidateMixedArguments(t *testing.T) {
 		{[]string{"--config=hello", "--skip-token-print=true"}, true},
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--skip-token-print"}, true},
 		{[]string{"--config=hello", "--yes=true"}, true},
+		{[]string{"--config=hello", "--print-manifest"}, true},
 		// Expected to fail, --config is mixed with the --foo flag
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--foo=bar"}, false},
 		{[]string{"--config=hello", "--foo=bar"}, false},
@@ -771,6 +772,7 @@ func TestValidateMixedArguments(t *testing.T) {
 		f.Bool("allow-experimental-upgrades", true, "upgrade flags for plan and apply command")
 		f.Bool("skip-token-print", false, "flag not bound to config object")
 		f.Bool("yes", false, "flag not bound to config object")
+		f.Bool("print-manifest", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 		if err := f.Parse(rt.args); err != nil {
 			t.Fatal(err)
@@ -1065,7 +1067,7 @@ func TestValidateSocketPath(t *testing.T) {
 		{name: "valid socket URL", criSocket: kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + "/some/path", expectedErrors: false},
 		{name: "unsupported URL scheme", criSocket: "bla:///some/path", expectedErrors: true},
 		{name: "missing URL scheme", criSocket: "/some/path", expectedErrors: true},
-		{name: "unparseable URL", criSocket: ":::", expectedErrors: true},
+		{name: "unparsable URL", criSocket: ":::", expectedErrors: true},
 		{name: "empty CRISocket", criSocket: "", expectedErrors: true},
 	}
 	for _, tc := range tests {

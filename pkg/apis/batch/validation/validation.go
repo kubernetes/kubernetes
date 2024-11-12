@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -219,7 +218,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.ManagedBy != nil {
 		allErrs = append(allErrs, apimachineryvalidation.IsDomainPrefixedPath(fldPath.Child("managedBy"), *spec.ManagedBy)...)
 		if len(*spec.ManagedBy) > maxManagedByLength {
-			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("managedBy"), *spec.ManagedBy, maxManagedByLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("managedBy"), "" /*unused*/, maxManagedByLength))
 		}
 	}
 	if spec.CompletionMode != nil {
@@ -436,7 +435,7 @@ func validateSuccessPolicyRule(spec *batch.JobSpec, rule *batch.SuccessPolicyRul
 	if rule.SucceededIndexes != nil {
 		succeededIndexes := rulePath.Child("succeededIndexes")
 		if len(*rule.SucceededIndexes) > maxJobSuccessPolicySucceededIndexesLimit {
-			allErrs = append(allErrs, field.TooLong(succeededIndexes, *rule.SucceededIndexes, maxJobSuccessPolicySucceededIndexesLimit))
+			allErrs = append(allErrs, field.TooLong(succeededIndexes, "" /*unused*/, maxJobSuccessPolicySucceededIndexesLimit))
 		}
 		var err error
 		if totalIndexes, err = validateIndexesFormat(*rule.SucceededIndexes, *spec.Completions); err != nil {
@@ -755,7 +754,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.StartingDeadlineSeconds), fldPath.Child("startingDeadlineSeconds"))...)
 	}
 
-	if oldSpec == nil || !pointer.StringEqual(oldSpec.TimeZone, spec.TimeZone) {
+	if oldSpec == nil || !ptr.Equal(oldSpec.TimeZone, spec.TimeZone) {
 		allErrs = append(allErrs, validateTimeZone(spec.TimeZone, fldPath.Child("timeZone"))...)
 	}
 

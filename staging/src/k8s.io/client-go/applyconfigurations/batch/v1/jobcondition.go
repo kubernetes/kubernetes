@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,12 +27,12 @@ import (
 // JobConditionApplyConfiguration represents a declarative configuration of the JobCondition type for use
 // with apply.
 type JobConditionApplyConfiguration struct {
-	Type               *v1.JobConditionType    `json:"type,omitempty"`
-	Status             *corev1.ConditionStatus `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time            `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time            `json:"lastTransitionTime,omitempty"`
-	Reason             *string                 `json:"reason,omitempty"`
-	Message            *string                 `json:"message,omitempty"`
+	Type               *batchv1.JobConditionType `json:"type,omitempty"`
+	Status             *corev1.ConditionStatus   `json:"status,omitempty"`
+	LastProbeTime      *metav1.Time              `json:"lastProbeTime,omitempty"`
+	LastTransitionTime *metav1.Time              `json:"lastTransitionTime,omitempty"`
+	Reason             *string                   `json:"reason,omitempty"`
+	Message            *string                   `json:"message,omitempty"`
 }
 
 // JobConditionApplyConfiguration constructs a declarative configuration of the JobCondition type for use with
@@ -44,7 +44,7 @@ func JobCondition() *JobConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *JobConditionApplyConfiguration) WithType(value v1.JobConditionType) *JobConditionApplyConfiguration {
+func (b *JobConditionApplyConfiguration) WithType(value batchv1.JobConditionType) *JobConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -144,10 +144,6 @@ func TestExcludedOperations(t *testing.T) {
 		attr admission.Attributes
 	}{
 		{
-			"subresource",
-			admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "namespace", "name", schema.GroupVersionResource{}, "subresource", admission.Create, nil, false, nil),
-		},
-		{
 			"non-namespaced resource",
 			admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "namespace", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil),
 		},

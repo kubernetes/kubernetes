@@ -403,7 +403,7 @@ func optMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *
 				meh.NewList(),
 				unusedIterVar,
 				varName,
-				meh.NewMemberCall(valueFunc, target),
+				meh.NewMemberCall(valueFunc, meh.Copy(target)),
 				meh.NewLiteral(types.False),
 				meh.NewIdent(varName),
 				mapExpr,
@@ -430,7 +430,7 @@ func optFlatMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Exp
 			meh.NewList(),
 			unusedIterVar,
 			varName,
-			meh.NewMemberCall(valueFunc, target),
+			meh.NewMemberCall(valueFunc, meh.Copy(target)),
 			meh.NewLiteral(types.False),
 			meh.NewIdent(varName),
 			mapExpr,
@@ -444,6 +444,12 @@ func enableOptionalSyntax() EnvOption {
 		e.prsrOpts = append(e.prsrOpts, parser.EnableOptionalSyntax(true))
 		return e, nil
 	}
+}
+
+// EnableErrorOnBadPresenceTest enables error generation when a presence test or optional field
+// selection is performed on a primitive type.
+func EnableErrorOnBadPresenceTest(value bool) EnvOption {
+	return features(featureEnableErrorOnBadPresenceTest, value)
 }
 
 func decorateOptionalOr(i interpreter.Interpretable) (interpreter.Interpretable, error) {

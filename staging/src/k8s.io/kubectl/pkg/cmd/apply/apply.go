@@ -71,6 +71,7 @@ type ApplyFlags struct {
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
+	Subresource    string
 
 	PruneAllowlist []string
 
@@ -97,6 +98,7 @@ type ApplyOptions struct {
 	All             bool
 	Overwrite       bool
 	OpenAPIPatch    bool
+	Subresource     string
 
 	ValidationDirective string
 	Validator           validation.Schema
@@ -235,6 +237,7 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef)
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmdutil.AddSubresourceFlags(cmd, &flags.Subresource, "If specified, apply will operate on the subresource of the requested object.  Only allowed when using --server-side.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -356,6 +359,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		All:             flags.All,
 		Overwrite:       flags.Overwrite,
 		OpenAPIPatch:    flags.OpenAPIPatch,
+		Subresource:     flags.Subresource,
 
 		Recorder:            recorder,
 		Namespace:           namespace,
@@ -437,6 +441,9 @@ func (o *ApplyOptions) Validate() error {
 				return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
 			}
 		}
+	}
+	if len(o.Subresource) > 0 && !o.ServerSideApply {
+		return fmt.Errorf("--subresource can only be specified for --server-side")
 	}
 
 	return nil
@@ -577,13 +584,15 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 		options := metav1.PatchOptions{
 			Force: &o.ForceConflicts,
 		}
-		obj, err := helper.Patch(
-			info.Namespace,
-			info.Name,
-			types.ApplyPatchType,
-			data,
-			&options,
-		)
+		obj, err := helper.
+			WithSubresource(o.Subresource).
+			Patch(
+				info.Namespace,
+				info.Name,
+				types.ApplyPatchType,
+				data,
+				&options,
+			)
 		if err != nil {
 			if isIncompatibleServerError(err) {
 				err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)

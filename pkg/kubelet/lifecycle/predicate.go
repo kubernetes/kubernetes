@@ -24,12 +24,59 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+)
+
+const (
+	// PodOSSelectorNodeLabelDoesNotMatch is used to denote that the pod was
+	// rejected admission to the node because the pod's node selector
+	// corresponding to kubernetes.io/os label didn't match the node label.
+	PodOSSelectorNodeLabelDoesNotMatch = "PodOSSelectorNodeLabelDoesNotMatch"
+
+	// PodOSNotSupported is used to denote that the pod was rejected admission
+	// to the node because the pod's OS field didn't match the node OS.
+	PodOSNotSupported = "PodOSNotSupported"
+
+	// InvalidNodeInfo is used to denote that the pod was rejected admission
+	// to the node because the kubelet was unable to retrieve the node info.
+	InvalidNodeInfo = "InvalidNodeInfo"
+
+	// InitContainerRestartPolicyForbidden is used to denote that the pod was
+	// rejected admission to the node because it uses a restart policy other
+	// than Always for some of its init containers.
+	InitContainerRestartPolicyForbidden = "InitContainerRestartPolicyForbidden"
+
+	// UnexpectedAdmissionError is used to denote that the pod was rejected
+	// admission to the node because of an error during admission that could not
+	// be categorized.
+	UnexpectedAdmissionError = "UnexpectedAdmissionError"
+
+	// UnknownReason is used to denote that the pod was rejected admission to
+	// the node because a predicate failed for a reason that could not be
+	// determined.
+	UnknownReason = "UnknownReason"
+
+	// UnexpectedPredicateFailureType is used to denote that the pod was
+	// rejected admission to the node because a predicate returned a reason
+	// object that was not an InsufficientResourceError or a PredicateFailureError.
+	UnexpectedPredicateFailureType = "UnexpectedPredicateFailureType"
+
+	// Prefix for admission reason when kubelet rejects a pod due to insufficient
+	// resources available.
+	InsufficientResourcePrefix = "OutOf"
+
+	// These reasons are used to denote that the pod has reject admission
+	// to the node because there's not enough resources to run the pod.
+	OutOfCPU              = "OutOfcpu"
+	OutOfMemory           = "OutOfmemory"
+	OutOfEphemeralStorage = "OutOfephemeral-storage"
+	OutOfPods             = "OutOfpods"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -66,7 +113,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		klog.ErrorS(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "InvalidNodeInfo",
+			Reason:  InvalidNodeInfo,
 			Message: "Kubelet cannot get node info.",
 		}
 	}
@@ -76,14 +123,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
+			Reason:  PodOSSelectorNodeLabelDoesNotMatch,
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
 		}
 	}
 	if rejectPodAdmissionBasedOnOSField(admitPod) {
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "PodOSNotSupported",
+			Reason:  PodOSNotSupported,
 			Message: "Failed to admit pod as the OS field doesn't match node OS",
 		}
 	}
@@ -95,12 +142,12 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for _, c := range admitPod.Spec.InitContainers {
-			if types.IsRestartableInitContainer(&c) {
+			if podutil.IsRestartableInitContainer(&c) {
 				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)
 				klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 				return PodAdmitResult{
 					Admit:   false,
-					Reason:  "InitContainerRestartPolicyForbidden",
+					Reason:  InitContainerRestartPolicyForbidden,
 					Message: message,
 				}
 			}
@@ -113,7 +160,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
-			Reason:  "UnexpectedAdmissionError",
+			Reason:  UnexpectedAdmissionError,
 			Message: message,
 		}
 	}
@@ -138,7 +185,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
-				Reason:  "UnexpectedAdmissionError",
+				Reason:  UnexpectedAdmissionError,
 				Message: message,
 			}
 		}
@@ -151,7 +198,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
-				Reason:  "UnknownReason",
+				Reason:  UnknownReason,
 				Message: message,
 			}
 		}
@@ -163,11 +210,22 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			message = re.Error()
 			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		case *InsufficientResourceError:
-			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			switch re.ResourceName {
+			case v1.ResourceCPU:
+				reason = OutOfCPU
+			case v1.ResourceMemory:
+				reason = OutOfMemory
+			case v1.ResourceEphemeralStorage:
+				reason = OutOfEphemeralStorage
+			case v1.ResourcePods:
+				reason = OutOfPods
+			default:
+				reason = fmt.Sprintf("%s%s", InsufficientResourcePrefix, re.ResourceName)
+			}
 			message = re.Error()
 			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		default:
-			reason = "UnexpectedPredicateFailureType"
+			reason = UnexpectedPredicateFailureType
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
 			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}

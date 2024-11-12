@@ -17,6 +17,8 @@ limitations under the License.
 package fieldpath
 
 import (
+	"fmt"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 	"sort"
 	"strings"
 
@@ -133,6 +135,198 @@ func (s *Set) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.TypeRef) 
 	return &Set{
 		Members:  members,
 		Children: *s.Children.EnsureNamedFieldsAreMembers(sc, tr),
+	}
+}
+
+// MakePrefixMatcherOrDie is the same as PrefixMatcher except it panics if parts can't be
+// turned into a SetMatcher.
+func MakePrefixMatcherOrDie(parts ...interface{}) *SetMatcher {
+	result, err := PrefixMatcher(parts...)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// PrefixMatcher creates a SetMatcher that matches all field paths prefixed by the given list of matcher path parts.
+// The matcher parts may any of:
+//
+//   - PathElementMatcher - for wildcards, `MatchAnyPathElement()` can be used as well.
+//   - PathElement - for any path element
+//   - value.FieldList - for listMap keys
+//   - value.Value - for scalar list elements
+//   - string - For field names
+//   - int - for array indices
+func PrefixMatcher(parts ...interface{}) (*SetMatcher, error) {
+	current := MatchAnySet() // match all field path suffixes
+	for i := len(parts) - 1; i >= 0; i-- {
+		part := parts[i]
+		var pattern PathElementMatcher
+		switch t := part.(type) {
+		case PathElementMatcher:
+			// any path matcher, including wildcard
+			pattern = t
+		case PathElement:
+			// any path element
+			pattern = PathElementMatcher{PathElement: t}
+		case *value.FieldList:
+			// a listMap key
+			if len(*t) == 0 {
+				return nil, fmt.Errorf("associative list key type path elements must have at least one key (got zero)")
+			}
+			pattern = PathElementMatcher{PathElement: PathElement{Key: t}}
+		case value.Value:
+			// a scalar or set-type list element
+			pattern = PathElementMatcher{PathElement: PathElement{Value: &t}}
+		case string:
+			// a plain field name
+			pattern = PathElementMatcher{PathElement: PathElement{FieldName: &t}}
+		case int:
+			// a plain list index
+			pattern = PathElementMatcher{PathElement: PathElement{Index: &t}}
+		default:
+			return nil, fmt.Errorf("unexpected type %T", t)
+		}
+		current = &SetMatcher{
+			members: []*SetMemberMatcher{{
+				Path:  pattern,
+				Child: current,
+			}},
+		}
+	}
+	return current, nil
+}
+
+// MatchAnyPathElement returns a PathElementMatcher that matches any path element.
+func MatchAnyPathElement() PathElementMatcher {
+	return PathElementMatcher{Wildcard: true}
+}
+
+// MatchAnySet returns a SetMatcher that matches any set.
+func MatchAnySet() *SetMatcher {
+	return &SetMatcher{wildcard: true}
+}
+
+// NewSetMatcher returns a new SetMatcher.
+// Wildcard members take precedent over non-wildcard members;
+// all non-wildcard members are ignored if there is a wildcard members.
+func NewSetMatcher(wildcard bool, members ...*SetMemberMatcher) *SetMatcher {
+	sort.Sort(sortedMemberMatcher(members))
+	return &SetMatcher{wildcard: wildcard, members: members}
+}
+
+// SetMatcher defines a matcher that matches fields in a Set.
+// SetMatcher is structured much like a Set but with wildcard support.
+type SetMatcher struct {
+	// wildcard indicates that all members and children are included in the match.
+	// If set, the members field is ignored.
+	wildcard bool
+	// members provides patterns to match the members of a Set.
+	// Wildcard members are sorted before non-wildcards and take precedent over
+	// non-wildcard members.
+	members sortedMemberMatcher
+}
+
+type sortedMemberMatcher []*SetMemberMatcher
+
+func (s sortedMemberMatcher) Len() int           { return len(s) }
+func (s sortedMemberMatcher) Less(i, j int) bool { return s[i].Path.Less(s[j].Path) }
+func (s sortedMemberMatcher) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s sortedMemberMatcher) Find(p PathElementMatcher) (location int, ok bool) {
+	return sort.Find(len(s), func(i int) int {
+		return s[i].Path.Compare(p)
+	})
+}
+
+// Merge merges s and s2 and returns a SetMatcher that matches all field paths matched by either s or s2.
+// During the merge, members of s and s2 with the same PathElementMatcher merged into a single member
+// with the children of each merged by calling this function recursively.
+func (s *SetMatcher) Merge(s2 *SetMatcher) *SetMatcher {
+	if s.wildcard || s2.wildcard {
+		return NewSetMatcher(true)
+	}
+	merged := make(sortedMemberMatcher, len(s.members), len(s.members)+len(s2.members))
+	copy(merged, s.members)
+	for _, m := range s2.members {
+		if i, ok := s.members.Find(m.Path); ok {
+			// since merged is a shallow copy, do not modify elements in place
+			merged[i] = &SetMemberMatcher{
+				Path:  merged[i].Path,
+				Child: merged[i].Child.Merge(m.Child),
+			}
+		} else {
+			merged = append(merged, m)
+		}
+	}
+	return NewSetMatcher(false, merged...) // sort happens here
+}
+
+// SetMemberMatcher defines a matcher that matches the members of a Set.
+// SetMemberMatcher is structured much like the elements of a SetNodeMap, but
+// with wildcard support.
+type SetMemberMatcher struct {
+	// Path provides a matcher to match members of a Set.
+	// If Path is a wildcard, all members of a Set are included in the match.
+	// Otherwise, if any Path is Equal to a member of a Set, that member is
+	// included in the match and the children of that member are matched
+	// against the Child matcher.
+	Path PathElementMatcher
+
+	// Child provides a matcher to use for the children of matched members of a Set.
+	Child *SetMatcher
+}
+
+// PathElementMatcher defined a path matcher for a PathElement.
+type PathElementMatcher struct {
+	// Wildcard indicates that all PathElements are matched by this matcher.
+	// If set, PathElement is ignored.
+	Wildcard bool
+
+	// PathElement indicates that a PathElement is matched if it is Equal
+	// to this PathElement.
+	PathElement
+}
+
+func (p PathElementMatcher) Equals(p2 PathElementMatcher) bool {
+	return p.Wildcard != p2.Wildcard && p.PathElement.Equals(p2.PathElement)
+}
+
+func (p PathElementMatcher) Less(p2 PathElementMatcher) bool {
+	if p.Wildcard && !p2.Wildcard {
+		return true
+	} else if p2.Wildcard {
+		return false
+	}
+	return p.PathElement.Less(p2.PathElement)
+}
+
+func (p PathElementMatcher) Compare(p2 PathElementMatcher) int {
+	if p.Wildcard && !p2.Wildcard {
+		return -1
+	} else if p2.Wildcard {
+		return 1
+	}
+	return p.PathElement.Compare(p2.PathElement)
+}
+
+// FilterIncludeMatches returns a Set with only the field paths that match.
+func (s *Set) FilterIncludeMatches(pattern *SetMatcher) *Set {
+	if pattern.wildcard {
+		return s
+	}
+
+	members := PathElementSet{}
+	for _, m := range s.Members.members {
+		for _, pm := range pattern.members {
+			if pm.Path.Wildcard || pm.Path.PathElement.Equals(m) {
+				members.Insert(m)
+				break
+			}
+		}
+	}
+	return &Set{
+		Members:  members,
+		Children: *s.Children.FilterIncludeMatches(pattern),
 	}
 }
 
@@ -476,6 +670,33 @@ func (s *SetNodeMap) EnsureNamedFieldsAreMembers(sc *schema.Schema, tr schema.Ty
 	}
 }
 
+// FilterIncludeMatches returns a SetNodeMap with only the field paths that match the matcher.
+func (s *SetNodeMap) FilterIncludeMatches(pattern *SetMatcher) *SetNodeMap {
+	if pattern.wildcard {
+		return s
+	}
+
+	var out sortedSetNode
+	for _, member := range s.members {
+		for _, c := range pattern.members {
+			if c.Path.Wildcard || c.Path.PathElement.Equals(member.pathElement) {
+				childSet := member.set.FilterIncludeMatches(c.Child)
+				if childSet.Size() > 0 {
+					out = append(out, setNode{
+						pathElement: member.pathElement,
+						set:         childSet,
+					})
+				}
+				break
+			}
+		}
+	}
+
+	return &SetNodeMap{
+		members: out,
+	}
+}
+
 // Iterate calls f for each PathElement in the set.
 func (s *SetNodeMap) Iterate(f func(PathElement)) {
 	for _, n := range s.members {
@@ -502,4 +723,60 @@ func (s *SetNodeMap) Leaves() *SetNodeMap {
 		}
 	}
 	return out
+}
+
+// Filter defines an interface for excluding field paths from a set.
+// NewExcludeSetFilter can be used to create a filter that removes
+// specific field paths and all of their children.
+// NewIncludeMatcherFilter can be used to create a filter that removes all fields except
+// the fields that match a field path matcher. PrefixMatcher and MakePrefixMatcherOrDie
+// can be used to define field path patterns.
+type Filter interface {
+	// Filter returns a filtered copy of the set.
+	Filter(*Set) *Set
+}
+
+// NewExcludeSetFilter returns a filter that removes field paths in the exclude set.
+func NewExcludeSetFilter(exclude *Set) Filter {
+	return excludeFilter{exclude}
+}
+
+// NewExcludeFilterSetMap converts a map of APIVersion to exclude set to a map of APIVersion to exclude filters.
+func NewExcludeFilterSetMap(resetFields map[APIVersion]*Set) map[APIVersion]Filter {
+	result := make(map[APIVersion]Filter)
+	for k, v := range resetFields {
+		result[k] = excludeFilter{v}
+	}
+	return result
+}
+
+type excludeFilter struct {
+	excludeSet *Set
+}
+
+func (t excludeFilter) Filter(set *Set) *Set {
+	return set.RecursiveDifference(t.excludeSet)
+}
+
+// NewIncludeMatcherFilter returns a filter that only includes field paths that match.
+// If no matchers are provided, the filter includes all field paths.
+// PrefixMatcher and MakePrefixMatcherOrDie can help create basic matcher.
+func NewIncludeMatcherFilter(matchers ...*SetMatcher) Filter {
+	if len(matchers) == 0 {
+		return includeMatcherFilter{&SetMatcher{wildcard: true}}
+	}
+	matcher := matchers[0]
+	for i := 1; i < len(matchers); i++ {
+		matcher = matcher.Merge(matchers[i])
+	}
+
+	return includeMatcherFilter{matcher}
+}
+
+type includeMatcherFilter struct {
+	matcher *SetMatcher
+}
+
+func (pf includeMatcherFilter) Filter(set *Set) *Set {
+	return set.FilterIncludeMatches(pf.matcher)
 }

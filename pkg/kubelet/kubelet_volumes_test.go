@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -78,8 +79,9 @@ func TestListVolumesForPod(t *testing.T) {
 		},
 	})
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
@@ -196,8 +198,9 @@ func TestPodVolumesExist(t *testing.T) {
 		},
 	}
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
@@ -255,8 +258,9 @@ func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
 		},
 	}
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
@@ -316,8 +320,9 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 		},
 	}
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
 	for i, pod := range pods {
@@ -369,8 +374,9 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
@@ -384,7 +390,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	for _, name := range expectedPodVolumes {
 		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyAttachCallCount(
@@ -428,8 +434,9 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	// Add pod
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -447,7 +454,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyAttachCallCount(
@@ -479,7 +486,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 	// Verify volumes detached and no longer reported as in use
 	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyDetachCallCount(
 		1 /* expectedDetachCallCount */, testKubelet.volumePlugin))
 }
@@ -534,15 +541,16 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName("fake/fake-device"),
-		stopCh,
+		tCtx.Done(),
 		kubelet.volumeManager)
 
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod))
@@ -558,7 +566,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	for _, name := range expectedPodVolumes {
 		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
@@ -618,8 +626,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := runVolumeManager(kubelet)
-	defer close(stopCh)
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
+	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	// Add pod
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -627,7 +636,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
 		v1.UniqueVolumeName("fake/fake-device"),
-		stopCh,
+		tCtx.Done(),
 		kubelet.volumeManager)
 
 	// Verify volumes attached
@@ -645,7 +654,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		assert.Contains(t, podVolumes, name, "Volumes for pod %+v", pod)
 	}
 
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, testKubelet.volumePlugin))
 	assert.NoError(t, volumetest.VerifyZeroAttachCalls(testKubelet.volumePlugin))
@@ -675,12 +684,13 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Verify volumes detached and no longer reported as in use
 	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
-	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
+	assert.GreaterOrEqual(t, testKubelet.volumePlugin.GetNewAttacherCallCount(), 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
 }
 
 type stubVolume struct {
-	path string
+	path       string
+	attributes volume.Attributes
 	volume.MetricsNil
 }
 
@@ -689,7 +699,7 @@ func (f *stubVolume) GetPath() string {
 }
 
 func (f *stubVolume) GetAttributes() volume.Attributes {
-	return volume.Attributes{}
+	return f.attributes
 }
 
 func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {

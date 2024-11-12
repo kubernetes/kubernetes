@@ -132,7 +132,15 @@ var ipLib = &ip{}
 type ip struct{}
 
 func (*ip) LibraryName() string {
-	return "net.ip"
+	return "kubernetes.net.ip"
+}
+
+func (*ip) declarations() map[string][]cel.FunctionOpt {
+	return ipLibraryDecls
+}
+
+func (*ip) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.IPType}
 }
 
 var ipLibraryDecls = map[string][]cel.FunctionOpt{

@@ -222,7 +222,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 		gomega.Expect(value.String()).To(gomega.Equal("9Mi"), "huge pages with size 3Mi should be supported")
 
 		ginkgo.By("restarting the node and verifying that huge pages with size 3Mi are not supported")
-		restartKubelet(true)
+		restartKubelet(ctx, true)
 
 		ginkgo.By("verifying that the hugepages-3Mi resource no longer is present")
 		gomega.Eventually(ctx, func() bool {
@@ -230,19 +230,19 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-3Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.BeFalse())
+		}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("hugepages resource should not be present"))
 	})
 
 	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func(ctx context.Context) {
 		ginkgo.By("Stopping kubelet")
-		startKubelet := stopKubelet()
+		restartKubelet := mustStopKubelet(ctx, f)
 		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
 		patch := []byte(`[{"op": "remove", "path": "/status/capacity/hugepages-2Mi"}, {"op": "remove", "path": "/status/allocatable/hugepages-2Mi"}]`)
 		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
 		framework.ExpectNoError(result.Error(), "while patching")
 
-		ginkgo.By("Starting kubelet again")
-		startKubelet()
+		ginkgo.By("Restarting kubelet again")
+		restartKubelet(ctx)
 
 		ginkgo.By("verifying that the hugepages-2Mi resource is present")
 		gomega.Eventually(ctx, func() bool {
@@ -250,7 +250,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			framework.ExpectNoError(err, "while getting node status")
 			_, isPresent := node.Status.Capacity["hugepages-2Mi"]
 			return isPresent
-		}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
+		}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("hugepages resource should be present"))
 	})
 
 	ginkgo.When("start the pod", func() {
@@ -352,7 +352,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			setHugepages(ctx)
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			waitForHugepages(ctx)
 
@@ -370,7 +370,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[No
 			releaseHugepages(ctx)
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
 			waitForHugepages(ctx)
 		})

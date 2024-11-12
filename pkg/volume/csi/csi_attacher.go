@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -53,8 +52,6 @@ type csiAttacher struct {
 
 	csiClient csiClient
 }
-
-type verifyAttachDetachStatus func(attach *storage.VolumeAttachment, volumeHandle string) (bool, error)
 
 // volume.Attacher methods
 var _ volume.Attacher = &csiAttacher{}
@@ -141,37 +138,33 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	return "", nil
 }
 
-func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, timeout time.Duration) (string, error) {
+// WaitForAttach waits for the attach operation to complete and returns the device path when it is done.
+// But in this case, there should be no waiting. The device is found by the CSI driver later, in NodeStage / NodePublish calls.
+// so it should just return device metadata, in this case it is VolumeAttachment name. If the target VolumeAttachment does not
+// exist or is not attached, the function will return an error. And then the caller (kubelet) should retry it.
+// We can get rid of watching it that serves no purpose. More details in https://issues.k8s.io/124398
+func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, _ time.Duration) (string, error) {
 	source, err := getPVSourceFromSpec(spec)
 	if err != nil {
 		return "", errors.New(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
 	}
 
+	volumeHandle := source.VolumeHandle
 	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
 
-	return c.waitForVolumeAttachment(source.VolumeHandle, attachID, timeout)
-}
-
-func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, timeout time.Duration) (string, error) {
-	klog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
-
-	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
-	defer timer.Stop()
-
-	return c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
-}
-
-func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
-
-	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
 	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
 	}
-	err = c.waitForVolumeAttachDetachStatus(attach, volumeHandle, attachID, timer, timeout, verifyAttachmentStatus)
+
+	successful, err := verifyAttachmentStatus(attach, volumeHandle)
 	if err != nil {
 		return "", err
+	}
+	if !successful {
+		klog.Error(log("attacher.WaitForAttach failed for volume [%s] attached (will continue to try)", volumeHandle))
+		return "", fmt.Errorf("volume %v is not attached for volume attachment %v", volumeHandle, attachID)
 	}
 	return attach.Name, nil
 }
@@ -269,7 +262,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 }
 
 func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) error {
-	klog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
+	klog.V(4).Info(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	if deviceMountPath == "" {
 		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
@@ -363,7 +356,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		// finished, we should remove the directory.
 		if err != nil && volumetypes.IsOperationFinishedError(err) {
 			// clean up metadata
-			klog.Errorf(log("attacher.MountDevice failed: %v", err))
+			klog.Error(log("attacher.MountDevice failed: %v", err))
 			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
 				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
 			}
@@ -377,7 +370,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	if !stageUnstageSet {
-		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
+		klog.Info(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
 		return nil
 	}
@@ -415,7 +408,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return err
 	}
 
-	klog.V(4).Infof(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
+	klog.V(4).Info(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
 	return err
 }
 
@@ -532,62 +525,6 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(spec *volume.Spe
 	}
 }
 
-func (c *csiAttacher) waitForVolumeAttachDetachStatus(attach *storage.VolumeAttachment, volumeHandle, attachID string,
-	timer *time.Timer, timeout time.Duration, verifyStatus verifyAttachDetachStatus) error {
-	successful, err := verifyStatus(attach, volumeHandle)
-	if err != nil {
-		return err
-	}
-	if successful {
-		return nil
-	}
-
-	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
-	if err != nil {
-		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
-	}
-
-	ch := watcher.ResultChan()
-	defer watcher.Stop()
-	for {
-		select {
-		case event, ok := <-ch:
-			if !ok {
-				klog.Errorf("[attachment.ID=%v] watch channel had been closed", attachID)
-				return errors.New("volume attachment watch channel had been closed")
-			}
-
-			switch event.Type {
-			case watch.Added, watch.Modified:
-				attach, _ := event.Object.(*storage.VolumeAttachment)
-				successful, err := verifyStatus(attach, volumeHandle)
-				if err != nil {
-					return err
-				}
-				if successful {
-					return nil
-				}
-			case watch.Deleted:
-				// set attach nil to get different results
-				// for detachment, a deleted event means successful detachment, should return success
-				// for attachment, should return fail
-				if successful, err := verifyStatus(nil, volumeHandle); !successful {
-					return err
-				}
-				klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] has been deleted", attachID, volumeHandle))
-				return nil
-
-			case watch.Error:
-				klog.Warningf("waitForVolumeAttachDetachInternal received watch error: %v", event)
-			}
-
-		case <-timer.C:
-			klog.Error(log("attachdetacher.WaitForDetach timeout after %v [volume=%v; attachment.ID=%v]", timeout, volumeHandle, attachID))
-			return fmt.Errorf("attachdetachment timeout for volume %v", volumeHandle)
-		}
-	}
-}
-
 func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	klog.V(4).Info(log("attacher.UnmountDevice(%s)", deviceMountPath))
 
@@ -604,7 +541,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 			return nil
 		}
 
-		klog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
+		klog.Error(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
 		return err
 	}
 
@@ -627,7 +564,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		return errors.New(log("attacher.UnmountDevice failed to check whether STAGE_UNSTAGE_VOLUME set: %v", err))
 	}
 	if !stageUnstageSet {
-		klog.Infof(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
+		klog.Info(log("attacher.UnmountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping UnmountDevice..."))
 		// Just	delete the global directory + json file
 		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
 			return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
@@ -650,7 +587,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		return errors.New(log("failed to clean up global mount %s: %s", dataDir, err))
 	}
 
-	klog.V(4).Infof(log("attacher.UnmountDevice successfully requested NodeUnStageVolume [%s]", deviceMountPath))
+	klog.V(4).Info(log("attacher.UnmountDevice successfully requested NodeUnStageVolume [%s]", deviceMountPath))
 	return nil
 }
 

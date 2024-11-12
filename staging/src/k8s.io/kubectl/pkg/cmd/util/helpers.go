@@ -243,7 +243,7 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 // commands.
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
-		klog.V(4).Infof(debugErr.DebugError())
+		klog.V(4).Info(debugErr.DebugError())
 	}
 	status, isStatus := err.(apierrors.APIStatus)
 	switch {
@@ -430,7 +430,8 @@ const (
 	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	DebugCustomProfile      FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
+	// DebugCustomProfile should be dropped in 1.34
+	DebugCustomProfile FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
@@ -451,10 +452,7 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"validate",
 		"strict",
-		`Must be one of: strict (or true), warn, ignore (or false).
-		"true" or "strict" will use a schema to validate the input and fail the request if invalid. It will perform server side validation if ServerSideFieldValidation is enabled on the api-server, but will fall back to less reliable client-side validation if not.
-		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
-		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
+		`Must be one of: strict (or true), warn, ignore (or false). "true" or "strict" will use a schema to validate the input and fail the request if invalid. It will perform server side validation if ServerSideFieldValidation is enabled on the api-server, but will fall back to less reliable client-side validation if not. "warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise. "false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
 	)
 
 	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
@@ -539,10 +537,11 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	}
 }
 
-func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is beta and may change in the future.", usage, allowedSubresources))
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s This flag is beta and may change in the future.", usage))
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+		var commonSubresources = []string{"status", "scale", "resize"}
+		return commonSubresources, cobra.ShellCompDirectiveNoFileComp
 	}))
 }
 

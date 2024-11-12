@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apiserver/pkg/util/version"
+	version "k8s.io/component-base/version"
 )
 
 type ResourceEncodingConfig interface {
@@ -117,6 +117,10 @@ type introducedInterface interface {
 	APILifecycleIntroduced() (major, minor int)
 }
 
+type replacementInterface interface {
+	APILifecycleReplacement() schema.GroupVersionKind
+}
+
 func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example runtime.Object, effectiveVersion version.EffectiveVersion, scheme *runtime.Scheme) (schema.GroupVersion, error) {
 	if example == nil || effectiveVersion == nil {
 		return binaryVersionOfResource, nil
@@ -130,13 +134,24 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 	gvks, _, err := scheme.ObjectKinds(example)
 	if err != nil {
 		return schema.GroupVersion{}, err
-	} else if len(gvks) == 0 {
-		// Probably shouldn't happen if err is non-nil
+	}
+
+	var gvk schema.GroupVersionKind
+	for _, item := range gvks {
+		if item.Group != binaryVersionOfResource.Group {
+			continue
+		}
+
+		gvk = item
+		break
+	}
+
+	if len(gvk.Kind) == 0 {
 		return schema.GroupVersion{}, fmt.Errorf("object %T has no GVKs registered in scheme", example)
 	}
 
 	// VersionsForGroupKind returns versions in priority order
-	versions := scheme.VersionsForGroupKind(schema.GroupKind{Group: gvks[0].Group, Kind: gvks[0].Kind})
+	versions := scheme.VersionsForGroupKind(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind})
 
 	compatibilityVersion := effectiveVersion.MinCompatibilityVersion()
 
@@ -148,7 +163,7 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 		gvk := schema.GroupVersionKind{
 			Group:   gv.Group,
 			Version: gv.Version,
-			Kind:    gvks[0].Kind,
+			Kind:    gvk.Kind,
 		}
 
 		exampleOfGVK, err := scheme.New(gvk)
@@ -159,6 +174,14 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 		// If it was introduced after current compatibility version, don't use it
 		// skip the introduced check for test when currentVersion is 0.0 to test all apis
 		if introduced, hasIntroduced := exampleOfGVK.(introducedInterface); hasIntroduced && (compatibilityVersion.Major() > 0 || compatibilityVersion.Minor() > 0) {
+
+			// Skip versions that have a replacement.
+			// This can be used to override this storage version selection by
+			// marking a storage version has having a replacement and preventing a
+			// that storage version from being selected.
+			if _, hasReplacement := exampleOfGVK.(replacementInterface); hasReplacement {
+				continue
+			}
 			// API resource lifecycles should be relative to k8s api version
 			majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()
 			introducedVer := apimachineryversion.MajorMinor(uint(majorIntroduced), uint(minorIntroduced))

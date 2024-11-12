@@ -21,7 +21,9 @@ package service
 
 import (
 	"os"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/klog/v2"
@@ -31,20 +33,89 @@ import (
 )
 
 type handler struct {
-	tosvc   chan bool
-	fromsvc chan error
+	tosvc              chan bool
+	fromsvc            chan error
+	acceptPreshutdown  bool
+	preshutdownHandler PreshutdownHandler
 }
+
+type PreshutdownHandler interface {
+	ProcessShutdownEvent() error
+}
+
+// SERVICE_PRESHUTDOWN_INFO structure
+type SERVICE_PRESHUTDOWN_INFO struct {
+	PreshutdownTimeout uint32 // The time-out value, in milliseconds.
+}
+
+func QueryPreShutdownInfo(h windows.Handle) (*SERVICE_PRESHUTDOWN_INFO, error) {
+	// Query the SERVICE_CONFIG_PRESHUTDOWN_INFO
+	n := uint32(1024)
+	b := make([]byte, n)
+	for {
+		err := windows.QueryServiceConfig2(h, windows.SERVICE_CONFIG_PRESHUTDOWN_INFO, &b[0], n, &n)
+		if err == nil {
+			break
+		}
+		if err.(syscall.Errno) != syscall.ERROR_INSUFFICIENT_BUFFER {
+			return nil, err
+		}
+		if n <= uint32(len(b)) {
+			return nil, err
+		}
+
+		b = make([]byte, n)
+	}
+
+	// Convert the buffer to SERVICE_PRESHUTDOWN_INFO
+	info := (*SERVICE_PRESHUTDOWN_INFO)(unsafe.Pointer(&b[0]))
+
+	return info, nil
+}
+
+func UpdatePreShutdownInfo(h windows.Handle, timeoutMilliSeconds uint32) error {
+	// Set preshutdown info
+	preshutdownInfo := SERVICE_PRESHUTDOWN_INFO{
+		PreshutdownTimeout: timeoutMilliSeconds,
+	}
+
+	err := windows.ChangeServiceConfig2(h, windows.SERVICE_CONFIG_PRESHUTDOWN_INFO, (*byte)(unsafe.Pointer(&preshutdownInfo)))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var thehandler *handler // This is, unfortunately, a global along with the service, which means only one service per process.
 
 // InitService is the entry point for running the daemon as a Windows
 // service. It returns an indication of whether it is running as a service;
 // and an error.
 func InitService(serviceName string) error {
+	return initService(serviceName, false)
+}
+
+// InitService is the entry point for running the daemon as a Windows
+// service which will accept preshutdown event. It returns an indication
+// of whether it is running as a service; and an error.
+func InitServiceWithShutdown(serviceName string) error {
+	return initService(serviceName, true)
+}
+
+// initService will try to run the daemon as a Windows
+// service, with an option to indicate if the service will accept the preshutdown event.
+func initService(serviceName string, acceptPreshutdown bool) error {
+	var err error
 	h := &handler{
-		tosvc:   make(chan bool),
-		fromsvc: make(chan error),
+		tosvc:              make(chan bool),
+		fromsvc:            make(chan error),
+		acceptPreshutdown:  acceptPreshutdown,
+		preshutdownHandler: nil,
 	}
 
-	var err error
+	thehandler = h
+
 	go func() {
 		err = svc.Run(serviceName, h)
 		h.fromsvc <- err
@@ -53,10 +124,19 @@ func InitService(serviceName string) error {
 	// Wait for the first signal from the service handler.
 	err = <-h.fromsvc
 	if err != nil {
+		klog.Errorf("Running %s as a Windows has error %v!", serviceName, err)
 		return err
 	}
 	klog.Infof("Running %s as a Windows service!", serviceName)
 	return nil
+}
+
+func SetPreShutdownHandler(preshutdownhandler PreshutdownHandler) {
+	thehandler.preshutdownHandler = preshutdownhandler
+}
+
+func IsServiceInitialized() bool {
+	return thehandler != nil
 }
 
 func (h *handler) Execute(_ []string, r <-chan svc.ChangeRequest, s chan<- svc.Status) (bool, uint32) {
@@ -64,7 +144,13 @@ func (h *handler) Execute(_ []string, r <-chan svc.ChangeRequest, s chan<- svc.S
 	// Unblock initService()
 	h.fromsvc <- nil
 
-	s <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.Accepted(windows.SERVICE_ACCEPT_PARAMCHANGE)}
+	if h.acceptPreshutdown {
+		s <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptPreShutdown | svc.Accepted(windows.SERVICE_ACCEPT_PARAMCHANGE)}
+		klog.Infof("Accept preshutdown")
+	} else {
+		s <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.Accepted(windows.SERVICE_ACCEPT_PARAMCHANGE)}
+	}
+
 	klog.Infof("Service running")
 Loop:
 	for {
@@ -79,6 +165,8 @@ Loop:
 				s <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				klog.Infof("Service stopping")
+
+				s <- svc.Status{State: svc.StopPending}
 				// We need to translate this request into a signal that can be handled by the signal handler
 				// handling shutdowns normally (currently apiserver/pkg/server/signal.go).
 				// If we do not do this, our main threads won't be notified of the upcoming shutdown.
@@ -102,6 +190,15 @@ Loop:
 						os.Exit(0)
 					}()
 				}
+				break Loop
+			case svc.PreShutdown:
+				klog.Infof("Node pre-shutdown")
+				s <- svc.Status{State: svc.StopPending}
+
+				if h.preshutdownHandler != nil {
+					h.preshutdownHandler.ProcessShutdownEvent()
+				}
+
 				break Loop
 			}
 		}

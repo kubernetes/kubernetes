@@ -99,6 +99,32 @@ func TestReadTracingConfiguration(t *testing.T) {
 			expectedError:  strptr("unable to read tracing configuration from \"test-tracing-config-absent\": open test-tracing-config-absent: no such file or directory"),
 		},
 		{
+			name:       "duplicate field error; strict validation",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: TracingConfiguration
+endpoint: localhost:4317
+endpoint: localhost:4318
+samplingRatePerMillion: 12345
+`,
+			expectedResult: nil,
+			expectedError:  strptr("unable to decode tracing configuration data: strict decoding error"),
+		},
+		{
+			name:       "unknown field error; strict validation",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: TracingConfiguration
+foo: bar
+endpoint: localhost:4318
+samplingRatePerMillion: 12345
+`,
+			expectedResult: nil,
+			expectedError:  strptr("unable to decode tracing configuration data: strict decoding error"),
+		},
+		{
 			name:       "v1alpha1",
 			createFile: true,
 			contents: `

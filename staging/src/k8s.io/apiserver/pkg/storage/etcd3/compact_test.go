@@ -27,7 +27,7 @@ import (
 )
 
 func TestCompact(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
+	client := testserver.RunEtcd(t, nil).Client
 	ctx := context.Background()
 
 	putResp, err := client.Put(ctx, "/somekey", "data")
@@ -56,7 +56,7 @@ func TestCompact(t *testing.T) {
 // - C1 compacts first. It will succeed.
 // - C2 compacts after. It will fail. But it will get latest logical time, which should be larger by one.
 func TestCompactConflict(t *testing.T) {
-	client := testserver.RunEtcd(t, nil)
+	client := testserver.RunEtcd(t, nil).Client
 	ctx := context.Background()
 
 	putResp, err := client.Put(ctx, "/somekey", "data")

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -417,6 +418,13 @@ func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange,
 // SupportsAttributes ignores all calls that do not deal with pod resources or storage requests (PVCs).
 // Also ignores any call that has a subresource defined.
 func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) bool {
+	// Handle in-place vertical scaling of pods, where users modify container
+	// resources using the resize subresource.
+	if a.GetSubresource() == "resize" && a.GetKind().GroupKind() == api.Kind("Pod") && a.GetOperation() == admission.Update {
+		return true
+	}
+
+	// No other subresources are supported
 	if a.GetSubresource() != "" {
 		return false
 	}
@@ -524,7 +532,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		// enforce pod limits on init containers
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				InPlacePodVerticalScalingEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
@@ -549,38 +557,25 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 }
 
 type podResourcesOptions struct {
-	// InPlacePodVerticalScalingEnabled indicates that the in-place pod vertical scaling feature gate is enabled.
-	InPlacePodVerticalScalingEnabled bool
+	// PodLevelResourcesEnabled indicates that the PodLevelResources feature gate is
+	// enabled.
+	PodLevelResourcesEnabled bool
 }
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
+// NOTE: We do not want to check status resources here, only the spec. This is equivalent to setting
+// UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodRequests.
+// TODO(ndixita): PodRequests method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go. Refactor the code to
+// avoid duplicating podRequests method.
 func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	reqs := api.ResourceList{}
 
-	var containerStatuses map[string]*api.ContainerStatus
-	if opts.InPlacePodVerticalScalingEnabled {
-		containerStatuses = map[string]*api.ContainerStatus{}
-		for i := range pod.Status.ContainerStatuses {
-			containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
-		}
-	}
-
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
-		if opts.InPlacePodVerticalScalingEnabled {
-			cs, found := containerStatuses[container.Name]
-			if found {
-				if pod.Status.Resize == api.PodResizeStatusInfeasible {
-					containerReqs = cs.AllocatedResources
-				} else {
-					containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
-				}
-			}
-		}
-
 		addResourceList(reqs, containerReqs)
 	}
 
@@ -609,13 +604,31 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	}
 
 	maxResourceList(reqs, initContainerReqs)
+
+	// If PodLevelResources feature is enabled and resources are set at pod-level,
+	// override aggregated container requests of resources supported by pod-level
+	// resources with quantities specified at pod-level.
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		for resourceName, quantity := range pod.Spec.Resources.Requests {
+			if isSupportedPodLevelResource(resourceName) {
+				// override with pod-level resource requests
+				reqs[resourceName] = quantity
+			}
+		}
+	}
+
 	return reqs
 }
 
 // podLimits is a simplified version of pkg/api/v1/resource/PodLimits that operates against the core version of
 // pod. Any changes to that calculation should be reflected here.
+// NOTE: We do not want to check status resources here, only the spec. This is equivalent to setting
+// UseStatusResources=false in the common helper.
 // TODO: Maybe we can consider doing a partial conversion of the pod to a v1
 // type and then using the pkg/api/v1/resource/PodLimits.
+// TODO(ndixita): PodLimits method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go. Refactor the code to
+// avoid duplicating podLimits method.
 func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	limits := api.ResourceList{}
 
@@ -646,7 +659,33 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 
 	maxResourceList(limits, initContainerLimits)
 
+	// If PodLevelResources feature is enabled and resources are set at pod-level,
+	// override aggregated container limits of resources supported by pod-level
+	// resources with quantities specified at pod-level.
+	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
+		for resourceName, quantity := range pod.Spec.Resources.Limits {
+			if isSupportedPodLevelResource(resourceName) {
+				// override with pod-level resource limits
+				limits[resourceName] = quantity
+			}
+		}
+	}
+
 	return limits
+}
+
+var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory)
+
+// isSupportedPodLevelResources checks if a given resource is supported by pod-level
+// resource management through the PodLevelResources feature. Returns true if
+// the resource is supported.
+// isSupportedPodLevelResource method exists in
+// staging/src/k8s.io/component-helpers/resource/helpers.go.
+// isSupportedPodLevelResource is added here to avoid conversion of v1.
+// Pod to api.Pod.
+// TODO(ndixita): Find alternatives to avoid duplicating the code.
+func isSupportedPodLevelResource(name api.ResourceName) bool {
+	return supportedPodLevelResources.Has(name)
 }
 
 // addResourceList adds the resources in newList to list.
@@ -668,25 +707,4 @@ func maxResourceList(list, newList api.ResourceList) {
 			list[name] = quantity.DeepCopy()
 		}
 	}
-}
-
-// max returns the result of max(a, b) for each named resource and is only used if we can't
-// accumulate into an existing resource list
-func max(a api.ResourceList, b api.ResourceList) api.ResourceList {
-	result := api.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
-	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
-	}
-	return result
 }

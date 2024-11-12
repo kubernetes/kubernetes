@@ -19,7 +19,7 @@ package qos
 import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	resourcehelper "k8s.io/component-helpers/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -40,6 +40,8 @@ const (
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000
 // and 1000. Containers with higher OOM scores are killed if the system runs out of memory.
 // See https://lwn.net/Articles/391222/ for more information.
+// OOMScoreAdjust should be calculated based on the allocated resources, so the pod argument should
+// contain the allocated resources in the spec.
 func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapacity int64) int {
 	if types.IsNodeCriticalPod(pod) {
 		// Only node critical pod should be the last to get killed.
@@ -62,13 +64,49 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// which use more than their request will have an OOM score of 1000 and will be prime
 	// targets for OOM kills.
 	// Note that this is a heuristic, it won't work if a container has many small processes.
-	memoryRequest := container.Resources.Requests.Memory().Value()
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			memoryRequest = cs.AllocatedResources.Memory().Value()
+	containerMemReq := container.Resources.Requests.Memory().Value()
+
+	var oomScoreAdjust, remainingReqPerContainer int64
+	// When PodLevelResources feature is enabled, the OOM score adjustment formula is modified
+	// to account for pod-level memory requests. Any extra pod memory request that's
+	// not allocated to the containers is divided equally among all containers and
+	// added to their individual memory requests when calculating the OOM score
+	// adjustment. Otherwise, only container-level memory requests are used. See
+	// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
+	// for more details.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		resourcehelper.IsPodLevelRequestsSet(pod) {
+		// TODO(ndixita): Refactor to use this formula in all cases, as
+		// remainingReqPerContainer will be 0 when pod-level resources are not set.
+		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
+		oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
+	} else {
+		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
+	}
+
+	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
+	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isSidecarContainer(pod, container) {
+		// check min memory quantity in regular containers
+		minMemoryRequest := minRegularContainerMemory(*pod)
+
+		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
+		// we add the per-container share of unallocated pod memory requests to the minimum memory request.
+		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
+		// calculation remains consistent
+		//  with how we handle pod-level memory requests for regular containers.
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+			resourcehelper.IsPodLevelRequestsSet(pod) {
+			minMemoryRequest += remainingReqPerContainer
+		}
+		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
+		// the OOM adjustment for sidecar container will match
+		// or fall below the OOM score adjustment of regular containers in the Pod.
+		if oomScoreAdjust > minMemoryOomScoreAdjust {
+			oomScoreAdjust = minMemoryOomScoreAdjust
 		}
 	}
-	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity
+
 	// A guaranteed pod using 100% of memory can have an OOM score of 10. Ensure
 	// that burstable pods have a higher OOM score adjustment.
 	if int(oomScoreAdjust) < (1000 + guaranteedOOMScoreAdj) {
@@ -79,4 +117,19 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+// isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
+// Since v1.Container does not directly specify whether a container is a sidecar,
+// this function uses available indicators (container.RestartPolicy == v1.ContainerRestartPolicyAlways)
+// to make that determination.
+func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
+	if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		for _, initContainer := range pod.Spec.InitContainers {
+			if initContainer.Name == container.Name {
+				return true
+			}
+		}
+	}
+	return false
 }

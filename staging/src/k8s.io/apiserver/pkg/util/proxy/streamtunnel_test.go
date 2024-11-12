@@ -19,7 +19,6 @@ package proxy
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -171,7 +170,7 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 		// Handshake fails.
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		require.Error(t, err, "handshake should have returned an error")
-		assert.True(t, strings.Contains(err.Error(), "unable to negotiate protocol"))
+		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer spdyServer.Close()
@@ -280,12 +279,12 @@ func TestTunnelingResponseWriter_Hijack(t *testing.T) {
 	trw = &tunnelingResponseWriter{written: true}
 	_, _, err = trw.Hijack()
 	assert.Error(t, err, "Hijack after writing to response writer is error")
-	assert.True(t, strings.Contains(err.Error(), "connection has already been written to"))
+	assert.ErrorContains(t, err, "connection has already been written to")
 	// Hijacking after already hijacked is an error.
 	trw = &tunnelingResponseWriter{hijacked: true}
 	_, _, err = trw.Hijack()
 	assert.Error(t, err, "Hijack after writing to response writer is error")
-	assert.True(t, strings.Contains(err.Error(), "connection has already been hijacked"))
+	assert.ErrorContains(t, err, "connection has already been hijacked")
 }
 
 func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
@@ -304,7 +303,7 @@ func TestTunnelingResponseWriter_DelegateResponseWriter(t *testing.T) {
 	trw.hijacked = true
 	_, err = trw.Write(expectedWrite)
 	assert.Error(t, err, "Writing to ResponseWriter after Hijack() is an error")
-	assert.True(t, errors.Is(err, http.ErrHijacked), "Hijacked error returned if writing after hijacked")
+	require.ErrorIs(t, err, http.ErrHijacked, "Hijacked error returned if writing after hijacked")
 	// Validate WriteHeader().
 	trw = &tunnelingResponseWriter{w: &mockResponseWriter{}}
 	expectedStatusCode := 201
@@ -358,14 +357,14 @@ func TestTunnelingWebsocketUpgraderConn_LocalRemoteAddress(t *testing.T) {
 func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
 	tc := &tunnelingWebsocketUpgraderConn{conn: &mockConn{}}
 	expected := time.Now()
-	assert.Nil(t, tc.SetDeadline(expected), "SetDeadline does not return error")
+	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "SetDeadline() sets read deadline")
 	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "SetDeadline() sets write deadline")
 	expected = time.Now()
-	assert.Nil(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
+	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).writeDeadline, "Expected write deadline set")
 	expected = time.Now()
-	assert.Nil(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
+	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline does not return error")
 	assert.Equal(t, expected, tc.conn.(*mockConn).readDeadline, "Expected read deadline set")
 	expectedErr := fmt.Errorf("deadline error")
 	tc = &tunnelingWebsocketUpgraderConn{conn: &mockConn{deadlineErr: expectedErr}}
@@ -374,9 +373,9 @@ func TestTunnelingWebsocketUpgraderConn_SetDeadline(t *testing.T) {
 	assert.Equal(t, expectedErr, actualErr, "SetDeadline() expected error returned")
 	// Connection nil, returns nil error.
 	tc.conn = nil
-	assert.Nil(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
-	assert.Nil(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
-	assert.Nil(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetDeadline(expected), "SetDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetWriteDeadline(expected), "SetWriteDeadline() with nil connection always returns nil error")
+	assert.NoError(t, tc.SetReadDeadline(expected), "SetReadDeadline() with nil connection always returns nil error")
 }
 
 var expectedContentLengthHeaders = http.Header{

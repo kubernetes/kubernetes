@@ -67,8 +67,8 @@ func (o *imagePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.
 func (o *imagePlugin) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       true,
-		Managed:        true,
-		SELinuxRelabel: true,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 

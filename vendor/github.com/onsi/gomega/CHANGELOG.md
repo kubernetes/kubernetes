@@ -1,3 +1,53 @@
+## 1.35.1
+
+### Fixes
+- Export EnforceDefaultTimeoutsWhenUsingContexts and DisableDefaultTimeoutsWhenUsingContext [ca36da1]
+
+## 1.35.0
+
+### Features
+
+- You can now call `EnforceDefaultTimeoutsWhenUsingContexts()` to have `Eventually` honor the default timeout when passed a context.  (prior to this you had to expclility add a timeout) [e4c4265]
+- You can call `StopTrying(message).Successfully()` to abort a `Consistently` early without failure [eeca931]
+
+### Fixes
+
+- Stop memoizing the result of `HaveField` to avoid unexpected errors when used with async assertions. [3bdbc4e]
+
+### Maintenance
+
+- Bump all dependencies [a05a416]
+
+## 1.34.2
+
+Require Go 1.22+
+
+### Maintenance
+- bump ginkgo as well [c59c6dc]
+- bump to go 1.22 - remove x/exp dependency [8158b99]
+
+## 1.34.1
+
+### Maintenance
+- Use slices from exp/slices to keep golang 1.20 compat [5e71dcd]
+
+## 1.34.0
+
+### Features
+- Add RoundTripper method to ghttp.Server [c549e0d]
+
+### Fixes
+- fix incorrect handling of nil slices in HaveExactElements (fixes #771) [878940c]
+- issue_765 - fixed bug in Hopcroft-Karp algorithm [ebadb67]
+
+### Maintenance
+- bump ginkgo [8af2ece]
+- Fix typo in docs [123a071]
+- Bump github.com/onsi/ginkgo/v2 from 2.17.2 to 2.17.3 (#756) [0e69083]
+- Bump google.golang.org/protobuf from 1.33.0 to 1.34.1 (#755) [2675796]
+- Bump golang.org/x/net from 0.24.0 to 0.25.0 (#754) [4160c0f]
+- Bump github-pages from 230 to 231 in /docs (#748) [892c303]
+
 ## 1.33.1
 
 ### Fixes

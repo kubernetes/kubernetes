@@ -22,14 +22,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	coordinationv1alpha1client "k8s.io/client-go/kubernetes/typed/coordination/v1alpha1"
+	coordinationv1alpha2client "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -43,7 +43,7 @@ type CacheSyncWaiter interface {
 }
 
 type LeaseCandidate struct {
-	leaseClient            coordinationv1alpha1client.LeaseCandidateInterface
+	leaseClient            coordinationv1alpha2client.LeaseCandidateInterface
 	leaseCandidateInformer cache.SharedIndexInformer
 	informerFactory        informers.SharedInformerFactory
 	hasSynced              cache.InformerSynced
@@ -60,7 +60,7 @@ type LeaseCandidate struct {
 	clock clock.Clock
 
 	binaryVersion, emulationVersion string
-	preferredStrategies             []v1.CoordinatedLeaseStrategy
+	strategy                        v1.CoordinatedLeaseStrategy
 }
 
 // NewCandidate creates new LeaseCandidate controller that creates a
@@ -73,7 +73,7 @@ func NewCandidate(clientset kubernetes.Interface,
 	candidateName string,
 	targetLease string,
 	binaryVersion, emulationVersion string,
-	preferredStrategies []v1.CoordinatedLeaseStrategy,
+	strategy v1.CoordinatedLeaseStrategy,
 ) (*LeaseCandidate, CacheSyncWaiter, error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", candidateName).String()
 	// A separate informer factory is required because this must start before informerFactories
@@ -84,10 +84,10 @@ func NewCandidate(clientset kubernetes.Interface,
 			options.FieldSelector = fieldSelector
 		}),
 	)
-	leaseCandidateInformer := informerFactory.Coordination().V1alpha1().LeaseCandidates().Informer()
+	leaseCandidateInformer := informerFactory.Coordination().V1alpha2().LeaseCandidates().Informer()
 
 	lc := &LeaseCandidate{
-		leaseClient:            clientset.CoordinationV1alpha1().LeaseCandidates(candidateNamespace),
+		leaseClient:            clientset.CoordinationV1alpha2().LeaseCandidates(candidateNamespace),
 		leaseCandidateInformer: leaseCandidateInformer,
 		informerFactory:        informerFactory,
 		name:                   candidateName,
@@ -96,13 +96,13 @@ func NewCandidate(clientset kubernetes.Interface,
 		clock:                  clock.RealClock{},
 		binaryVersion:          binaryVersion,
 		emulationVersion:       emulationVersion,
-		preferredStrategies:    preferredStrategies,
+		strategy:               strategy,
 	}
 	lc.queue = workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[int](), workqueue.TypedRateLimitingQueueConfig[int]{Name: "leasecandidate"})
 
 	h, err := leaseCandidateInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			if leasecandidate, ok := newObj.(*v1alpha1.LeaseCandidate); ok {
+			if leasecandidate, ok := newObj.(*v1alpha2.LeaseCandidate); ok {
 				if leasecandidate.Spec.PingTime != nil && leasecandidate.Spec.PingTime.After(leasecandidate.Spec.RenewTime.Time) {
 					lc.enqueueLease()
 				}
@@ -184,17 +184,17 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	return nil
 }
 
-func (c *LeaseCandidate) newLeaseCandidate() *v1alpha1.LeaseCandidate {
-	lc := &v1alpha1.LeaseCandidate{
+func (c *LeaseCandidate) newLeaseCandidate() *v1alpha2.LeaseCandidate {
+	lc := &v1alpha2.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.name,
 			Namespace: c.namespace,
 		},
-		Spec: v1alpha1.LeaseCandidateSpec{
-			LeaseName:           c.leaseName,
-			BinaryVersion:       c.binaryVersion,
-			EmulationVersion:    c.emulationVersion,
-			PreferredStrategies: c.preferredStrategies,
+		Spec: v1alpha2.LeaseCandidateSpec{
+			LeaseName:        c.leaseName,
+			BinaryVersion:    c.binaryVersion,
+			EmulationVersion: c.emulationVersion,
+			Strategy:         c.strategy,
 		},
 	}
 	lc.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}

@@ -19,6 +19,7 @@ package generators
 import (
 	"io"
 	"path"
+	"slices"
 	"strings"
 
 	"k8s.io/gengo/v2/generator"
@@ -114,7 +115,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(constructor, typeParams)
 		}
 	}
-	g.generateWithFuncs(t, typeParams, sw, nil)
+	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{})
 	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()
 }
@@ -176,7 +177,8 @@ func (g *applyConfigurationGenerator) generateGetters(t *types.Type, typeParams 
 	}
 }
 
-func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
+func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams,
+	generated *[]string) {
 	for _, member := range t.Members {
 		if blocklisted(t, member) {
 			continue
@@ -186,6 +188,11 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 			memberType = &types.Type{Kind: types.Pointer, Elem: memberType}
 		}
 		if jsonTags, ok := lookupJSONTags(member); ok {
+			if slices.Contains(*generated, member.Name) {
+				klog.V(5).Infof("With%s already generated on %s, skipping\n", member.Name, t.Name)
+				continue
+			}
+			*generated = append(*generated, member.Name)
 			memberParams := memberParams{
 				TypeParams: typeParams,
 				Member:     member,
@@ -194,7 +201,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 				EmbeddedIn: embed,
 			}
 			if memberParams.Member.Embedded {
-				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams)
+				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams, generated)
 				if !jsonTags.inline {
 					// non-inlined embeds are nillable and need a "ensure exists" utility function
 					sw.Do(ensureEmbedExists, memberParams)
@@ -281,9 +288,9 @@ func (g *applyConfigurationGenerator) generateMemberWith(sw *generator.SnippetWr
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(value $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 	if g.refGraph.isApplyConfig(memberParams.Member.Type) || isNillable(memberParams.Member.Type) {
-		sw.Do("b.$.Member.Name$ = value\n", memberParams)
+		sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = value\n", memberParams)
 	} else {
-		sw.Do("b.$.Member.Name$ = &value\n", memberParams)
+		sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = &value\n", memberParams)
 	}
 	sw.Do("  return b\n", memberParams)
 	sw.Do("}\n", memberParams)
@@ -297,7 +304,7 @@ func (g *applyConfigurationGenerator) generateMemberGetter(sw *generator.Snippet
 		sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() *$.MemberType|raw$ {\n", memberParams)
 	}
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
-	sw.Do("  return b.$.Member.Name$\n", memberParams)
+	sw.Do("  return b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$\n", memberParams)
 	sw.Do("}\n", memberParams)
 }
 
@@ -324,15 +331,15 @@ func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.S
 		sw.Do("}\n", memberParams)
 
 		if memberIsPointerToSlice {
-			sw.Do("*b.$.Member.Name$ = append(*b.$.Member.Name$, *values[i])\n", memberParams)
+			sw.Do("*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, *values[i])\n", memberParams)
 		} else {
-			sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, *values[i])\n", memberParams)
+			sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, *values[i])\n", memberParams)
 		}
 	} else {
 		if memberIsPointerToSlice {
-			sw.Do("*b.$.Member.Name$ = append(*b.$.Member.Name$, values[i])\n", memberParams)
+			sw.Do("*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, values[i])\n", memberParams)
 		} else {
-			sw.Do("b.$.Member.Name$ = append(b.$.Member.Name$, values[i])\n", memberParams)
+			sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, values[i])\n", memberParams)
 		}
 	}
 	sw.Do("  }\n", memberParams)
@@ -347,11 +354,11 @@ func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.Sni
 	sw.Do("// overwriting an existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
-	sw.Do("  if b.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
-	sw.Do("    b.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
+	sw.Do("  if b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
+	sw.Do("    b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
 	sw.Do("  }\n", memberParams)
 	sw.Do("  for k, v := range entries {\n", memberParams)
-	sw.Do("    b.$.Member.Name$[k] = v\n", memberParams)
+	sw.Do("    b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$[k] = v\n", memberParams)
 	sw.Do("  }\n", memberParams)
 	sw.Do("  return b\n", memberParams)
 	sw.Do("}\n", memberParams)

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
@@ -111,7 +112,7 @@ func TestCreateHealthcheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ready := make(chan struct{})
 			tc.cfg.Transport.ServerList = client.Endpoints()
-			newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+			newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
@@ -211,7 +212,7 @@ func TestCreateReadycheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ready := make(chan struct{})
 			tc.cfg.Transport.ServerList = client.Endpoints()
-			newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+			newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
@@ -277,7 +278,7 @@ func TestRateLimitHealthcheck(t *testing.T) {
 			ready := make(chan struct{})
 
 			var counter uint64
-			newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+			newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
@@ -373,7 +374,7 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	signal := make(chan struct{})
 
 	var counter uint64
-	newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+	newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 		defer close(ready)
 		dummyKV := mockKV{
 			get: func(ctx context.Context) (*clientv3.GetResponse, error) {

@@ -108,6 +108,8 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. The function may NOT transform the provided
 // object.
+// NOTE: the object in obj may be nil if it cannot be read from the
+// storage, due to transformation or decode error.
 type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
 // ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
@@ -137,11 +139,11 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 	}
 	objMeta, err := meta.Accessor(obj)
 	if err != nil {
-		return NewInternalErrorf(
-			"can't enforce preconditions %v on un-introspectable object %v, got error: %v",
-			*p,
-			obj,
-			err)
+		return NewInternalError(
+			fmt.Errorf("can't enforce preconditions %v on un-introspectable object %v, got error: %w",
+				*p,
+				obj,
+				err))
 	}
 	if p.UID != nil && *p.UID != objMeta.GetUID() {
 		err := fmt.Sprintf(
@@ -178,7 +180,7 @@ type Interface interface {
 	// However, the implementations have to retry in case suggestion is stale.
 	Delete(
 		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
-		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object) error
+		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object, opts DeleteOptions) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -311,4 +313,15 @@ type ListOptions struct {
 	// event containing a ResourceVersion after which the server
 	// continues streaming events.
 	SendInitialEvents *bool
+}
+
+// DeleteOptions provides the options that may be provided for storage delete operations.
+type DeleteOptions struct {
+	// IgnoreStoreReadError, if enabled, will ignore store read error
+	// such as transformation or decode failure and go ahead with the
+	// deletion of the object.
+	// NOTE: for normal deletion flow it should always be false, it may be
+	// enabled by the caller only to facilitate unsafe deletion of corrupt
+	// object which otherwise can not be deleted using the normal flow
+	IgnoreStoreReadError bool
 }

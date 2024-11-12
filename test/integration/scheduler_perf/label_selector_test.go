@@ -60,7 +60,7 @@ func TestLabelFilter(t *testing.T) {
 		t.Run(labelFilter, func(t *testing.T) {
 			for labels, expected := range labelResults {
 				t.Run(labels, func(t *testing.T) {
-					actual := enabled(labelFilter, strings.Split(labels, ",")...)
+					actual := enabled(strings.Split(labelFilter, ","), strings.Split(labels, ",")...)
 					if actual != expected {
 						t.Errorf("expected enabled to be %v, got %v", expected, actual)
 					}

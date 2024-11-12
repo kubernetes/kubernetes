@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-unblocker-topology-
+  labels:
+    topology: blue
+    color: green
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            color: green
+        topologyKey: kubernetes.io/hostname
+        namespaces: ["podtopologyspread"]
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause

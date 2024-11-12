@@ -10,10 +10,6 @@
     {
       "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
       "version": "v1"
-    },
-    {
-      "groupVersion": "flowcontrol.apiserver.k8s.io/v1beta3",
-      "version": "v1beta3"
     }
   ]
 }

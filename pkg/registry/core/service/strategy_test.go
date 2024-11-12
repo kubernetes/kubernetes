@@ -21,11 +21,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -473,6 +476,9 @@ func TestDropServiceStatusDisabledFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ipModeEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			dropServiceStatusDisabledFields(tc.svc, tc.oldSvc)
 
@@ -789,10 +795,16 @@ func TestDropTypeDependentFields(t *testing.T) {
 }
 
 func TestMatchService(t *testing.T) {
+	noHeadlessServiceRequirement, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	if err != nil {
+		t.Fatalf("Error creating no headless service requirement: %v", err)
+	}
+	noHeadlessServiceLabelSelector := labels.NewSelector().Add(*noHeadlessServiceRequirement)
 	testCases := []struct {
 		name          string
 		in            *api.Service
 		fieldSelector fields.Selector
+		labelSelector labels.Selector
 		expectMatch   bool
 	}{
 		{
@@ -805,6 +817,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.name=test"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -817,6 +830,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=testns"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -829,6 +843,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.name=nomatch"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -841,6 +856,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=nomatch"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -849,6 +865,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -857,6 +874,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -865,6 +883,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -873,6 +892,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -881,6 +901,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=192.168.1.1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -889,6 +910,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -897,6 +919,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "192.168.1.1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=\"\""),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -905,6 +928,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: "2001:db2::1"},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=2001:db2::1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   true,
 		},
 		{
@@ -913,6 +937,7 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=192.168.1.1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
@@ -921,18 +946,49 @@ func TestMatchService(t *testing.T) {
 				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
 			},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=2001:db2::1"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
 		},
 		{
 			name:          "no match on empty service",
 			in:            &api.Service{},
 			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=None"),
+			labelSelector: labels.Everything(),
 			expectMatch:   false,
+		},
+		{
+			name: "no match on headless service",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.IsHeadlessService: "",
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   false,
+		},
+		{
+			name: "no match on headless service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   false,
+		},
+		{
+			name:          "match on empty service",
+			in:            &api.Service{},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP!=None"),
+			labelSelector: noHeadlessServiceLabelSelector,
+			expectMatch:   true,
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			m := Matcher(labels.Everything(), testCase.fieldSelector)
+			m := Matcher(testCase.labelSelector, testCase.fieldSelector)
 			result, err := m.Matches(testCase.in)
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)

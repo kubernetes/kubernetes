@@ -82,6 +82,10 @@ func New(colorMode ColorMode) Formatter {
 		return fmt.Sprintf("\x1b[38;5;%dm", colorCode)
 	}
 
+	if _, noColor := os.LookupEnv("GINKGO_NO_COLOR"); noColor {
+		colorMode = ColorModeNone
+	}
+
 	f := Formatter{
 		ColorMode: colorMode,
 		colors: map[string]string{

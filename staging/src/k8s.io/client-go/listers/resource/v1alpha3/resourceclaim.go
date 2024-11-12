@@ -19,10 +19,10 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ResourceClaimLister helps list ResourceClaims.
@@ -30,7 +30,7 @@ import (
 type ResourceClaimLister interface {
 	// List lists all ResourceClaims in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha3.ResourceClaim, err error)
+	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaim, err error)
 	// ResourceClaims returns an object that can list and get ResourceClaims.
 	ResourceClaims(namespace string) ResourceClaimNamespaceLister
 	ResourceClaimListerExpansion
@@ -38,17 +38,17 @@ type ResourceClaimLister interface {
 
 // resourceClaimLister implements the ResourceClaimLister interface.
 type resourceClaimLister struct {
-	listers.ResourceIndexer[*v1alpha3.ResourceClaim]
+	listers.ResourceIndexer[*resourcev1alpha3.ResourceClaim]
 }
 
 // NewResourceClaimLister returns a new ResourceClaimLister.
 func NewResourceClaimLister(indexer cache.Indexer) ResourceClaimLister {
-	return &resourceClaimLister{listers.New[*v1alpha3.ResourceClaim](indexer, v1alpha3.Resource("resourceclaim"))}
+	return &resourceClaimLister{listers.New[*resourcev1alpha3.ResourceClaim](indexer, resourcev1alpha3.Resource("resourceclaim"))}
 }
 
 // ResourceClaims returns an object that can list and get ResourceClaims.
 func (s *resourceClaimLister) ResourceClaims(namespace string) ResourceClaimNamespaceLister {
-	return resourceClaimNamespaceLister{listers.NewNamespaced[*v1alpha3.ResourceClaim](s.ResourceIndexer, namespace)}
+	return resourceClaimNamespaceLister{listers.NewNamespaced[*resourcev1alpha3.ResourceClaim](s.ResourceIndexer, namespace)}
 }
 
 // ResourceClaimNamespaceLister helps list and get ResourceClaims.
@@ -56,15 +56,15 @@ func (s *resourceClaimLister) ResourceClaims(namespace string) ResourceClaimName
 type ResourceClaimNamespaceLister interface {
 	// List lists all ResourceClaims in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha3.ResourceClaim, err error)
+	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaim, err error)
 	// Get retrieves the ResourceClaim from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha3.ResourceClaim, error)
+	Get(name string) (*resourcev1alpha3.ResourceClaim, error)
 	ResourceClaimNamespaceListerExpansion
 }
 
 // resourceClaimNamespaceLister implements the ResourceClaimNamespaceLister
 // interface.
 type resourceClaimNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha3.ResourceClaim]
+	listers.ResourceIndexer[*resourcev1alpha3.ResourceClaim]
 }

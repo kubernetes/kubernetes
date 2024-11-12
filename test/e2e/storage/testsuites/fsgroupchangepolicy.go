@@ -113,8 +113,6 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		l = local{}
 		l.driver = driver
 		l.config = driver.PrepareTest(ctx, f)
-		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func(ctx context.Context) {
@@ -128,6 +126,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 	}
+
+	rwopAccessMode := v1.ReadWriteOncePod
 
 	tests := []struct {
 		name                              string // Test case name
@@ -143,6 +143,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		// * OnRootMismatch policy is not supported.
 		// * It may not be possible to chgrp after mounting a volume.
 		supportsVolumeMountGroup bool
+		volumeAccessMode         *v1.PersistentVolumeAccessMode
 	}{
 		// Test cases for 'Always' policy
 		{
@@ -153,6 +154,16 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			finalExpectedRootDirFileOwnership: 2000,
 			finalExpectedSubDirFileOwnership:  2000,
 			supportsVolumeMountGroup:          true,
+		},
+		{
+			name:                              "rwop pod created with an initial fsgroup, new pod fsgroup applied to volume contents",
+			podfsGroupChangePolicy:            "Always",
+			initialPodFsGroup:                 1000,
+			secondPodFsGroup:                  2000,
+			finalExpectedRootDirFileOwnership: 2000,
+			finalExpectedSubDirFileOwnership:  2000,
+			supportsVolumeMountGroup:          true,
+			volumeAccessMode:                  &rwopAccessMode,
 		},
 		{
 			name:                              "pod created with an initial fsgroup, volume contents ownership changed via chgrp in first pod, new pod with same fsgroup applied to the volume contents",
@@ -218,6 +229,13 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			}
 
 			init(ctx)
+			testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+			if test.volumeAccessMode != nil {
+				accessModes := []v1.PersistentVolumeAccessMode{*test.volumeAccessMode}
+				l.resource = storageframework.CreateVolumeResourceWithAccessModes(ctx, l.driver, l.config, pattern, testVolumeSizeRange, accessModes, nil)
+			} else {
+				l.resource = storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
+			}
 			ginkgo.DeferCleanup(cleanup)
 			podConfig := e2epod.Config{
 				NS:                     f.Namespace.Name,

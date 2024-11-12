@@ -245,7 +245,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource, ex
 
 	var err error
 	if backwardCompatibleInterface, ok := s.ResourceEncodingConfig.(CompatibilityResourceEncodingConfig); ok {
-		codecConfig.StorageVersion, err = backwardCompatibleInterface.BackwardCompatibileStorageEncodingFor(groupResource, example)
+		codecConfig.StorageVersion, err = backwardCompatibleInterface.BackwardCompatibileStorageEncodingFor(chosenStorageResource, example)
 		if err != nil {
 			return nil, err
 		}

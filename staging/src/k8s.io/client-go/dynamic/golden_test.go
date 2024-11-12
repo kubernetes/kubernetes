@@ -17,7 +17,9 @@ limitations under the License.
 package dynamic_test
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +34,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
@@ -204,7 +207,7 @@ func TestGoldenRequest(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to load fixture: %v", err)
 				}
-				if diff := cmp.Diff(got, want); diff != "" {
+				if diff := cmp.Diff(want, got); diff != "" {
 					t.Errorf("unexpected difference from expected bytes:\n%s", diff)
 				}
 			}))
@@ -242,6 +245,160 @@ func TestGoldenRequest(t *testing.T) {
 			case <-handled:
 			default:
 				t.Fatal("no request received")
+			}
+		})
+	}
+}
+
+type RoundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
+
+// TestGoldenResponse tests that the objects returned from dynamic client methods, given a fixed
+// HTTP response, are not changed unintentionally by changes to the client.
+func TestGoldenResponse(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		response string // name of fixture containing a serialized HTTP1.1 response
+		do       func(t *testing.T, client dynamic.ResourceInterface) interface{}
+	}{
+		{
+			name:     "create",
+			response: "nonlist",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				got, err := client.Create(context.Background(), &unstructured.Unstructured{}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return got.UnstructuredContent()
+			},
+		},
+		{
+			name:     "update",
+			response: "nonlist",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				got, err := client.Update(context.Background(), &unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "name"}}}, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return got.UnstructuredContent()
+			},
+		},
+		{
+			name:     "updatestatus",
+			response: "nonlist",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				got, err := client.UpdateStatus(context.Background(), &unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "name"}}}, metav1.UpdateOptions{})
+
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return got.UnstructuredContent()
+			},
+		},
+		{
+			name:     "get",
+			response: "nonlist",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				got, err := client.Get(context.Background(), "name", metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return got.UnstructuredContent()
+			},
+		},
+		{
+			name:     "list",
+			response: "list",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				got, err := client.List(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return got.UnstructuredContent()
+
+			},
+		},
+		{
+			name:     "watch",
+			response: "events",
+			do: func(t *testing.T, client dynamic.ResourceInterface) interface{} {
+				w, err := client.Watch(context.Background(), metav1.ListOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer w.Stop()
+
+				var got []interface{}
+				for e := range w.ResultChan() {
+					u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&e)
+					if err != nil {
+						t.Fatalf("failed to convert watch event to unstructured content: %v", err)
+					}
+					got = append(got, u)
+				}
+
+				return got
+			},
+		},
+	} {
+		parentTestName := t.Name()
+		t.Run(tc.name, func(t *testing.T) {
+			client, err := dynamic.NewForConfig(&rest.Config{
+
+				Transport: RoundTripperFunc(func(request *http.Request) (*http.Response, error) {
+					fd, err := os.Open(filepath.Join("testdata", filepath.FromSlash(parentTestName), "responses", tc.response))
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer func() {
+						if err := fd.Close(); err != nil {
+							t.Fatal(err)
+						}
+					}()
+
+					response, err := http.ReadResponse(bufio.NewReader(fd), request)
+					if err != nil {
+						t.Fatal(err)
+					}
+					return response, nil
+				}),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := tc.do(t, client.Resource(schema.GroupVersionResource{}))
+
+			path := filepath.Join("testdata", filepath.FromSlash(t.Name()))
+			if os.Getenv("UPDATE_DYNAMIC_CLIENT_FIXTURES") == "true" {
+				fixture, err := json.Marshal(got)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, fixture, os.FileMode(0644)); err != nil {
+					t.Fatalf("failed to update fixture: %v", err)
+				}
+			}
+			fixture, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var want interface{}
+			if err := json.Unmarshal(fixture, &want); err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("unexpected diff:\n%s", diff)
 			}
 		})
 	}

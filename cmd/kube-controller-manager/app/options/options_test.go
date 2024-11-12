@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilversion "k8s.io/component-base/version"
 
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
@@ -98,6 +98,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-daemonset-syncs=10",
 	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
@@ -264,7 +265,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
 			&daemonconfig.DaemonSetControllerConfiguration{
-				ConcurrentDaemonSetSyncs: 2,
+				ConcurrentDaemonSetSyncs: 10,
 			},
 		},
 		DeploymentController: &DeploymentControllerOptions{
@@ -430,6 +431,7 @@ func TestAddFlags(t *testing.T) {
 			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     []string{"x-remote-user"},
+				UIDHeaders:          nil,
 				GroupHeaders:        []string{"x-remote-group"},
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			},
@@ -448,7 +450,7 @@ func TestAddFlags(t *testing.T) {
 		Master:                   "192.168.4.20",
 		Metrics:                  &metrics.Options{},
 		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
+		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -457,6 +459,83 @@ func TestAddFlags(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	testcases := []struct {
+		name    string
+		flags   []string // not a good place to test flagParse error
+		wantErr bool     // this won't apply to flagParse, it only apply to KubeControllerManagerOptions.Validate
+	}{
+		{
+			name:    "empty flags",
+			flags:   []string{},
+			wantErr: false,
+		},
+		{
+			name: "cloud provider empty flag",
+			flags: []string{
+				"--cloud-provider", "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "cloud provider set but not external",
+			flags: []string{
+				"--cloud-provider=gce",
+			},
+			wantErr: true,
+		},
+		{
+			name: "cloud provider set to external",
+			flags: []string{
+				"--cloud-provider=external",
+			},
+			wantErr: false,
+		},
+		{
+			name: "nodeipam to cloudAllocator",
+			flags: []string{
+				"--cidr-allocator-type=CloudAllocator",
+			},
+			wantErr: true,
+		},
+		{
+			name: "nodeipam to rangeAllocator",
+			flags: []string{
+				"--cidr-allocator-type=RangeAllocator",
+			},
+			wantErr: false,
+		},
+		{
+			name: "nodeipam to IPAMFromCloud",
+			flags: []string{
+				"--cidr-allocator-type=IPAMFromCloud",
+			},
+			wantErr: true,
+		},
+		{
+			name: "concurrent daemonset syncs set to 0",
+			flags: []string{
+				"--concurrent-daemonset-syncs=0",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, s := setupControllerManagerFlagSet(t)
+			err := fs.Parse(tc.flags)
+			checkTestError(t, err, false, "")
+			err = s.Validate([]string{""}, []string{""}, nil)
+			if !tc.wantErr && err != nil {
+				t.Fatal(fmt.Errorf("expected no error, got %w", err))
+			} else if tc.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -538,7 +617,7 @@ func TestApplyTo(t *testing.T) {
 				},
 			},
 			DaemonSetController: daemonconfig.DaemonSetControllerConfiguration{
-				ConcurrentDaemonSetSyncs: 2,
+				ConcurrentDaemonSetSyncs: 10,
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
@@ -658,7 +737,7 @@ func TestApplyTo(t *testing.T) {
 
 func TestEmulatedVersion(t *testing.T) {
 	var cleanupAndSetupFunc = func() featuregate.FeatureGate {
-		componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+		componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 		componentGlobalsRegistry.Reset() // make sure this test have a clean state
 		t.Cleanup(func() {
 			componentGlobalsRegistry.Reset() // make sure this test doesn't leak a dirty state
@@ -675,7 +754,7 @@ func TestEmulatedVersion(t *testing.T) {
 				{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 			},
 		}))
-		utilruntime.Must(componentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, verKube, fg))
+		utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, verKube, fg))
 		return fg
 	}
 
@@ -1454,8 +1533,8 @@ func TestWatchListClientFlagChange(t *testing.T) {
 
 func assertWatchListClientFeatureDefaultValue(t *testing.T) {
 	watchListClientDefaultValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if watchListClientDefaultValue {
-		t.Fatalf("expected %q feature gate to be disabled for KCM", clientgofeaturegate.WatchListClient)
+	if !watchListClientDefaultValue {
+		t.Fatalf("expected %q feature gate to be enabled for KCM", clientgofeaturegate.WatchListClient)
 	}
 }
 
@@ -1466,7 +1545,7 @@ func assertWatchListCommandLineDefaultValue(t *testing.T, fs *pflag.FlagSet) {
 		t.Fatalf("didn't find %q flag", fgFlagName)
 	}
 
-	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=false)"
+	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=true)"
 	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
 		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
 	}

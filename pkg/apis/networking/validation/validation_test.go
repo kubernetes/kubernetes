@@ -1455,7 +1455,7 @@ func TestValidateIngressClass(t *testing.T) {
 		},
 		"valid name, controller too long": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/"+strings.Repeat("a", 244)),
-			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("spec.controller"), "", 250)},
+			expectedErrs: field.ErrorList{field.TooLong(field.NewPath("spec.controller"), "" /*unused*/, 250)},
 		},
 		"valid name, valid controller, valid params": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",

@@ -24,9 +24,9 @@ import (
 	"strings"
 	"sync"
 
+	inuserns "github.com/moby/sys/userns"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/mount-utils"
 )
@@ -110,8 +110,12 @@ func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
 	procSwapsLines := strings.Split(procSwapsStr, "\n")
 
 	// If there is more than one line (table headers) in /proc/swaps then swap is enabled
-	klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
-	return len(procSwapsLines) > 1
+	isSwapOn := len(procSwapsLines) > 1
+	if isSwapOn {
+		klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
+	}
+
+	return isSwapOn
 }
 
 // IsSwapOn detects whether swap in enabled on the system by inspecting

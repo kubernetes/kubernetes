@@ -37,13 +37,6 @@ const (
 	UnprivilegedUserToken = "unprivileged-user"
 )
 
-// MinVerbosity determines the minimum klog verbosity when running tests that
-// involve the apiserver.  This overrides the -v value from the command line,
-// i.e. -v=0 has no effect when MinVerbosity is 4 (the default).  Tests can opt
-// out of this by setting MinVerbosity to zero before starting the control
-// plane or choose some different minimum verbosity.
-var MinVerbosity = 4
-
 // DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
 func DefaultOpenAPIConfig() *openapicommon.Config {
 	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))

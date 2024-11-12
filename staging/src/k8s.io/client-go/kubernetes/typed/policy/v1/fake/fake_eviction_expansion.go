@@ -24,10 +24,10 @@ import (
 	core "k8s.io/client-go/testing"
 )
 
-func (c *FakeEvictions) Evict(ctx context.Context, eviction *policy.Eviction) error {
+func (c *fakeEvictions) Evict(ctx context.Context, eviction *policy.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
-	action.Namespace = c.ns
+	action.Namespace = c.Namespace()
 	action.Resource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	action.Subresource = "eviction"
 	action.Object = eviction

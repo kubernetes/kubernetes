@@ -59,6 +59,21 @@ const (
 	// SizerType types support the size() method.
 	SizerType
 
-	// SubtractorType type support '-' operations.
+	// SubtractorType types support '-' operations.
 	SubtractorType
+
+	// FoldableType types support comprehensions v2 macros which iterate over (key, value) pairs.
+	FoldableType
+)
+
+const (
+	// ListerType supports a set of traits necessary for list operations.
+	//
+	// The ListerType is syntactic sugar and not intended to be a perfect reflection of all List operators.
+	ListerType = AdderType | ContainerType | IndexerType | IterableType | SizerType
+
+	// MapperType supports a set of traits necessary for map operations.
+	//
+	// The MapperType is syntactic sugar and not intended to be a perfect reflection of all Map operators.
+	MapperType = ContainerType | IndexerType | IterableType | SizerType
 )

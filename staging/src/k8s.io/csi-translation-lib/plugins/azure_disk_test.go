@@ -24,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestIsManagedDisk(t *testing.T) {
@@ -99,6 +101,7 @@ func TestGetDiskName(t *testing.T) {
 func TestTranslateAzureDiskInTreeInlineVolumeToCSI(t *testing.T) {
 	sharedBlobDiskKind := corev1.AzureDedicatedBlobDisk
 	translator := NewAzureDiskCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	cases := []struct {
 		name   string
@@ -158,7 +161,7 @@ func TestTranslateAzureDiskInTreeInlineVolumeToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume, "")
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(logger, tc.volume, "")
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -175,6 +178,7 @@ func TestTranslateAzureDiskInTreeInlineVolumeToCSI(t *testing.T) {
 
 func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 	translator := NewAzureDiskCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	sharedBlobDiskKind := corev1.AzureDedicatedBlobDisk
 	cachingMode := corev1.AzureDataDiskCachingMode("cachingmode")
@@ -250,7 +254,7 @@ func TestTranslateAzureDiskInTreePVToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreePVToCSI(tc.volume)
+		got, err := translator.TranslateInTreePVToCSI(logger, tc.volume)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -447,6 +451,7 @@ func TestTranslateTranslateCSIPVToInTree(t *testing.T) {
 
 func TestTranslateInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewAzureDiskCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	tcs := []struct {
 		name       string
@@ -513,7 +518,7 @@ func TestTranslateInTreeStorageClassToCSI(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Logf("Testing %v", tc.name)
-		gotOptions, err := translator.TranslateInTreeStorageClassToCSI(tc.options)
+		gotOptions, err := translator.TranslateInTreeStorageClassToCSI(logger, tc.options)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}

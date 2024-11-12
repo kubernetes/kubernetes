@@ -41,13 +41,13 @@ import (
 // validator implements the Validator interface
 type validator struct {
 	celMatcher            matchconditions.Matcher
-	validationFilter      cel.Filter
-	auditAnnotationFilter cel.Filter
-	messageFilter         cel.Filter
+	validationFilter      cel.ConditionEvaluator
+	auditAnnotationFilter cel.ConditionEvaluator
+	messageFilter         cel.ConditionEvaluator
 	failPolicy            *v1.FailurePolicyType
 }
 
-func NewValidator(validationFilter cel.Filter, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.Filter, failPolicy *v1.FailurePolicyType) Validator {
+func NewValidator(validationFilter cel.ConditionEvaluator, celMatcher matchconditions.Matcher, auditAnnotationFilter, messageFilter cel.ConditionEvaluator, failPolicy *v1.FailurePolicyType) Validator {
 	return &validator{
 		celMatcher:            celMatcher,
 		validationFilter:      validationFilter,
@@ -122,6 +122,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 	messageResults, _, err := v.messageFilter.ForInput(ctx, versionedAttr, admissionRequest, expressionOptionalVars, ns, remainingBudget)
 	for i, evalResult := range evalResults {
 		var decision = &decisions[i]
+		decision.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*ValidationCondition)
 		if !ok {
@@ -146,6 +147,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 			decision.Message = fmt.Sprintf("failed messageExpression: %s", err)
 		} else if evalResult.EvalResult != celtypes.True {
 			decision.Action = ActionDeny
+			decision.Evaluation = EvalDeny
 			if validation.Reason == nil {
 				decision.Reason = metav1.StatusReasonInvalid
 			} else {
@@ -210,6 +212,7 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 			continue
 		}
 		var auditAnnotationResult = &auditAnnotationResults[i]
+		auditAnnotationResult.Elapsed = evalResult.Elapsed
 		// TODO: move this to generics
 		validation, ok := evalResult.ExpressionAccessor.(*AuditAnnotationCondition)
 		if !ok {

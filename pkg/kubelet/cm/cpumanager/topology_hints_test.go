@@ -49,16 +49,16 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 		Topology: []cadvisorapi.Node{
 			{Id: 0,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 0, Id: 0, Threads: []int{0, 6}},
-					{SocketID: 0, Id: 1, Threads: []int{1, 7}},
-					{SocketID: 0, Id: 2, Threads: []int{2, 8}},
+					{SocketID: 0, Id: 0, Threads: []int{0, 6}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 1, Threads: []int{1, 7}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 0, Id: 2, Threads: []int{2, 8}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 			{Id: 1,
 				Cores: []cadvisorapi.Core{
-					{SocketID: 1, Id: 0, Threads: []int{3, 9}},
-					{SocketID: 1, Id: 1, Threads: []int{4, 10}},
-					{SocketID: 1, Id: 2, Threads: []int{5, 11}},
+					{SocketID: 1, Id: 0, Threads: []int{3, 9}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 1, Threads: []int{4, 10}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
+					{SocketID: 1, Id: 2, Threads: []int{5, 11}, UncoreCaches: []cadvisorapi.Cache{{Id: 1}}},
 				},
 			},
 		},
@@ -245,11 +245,6 @@ func TestGetTopologyHints(t *testing.T) {
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
-
-		if m.pendingAdmissionPod == nil {
-			t.Errorf("The pendingAdmissionPod should point to the current pod after the call to GetTopologyHints()")
-		}
-
 		sort.SliceStable(hints, func(i, j int) bool {
 			return hints[i].LessThan(hints[j])
 		})
@@ -298,7 +293,6 @@ func TestGetPodTopologyHints(t *testing.T) {
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
-
 		sort.SliceStable(podHints, func(i, j int) bool {
 			return podHints[i].LessThan(podHints[j])
 		})

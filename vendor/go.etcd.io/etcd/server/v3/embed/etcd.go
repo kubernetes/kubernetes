@@ -17,6 +17,7 @@ package embed
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	defaultLog "log"
@@ -217,11 +218,13 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		EnableLeaseCheckpoint:                    cfg.ExperimentalEnableLeaseCheckpoint,
 		LeaseCheckpointPersist:                   cfg.ExperimentalEnableLeaseCheckpointPersist,
 		CompactionBatchLimit:                     cfg.ExperimentalCompactionBatchLimit,
+		CompactionSleepInterval:                  cfg.ExperimentalCompactionSleepInterval,
 		WatchProgressNotifyInterval:              cfg.ExperimentalWatchProgressNotifyInterval,
 		DowngradeCheckTime:                       cfg.ExperimentalDowngradeCheckTime,
 		WarningApplyDuration:                     cfg.ExperimentalWarningApplyDuration,
 		ExperimentalMemoryMlock:                  cfg.ExperimentalMemoryMlock,
 		ExperimentalTxnModeWriteWithSharedBuffer: cfg.ExperimentalTxnModeWriteWithSharedBuffer,
+		ExperimentalStopGRPCServiceOnDefrag:      cfg.ExperimentalStopGRPCServiceOnDefrag,
 		ExperimentalBootstrapDefragThresholdMegabytes: cfg.ExperimentalBootstrapDefragThresholdMegabytes,
 		V2Deprecation: cfg.V2DeprecationEffective(),
 	}
@@ -830,6 +833,24 @@ func (e *Etcd) pickGrpcGatewayServeContext(splitHttp bool) *serveCtx {
 	panic("Expect at least one context able to serve grpc")
 }
 
+var ErrMissingClientTLSInfoForMetricsURL = errors.New("client TLS key/cert (--cert-file, --key-file) must be provided for metrics secure url")
+
+func (e *Etcd) createMetricsListener(murl url.URL) (net.Listener, error) {
+	tlsInfo := &e.cfg.ClientTLSInfo
+	switch murl.Scheme {
+	case "http":
+		tlsInfo = nil
+	case "https", "unixs":
+		if e.cfg.ClientTLSInfo.Empty() {
+			return nil, ErrMissingClientTLSInfoForMetricsURL
+		}
+	}
+	return transport.NewListenerWithOpts(murl.Host, murl.Scheme,
+		transport.WithTLSInfo(tlsInfo),
+		transport.WithSocketOpts(&e.cfg.SocketOpts),
+	)
+}
+
 func (e *Etcd) serveMetrics() (err error) {
 	if e.cfg.Metrics == "extensive" {
 		grpc_prometheus.EnableHandlingTimeHistogram()
@@ -841,14 +862,7 @@ func (e *Etcd) serveMetrics() (err error) {
 		etcdhttp.HandleHealth(e.cfg.logger, metricsMux, e.Server)
 
 		for _, murl := range e.cfg.ListenMetricsUrls {
-			tlsInfo := &e.cfg.ClientTLSInfo
-			if murl.Scheme == "http" {
-				tlsInfo = nil
-			}
-			ml, err := transport.NewListenerWithOpts(murl.Host, murl.Scheme,
-				transport.WithTLSInfo(tlsInfo),
-				transport.WithSocketOpts(&e.cfg.SocketOpts),
-			)
+			ml, err := e.createMetricsListener(murl)
 			if err != nil {
 				return err
 			}

@@ -43,7 +43,7 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 
 		ginkgo.By("perform kubelet health check to check if kubelet is healthy and running.")
 		// Precautionary check that kubelet is healthy before running the test.
-		gomega.Expect(kubeletHealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrue())
+		gomega.Expect(kubeletHealthCheck(kubeletHealthCheckURL)).To(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 		ginkgo.By("acquiring the lock on lock file i.e /var/run/kubelet.lock")
 		// Open the file with the intention to acquire the lock, this would imitate the behaviour
@@ -71,6 +71,6 @@ var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisru
 		// It should not be as the lock contention forces the kubelet to stop.
 		gomega.Eventually(ctx, func() bool {
 			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, 10*time.Second, time.Second).Should(gomega.BeFalse())
+		}, 10*time.Second, time.Second).Should(gomega.BeFalseBecause("expected kubelet to not be in healthy state"))
 	})
 })

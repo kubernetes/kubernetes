@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,6 +38,7 @@ type triggerFunc func(gvr schema.GroupVersionResource, ns string, fakeClient *fa
 func triggerFactory(t *testing.T) triggerFunc {
 	return func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, _ *unstructured.Unstructured) *unstructured.Unstructured {
 		testObject := newUnstructured("apps/v1", "Deployment", "ns-foo", "name-foo")
+		testObject.SetLabels(map[string]string{"environment": "test"})
 		createdObj, err := fakeClient.Resource(gvr).Namespace(ns).Create(context.TODO(), testObject, metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
@@ -55,13 +57,14 @@ func handler(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandle
 
 func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 	scenarios := []struct {
-		name        string
-		existingObj *unstructured.Unstructured
-		gvr         schema.GroupVersionResource
-		informNS    string
-		ns          string
-		trigger     func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured
-		handler     func(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandlerFuncs
+		name             string
+		existingObj      *unstructured.Unstructured
+		gvr              schema.GroupVersionResource
+		informNS         string
+		ns               string
+		trigger          func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured
+		handler          func(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandlerFuncs
+		tweakListOptions dynamicinformer.TweakListOptionsFunc
 	}{
 		// scenario 1
 		{
@@ -80,6 +83,50 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			gvr:      schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			trigger:  triggerFactory(t),
 			handler:  handler,
+		},
+		{
+			name:     "tweak options: test adding an object not matching field selector should not trigger AddFunc",
+			informNS: "ns-foo",
+			ns:       "ns-foo",
+			gvr:      schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			trigger:  triggerFactory(t),
+			handler:  handler,
+			tweakListOptions: func(opts *metav1.ListOptions) {
+				opts.FieldSelector = "metadata.name=name-bar"
+			},
+		},
+		{
+			name:     "tweak options: test adding an object matching field selector should trigger AddFunc",
+			informNS: "ns-foo",
+			ns:       "ns-foo",
+			gvr:      schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			trigger:  triggerFactory(t),
+			handler:  handler,
+			tweakListOptions: func(opts *metav1.ListOptions) {
+				opts.FieldSelector = "metadata.name=name-foo"
+			},
+		},
+		{
+			name:     "tweak options: test adding an object not matching label selector should not trigger AddFunc",
+			informNS: "ns-foo",
+			ns:       "ns-foo",
+			gvr:      schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			trigger:  triggerFactory(t),
+			handler:  handler,
+			tweakListOptions: func(opts *metav1.ListOptions) {
+				opts.LabelSelector = "environment=production"
+			},
+		},
+		{
+			name:     "tweak options: test adding an object matching label selector should trigger AddFunc",
+			informNS: "ns-foo",
+			ns:       "ns-foo",
+			gvr:      schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			trigger:  triggerFactory(t),
+			handler:  handler,
+			tweakListOptions: func(opts *metav1.ListOptions) {
+				opts.LabelSelector = "environment=test"
+			},
 		},
 	}
 

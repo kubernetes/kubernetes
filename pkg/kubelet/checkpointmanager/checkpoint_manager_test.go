@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1"
+	v1 "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1"
 )
 
 var testStore *utilstore.MemStore
@@ -199,8 +199,8 @@ func TestCheckpointManager(t *testing.T) {
 		assert.NoError(t, err)
 		actualPortMappings, actualHostNetwork := checkpointOut.GetData()
 		expPortMappings, expHostNetwork := tc.checkpoint.GetData()
-		assert.Equal(t, actualPortMappings, expPortMappings)
-		assert.Equal(t, actualHostNetwork, expHostNetwork)
+		assert.Equal(t, expPortMappings, actualPortMappings)
+		assert.Equal(t, expHostNetwork, actualHostNetwork)
 	}
 	// Test it fails if tried to read V1 structure into V2, a different structure from the structure which is checkpointed
 	checkpointV2 := newFakeCheckpointV2("", nil, false)
@@ -229,7 +229,7 @@ func TestCheckpointManager(t *testing.T) {
 	keys, err := manager.ListCheckpoints()
 	assert.NoError(t, err)
 	sort.Strings(keys)
-	assert.Equal(t, keys, []string{"key1", "key2"})
+	assert.Equal(t, []string{"key1", "key2"}, keys)
 
 	// Test RemoveCheckpoints
 	err = manager.RemoveCheckpoint("key1")
@@ -241,7 +241,7 @@ func TestCheckpointManager(t *testing.T) {
 	// Test ListCheckpoints
 	keys, err = manager.ListCheckpoints()
 	assert.NoError(t, err)
-	assert.Equal(t, keys, []string{"key2"})
+	assert.Equal(t, []string{"key2"}, keys)
 
 	// Test Get NonExisted Checkpoint
 	checkpointNE := newFakeCheckpointV1("NE", nil, false)

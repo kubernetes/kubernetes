@@ -17,7 +17,9 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"testing"
@@ -30,9 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 func TestWatchListResult(t *testing.T) {
@@ -60,41 +64,34 @@ func TestWatchListResult(t *testing.T) {
 			expectedErr: fmt.Errorf("*v1.Pod is not a list: no Items field in this object"),
 		},
 		{
-			name:        "an err is always returned",
-			result:      nil,
-			target:      WatchListResult{err: fmt.Errorf("dummy err")},
-			expectedErr: fmt.Errorf("dummy err"),
+			name:   "invalid base64EncodedInitialEventsListBlueprint",
+			result: &v1.PodList{},
+			target: WatchListResult{
+				base64EncodedInitialEventsListBlueprint: "invalid",
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
+			expectedErr: fmt.Errorf("failed to decode the received blueprint list, err illegal base64 data at input byte 4"),
 		},
 		{
 			name:   "empty list",
 			result: &v1.PodList{},
+			target: WatchListResult{
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList"},
 				Items:    []v1.Pod{},
 			},
 		},
 		{
-			name:   "gv is applied",
-			result: &v1.PodList{},
-			target: WatchListResult{gv: schema.GroupVersion{Group: "g", Version: "v"}},
-			expectedResult: &v1.PodList{
-				TypeMeta: metav1.TypeMeta{Kind: "PodList", APIVersion: "g/v"},
-				Items:    []v1.Pod{},
-			},
-		},
-		{
-			name:   "gv is applied, empty group",
-			result: &v1.PodList{},
-			target: WatchListResult{gv: schema.GroupVersion{Version: "v"}},
-			expectedResult: &v1.PodList{
-				TypeMeta: metav1.TypeMeta{Kind: "PodList", APIVersion: "v"},
-				Items:    []v1.Pod{},
-			},
-		},
-		{
 			name:   "rv is applied",
 			result: &v1.PodList{},
-			target: WatchListResult{initialEventsEndBookmarkRV: "100"},
+			target: WatchListResult{
+				initialEventsEndBookmarkRV:              "100",
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "100"},
@@ -104,17 +101,35 @@ func TestWatchListResult(t *testing.T) {
 		{
 			name:   "items are applied",
 			result: &v1.PodList{},
-			target: WatchListResult{items: []runtime.Object{makePod(1), makePod(2)}},
+			target: WatchListResult{
+				items:                                   []runtime.Object{makePod(1), makePod(2)},
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList"},
 				Items:    []v1.Pod{*makePod(1), *makePod(2)},
 			},
 		},
 		{
-			name:        "type mismatch",
-			result:      &v1.PodList{},
-			target:      WatchListResult{items: []runtime.Object{makeNamespace("1")}},
+			name:   "list's object type mismatch",
+			result: &v1.PodList{},
+			target: WatchListResult{
+				items:                                   []runtime.Object{makeNamespace("1")},
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
 			expectedErr: fmt.Errorf("received object type = v1.Namespace at index = 0, doesn't match the list item type = v1.Pod"),
+		},
+		{
+			name:   "list type mismatch",
+			result: &v1.SecretList{},
+			target: WatchListResult{
+				items:                                   []runtime.Object{makePod(1), makePod(2)},
+				base64EncodedInitialEventsListBlueprint: encodeObjectToBase64String(makeEmptyPodList(), t),
+				negotiatedObjectDecoder:                 newJSONSerializer(),
+			},
+			expectedErr: fmt.Errorf("unable to decode /v1, Kind=PodList into *v1.SecretList"),
 		},
 	}
 	for _, scenario := range scenarios {
@@ -141,25 +156,23 @@ func TestWatchListResult(t *testing.T) {
 
 func TestWatchListSuccess(t *testing.T) {
 	scenarios := []struct {
-		name           string
-		gv             schema.GroupVersion
-		watchEvents    []watch.Event
+		name                    string
+		watchEvents             []watch.Event
+		negotiatedObjectDecoder runtime.Serializer
+
 		expectedResult *v1.PodList
 	}{
 		{
-			name: "happy path",
-			// Note that the APIVersion for the core API group is "v1" (not "core/v1").
-			// We fake "core/v1" here to test if the Group part is properly
-			// recognized and set on the resulting object.
-			gv: schema.GroupVersion{Group: "core", Version: "v1"},
+			name:                    "happy path",
+			negotiatedObjectDecoder: newJSONSerializer(),
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod(1)},
 				{Type: watch.Added, Object: makePod(2)},
-				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
+				{Type: watch.Bookmark, Object: makeBookmarkEvent(5, t)},
 			},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "core/v1",
+					APIVersion: "",
 					Kind:       "PodList",
 				},
 				ListMeta: metav1.ListMeta{ResourceVersion: "5"},
@@ -167,30 +180,14 @@ func TestWatchListSuccess(t *testing.T) {
 			},
 		},
 		{
-			name: "APIVersion with only version provided is properly set",
-			gv:   schema.GroupVersion{Version: "v1"},
+			name:                    "only the bookmark",
+			negotiatedObjectDecoder: newJSONSerializer(),
 			watchEvents: []watch.Event{
-				{Type: watch.Added, Object: makePod(1)},
-				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
+				{Type: watch.Bookmark, Object: makeBookmarkEvent(5, t)},
 			},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
-					Kind:       "PodList",
-				},
-				ListMeta: metav1.ListMeta{ResourceVersion: "5"},
-				Items:    []v1.Pod{*makePod(1)},
-			},
-		},
-		{
-			name: "only the bookmark",
-			gv:   schema.GroupVersion{Version: "v1"},
-			watchEvents: []watch.Event{
-				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
-			},
-			expectedResult: &v1.PodList{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
+					APIVersion: "",
 					Kind:       "PodList",
 				},
 				ListMeta: metav1.ListMeta{ResourceVersion: "5"},
@@ -203,11 +200,7 @@ func TestWatchListSuccess(t *testing.T) {
 			ctx := context.Background()
 			fakeWatcher := watch.NewFake()
 			target := &Request{
-				c: &RESTClient{
-					content: ClientContentConfig{
-						GroupVersion: scenario.gv,
-					},
-				},
+				c: &RESTClient{},
 			}
 
 			go func(watchEvents []watch.Event) {
@@ -216,7 +209,7 @@ func TestWatchListSuccess(t *testing.T) {
 				}
 			}(scenario.watchEvents)
 
-			res := target.handleWatchList(ctx, fakeWatcher)
+			res := target.handleWatchList(ctx, fakeWatcher, scenario.negotiatedObjectDecoder)
 			if res.err != nil {
 				t.Fatal(res.err)
 			}
@@ -303,7 +296,7 @@ func TestWatchListFailure(t *testing.T) {
 				}
 			}(scenario.watcher, scenario.watchEvents)
 
-			res := target.handleWatchList(scenario.ctx, scenario.watcher)
+			res := target.handleWatchList(scenario.ctx, scenario.watcher, nil /*TODO*/)
 			resErr := res.Into(nil)
 			if resErr == nil {
 				t.Fatal("expected to get an error, got nil")
@@ -338,6 +331,13 @@ func TestWatchListWhenFeatureGateDisabled(t *testing.T) {
 	}
 }
 
+func makeEmptyPodList() *v1.PodList {
+	return &v1.PodList{
+		TypeMeta: metav1.TypeMeta{Kind: "PodList"},
+		Items:    []v1.Pod{},
+	}
+}
+
 func makePod(rv uint64) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -353,11 +353,14 @@ func makeNamespace(name string) *v1.Namespace {
 	return &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 }
 
-func makeBookmarkEvent(rv uint64) *v1.Pod {
+func makeBookmarkEvent(rv uint64, t *testing.T) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: fmt.Sprintf("%d", rv),
-			Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+			Annotations: map[string]string{
+				metav1.InitialEventsAnnotationKey:              "true",
+				metav1.InitialEventsListBlueprintAnnotationKey: encodeObjectToBase64String(makeEmptyPodList(), t),
+			},
 		},
 	}
 }
@@ -371,4 +374,24 @@ func (f fakeObj) GetObjectKind() schema.ObjectKind {
 
 func (f fakeObj) DeepCopyObject() runtime.Object {
 	return fakeObj{}
+}
+
+func newJSONSerializer() runtime.Serializer {
+	return runtimejson.NewSerializerWithOptions(
+		runtimejson.DefaultMetaFactory,
+		clientgoscheme.Scheme,
+		clientgoscheme.Scheme,
+		runtimejson.SerializerOptions{},
+	)
+}
+
+func encodeObjectToBase64String(obj runtime.Object, t *testing.T) string {
+	e := newJSONSerializer()
+
+	var buf bytes.Buffer
+	err := e.Encode(obj, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }

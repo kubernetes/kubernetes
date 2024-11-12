@@ -184,7 +184,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance
@@ -228,7 +231,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance
@@ -314,7 +320,10 @@ func TestCreateCoreDNSAddon(t *testing.T) {
     forward . /etc/resolv.conf {
        max_concurrent 1000
     }
-    cache 30
+    cache 30 {
+       disable success cluster.local
+       disable denial cluster.local
+    }
     loop
     reload
     loadbalance

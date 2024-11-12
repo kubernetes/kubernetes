@@ -19,10 +19,10 @@ limitations under the License.
 package v2beta1
 
 import (
-	"net/http"
+	http "net/http"
 
-	v2beta1 "k8s.io/api/autoscaling/v2beta1"
-	"k8s.io/client-go/kubernetes/scheme"
+	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -85,10 +85,10 @@ func New(c rest.Interface) *AutoscalingV2beta1Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v2beta1.SchemeGroupVersion
+	gv := autoscalingv2beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

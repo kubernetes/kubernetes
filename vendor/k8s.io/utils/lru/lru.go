@@ -16,6 +16,7 @@ limitations under the License.
 package lru
 
 import (
+	"fmt"
 	"sync"
 
 	groupcache "k8s.io/utils/internal/third_party/forked/golang/golang-lru"
@@ -42,6 +43,15 @@ func NewWithEvictionFunc(size int, f EvictionFunc) *Cache {
 	c := New(size)
 	c.cache.OnEvicted = f
 	return c
+}
+
+// SetEvictionFunc updates the eviction func
+func (c *Cache) SetEvictionFunc(f EvictionFunc) error {
+	if c.cache.OnEvicted != nil {
+		return fmt.Errorf("lru cache eviction function is already set")
+	}
+	c.cache.OnEvicted = f
+	return nil
 }
 
 // Add adds a value to the cache.

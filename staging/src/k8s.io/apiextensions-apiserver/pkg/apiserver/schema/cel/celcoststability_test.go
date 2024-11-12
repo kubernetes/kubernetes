@@ -372,15 +372,29 @@ func TestCelCostStability(t *testing.T) {
 				"!('c' in self.val)": 4,
 				"'d' in self.val":    3,
 				// field selection also possible if map key is a valid CEL identifier
-				"!has(self.val.a)":                               3,
-				"has(self.val.b)":                                2,
-				"!has(self.val.c)":                               3,
-				"has(self.val.d)":                                2,
-				"self.val.all(k, self.val[k] > 0)":               17,
+				"!has(self.val.a)":                 3,
+				"has(self.val.b)":                  2,
+				"!has(self.val.c)":                 3,
+				"has(self.val.d)":                  2,
+				"self.val.all(k, self.val[k] > 0)": 17,
+				// It is important that the condition does not match in this exists test
+				// since the map iteration order is non-deterministic, and exists short circuits when it matches.
+				"!self.val.exists(k, self.val[k] == 3)":          20,
 				"self.val.exists_one(k, self.val[k] == 2)":       14,
 				"!self.val.exists_one(k, self.val[k] > 0)":       17,
 				"size(self.val) == 2":                            4,
 				"size(self.val.filter(k, self.val[k] > 1)) == 1": 26,
+
+				// two variable comprehensions
+				"self.val.all(k, v, v > 0)": 13,
+				// It is important that the condition does not match in this exists test
+				// since the map iteration order is non-deterministic, and exists short circuits when it matches.
+				"!self.val.exists(k, v, v == 3)":                                        16,
+				"self.val.existsOne(k, v, v == 2)":                                      10,
+				"self.val.transformMap(k, v, v > 1, v + 1).size() == 1":                 14,
+				"self.val.transformMap(k, v, v + 1).size() == 2":                        15,
+				"self.val.transformMapEntry(k, v, v > 1, {k + '2': v + 1}).size() == 1": 45,
+				"self.val.transformMapEntry(k, v, {k + '2': v + 1}).size() == 2":        77,
 			},
 		},
 		{name: "listMap access",
@@ -426,6 +440,13 @@ func TestCelCostStability(t *testing.T) {
 				// all() and exists() macros ignore errors from predicates so long as the condition holds for at least one element
 				"self.listMap.exists(m, m.v2 == 'z')": 24,
 				"!self.listMap.all(m, m.v2 != 'z')":   22,
+
+				// two variable comprehensions
+				"!self.listMap.all(i, m, has(m.v2) && m.v2 != 'z')":                            10,
+				"self.listMap.exists(i, m, has(m.v2) && m.v2 == 'z')":                          21,
+				"self.listMap.existsOne(i, m, has(m.v2) && m.v2 == 'z')":                       12,
+				"self.listMap.transformList(i, m, has(m.v2) && m.v2 == 'z', m.v2).size() == 1": 25,
+				"self.listMap.transformList(i, m, m.v).size() == 3":                            47,
 			},
 		},
 		{name: "list access",
@@ -447,6 +468,13 @@ func TestCelCostStability(t *testing.T) {
 				"size(self.array.filter(e, e%2 == 0)) == 3":                      68,
 				"self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)": 194,
 				"size(self.array) == 8":                                          4,
+
+				// two variable comprehensions
+				"self.array.all(i, e, e > 0)":                             43,
+				"self.array.exists(i, e, e > 2)":                          36,
+				"self.array.existsOne(i, e, e > 4)":                       22,
+				"self.array.transformList(i, e, e > 2, e * 2).size() > 0": 77,
+				"self.array.transformList(i, e, e * 2).size() > 0":        117,
 			},
 		},
 		{name: "listSet access",
@@ -2010,14 +2038,14 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`isQuantity(self.val2)`: 314575,
 				`isQuantity("200M")`:    1,
 				`isQuantity("20Mi")`:    1,
-				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           uint64(3689348814741910532),
-				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: uint64(5534023222112865798),
+				`quantity("200M") == quantity("0.2G") && quantity("0.2G") == quantity("200M")`:                                           uint64(6),
+				`quantity("2M") == quantity("0.002G") && quantity("2000k") == quantity("2M") && quantity("0.002G") == quantity("2000k")`: uint64(9),
 				`quantity(self.val1).isLessThan(quantity(self.val2))`:                                                                    629151,
 				`quantity("50M").isLessThan(quantity("100M"))`:                                                                           3,
 				`quantity("50Mi").isGreaterThan(quantity("50M"))`:                                                                        3,
 				`quantity("200M").compareTo(quantity("0.2G")) == 0`:                                                                      4,
-				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              uint64(1844674407370955268),
-				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(1844674407370955267),
+				`quantity("50k").add(quantity("20")) == quantity("50.02k")`:                                                              uint64(5),
+				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(4),
 				`quantity("50").isInteger()`:                                                                                             2,
 				`quantity(self.val1).isInteger()`:                                                                                        314576,
 			},

@@ -22,6 +22,7 @@ reference them.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -524,7 +525,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 		// should not happen
 		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
 			needed, nodeName)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	nodeToUpdate.statusUpdateNeeded = needed
@@ -583,13 +584,13 @@ func (asw *actualStateOfWorld) GetAttachState(
 }
 
 // SetVolumeClaimSize sets size of the volume. But this function should not be used from attach_detach controller.
-func (asw *actualStateOfWorld) InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) {
+func (asw *actualStateOfWorld) InitializeClaimSize(logger klog.Logger, volumeName v1.UniqueVolumeName, claimSize resource.Quantity) {
 	logger.V(5).Info("no-op InitializeClaimSize call in attach-detach controller")
 }
 
-func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) *resource.Quantity {
+func (asw *actualStateOfWorld) GetClaimSize(volumeName v1.UniqueVolumeName) resource.Quantity {
 	// not needed in attach-detach controller
-	return nil
+	return resource.Quantity{}
 }
 
 func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {

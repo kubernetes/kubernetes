@@ -17,7 +17,9 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,13 +27,18 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimejson "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/watch"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 var _ runtime.CacheableObject = &mockCacheableObject{}
@@ -221,4 +228,119 @@ func TestWatchEncoderIdentifier(t *testing.T) {
 		t.Error("  - watchEncoder::doEncode method when creating outEvent")
 		t.Error("  - watchEncoder::typeIdentifier to capture all relevant fields in identifier")
 	}
+}
+
+func TestWatchListEncoder(t *testing.T) {
+	makePartialObjectMetadataListWithoutKind := func(rv string) *metav1.PartialObjectMetadataList {
+		return &metav1.PartialObjectMetadataList{
+			// do not set the type info to match
+			// newWatchListTransformer
+			ListMeta: metav1.ListMeta{ResourceVersion: rv},
+		}
+	}
+	makePodListWithKind := func(rv string) *v1.PodList {
+		return &v1.PodList{
+			TypeMeta: metav1.TypeMeta{
+				// set the type info so
+				// that it differs from
+				// PartialObjectMetadataList
+				Kind: "PodList",
+			},
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: rv,
+			},
+		}
+	}
+	makeBookmarkEventFor := func(pod *v1.Pod) watch.Event {
+		return watch.Event{
+			Type:   watch.Bookmark,
+			Object: pod,
+		}
+	}
+	makePod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				Namespace:   "ns",
+				Annotations: map[string]string{},
+			},
+		}
+	}
+	makePodWithInitialEventsAnnotation := func(name string) *v1.Pod {
+		p := makePod(name)
+		p.Annotations[metav1.InitialEventsAnnotationKey] = "true"
+		return p
+	}
+
+	scenarios := []struct {
+		name              string
+		negotiatedEncoder runtime.Serializer
+		targetGVK         *schema.GroupVersionKind
+
+		actualEvent   watch.Event
+		listBlueprint runtime.Object
+
+		expectedBase64ListBlueprint string
+	}{
+		{
+			name:              "pass through, an obj without the annotation received",
+			actualEvent:       makeBookmarkEventFor(makePod("1")),
+			negotiatedEncoder: newJSONSerializer(),
+		},
+		{
+			name:                        "encodes the initialEventsListBlueprint if an obj with the annotation is passed",
+			actualEvent:                 makeBookmarkEventFor(makePodWithInitialEventsAnnotation("1")),
+			listBlueprint:               makePodListWithKind("100"),
+			expectedBase64ListBlueprint: encodeObjectToBase64String(makePodListWithKind("100"), t),
+			negotiatedEncoder:           newJSONSerializer(),
+		},
+		{
+			name:                        "encodes the initialEventsListBlueprint as PartialObjectMetadata when requested",
+			targetGVK:                   &schema.GroupVersionKind{Group: "meta.k8s.io", Version: "v1", Kind: "PartialObjectMetadata"},
+			actualEvent:                 makeBookmarkEventFor(makePodWithInitialEventsAnnotation("2")),
+			listBlueprint:               makePodListWithKind("101"),
+			expectedBase64ListBlueprint: encodeObjectToBase64String(makePartialObjectMetadataListWithoutKind("101"), t),
+			negotiatedEncoder:           newJSONSerializer(),
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			target := newWatchListTransformer(scenario.listBlueprint, scenario.targetGVK, scenario.negotiatedEncoder)
+			transformedEvent := target.transform(scenario.actualEvent)
+
+			actualObjectMeta, err := meta.Accessor(transformedEvent.Object)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			base64ListBlueprint, ok := actualObjectMeta.GetAnnotations()[metav1.InitialEventsListBlueprintAnnotationKey]
+			if !ok && len(scenario.expectedBase64ListBlueprint) != 0 {
+				t.Fatalf("the encoded obj doesn't have %q", metav1.InitialEventsListBlueprintAnnotationKey)
+			}
+			if base64ListBlueprint != scenario.expectedBase64ListBlueprint {
+				t.Fatalf("unexpected base64ListBlueprint = %s, expected = %s", base64ListBlueprint, scenario.expectedBase64ListBlueprint)
+			}
+		})
+	}
+}
+
+func encodeObjectToBase64String(obj runtime.Object, t *testing.T) string {
+	e := newJSONSerializer()
+
+	var buf bytes.Buffer
+	err := e.Encode(obj, &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func newJSONSerializer() runtime.Serializer {
+	return runtimejson.NewSerializerWithOptions(
+		runtimejson.DefaultMetaFactory,
+		clientgoscheme.Scheme,
+		clientgoscheme.Scheme,
+		runtimejson.SerializerOptions{},
+	)
 }

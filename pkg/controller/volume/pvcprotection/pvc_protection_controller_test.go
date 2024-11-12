@@ -276,12 +276,13 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple PVCs with finalizer for the same namespace; no alive pods -> finalizer is removed and only one API pod list is made",
+			name: "multiple PVCs with finalizer for the same namespace; no alive pods -> finalizer is removed",
 			updatedPVCs: []*v1.PersistentVolumeClaim{deleted(withProtectionFinalizer(pvc())),
 				deleted(withProtectionFinalizer(pvcWithConfig("pvc2", defaultNS)))},
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithConfig("pvc2", defaultNS))),
 			},
 		},
@@ -348,7 +349,7 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 		},
 		{
-			name: "deleted multiple PVCs with finalizer (same namespace) + pod with unrelated PVC and EmptyDir exists -> only one live pod list & finalizers are removed",
+			name: "deleted multiple PVCs with finalizer (same namespace) + pod with unrelated PVC and EmptyDir exists",
 			initialObjects: []runtime.Object{
 				withEmptyDir(withPVC("unrelatedPVC", pod())),
 			},
@@ -359,7 +360,9 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithConfig("pvc2", defaultNS))),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithConfig("pvc3", defaultNS))),
 			},
 		},
@@ -392,6 +395,7 @@ func TestPVCProtectionController(t *testing.T) {
 			informersAreLate: true,
 			updatedPVCs:      []*v1.PersistentVolumeClaim{deleted(withProtectionFinalizer(pvc())), deleted(withProtectionFinalizer(pvcWithConfig("pvc2", defaultNS))), deleted(withProtectionFinalizer(pvcWithConfig("pvc3", "namespace-3")))},
 			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithConfig("pvc2", defaultNS))),
 				clienttesting.NewListAction(podGVR, podGVK, "namespace-3", metav1.ListOptions{}),

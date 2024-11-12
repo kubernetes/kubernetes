@@ -445,8 +445,8 @@ func TestOpenAPIMemCache(t *testing.T) {
 					continue
 				}
 
-				assert.True(t, reflect.ValueOf(paths).Pointer() == reflect.ValueOf(pathsAgain).Pointer())
-				assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(schemaAgain).Pointer())
+				assert.Equal(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 
 				// Invalidate and try again. This time pointers should not be equal
 				client.Invalidate()
@@ -461,8 +461,8 @@ func TestOpenAPIMemCache(t *testing.T) {
 					continue
 				}
 
-				assert.True(t, reflect.ValueOf(paths).Pointer() != reflect.ValueOf(pathsAgain).Pointer())
-				assert.True(t, reflect.ValueOf(original).Pointer() != reflect.ValueOf(schemaAgain).Pointer())
+				assert.NotEqual(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				assert.NotEqual(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 				assert.Equal(t, original, schemaAgain)
 			}
 		})

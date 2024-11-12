@@ -376,8 +376,21 @@ func testDefaulting(t *testing.T, watchCache bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer w.Stop()
 		select {
 		case event := <-w.ResultChan():
+			// since the RV we watch from can be compacted
+			// during the execution of the test,
+			// tolerate the expiration error.
+			//
+			// see: https://github.com/kubernetes/kubernetes/issues/125760
+			if event.Type == watch.Error {
+				if !apierrors.IsResourceExpired(apierrors.FromObject(event.Object)) {
+					t.Fatalf("unexpected watch event: %v, %#v", event.Type, event.Object)
+				}
+				t.Logf("skipping the WATCH at RV = %s, because the revision has been compacetd, err: %#v", initialResourceVersion, event.Object)
+				break
+			}
 			if event.Type != watch.Modified {
 				t.Fatalf("unexpected watch event: %v, %#v", event.Type, event.Object)
 			}

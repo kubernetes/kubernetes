@@ -18,6 +18,11 @@ package options
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -43,9 +48,9 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+
 	"k8s.io/utils/pointer"
 )
 
@@ -103,7 +108,7 @@ func TestAuthenticationValidate(t *testing.T) {
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://foo.bar.com"},
 			},
-			expectErr: "service-account-key-file is a required flag",
+			expectErr: "either `--service-account-key-file` or `--service-account-signing-endpoint` must be set",
 		},
 		{
 			name: "test when ServiceAccounts doesn't have issuer",
@@ -238,12 +243,6 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
 		},
 		{
-			name:             "fails to validate if ServiceAccountTokenNodeBindingValidation is disabled and ServiceAccountTokenNodeBinding is enabled",
-			enabledFeatures:  []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBinding},
-			disabledFeatures: []featuregate.Feature{kubefeatures.ServiceAccountTokenNodeBindingValidation},
-			expectErr:        "the \"ServiceAccountTokenNodeBinding\" feature gate can only be enabled if the \"ServiceAccountTokenNodeBindingValidation\" feature gate is also enabled",
-		},
-		{
 			name:                         "test when authentication config file and anonymous-auth flags are set AnonymousAuthConfigurableEndpoints disabled",
 			disabledFeatures:             []featuregate.Feature{features.AnonymousAuthConfigurableEndpoints},
 			testAuthenticationConfigFile: "configfile",
@@ -303,6 +302,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		},
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			UsernameHeaders:     []string{"x-remote-user"},
+			UIDHeaders:          []string{"x-remote-uid"},
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			ClientCAFile:        "testdata/root.pem",
@@ -352,6 +352,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
 			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+			UIDHeaders:          headerrequest.StaticStringSlice{"x-remote-uid"},
 			GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 			ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 			CAContentProvider:   nil, // this is nil because you can't compare functions
@@ -397,6 +398,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 		"--client-ca-file=client-cacert",
 		"--requestheader-client-ca-file=testdata/root.pem",
 		"--requestheader-username-headers=x-remote-user-custom",
+		"--requestheader-uid-headers=x-remote-uid-custom",
 		"--requestheader-group-headers=x-remote-group-custom",
 		"--requestheader-allowed-names=kube-aggregator",
 		"--service-account-key-file=cert",
@@ -430,6 +432,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			ClientCAFile:    "testdata/root.pem",
 			UsernameHeaders: []string{"x-remote-user-custom"},
+			UIDHeaders:      []string{"x-remote-uid-custom"},
 			GroupHeaders:    []string{"x-remote-group-custom"},
 			AllowedNames:    []string{"kube-aggregator"},
 		},
@@ -485,7 +488,6 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 }
 
 func TestWithTokenGetterFunction(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.ServiceAccountTokenNodeBindingValidation, false)
 	fakeClientset := fake.NewSimpleClientset()
 	versionedInformer := informers.NewSharedInformerFactory(fakeClientset, 0)
 	{
@@ -1514,4 +1516,172 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func TestToAuthenticationConfigForServiceAccount(t *testing.T) {
+
+	dummyExternalGetter := &dummyPublicKeyGetter{}
+	keyFileName := "public_key.pem"
+
+	key1, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic("Error while generating first RSA key")
+	}
+	pubKey1Bytes, err := x509.MarshalPKIXPublicKey(&key1.PublicKey)
+	if err != nil {
+		panic("Error while marshaling first public key")
+	}
+
+	publicKeyBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: pubKey1Bytes,
+	}
+
+	publicKeyFile, err := os.Create(keyFileName)
+	if err != nil {
+		fmt.Println("Error creating public key file:", err)
+		return
+	}
+	t.Cleanup(func() {
+		// An open file cannot be removed on Windows. Close it first.
+		if err := publicKeyFile.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(publicKeyFile.Name()); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	if err := pem.Encode(publicKeyFile, publicKeyBlock); err != nil {
+		fmt.Println("Error encoding public key:", err)
+		return
+	}
+
+	testCases := []struct {
+		desc                   string
+		options                *BuiltInAuthenticationOptions
+		expectConfig           kubeauthenticator.Config
+		expectedErr            error
+		expectedExternalGetter bool
+		expectedStaticGetter   bool
+	}{
+		{
+			desc: "neither key file nor external getter configured",
+			options: &BuiltInAuthenticationOptions{
+				ServiceAccounts: &ServiceAccountAuthenticationOptions{
+					Lookup:                   true,
+					Issuers:                  []string{"http://foo.bar.com"},
+					KeyFiles:                 []string{},
+					ExternalPublicKeysGetter: nil,
+				},
+			},
+			expectConfig: kubeauthenticator.Config{
+				APIAudiences:          authenticator.Audiences{"http://foo.bar.com"},
+				ServiceAccountLookup:  true,
+				ServiceAccountIssuers: []string{"http://foo.bar.com"},
+			},
+			expectedErr: nil,
+		},
+		{
+			desc: "both key file and external getter configured",
+			options: &BuiltInAuthenticationOptions{
+				ServiceAccounts: &ServiceAccountAuthenticationOptions{
+					Lookup:                   true,
+					Issuers:                  []string{"http://foo.bar.com"},
+					KeyFiles:                 []string{keyFileName},
+					ExternalPublicKeysGetter: dummyExternalGetter,
+				},
+			},
+			expectConfig: kubeauthenticator.Config{
+				APIAudiences:          authenticator.Audiences{"http://foo.bar.com"},
+				ServiceAccountLookup:  true,
+				ServiceAccountIssuers: []string{"http://foo.bar.com"},
+			},
+			expectedErr: fmt.Errorf("cannot set mutually exclusive flags `--service-account-key-file` and `--service-account-signing-endpoint` at the same time"),
+		},
+		{
+			desc: "external getter configured",
+			options: &BuiltInAuthenticationOptions{
+				ServiceAccounts: &ServiceAccountAuthenticationOptions{
+					Lookup:                   true,
+					Issuers:                  []string{"http://foo.bar.com"},
+					KeyFiles:                 []string{},
+					ExternalPublicKeysGetter: dummyExternalGetter,
+				},
+			},
+			expectConfig: kubeauthenticator.Config{
+				APIAudiences:          authenticator.Audiences{"http://foo.bar.com"},
+				ServiceAccountLookup:  true,
+				ServiceAccountIssuers: []string{"http://foo.bar.com"},
+			},
+			expectedErr:            nil,
+			expectedExternalGetter: true,
+		},
+		{
+			desc: "external getter configured",
+			options: &BuiltInAuthenticationOptions{
+				ServiceAccounts: &ServiceAccountAuthenticationOptions{
+					Lookup:                   true,
+					Issuers:                  []string{"http://foo.bar.com"},
+					KeyFiles:                 []string{keyFileName},
+					ExternalPublicKeysGetter: nil,
+				},
+			},
+			expectConfig: kubeauthenticator.Config{
+				APIAudiences:          authenticator.Audiences{"http://foo.bar.com"},
+				ServiceAccountLookup:  true,
+				ServiceAccountIssuers: []string{"http://foo.bar.com"},
+			},
+			expectedErr:          nil,
+			expectedStaticGetter: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		resultConfig, err := tc.options.ToAuthenticationConfig()
+		if tc.expectedErr != nil {
+			if err == nil || tc.expectedErr.Error() != err.Error() {
+				t.Fatalf("Expected error: %v and got: %v", tc.expectedErr, err)
+			}
+			return
+		}
+
+		// make out of scope fields nil
+		resultConfig.AuthenticationConfig = nil
+
+		if tc.expectedExternalGetter {
+			if resultConfig.ServiceAccountPublicKeysGetter == nil {
+				t.Fatalf("Expected external getter but none")
+			} else if resultConfig.ServiceAccountPublicKeysGetter != dummyExternalGetter {
+				t.Fatalf("Expected external getter but found someting else")
+			}
+			resultConfig.ServiceAccountPublicKeysGetter = nil
+		}
+
+		if tc.expectedStaticGetter {
+			if resultConfig.ServiceAccountPublicKeysGetter == nil {
+				t.Fatalf("Expected static getter but none")
+			} else if resultConfig.ServiceAccountPublicKeysGetter == dummyExternalGetter {
+				t.Fatalf("Expected static getter but found external getter")
+			}
+			resultConfig.ServiceAccountPublicKeysGetter = nil
+		}
+
+		if !reflect.DeepEqual(resultConfig, tc.expectConfig) {
+			t.Error(cmp.Diff(resultConfig, tc.expectConfig))
+		}
+	}
+}
+
+type dummyPublicKeyGetter struct {
+}
+
+func (d *dummyPublicKeyGetter) AddListener(listener serviceaccount.Listener) {}
+
+func (d *dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
+	return 10
+}
+
+func (d *dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
+	return []serviceaccount.PublicKey{}
 }

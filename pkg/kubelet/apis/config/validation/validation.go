@@ -46,6 +46,12 @@ var (
 func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featureGate featuregate.FeatureGate) error {
 	allErrors := []error{}
 
+	// TODO(lauralorenz): Reasses / confirm interpretation of feature gates
+	// depending on where we are in merging dynamic KubeletConfiguration when
+	// this is called. Here we copy the gates to a local var, and unilaterally
+	// merge it with the current gate config to test. See also defaults.go which
+	// intersects with this assumption.
+
 	// Make a local copy of the feature gates and combine it with the gates set by this configuration.
 	// This allows us to validate the config against the set of gates it will actually run against.
 	localFeatureGate := featureGate.DeepCopy()
@@ -140,6 +146,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.RunOnce {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: runOnce (--runOnce) %v, Runonce mode has been deprecated and should not be set", kc.RunOnce))
+	}
 
 	for _, nodeTaint := range kc.RegisterWithTaints {
 		if err := utiltaints.CheckTaintValidation(nodeTaint); err != nil {
@@ -203,6 +212,37 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled"))
 	}
 
+	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax is enabled, CrashLoopBackOff.MaxContainerRestartPeriod must be set"))
+		}
+		if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil && utilvalidation.IsInRange(int(kc.CrashLoopBackOff.MaxContainerRestartPeriod.Duration.Milliseconds()), 1000, 300000) != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: CrashLoopBackOff.MaxContainerRestartPeriod (got: %v seconds) must be set between 1s and 300s", kc.CrashLoopBackOff.MaxContainerRestartPeriod.Seconds()))
+		}
+	} else if kc.CrashLoopBackOff.MaxContainerRestartPeriod != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: FeatureGate KubeletCrashLoopBackOffMax not enabled, CrashLoopBackOff.MaxContainerRestartPeriod must not be set"))
+	}
+
+	// Check for mutually exclusive keys before the main validation loop
+	reservedKeys := map[string]bool{
+		kubetypes.SystemReservedEnforcementKey:             false,
+		kubetypes.SystemReservedCompressibleEnforcementKey: false,
+		kubetypes.KubeReservedEnforcementKey:               false,
+		kubetypes.KubeReservedCompressibleEnforcementKey:   false,
+	}
+
+	for _, val := range kc.EnforceNodeAllocatable {
+		reservedKeys[val] = true
+	}
+
+	if reservedKeys[kubetypes.SystemReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.SystemReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
+	}
+
+	if reservedKeys[kubetypes.KubeReservedCompressibleEnforcementKey] && reservedKeys[kubetypes.KubeReservedEnforcementKey] {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: both %q and %q cannot be specified together in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
+	}
+
 	uniqueEnforcements := sets.Set[string]{}
 	for _, val := range kc.EnforceNodeAllocatable {
 		if uniqueEnforcements.Has(val) {
@@ -213,13 +253,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
-		case kubetypes.SystemReservedEnforcementKey:
+		case kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey:
 			if kc.SystemReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemReservedCgroup (--system-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey))
 			}
-		case kubetypes.KubeReservedEnforcementKey:
+		case kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey:
 			if kc.KubeReservedCgroup == "" {
-				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q contained in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey))
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: kubeReservedCgroup (--kube-reserved-cgroup) must be specified when %q or %q included in enforceNodeAllocatable (--enforce-node-allocatable)", kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey))
 			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
@@ -228,8 +268,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			// skip all further checks when this is explicitly "none"
 			continue
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, or %q",
-				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey, kubetypes.NodeAllocatableNoneKey))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for enforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, %q, %q or %q",
+				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.SystemReservedCompressibleEnforcementKey,
+				kubetypes.KubeReservedEnforcementKey, kubetypes.KubeReservedCompressibleEnforcementKey, kubetypes.NodeAllocatableNoneKey))
 			continue
 		}
 

@@ -20,6 +20,12 @@ import (
 	"sort"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // SetFlowSchemaCondition sets conditions.
@@ -97,4 +103,16 @@ func (s FlowSchemaSequence) Less(i, j int) bool {
 
 func (s FlowSchemaSequence) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+var metaInternalVersionCodecsWithCBOR = serializer.NewCodecFactory(metainternalversionscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+
+// GetMetaInternalVersionCodecs returns a negotiated serializer that recognizes the types from
+// k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme.Scheme. It will or will include a CBOR
+// serializer if CBOR is enabled.
+func GetMetaInternalVersionCodecs() runtime.NegotiatedSerializer {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		return metaInternalVersionCodecsWithCBOR
+	}
+	return metainternalversionscheme.Codecs
 }

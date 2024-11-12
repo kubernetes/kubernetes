@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Events.
 type EventInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.EventLister
+	Lister() corev1.EventLister
 }
 
 type eventInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredEventInformer(client kubernetes.Interface, namespace string, res
 				return client.CoreV1().Events(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&corev1.Event{},
+		&apicorev1.Event{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *eventInformer) defaultInformer(client kubernetes.Interface, resyncPerio
 }
 
 func (f *eventInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Event{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.Event{}, f.defaultInformer)
 }
 
-func (f *eventInformer) Lister() v1.EventLister {
-	return v1.NewEventLister(f.Informer().GetIndexer())
+func (f *eventInformer) Lister() corev1.EventLister {
+	return corev1.NewEventLister(f.Informer().GetIndexer())
 }

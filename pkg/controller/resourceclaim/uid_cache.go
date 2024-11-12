@@ -17,16 +17,13 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"sync"
-
-	"github.com/golang/groupcache/lru"
+	"k8s.io/utils/lru"
 
 	"k8s.io/apimachinery/pkg/types"
 )
 
 // uidCache is an LRU cache for uid.
 type uidCache struct {
-	mutex sync.Mutex
 	cache *lru.Cache
 }
 
@@ -39,15 +36,11 @@ func newUIDCache(maxCacheEntries int) *uidCache {
 
 // Add adds a uid to the cache.
 func (c *uidCache) Add(uid types.UID) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	c.cache.Add(uid, nil)
 }
 
 // Has returns if a uid is in the cache.
 func (c *uidCache) Has(uid types.UID) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	_, found := c.cache.Get(uid)
 	return found
 }

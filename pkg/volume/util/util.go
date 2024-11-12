@@ -32,12 +32,10 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -511,58 +509,19 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 		volume.ConfigMap != nil
 }
 
-// GetLocalPersistentVolumeNodeNames returns the node affinity node name(s) for
-// local PersistentVolumes. nil is returned if the PV does not have any
-// specific node affinity node selector terms and match expressions.
-// PersistentVolume with node affinity has select and match expressions
-// in the form of:
-//
-//	nodeAffinity:
-//	  required:
-//	    nodeSelectorTerms:
-//	    - matchExpressions:
-//	      - key: kubernetes.io/hostname
-//	        operator: In
-//	        values:
-//	        - <node1>
-//	        - <node2>
-func GetLocalPersistentVolumeNodeNames(pv *v1.PersistentVolume) []string {
-	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil {
-		return nil
-	}
-
-	var result sets.Set[string]
-	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		var nodes sets.Set[string]
-		for _, matchExpr := range term.MatchExpressions {
-			if matchExpr.Key == v1.LabelHostname && matchExpr.Operator == v1.NodeSelectorOpIn {
-				if nodes == nil {
-					nodes = sets.New(matchExpr.Values...)
-				} else {
-					nodes = nodes.Intersection(sets.New(matchExpr.Values...))
-				}
-			}
-		}
-		result = result.Union(nodes)
-	}
-
-	return sets.List(result)
-}
-
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device, together with list
-// of all SELinux contexts of all containers that use the volumes.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+// either as filesystem mount or raw block device.
+// To save another sweep through containers, SELinux options are optionally collected too.
+func GetPodVolumeNames(pod *v1.Pod, collectSELinuxOptions bool) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
 	mounts = sets.New[string]()
 	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
-		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if collectSELinuxOptions {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
-				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
 				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
 			}
 		}
@@ -570,7 +529,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[s
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
-				if seLinuxOptions != nil {
+				if seLinuxOptions != nil && collectSELinuxOptions {
 					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
 				}
 			}

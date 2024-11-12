@@ -34,16 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/apiserver/pkg/apis/apiserver"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
-	"k8s.io/apiserver/pkg/cel/environment"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certutil "k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
-)
-
-var (
-	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
@@ -619,7 +615,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateAuthenticationConfiguration(tt.in, tt.disallowedIssuers).ToAggregate()
+			got := ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), tt.in, tt.disallowedIssuers).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("AuthenticationConfiguration validation mismatch (-want +got):\n%s", d)
 			}
@@ -1044,7 +1040,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{}
-			got := validateClaimValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateClaimValidationRules(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("ClaimValidationRules validation mismatch (-want +got):\n%s", d)
 			}
@@ -1364,6 +1360,69 @@ func TestValidateClaimMappings(t *testing.T) {
 			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
 		},
 		{
+			name: "extra mapping key prefix is k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains k8.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.k8s.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.k8s.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix is kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix contains kubernetes.io",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "example.kubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.kubernetes.io/foo": k8s.io, kubernetes.io and their subdomains are reserved for Kubernetes use`,
+		},
+		{
+			name: "extra mapping key prefix with ak8s.io, *.ak8s.io, bkubernetes.io, *.bkubernetes.io are still valid",
+			in: api.ClaimMappings{
+				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
+				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
+				Extra: []api.ExtraMapping{
+					{Key: "ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.ak8s.io/foo", ValueExpression: "claims.extra"},
+					{Key: "bkubernetes.io/foo", ValueExpression: "claims.extra"},
+					{Key: "example.bkubernetes.io/foo", ValueExpression: "claims.extra"},
+				},
+			},
+			structuredAuthnFeatureEnabled: true,
+			want:                          "",
+		},
+		{
 			name: "valid claim mappings but uses email without verification",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
@@ -1509,7 +1568,7 @@ func TestValidateClaimMappings(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{usesEmailVerifiedClaim: tt.usesEmailVerifiedClaim}
-			got := validateClaimMappings(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateClaimMappings(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				fmt.Println(errString(got))
 				t.Fatalf("ClaimMappings validation mismatch (-want +got):\n%s", d)
@@ -1598,7 +1657,7 @@ func TestValidateUserValidationRules(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			state := &validationState{}
-			got := validateUserValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			got := validateUserValidationRules(authenticationcel.NewDefaultCompiler(), state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("UserValidationRules validation mismatch (-want +got):\n%s", d)
 			}
@@ -1621,14 +1680,12 @@ type (
 		name            string
 		configuration   api.AuthorizationConfiguration
 		expectedErrList field.ErrorList
-		knownTypes      sets.String
-		repeatableTypes sets.String
+		knownTypes      sets.Set[string]
+		repeatableTypes sets.Set[string]
 	}
 )
 
 func TestValidateAuthorizationConfiguration(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
-
 	badKubeConfigFile := "../some/relative/path/kubeconfig"
 
 	tempKubeConfigFile, err := os.CreateTemp("/tmp", "kubeconfig")
@@ -1645,8 +1702,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				Authorizers: []api.AuthorizerConfiguration{},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("authorizers"), "at least one authorization mode must be defined")},
-			knownTypes:      sets.NewString(),
-			repeatableTypes: sets.NewString(),
+			knownTypes:      sets.New[string](),
+			repeatableTypes: sets.New[string](),
 		},
 		{
 			name: "type and name are required if an authorizer is defined",
@@ -1656,8 +1713,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("type"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizer names should be of non-zero length",
@@ -1670,8 +1727,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("name"), "")},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizer names should be unique",
@@ -1688,8 +1745,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("name"), "foo")},
-			knownTypes:      sets.NewString(string("Foo"), string("Bar")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo", "Bar"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizer names should be DNS1123 labels",
@@ -1702,8 +1759,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizer names should be DNS1123 subdomains",
@@ -1716,8 +1773,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizer names should not be invalid DNS1123 labels or subdomains",
@@ -1730,8 +1787,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("name"), "FOO.example.domain", "")},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "bare minimum configuration with Webhook",
@@ -1755,8 +1812,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "bare minimum configuration with Webhook and MatchConditions",
@@ -1788,8 +1845,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "bare minimum configuration with multiple webhooks",
@@ -1828,8 +1885,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "configuration with unknown types",
@@ -1841,8 +1898,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("type"), "Foo", []string{"..."})},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "configuration with not repeatable types",
@@ -1859,8 +1916,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Duplicate(field.NewPath("type"), "Foo")},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "when type=Webhook, webhook needs to be defined",
@@ -1873,8 +1930,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("webhook"), "required when type=Webhook")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "when type!=Webhook, webhooks needs to be nil",
@@ -1888,8 +1945,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("webhook"), "non-null", "may only be specified when type=Webhook")},
-			knownTypes:      sets.NewString(string("Foo")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Foo"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "timeout should be specified",
@@ -1912,8 +1969,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("timeout"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		//
 		{
@@ -1938,8 +1995,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("timeout"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "timeout shouldn't be negative",
@@ -1963,8 +2020,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("timeout"), time.Duration(-30*time.Second).String(), "must be > 0s and <= 30s")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "timeout shouldn't be greater than 30seconds",
@@ -1988,8 +2045,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("timeout"), time.Duration(60*time.Second).String(), "must be > 0s and <= 30s")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizedTTL should be defined ",
@@ -2012,8 +2069,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("authorizedTTL"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "authorizedTTL shouldn't be negative",
@@ -2037,8 +2094,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("authorizedTTL"), time.Duration(-30*time.Second).String(), "must be > 0s")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "unauthorizedTTL should be defined ",
@@ -2061,8 +2118,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("unauthorizedTTL"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "unauthorizedTTL shouldn't be negative",
@@ -2086,8 +2143,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("unauthorizedTTL"), time.Duration(-30*time.Second).String(), "must be > 0s")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "SAR should be defined",
@@ -2110,8 +2167,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("subjectAccessReviewVersion"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "SAR should be one of v1 and v1beta1",
@@ -2135,8 +2192,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("subjectAccessReviewVersion"), "v2beta1", []string{"v1", "v1beta1"})},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "MatchConditionSAR should be defined",
@@ -2160,8 +2217,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("matchConditionSubjectAccessReviewVersion"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "MatchConditionSAR must not be anything other than v1",
@@ -2185,8 +2242,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("matchConditionSubjectAccessReviewVersion"), "v1beta1", []string{"v1"})},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "failurePolicy should be defined",
@@ -2209,8 +2266,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("failurePolicy"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "failurePolicy should be one of \"NoOpinion\" or \"Deny\"",
@@ -2234,8 +2291,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.NotSupported(field.NewPath("failurePolicy"), "AlwaysAllow", []string{"NoOpinion", "Deny"})},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "connectionInfo should be defined",
@@ -2256,8 +2313,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("connectionInfo"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "connectionInfo should be one of InClusterConfig or KubeConfigFile",
@@ -2283,8 +2340,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			expectedErrList: field.ErrorList{
 				field.NotSupported(field.NewPath("connectionInfo"), api.WebhookConnectionInfo{Type: "ExternalClusterConfig"}, []string{"InClusterConfig", "KubeConfigFile"}),
 			},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "if connectionInfo=InClusterConfig, then kubeConfigFile should be nil",
@@ -2311,8 +2368,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 			expectedErrList: field.ErrorList{
 				field.Invalid(field.NewPath("connectionInfo", "kubeConfigFile"), "", "can only be set when type=KubeConfigFile"),
 			},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "if connectionInfo=KubeConfigFile, then KubeConfigFile should be defined",
@@ -2336,8 +2393,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Required(field.NewPath("kubeConfigFile"), "")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "if connectionInfo=KubeConfigFile, then KubeConfigFile should be defined, must be an absolute path, should exist, shouldn't be a symlink",
@@ -2362,8 +2419,8 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{field.Invalid(field.NewPath("kubeConfigFile"), badKubeConfigFile, "must be an absolute path")},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 		{
 			name: "if connectionInfo=KubeConfigFile, an existent file needs to be passed",
@@ -2388,14 +2445,14 @@ func TestValidateAuthorizationConfiguration(t *testing.T) {
 				},
 			},
 			expectedErrList: field.ErrorList{},
-			knownTypes:      sets.NewString(string("Webhook")),
-			repeatableTypes: sets.NewString(string("Webhook")),
+			knownTypes:      sets.New("Webhook"),
+			repeatableTypes: sets.New("Webhook"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			errList := ValidateAuthorizationConfiguration(nil, &test.configuration, test.knownTypes, test.repeatableTypes)
+			errList := ValidateAuthorizationConfiguration(authorizationcel.NewDefaultCompiler(), nil, &test.configuration, test.knownTypes, test.repeatableTypes)
 			if len(errList) != len(test.expectedErrList) {
 				t.Errorf("expected %d errs, got %d, errors %v", len(test.expectedErrList), len(errList), errList)
 			}
@@ -2422,7 +2479,6 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 	testCases := []struct {
 		name            string
 		matchConditions []api.WebhookMatchCondition
-		featureEnabled  bool
 		expectedErr     string
 	}{
 		{
@@ -2435,26 +2491,11 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user == 'admin'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "",
-		},
-		{
-			name: "should fail when match conditions are used without feature enabled",
-			matchConditions: []api.WebhookMatchCondition{
-				{
-					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kube-system'",
-				},
-				{
-					Expression: "request.user == 'admin'",
-				},
-			},
-			featureEnabled: false,
-			expectedErr:    `matchConditions: Invalid value: "": matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled`,
+			expectedErr: "",
 		},
 		{
 			name:            "no matchConditions should not require feature enablement",
 			matchConditions: []api.WebhookMatchCondition{},
-			featureEnabled:  false,
 			expectedErr:     "",
 		},
 		{
@@ -2464,8 +2505,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "  ",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Required value",
+			expectedErr: "matchConditions[0].expression: Required value",
 		},
 		{
 			name: "match conditions with duplicate expressions",
@@ -2477,8 +2517,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user == 'admin'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
+			expectedErr: `matchConditions[1].expression: Duplicate value: "request.user == 'admin'"`,
 		},
 		{
 			name: "match conditions with undeclared reference",
@@ -2487,8 +2526,7 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "test",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
+			expectedErr: "matchConditions[0].expression: Invalid value: \"test\": compilation failed: ERROR: <input>:1:1: undeclared reference to 'test' (in container '')\n | test\n | ^",
 		},
 		{
 			name: "match conditions with bad return type",
@@ -2497,15 +2535,13 @@ func TestValidateAndCompileMatchConditions(t *testing.T) {
 					Expression: "request.user = 'test'",
 				},
 			},
-			featureEnabled: true,
-			expectedErr:    "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
+			expectedErr: "matchConditions[0].expression: Invalid value: \"request.user = 'test'\": compilation failed: ERROR: <input>:1:14: Syntax error: token recognition error at: '= '\n | request.user = 'test'\n | .............^\nERROR: <input>:1:16: Syntax error: extraneous input ''test'' expecting <EOF>\n | request.user = 'test'\n | ...............^",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, tt.featureEnabled)
-			celMatcher, errList := ValidateAndCompileMatchConditions(tt.matchConditions)
+			celMatcher, errList := ValidateAndCompileMatchConditions(authorizationcel.NewDefaultCompiler(), tt.matchConditions)
 			if len(tt.expectedErr) == 0 && len(tt.matchConditions) > 0 && len(errList) == 0 && celMatcher == nil {
 				t.Errorf("celMatcher should not be nil when there are matchCondition and no error returned")
 			}

@@ -10,8 +10,10 @@
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
   - k8s.io/utils/pointer
+  - k8s.io/utils/ptr
   - k8s.io/utils/net
   - k8s.io/klog
+  - k8s.io/component-helpers/resource
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.
@@ -54,7 +56,8 @@
   - "./staging/src/k8s.io/code-generator/examples"
   - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
-  - k8s.io/gengo
+  - k8s.io/apimachinery
+  - k8s.io/gengo/v2
   - k8s.io/code-generator
   - k8s.io/kube-openapi
   - k8s.io/klog
@@ -180,7 +183,7 @@
 - baseImportPath: "./vendor/k8s.io/kube-openapi"
   allowedImports:
   - k8s.io/kube-openapi
-  - k8s.io/gengo
+  - k8s.io/gengo/v2
   - k8s.io/klog
   - k8s.io/utils
 
@@ -316,3 +319,7 @@
   - k8s.io/cri-client
   - k8s.io/klog/v2
   - k8s.io/utils
+
+- baseImportPath: "./staging/src/k8s.io/externaljwt"
+  allowedImports:
+  - k8s.io/externaljwt

@@ -72,6 +72,16 @@ func (c *Comparison) ExcludeFields(fields *fieldpath.Set) *Comparison {
 	return c
 }
 
+func (c *Comparison) FilterFields(filter fieldpath.Filter) *Comparison {
+	if filter == nil {
+		return c
+	}
+	c.Removed = filter.Filter(c.Removed)
+	c.Modified = filter.Filter(c.Modified)
+	c.Added = filter.Filter(c.Added)
+	return c
+}
+
 type compareWalker struct {
 	lhs     value.Value
 	rhs     value.Value

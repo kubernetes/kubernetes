@@ -26,19 +26,23 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cloudprovider "k8s.io/cloud-provider"
 	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	utilversion "k8s.io/component-base/version"
 	cmoptions "k8s.io/controller-manager/options"
+	"k8s.io/klog/v2"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -47,6 +51,7 @@ import (
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	netutils "k8s.io/utils/net"
 
 	// add the kubernetes feature gates
@@ -101,7 +106,7 @@ type KubeControllerManagerOptions struct {
 	ShowHiddenMetricsForVersion string
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
-	ComponentGlobalsRegistry utilversion.ComponentGlobalsRegistry
+	ComponentGlobalsRegistry featuregate.ComponentGlobalsRegistry
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -111,10 +116,10 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		return nil, err
 	}
 
-	if utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent) == nil {
+	if featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent) == nil {
 		featureGate := utilfeature.DefaultMutableFeatureGate
 		effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-		utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
+		utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 	}
 
 	s := KubeControllerManagerOptions{
@@ -206,7 +211,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		Authorization:            apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:                  metrics.NewOptions(),
 		Logs:                     logs.NewOptions(),
-		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
+		ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry,
 	}
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
@@ -285,6 +290,16 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
+
+	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
+		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
+			// it turns out that there are some integration tests that start multiple control plane components which
+			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
+			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
+			klog.Errorf("unable to set %s feature gate, err: %v", clientgofeaturegate.WatchListClient, err)
+		}
+	}
+
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 
 	return fss
@@ -437,7 +452,17 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, utilversion.ValidateKubeEffectiveVersion(s.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)))
+	errs = append(errs, utilversion.ValidateKubeEffectiveVersion(s.ComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)))
+
+	// in-tree cloud providers are disabled since v1.31 (KEP-2395)
+	if len(s.KubeCloudShared.CloudProvider.Name) > 0 && !cloudprovider.IsExternal(s.KubeCloudShared.CloudProvider.Name) {
+		cloudprovider.DisableWarningForProvider(s.KubeCloudShared.CloudProvider.Name)
+		errs = append(errs, cloudprovider.ErrorForDisabledProvider(s.KubeCloudShared.CloudProvider.Name))
+	}
+
+	if len(s.KubeCloudShared.CIDRAllocatorType) > 0 && s.KubeCloudShared.CIDRAllocatorType != string(ipam.RangeAllocatorType) {
+		errs = append(errs, fmt.Errorf("built-in cloud providers are disabled. The ipam %s is not available", s.KubeCloudShared.CIDRAllocatorType))
+	}
 
 	// TODO: validate component config, master and kubeconfig
 

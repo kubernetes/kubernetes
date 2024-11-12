@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -57,15 +58,33 @@ var (
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
+  		# Return snapshot logs from pod nginx, prefixing each line with the source pod and container name
+		kubectl logs nginx --prefix 
+  
+		# Return snapshot logs from pod nginx, limiting output to 500 bytes
+   		kubectl logs nginx --limit-bytes=500
+
+		# Return snapshot logs from pod nginx, waiting up to 20 seconds for it to start running.
+  		kubectl logs nginx --pod-running-timeout=20s
+    
 		# Return snapshot logs from pod nginx with multi containers
 		kubectl logs nginx --all-containers=true
+
+		# Return snapshot logs from all pods in the deployment nginx
+		kubectl logs deployment/nginx --all-pods=true
 
 		# Return snapshot logs from all containers in pods defined by label app=nginx
 		kubectl logs -l app=nginx --all-containers=true
 
+  		# Return snapshot logs from all pods defined by label app=nginx, limiting concurrent log requests to 10 pods
+    		kubectl logs -l app=nginx --max-log-requests=10
+
 		# Return snapshot of previous terminated ruby container logs from pod web-1
 		kubectl logs -p -c ruby web-1
 
+		# Begin streaming the logs from pod nginx, continuing even if errors occur
+  		kubectl logs nginx -f --ignore-errors=true
+    
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
 
@@ -77,6 +96,9 @@ var (
 
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx
+		
+  		# Show all logs with timestamps from pod nginx starting from August 30, 2024, at 06:00:00 UTC
+  		kubectl logs nginx --since-time=2024-08-30T06:00:00Z --timestamps=true
 
 		# Show logs from a kubelet with an expired serving certificate
 		kubectl logs --insecure-skip-tls-verify-backend nginx
@@ -103,7 +125,7 @@ type LogsOptions struct {
 	Options       runtime.Object
 	Resources     []string
 
-	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
+	ConsumeRequestFn func(context.Context, rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
 	SinceTime                    string
@@ -354,14 +376,21 @@ func (o LogsOptions) RunLogs() error {
 				len(requests), o.MaxFollowConcurrency,
 			)
 		}
-
-		return o.parallelConsumeRequest(requests)
 	}
 
-	return o.sequentialConsumeRequest(requests)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
+	return intr.Run(func() error {
+		if o.Follow && len(requests) > 1 {
+			return o.parallelConsumeRequest(ctx, requests)
+		}
+
+		return o.sequentialConsumeRequest(ctx, requests)
+	})
 }
 
-func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) parallelConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
@@ -369,7 +398,7 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
 			out := o.addPrefixIfNeeded(objRef, writer)
-			if err := o.ConsumeRequestFn(request, out); err != nil {
+			if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
 
@@ -392,10 +421,10 @@ func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]
 	return err
 }
 
-func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+func (o LogsOptions) sequentialConsumeRequest(ctx context.Context, requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	for objRef, request := range requests {
 		out := o.addPrefixIfNeeded(objRef, o.Out)
-		if err := o.ConsumeRequestFn(request, out); err != nil {
+		if err := o.ConsumeRequestFn(ctx, request, out); err != nil {
 			if !o.IgnoreLogErrors {
 				return err
 			}
@@ -436,8 +465,8 @@ func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Wri
 // A successful read returns err == nil, not err == io.EOF.
 // Because the function is defined to read from request until io.EOF, it does
 // not treat an io.EOF as an error to be reported.
-func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
-	readCloser, err := request.Stream(context.TODO())
+func DefaultConsumeRequest(ctx context.Context, request rest.ResponseWrapper, out io.Writer) error {
+	readCloser, err := request.Stream(ctx)
 	if err != nil {
 		return err
 	}

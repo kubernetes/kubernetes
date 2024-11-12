@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
+	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type ClusterRolesGetter interface {
 
 // ClusterRoleInterface has methods to work with ClusterRole resources.
 type ClusterRoleInterface interface {
-	Create(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.CreateOptions) (*v1.ClusterRole, error)
-	Update(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.UpdateOptions) (*v1.ClusterRole, error)
+	Create(ctx context.Context, clusterRole *rbacv1.ClusterRole, opts metav1.CreateOptions) (*rbacv1.ClusterRole, error)
+	Update(ctx context.Context, clusterRole *rbacv1.ClusterRole, opts metav1.UpdateOptions) (*rbacv1.ClusterRole, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterRole, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterRoleList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rbacv1.ClusterRole, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*rbacv1.ClusterRoleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRole, err error)
-	Apply(ctx context.Context, clusterRole *rbacv1.ClusterRoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterRole, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *rbacv1.ClusterRole, err error)
+	Apply(ctx context.Context, clusterRole *applyconfigurationsrbacv1.ClusterRoleApplyConfiguration, opts metav1.ApplyOptions) (result *rbacv1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *rbacv1.ClusterRoleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList, *applyconfigurationsrbacv1.ClusterRoleApplyConfiguration]
 }
 
 // newClusterRoles returns a ClusterRoles
 func newClusterRoles(c *RbacV1Client) *clusterRoles {
 	return &clusterRoles{
-		gentype.NewClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *rbacv1.ClusterRoleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList, *applyconfigurationsrbacv1.ClusterRoleApplyConfiguration](
 			"clusterroles",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterRole { return &v1.ClusterRole{} },
-			func() *v1.ClusterRoleList { return &v1.ClusterRoleList{} }),
+			func() *rbacv1.ClusterRole { return &rbacv1.ClusterRole{} },
+			func() *rbacv1.ClusterRoleList { return &rbacv1.ClusterRoleList{} },
+			gentype.PrefersProtobuf[*rbacv1.ClusterRole](),
+		),
 	}
 }

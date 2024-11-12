@@ -8,7 +8,7 @@
       "name": "deviceclasses",
       "namespaced": false,
       "singularName": "deviceclass",
-      "storageVersionHash": "12soGlw2WzE=",
+      "storageVersionHash": "OgEE055Fbnc=",
       "verbs": [
         "create",
         "delete",
@@ -18,34 +18,6 @@
         "patch",
         "update",
         "watch"
-      ]
-    },
-    {
-      "kind": "PodSchedulingContext",
-      "name": "podschedulingcontexts",
-      "namespaced": true,
-      "singularName": "podschedulingcontext",
-      "storageVersionHash": "SkSsa067T7g=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "PodSchedulingContext",
-      "name": "podschedulingcontexts/status",
-      "namespaced": true,
-      "singularName": "",
-      "verbs": [
-        "get",
-        "patch",
-        "update"
       ]
     },
     {
@@ -53,7 +25,7 @@
       "name": "resourceclaims",
       "namespaced": true,
       "singularName": "resourceclaim",
-      "storageVersionHash": "ozQSw6/HyJ4=",
+      "storageVersionHash": "RnQSwRxMnsw=",
       "verbs": [
         "create",
         "delete",
@@ -81,7 +53,7 @@
       "name": "resourceclaimtemplates",
       "namespaced": true,
       "singularName": "resourceclaimtemplate",
-      "storageVersionHash": "lbw3G0J+kqQ=",
+      "storageVersionHash": "F6aZtQPvFlU=",
       "verbs": [
         "create",
         "delete",
@@ -98,7 +70,7 @@
       "name": "resourceslices",
       "namespaced": false,
       "singularName": "resourceslice",
-      "storageVersionHash": "8Uqm6frD4H0=",
+      "storageVersionHash": "7r9IQQZblMY=",
       "verbs": [
         "create",
         "delete",

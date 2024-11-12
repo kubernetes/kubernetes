@@ -64,7 +64,7 @@ graph using the Imports fields.
 
 The Load function can be configured by passing a pointer to a Config as
 the first argument. A nil Config is equivalent to the zero Config, which
-causes Load to run in LoadFiles mode, collecting minimal information.
+causes Load to run in [LoadFiles] mode, collecting minimal information.
 See the documentation for type Config for details.
 
 As noted earlier, the Config.Mode controls the amount of detail
@@ -72,14 +72,14 @@ reported about the loaded packages. See the documentation for type LoadMode
 for details.
 
 Most tools should pass their command-line arguments (after any flags)
-uninterpreted to [Load], so that it can interpret them
+uninterpreted to Load, so that it can interpret them
 according to the conventions of the underlying build system.
 
 See the Example function for typical usage.
 
 # The driver protocol
 
-[Load] may be used to load Go packages even in Go projects that use
+Load may be used to load Go packages even in Go projects that use
 alternative build systems, by installing an appropriate "driver"
 program for the build system and specifying its location in the
 GOPACKAGESDRIVER environment variable.
@@ -97,6 +97,15 @@ JSON-encoded [DriverRequest] message providing additional information
 is written to the driver's standard input. The driver must write a
 JSON-encoded [DriverResponse] message to its standard output. (This
 message differs from the JSON schema produced by 'go list'.)
+
+The value of the PWD environment variable seen by the driver process
+is the preferred name of its working directory. (The working directory
+may have other aliases due to symbolic links; see the comment on the
+Dir field of [exec.Cmd] for related information.)
+When the driver process emits in its response the name of a file
+that is a descendant of this directory, it must use an absolute path
+that has the value of PWD as a prefix, to ensure that the returned
+filenames satisfy the original query.
 */
 package packages // import "golang.org/x/tools/go/packages"
 
@@ -197,14 +206,6 @@ specified an ad-hoc package such as [a.go b.go].
 Instead, ssadump no longer requests the runtime package,
 but seeks it among the dependencies of the user-specified packages,
 and emits an error if it is not found.
-
-Overlays: The Overlay field in the Config allows providing alternate contents
-for Go source files, by providing a mapping from file path to contents.
-go/packages will pull in new imports added in overlay files when go/packages
-is run in LoadImports mode or greater.
-Overlay support for the go list driver isn't complete yet: if the file doesn't
-exist on disk, it will only be recognized in an overlay if it is a non-test file
-and the package would be reported even without the overlay.
 
 Questions & Tasks
 

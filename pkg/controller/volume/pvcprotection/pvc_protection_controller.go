@@ -193,19 +193,19 @@ func (c *Controller) runProcessNamespaceWorker(ctx context.Context) {
 }
 
 func (c *Controller) processNextWorkItem() bool {
-	queueLength := c.queue.Len()
-	for i := 0; i < queueLength; i++ {
-		pvcKey, quit := c.queue.Get()
-		if quit {
-			return false
-		}
-		pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
-		}
-		c.pvcProcessingStore.addOrUpdate(pvcNamespace, pvcKey, pvcName)
+	pvcKey, quit := c.queue.Get()
+	if quit {
+		return false
 	}
-	return !c.queue.ShuttingDown()
+
+	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
+		return true
+	}
+
+	c.pvcProcessingStore.addOrUpdate(pvcNamespace, pvcKey, pvcName)
+	return true
 }
 
 func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
@@ -222,7 +222,7 @@ func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
 			c.queue.Forget(pvcKey)
 		} else {
 			c.queue.AddRateLimited(pvcKey)
-			utilruntime.HandleError(fmt.Errorf("PVC %v in namespace %v failed with: %w", pvcName, namespace, err))
+			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", pvcName, namespace, err))
 		}
 		c.queue.Done(pvcKey)
 	}
@@ -291,7 +291,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 		logger.Error(err, "Error removing protection finalizer from PVC", "PVC", klog.KObj(pvc))
 		return err
 	}
-	logger.Info("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
+	logger.V(3).Info("Removed protection finalizer from PVC", "PVC", klog.KObj(pvc))
 	return nil
 }
 
@@ -310,9 +310,11 @@ func (c *Controller) isBeingUsed(ctx context.Context, pvc *v1.PersistentVolumeCl
 	// Even if no Pod using pvc was found in the Informer's cache it doesn't
 	// mean such a Pod doesn't exist: it might just not be in the cache yet. To
 	// be 100% confident that it is safe to delete pvc make sure no Pod is using
-	// it among those returned by a live list.
+	// it among those returned by a "lazy" live list.
 
-	// Use lazy live pod list instead of directly calling API server
+	// Use a "lazy" live pod list: lazyLivePodList caches the first successful live pod list response,
+	// so for a large number of PVC deletions in a short duration, subsequent requests can use the cached pod list
+	// instead of issuing a lot of API requests. The cache is refreshed for each run of processNextWorkItem().
 	return c.askAPIServer(ctx, pvc, lazyLivePodList)
 }
 
@@ -344,10 +346,10 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 
 func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList) (bool, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Looking for Pods using PVC with a live list", "PVC", klog.KObj(pvc))
+	logger.V(4).Info("Looking for Pods using PVC", "PVC", klog.KObj(pvc))
 	if lazyLivePodList.getCache() == nil {
+		logger.V(4).Info("Live listing Pods in namespace", "namespace", pvc.Namespace)
 		podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(ctx, metav1.ListOptions{})
-
 		if err != nil {
 			return false, fmt.Errorf("live list of pods failed: %s", err.Error())
 		}

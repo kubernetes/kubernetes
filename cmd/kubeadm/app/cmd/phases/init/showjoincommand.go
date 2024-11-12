@@ -47,7 +47,7 @@ var (
 
 		{{if .ControlPlaneEndpoint -}}
 		{{if .UploadCerts -}}
-		You can now join any number of the control-plane node running the following command on each as root:
+		You can now join any number of control-plane nodes running the following command on each as root:
 
 		  {{.joinControlPlaneCommand}}
 

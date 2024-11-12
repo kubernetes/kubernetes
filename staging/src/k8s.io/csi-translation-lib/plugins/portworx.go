@@ -19,9 +19,10 @@ package plugins
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -39,7 +40,7 @@ func NewPortworxCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassToCSI takes in-tree storage class used by in-tree plugin
 // and translates them to a storageclass consumable by CSI plugin
-func (p portworxCSITranslator) TranslateInTreeStorageClassToCSI(sc *storagev1.StorageClass) (*storagev1.StorageClass, error) {
+func (p portworxCSITranslator) TranslateInTreeStorageClassToCSI(logger klog.Logger, sc *storagev1.StorageClass) (*storagev1.StorageClass, error) {
 	if sc == nil {
 		return nil, fmt.Errorf("sc is nil")
 	}
@@ -49,7 +50,7 @@ func (p portworxCSITranslator) TranslateInTreeStorageClassToCSI(sc *storagev1.St
 
 // TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
 // the in-tree inline volume source to a CSIPersistentVolumeSource
-func (p portworxCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
+func (p portworxCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.PortworxVolume == nil {
 		return nil, fmt.Errorf("volume is nil or PortworxVolume not defined on volume")
 	}
@@ -82,7 +83,7 @@ func (p portworxCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volum
 
 // TranslateInTreePVToCSI takes a Portworx persistent volume and will translate
 // the in-tree pv source to a CSI Source
-func (p portworxCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (p portworxCSITranslator) TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.PortworxVolume == nil {
 		return nil, fmt.Errorf("pv is nil or PortworxVolume not defined on pv")
 	}

@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -118,7 +117,7 @@ type PodVolumes struct {
 type InTreeToCSITranslator interface {
 	IsPVMigratable(pv *v1.PersistentVolume) bool
 	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
-	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+	TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
 }
 
 // SchedulerVolumeBinder is used by the scheduler VolumeBinding plugin to
@@ -130,8 +129,6 @@ type InTreeToCSITranslator interface {
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
 //     a. Invokes all pre-filter plugins for the pod. GetPodVolumeClaims() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
-//     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
-//     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
 //     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
 //     c. Invokes all score plugins.  Future/TBD
 //     d. Selects the best node for the Pod.
@@ -153,14 +150,6 @@ type SchedulerVolumeBinder interface {
 	// GetPodVolumeClaims returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
 	// unbound with immediate binding (including prebound) and PVs that belong to storage classes of unbound PVCs with delayed binding.
 	GetPodVolumeClaims(logger klog.Logger, pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error)
-
-	// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
-	// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
-	// in subsequent scheduling stages.
-	//
-	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
-	// and all nodes should be considered.
-	GetEligibleNodes(logger klog.Logger, boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string])
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -381,55 +370,6 @@ func (b *volumeBinder) FindPodVolumes(logger klog.Logger, pod *v1.Pod, podVolume
 		}
 	}
 
-	return
-}
-
-// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
-// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
-// in subsequent scheduling stages.
-//
-// Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
-// should be considered.
-func (b *volumeBinder) GetEligibleNodes(logger klog.Logger, boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.Set[string]) {
-	if len(boundClaims) == 0 {
-		return
-	}
-
-	var errs []error
-	for _, pvc := range boundClaims {
-		pvName := pvc.Spec.VolumeName
-		pv, err := b.pvCache.GetPV(pvName)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		// if the PersistentVolume is local and has node affinity matching specific node(s),
-		// add them to the eligible nodes
-		nodeNames := util.GetLocalPersistentVolumeNodeNames(pv)
-		if len(nodeNames) != 0 {
-			// on the first found list of eligible nodes for the local PersistentVolume,
-			// insert to the eligible node set.
-			if eligibleNodes == nil {
-				eligibleNodes = sets.New(nodeNames...)
-			} else {
-				// for subsequent finding of eligible nodes for the local PersistentVolume,
-				// take the intersection of the nodes with the existing eligible nodes
-				// for cases if PV1 has node affinity to node1 and PV2 has node affinity to node2,
-				// then the eligible node list should be empty.
-				eligibleNodes = eligibleNodes.Intersection(sets.New(nodeNames...))
-			}
-		}
-	}
-
-	if len(errs) > 0 {
-		logger.V(4).Info("GetEligibleNodes: one or more error occurred finding eligible nodes", "error", errs)
-		return nil
-	}
-
-	if eligibleNodes != nil {
-		logger.V(4).Info("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes)
-	}
 	return
 }
 
@@ -674,7 +614,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 			return false, nil
 		}
 
-		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 		if err != nil {
 			return false, fmt.Errorf("failed to translate pv to csi: %w", err)
 		}
@@ -733,7 +673,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 				return false, fmt.Errorf("failed to get pv %q from cache: %w", pvc.Spec.VolumeName, err)
 			}
 
-			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+			pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 			if err != nil {
 				return false, err
 			}
@@ -882,7 +822,7 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 			return true, false, err
 		}
 
-		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 		if err != nil {
 			return false, true, err
 		}
@@ -1133,7 +1073,7 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 }
 
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
-func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
+func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
 		return pv, nil
 	}
@@ -1151,7 +1091,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return pv, nil
 	}
 
-	transPV, err := b.translator.TranslateInTreePVToCSI(pv)
+	transPV, err := b.translator.TranslateInTreePVToCSI(logger, pv)
 	if err != nil {
 		return nil, fmt.Errorf("could not translate pv: %v", err)
 	}

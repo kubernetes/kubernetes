@@ -129,7 +129,7 @@ func validateAllowMetricLabel(allowListMapping map[string]string) error {
 	for k := range allowListMapping {
 		reg := regexp.MustCompile(metricNameRegex + `,` + labelRegex)
 		if reg.FindString(k) != k {
-			return fmt.Errorf("--allow-metric-labels must have a list of kv pair with format `metricName:labelName=labelValue, labelValue,...`")
+			return fmt.Errorf("--allow-metric-labels must have a list of kv pair with format `metricName,labelName=labelValue, labelValue,...`")
 		}
 	}
 	return nil

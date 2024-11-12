@@ -24,6 +24,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -126,6 +127,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 }
 
 func TestRequiresRefresh(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	start := time.Now()
 	cases := []struct {
 		now, exp      time.Time
@@ -183,7 +185,7 @@ func TestRequiresRefresh(t *testing.T) {
 			mgr := NewManager(nil)
 			mgr.clock = clock
 
-			rr := mgr.requiresRefresh(tr)
+			rr := mgr.requiresRefresh(tCtx, tr)
 			if rr != c.expectRefresh {
 				t.Fatalf("unexpected requiresRefresh result, got: %v, want: %v", rr, c.expectRefresh)
 			}

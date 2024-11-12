@@ -17,6 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -31,19 +38,20 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
+	utilversion "k8s.io/component-base/version"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
 	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
 	t.Cleanup(func() {
 		componentGlobalsRegistry.Reset()
 	})
@@ -133,7 +141,7 @@ func TestAddFlags(t *testing.T) {
 			JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 			ComponentGlobalsRegistry:     componentGlobalsRegistry,
-			ComponentName:                utilversion.DefaultKubeComponent,
+			ComponentName:                featuregate.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -306,5 +314,200 @@ func TestAddFlags(t *testing.T) {
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
 	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
 		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
+	}
+}
+
+func TestCompleteForServiceAccount(t *testing.T) {
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic("Error while generating first RSA key")
+	}
+
+	// Marshal the private key into PEM format
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}
+
+	// Open a file to write the private key
+	privateKeyFile, err := os.Create("private_key.pem")
+	if err != nil {
+		t.Fatalf("Failed to create private key file: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = privateKeyFile.Close()
+		_ = os.Remove("private_key.pem")
+	})
+
+	// Write the PEM-encoded private key to the file
+	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
+		t.Fatalf("Failed to encode private key: %v", err)
+	}
+
+	// create and start mock signer.
+	socketPath := "@mock-external-jwt-signer.sock"
+	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+	defer mockSigner.CleanUp()
+
+	testCases := []struct {
+		desc                     string
+		issuers                  []string
+		signingEndpoint          string
+		signingKeyFiles          string
+		maxExpiration            time.Duration
+		externalMaxExpirationSec int64
+		fetchError               error
+		metadataError            error
+
+		wantError                      error
+		expectedMaxtokenExp            time.Duration
+		expectedIsExternalSigner       bool
+		externalPublicKeyGetterPresent bool
+	}{
+		{
+			desc: "no endpoint or key file",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint: socketPath,
+			signingKeyFiles: "private_key.pem",
+			maxExpiration:   time.Second * 3600,
+
+			wantError: fmt.Errorf("service-account-signing-key-file and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time"),
+		},
+		{
+			desc: "max token expiration breaching accepteable values",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint: socketPath,
+			signingKeyFiles: "private_key.pem",
+			maxExpiration:   time.Second * 10,
+
+			wantError: fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds"),
+		},
+		{
+			desc: "path to a signing key provided",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint: "",
+			signingKeyFiles: "private_key.pem",
+			maxExpiration:   time.Second * 3600,
+
+			expectedIsExternalSigner:       false,
+			externalPublicKeyGetterPresent: false,
+			expectedMaxtokenExp:            time.Second * 3600,
+		},
+		{
+			desc: "signing endpoint provided",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint:          socketPath,
+			signingKeyFiles:          "",
+			maxExpiration:            0,
+			externalMaxExpirationSec: 600, // 10m
+
+			expectedIsExternalSigner:       true,
+			externalPublicKeyGetterPresent: true,
+			expectedMaxtokenExp:            time.Second * 600, // 10m
+		},
+		{
+			desc: "signing endpoint provided and max token expiration set",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint:          socketPath,
+			signingKeyFiles:          "",
+			maxExpiration:            time.Second * 3600,
+			externalMaxExpirationSec: 600, // 10m
+
+			wantError: fmt.Errorf("service-account-max-token-expiration and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time"),
+		},
+		{
+			desc: "signing endpoint provided but return smaller than accaptable max token exp",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint:          socketPath,
+			signingKeyFiles:          "",
+			maxExpiration:            0,
+			externalMaxExpirationSec: 300, // 5m
+
+			wantError: fmt.Errorf("max token life supported by external-jwt-signer (300s) is less than acceptable (min 600s)"),
+		},
+		{
+			desc: "signing endpoint provided and error when getting metadata",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint:          socketPath,
+			signingKeyFiles:          "",
+			maxExpiration:            0,
+			externalMaxExpirationSec: 900, // 15m
+			metadataError:            fmt.Errorf("metadata error"),
+
+			wantError: fmt.Errorf("while setting up external-jwt-signer: rpc error: code = Unknown desc = metadata error"),
+		},
+		{
+			desc: "signing endpoint provided and error when creating plugin (during initial fetch)",
+			issuers: []string{
+				"iss",
+			},
+			signingEndpoint:          socketPath,
+			signingKeyFiles:          "",
+			maxExpiration:            0,
+			externalMaxExpirationSec: 900, // 15m
+			fetchError:               fmt.Errorf("keys fetch error"),
+
+			wantError: fmt.Errorf("while setting up external-jwt-signer: while initially filling key cache: while performing initial cache fill: while fetching token verification keys: while getting externally supported jwt signing keys: rpc error: code = Unknown desc = keys fetch error"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			options := NewOptions()
+			options.ServiceAccountSigningEndpoint = tc.signingEndpoint
+			options.ServiceAccountSigningKeyFile = tc.signingKeyFiles
+			options.Authentication = &kubeoptions.BuiltInAuthenticationOptions{
+				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
+					Issuers:       tc.issuers,
+					MaxExpiration: tc.maxExpiration,
+				},
+			}
+
+			_ = mockSigner.Reset()
+			mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec
+			mockSigner.MetadataError = tc.metadataError
+			mockSigner.FetchError = tc.fetchError
+
+			co := completedOptions{
+				Options: *options,
+			}
+
+			err := options.completeServiceAccountOptions(context.Background(), &co)
+
+			if tc.wantError != nil {
+				if err == nil || tc.wantError.Error() != err.Error() {
+					t.Errorf("Expected error: %v, got: %v", tc.wantError, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Didn't expect any error but got: %v", err)
+			}
+			if tc.externalPublicKeyGetterPresent != (co.Authentication.ServiceAccounts.ExternalPublicKeysGetter != nil) {
+				t.Errorf("Unexpected value of ExternalPublicKeysGetter: %v", co.Authentication.ServiceAccounts.ExternalPublicKeysGetter)
+			}
+			if tc.expectedIsExternalSigner != co.Authentication.ServiceAccounts.IsTokenSignerExternal {
+				t.Errorf("Expected IsTokenSignerExternal %v, found %v", tc.expectedIsExternalSigner, co.Authentication.ServiceAccounts.IsTokenSignerExternal)
+			}
+			if tc.expectedMaxtokenExp.Seconds() != co.Authentication.ServiceAccounts.MaxExpiration.Seconds() {
+				t.Errorf("Expected MaxExpiration to be %v, found %v", tc.expectedMaxtokenExp, co.Authentication.ServiceAccounts.MaxExpiration)
+			}
+		})
 	}
 }

@@ -366,11 +366,16 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 					// TODO(#123829) Remove once the schema watcher is merged.
 					// If the warnings are empty, touch the policy to retry type checking
 					if len(policy.Status.TypeChecking.ExpressionWarnings) == 0 {
-						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).WithLabels(map[string]string{
-							"touched": time.Now().String(),
-							"random":  fmt.Sprintf("%d", rand.Int()),
-						})
-						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{})
+						randomValue := fmt.Sprintf(`"%d"`, rand.Int())
+						// Use a fixed key and change only the value
+						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).
+							WithSpec(applyadmissionregistrationv1.ValidatingAdmissionPolicySpec().
+								WithAuditAnnotations(applyadmissionregistrationv1.AuditAnnotation().
+									WithKey("key").
+									WithValueExpression(randomValue),
+								),
+							)
+						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{FieldManager: "validatingadmissionpolicy-e2e"})
 						return false, err
 					}
 					return true, nil

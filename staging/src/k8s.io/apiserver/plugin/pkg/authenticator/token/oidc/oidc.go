@@ -56,6 +56,7 @@ import (
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
+	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
@@ -84,6 +85,12 @@ type Options struct {
 
 	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
 	Client *http.Client
+
+	// Optional CEL compiler used to compile the CEL expressions. This is useful to use a shared instance
+	// of the compiler as these compilers holding a CEL environment are expensive to create. If not provided,
+	// a default compiler will be created.
+	// Note: the compiler construction depends on feature gates and the compatibility version to be initialized.
+	Compiler authenticationcel.Compiler
 
 	// SupportedSigningAlgs sets the accepted set of JOSE signing algorithms that
 	// can be used by the provider to sign tokens.
@@ -244,7 +251,11 @@ type AuthenticatorTokenWithHealthCheck interface {
 // Thus, once the lifecycleCtx is canceled, the authenticator must not be used.
 // A caller may check if the authenticator is healthy by calling the HealthCheck method.
 func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHealthCheck, error) {
-	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(opts.JWTAuthenticator, opts.DisallowedIssuers)
+	compiler := opts.Compiler
+	if compiler == nil {
+		compiler = authenticationcel.NewDefaultCompiler()
+	}
+	celMapper, fieldErr := apiservervalidation.CompileAndValidateJWTAuthenticator(compiler, opts.JWTAuthenticator, opts.DisallowedIssuers)
 	if err := fieldErr.ToAggregate(); err != nil {
 		return nil, err
 	}
@@ -726,7 +737,7 @@ func (a *jwtAuthenticator) AuthenticateToken(ctx context.Context, token string) 
 		return nil, false, err
 	}
 
-	extra, err := a.getExtra(ctx, claimsUnstructured)
+	extra, err := a.getExtra(ctx, c, claimsUnstructured)
 	if err != nil {
 		return nil, false, err
 	}
@@ -914,17 +925,21 @@ func (a *jwtAuthenticator) getUID(ctx context.Context, c claims, claimsUnstructu
 	return evalResult.EvalResult.Value().(string), nil
 }
 
-func (a *jwtAuthenticator) getExtra(ctx context.Context, claimsUnstructured *unstructured.Unstructured) (map[string][]string, error) {
+func (a *jwtAuthenticator) getExtra(ctx context.Context, c claims, claimsUnstructured *unstructured.Unstructured) (map[string][]string, error) {
+	extra := make(map[string][]string)
+
+	if credentialID := getCredentialID(c); len(credentialID) > 0 {
+		extra[user.CredentialIDKey] = []string{credentialID}
+	}
+
 	if a.celMapper.Extra == nil {
-		return nil, nil
+		return extra, nil
 	}
 
 	evalResult, err := a.celMapper.Extra.EvalClaimMappings(ctx, claimsUnstructured)
 	if err != nil {
 		return nil, err
 	}
-
-	extra := make(map[string][]string, len(evalResult))
 	for _, result := range evalResult {
 		extraMapping, ok := result.ExpressionAccessor.(*authenticationcel.ExtraMappingExpression)
 		if !ok {
@@ -936,14 +951,23 @@ func (a *jwtAuthenticator) getExtra(ctx context.Context, claimsUnstructured *uns
 			return nil, fmt.Errorf("oidc: error evaluating extra claim expression: %s: %w", extraMapping.Expression, err)
 		}
 
-		if len(extraValues) == 0 {
-			continue
+		if len(extraValues) > 0 {
+			extra[extraMapping.Key] = extraValues
 		}
-
-		extra[extraMapping.Key] = extraValues
 	}
 
 	return extra, nil
+}
+
+func getCredentialID(c claims) string {
+	if _, ok := c["jti"]; ok {
+		var jti string
+		if err := c.unmarshalClaim("jti", &jti); err == nil {
+			return authenticationtokenjwt.CredentialIDForJTI(jti)
+		}
+	}
+
+	return ""
 }
 
 // getClaimJWT gets a distributed claim JWT from url, using the supplied access

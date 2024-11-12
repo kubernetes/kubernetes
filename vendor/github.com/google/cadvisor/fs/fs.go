@@ -20,6 +20,7 @@ package fs
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	zfs "github.com/mistifyio/go-zfs"
 	mount "github.com/moby/sys/mountinfo"
@@ -716,16 +718,41 @@ func (i *RealFsInfo) GetDirUsage(dir string) (UsageInfo, error) {
 }
 
 func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes uint64, inodesFree uint64, err error) {
-	var s syscall.Statfs_t
-	if err = syscall.Statfs(path, &s); err != nil {
-		return 0, 0, 0, 0, 0, err
+	// timeout the context with, default is 2sec
+	timeout := 2
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	type result struct {
+		total      uint64
+		free       uint64
+		avail      uint64
+		inodes     uint64
+		inodesFree uint64
+		err        error
 	}
-	total = uint64(s.Frsize) * s.Blocks
-	free = uint64(s.Frsize) * s.Bfree
-	avail = uint64(s.Frsize) * s.Bavail
-	inodes = uint64(s.Files)
-	inodesFree = uint64(s.Ffree)
-	return total, free, avail, inodes, inodesFree, nil
+
+	resultChan := make(chan result, 1)
+
+	go func() {
+		var s syscall.Statfs_t
+		if err = syscall.Statfs(path, &s); err != nil {
+			total, free, avail, inodes, inodesFree = 0, 0, 0, 0, 0
+		}
+		total = uint64(s.Frsize) * s.Blocks
+		free = uint64(s.Frsize) * s.Bfree
+		avail = uint64(s.Frsize) * s.Bavail
+		inodes = uint64(s.Files)
+		inodesFree = uint64(s.Ffree)
+		resultChan <- result{total: total, free: free, avail: avail, inodes: inodes, inodesFree: inodesFree, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return 0, 0, 0, 0, 0, ctx.Err()
+	case res := <-resultChan:
+		return res.total, res.free, res.avail, res.inodes, res.inodesFree, res.err
+	}
 }
 
 // Devicemapper thin provisioning is detailed at

@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -770,6 +770,8 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+	// SetPodActivator sets the PodActivator
+	SetPodActivator(activator PodActivator)
 
 	// Close calls Close method of each plugin.
 	Close() error
@@ -783,6 +785,8 @@ type Handle interface {
 	PodNominator
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
+	// PodActivator abstracts operations in the scheduling queue.
+	PodActivator
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point.
@@ -819,10 +823,9 @@ type Handle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
-	// ResourceClaimCache returns an assume cache of ResourceClaim objects
-	// which gets populated by the shared informer factory and the dynamic resources
-	// plugin.
-	ResourceClaimCache() *assumecache.AssumeCache
+	// SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
+	// A non-default implementation can be plugged into the framework to simulate the state of DRA objects.
+	SharedDRAManager() SharedDRAManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state *CycleState, pod *v1.Pod, info *NodeInfo) *Status
@@ -895,6 +898,16 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 		return ModeNoop
 	}
 	return ni.NominatingMode
+}
+
+// PodActivator abstracts operations in the scheduling queue.
+type PodActivator interface {
+	// Activate moves the given pods to activeQ.
+	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// the wildcard event is registered so that the pod will be requeued when it comes back.
+	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// Activate would ignore the pod.
+	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.

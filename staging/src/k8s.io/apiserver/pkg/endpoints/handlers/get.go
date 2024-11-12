@@ -45,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -57,6 +58,7 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		ctx, span := tracing.Start(ctx, "Get", traceFields(req)...)
+		req = req.WithContext(ctx)
 		defer span.End(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
@@ -171,6 +173,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		ctx := req.Context()
 		// For performance tracking purposes.
 		ctx, span := tracing.Start(ctx, "List", traceFields(req)...)
+		req = req.WithContext(ctx)
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
@@ -185,14 +188,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		if err != nil {
 			hasName = false
 		}
-
 		ctx = request.WithNamespace(ctx, namespace)
-
-		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
 
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
@@ -204,6 +200,17 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		metainternalversion.SetListOptionsDefaults(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList))
 		if errs := metainternalversionvalidation.ValidateListOptions(&opts, utilfeature.DefaultFeatureGate.Enabled(features.WatchList)); len(errs) > 0 {
 			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "ListOptions"}, "", errs)
+			scope.err(err, w, req)
+			return
+		}
+
+		var restrictions negotiation.EndpointRestrictions
+		restrictions = scope
+		if isListWatchRequest(opts) {
+			restrictions = &watchListEndpointRestrictions{scope}
+		}
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, restrictions)
+		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
@@ -258,6 +265,16 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
+
+			var emptyVersionedList runtime.Object
+			if isListWatchRequest(opts) {
+				emptyVersionedList, err = scope.Convertor.ConvertToVersion(r.NewList(), scope.Kind.GroupVersion())
+				if err != nil {
+					scope.err(errors.NewInternalError(err), w, req)
+					return
+				}
+			}
+
 			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "timeout", timeout)
 			ctx, cancel := context.WithTimeout(ctx, timeout)
 			defer func() { cancel() }()
@@ -266,7 +283,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				scope.err(err, w, req)
 				return
 			}
-			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts))
+			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), emptyVersionedList)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -306,4 +323,19 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		defer span.AddEvent("Writing http response done", attribute.Int("count", meta.LenList(result)))
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
 	}
+}
+
+type watchListEndpointRestrictions struct {
+	negotiation.EndpointRestrictions
+}
+
+func (e *watchListEndpointRestrictions) AllowsMediaTypeTransform(mimeType, mimeSubType string, target *schema.GroupVersionKind) bool {
+	if target != nil && target.Kind == "Table" {
+		return false
+	}
+	return e.EndpointRestrictions.AllowsMediaTypeTransform(mimeType, mimeSubType, target)
+}
+
+func isListWatchRequest(opts metainternalversion.ListOptions) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && ptr.Deref(opts.SendInitialEvents, false) && opts.AllowWatchBookmarks
 }

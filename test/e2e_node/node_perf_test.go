@@ -52,22 +52,12 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 	if cfg != nil {
 		// Update the Kubelet configuration.
 		ginkgo.By("Stopping the kubelet")
-		startKubelet := stopKubelet()
-
-		// wait until the kubelet health check will fail
-		gomega.Eventually(ctx, func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, time.Minute, time.Second).Should(gomega.BeFalse())
+		restartKubelet := mustStopKubelet(ctx, f)
 
 		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
 
-		ginkgo.By("Starting the kubelet")
-		startKubelet()
-
-		// wait until the kubelet health check will succeed
-		gomega.Eventually(ctx, func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+		ginkgo.By("Restarting the kubelet")
+		restartKubelet(ctx)
 	}
 
 	// Wait for the Kubelet to be ready.
@@ -75,7 +65,7 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+	}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
 }
 
 // Serial because the test updates kubelet configuration.

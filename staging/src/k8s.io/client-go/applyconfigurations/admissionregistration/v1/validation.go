@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ValidationApplyConfiguration represents a declarative configuration of the Validation type for use
 // with apply.
 type ValidationApplyConfiguration struct {
-	Expression        *string          `json:"expression,omitempty"`
-	Message           *string          `json:"message,omitempty"`
-	Reason            *v1.StatusReason `json:"reason,omitempty"`
-	MessageExpression *string          `json:"messageExpression,omitempty"`
+	Expression        *string              `json:"expression,omitempty"`
+	Message           *string              `json:"message,omitempty"`
+	Reason            *metav1.StatusReason `json:"reason,omitempty"`
+	MessageExpression *string              `json:"messageExpression,omitempty"`
 }
 
 // ValidationApplyConfiguration constructs a declarative configuration of the Validation type for use with
@@ -56,7 +56,7 @@ func (b *ValidationApplyConfiguration) WithMessage(value string) *ValidationAppl
 // WithReason sets the Reason field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Reason field is set to the value of the last call.
-func (b *ValidationApplyConfiguration) WithReason(value v1.StatusReason) *ValidationApplyConfiguration {
+func (b *ValidationApplyConfiguration) WithReason(value metav1.StatusReason) *ValidationApplyConfiguration {
 	b.Reason = &value
 	return b
 }

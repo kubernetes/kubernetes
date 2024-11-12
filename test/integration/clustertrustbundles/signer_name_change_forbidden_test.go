@@ -32,6 +32,10 @@ import (
 )
 
 func TestCTBSignerNameChangeForbidden(t *testing.T) {
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	// TODO: Remove this line once certificates v1alpha1 types to be removed in 1.32 are fully removed
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+
 	testCases := []struct {
 		objectName string
 		signer1    string

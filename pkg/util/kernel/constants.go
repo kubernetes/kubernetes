@@ -54,3 +54,11 @@ const TmpfsNoswapSupportKernelVersion = "6.4"
 // nftables mode with by default. This is not directly related to any specific kernel
 // commit; see https://issues.k8s.io/122743#issuecomment-1893922424
 const NFTablesKubeProxyKernelVersion = "5.13"
+
+// TCPReceiveMemoryNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_rmem was namespaced(netns).
+// (ref: https://github.com/torvalds/linux/commit/356d1833b638bd465672aefeb71def3ab93fc17d)
+const TCPReceiveMemoryNamespacedKernelVersion = "4.15"
+
+// TCPTransmitMemoryNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_wmem was namespaced(netns).
+// (ref: https://github.com/torvalds/linux/commit/356d1833b638bd465672aefeb71def3ab93fc17d)
+const TCPTransmitMemoryNamespacedKernelVersion = "4.15"

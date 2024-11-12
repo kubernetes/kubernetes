@@ -34,8 +34,6 @@ import (
 	"text/template"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -47,12 +45,13 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -217,7 +216,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics(), "")
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, authorizer.DecisionNoOpinion, []apiserver.WebhookMatchCondition{}, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), "")
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -337,7 +336,7 @@ func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
 
 // newV1Authorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new WebhookAuthorizer from it.
-func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, metrics metrics.AuthorizerMetrics, expressions []apiserver.WebhookMatchCondition, authzName string) (*WebhookAuthorizer, error) {
+func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, metrics metrics.AuthorizerMetrics, compiler authorizationcel.Compiler, expressions []apiserver.WebhookMatchCondition, authzName string) (*WebhookAuthorizer, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -367,7 +366,7 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, expressions, metrics, authzName)
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, authorizer.DecisionNoOpinion, expressions, metrics, compiler, authzName)
 }
 
 func TestV1TLSConfig(t *testing.T) {
@@ -426,7 +425,7 @@ func TestV1TLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newV1Authorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, noopAuthorizerMetrics(), []apiserver.WebhookMatchCondition{}, "")
+			wh, err := newV1Authorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), []apiserver.WebhookMatchCondition{}, "")
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -491,7 +490,7 @@ func TestV1Webhook(t *testing.T) {
 	}
 	defer s.Close()
 
-	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), []apiserver.WebhookMatchCondition{}, "")
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), []apiserver.WebhookMatchCondition{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -591,14 +590,13 @@ func TestV1WebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 	expressions := []apiserver.WebhookMatchCondition{
 		{
 			Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
 		},
 	}
 	// Create an authorizer that caches successful responses "forever" (100 days).
-	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, noopAuthorizerMetrics(), expressions, "")
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), expressions, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,7 +691,6 @@ func TestV1WebhookCache(t *testing.T) {
 
 // TestStructuredAuthzConfigFeatureEnablement verifies cel expressions can only be used when feature is enabled
 func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
-
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()
@@ -713,7 +710,6 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		expectedEvalErr    bool
 		expectedDecision   authorizer.Decision
 		expressions        []apiserver.WebhookMatchCondition
-		featureEnabled     bool
 		selectorEnabled    bool
 	}
 	aliceAttr := authorizer.AttributesRecord{
@@ -748,20 +744,6 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 			expectedCompileErr: false,
 			expectedDecision:   authorizer.DecisionAllow,
 			expressions:        []apiserver.WebhookMatchCondition{},
-			featureEnabled:     false,
-		},
-		{
-			name:               "should fail when match conditions are used without feature enabled",
-			attr:               aliceAttr,
-			allow:              false,
-			expectedCompileErr: true,
-			expectedDecision:   authorizer.DecisionNoOpinion,
-			expressions: []apiserver.WebhookMatchCondition{
-				{
-					Expression: "request.user == 'alice'",
-				},
-			},
-			featureEnabled: false,
 		},
 		{
 			name:               "feature enabled, match all against all expressions",
@@ -795,16 +777,18 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 					Expression: "request.resourceAttributes.labelSelector.?requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
 				},
 			},
-			featureEnabled:  true,
 			selectorEnabled: true,
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, test.featureEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, test.selectorEnabled)
-			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions, "")
+
+			// create new compiler because it depends on the feature gate
+			compiler := authorizationcel.NewDefaultCompiler()
+
+			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), compiler, test.expressions, "")
 			if test.expectedCompileErr && err == nil {
 				t.Fatalf("%d: Expected compile error", i)
 			} else if !test.expectedCompileErr && err != nil {
@@ -835,7 +819,6 @@ func TestWebhookMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 
 	aliceAttr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
@@ -910,13 +893,13 @@ func TestWebhookMetrics(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			celmetrics.ResetMetricsForTest()
-			defer celmetrics.ResetMetricsForTest()
-			wh1, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, celAuthorizerMetrics(), tt.expressions1, "wh1.example.com")
+			authorizationcel.ResetMetricsForTest()
+			defer authorizationcel.ResetMetricsForTest()
+			wh1, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, celAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), tt.expressions1, "wh1.example.com")
 			if err != nil {
 				t.Fatal(err)
 			}
-			wh2, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, celAuthorizerMetrics(), tt.expressions2, "wh2.example.com")
+			wh2, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, celAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), tt.expressions2, "wh2.example.com")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -932,23 +915,13 @@ func TestWebhookMetrics(t *testing.T) {
 	}
 }
 
-func BenchmarkNoCELExpressionFeatureOff(b *testing.B) {
-	expressions := []apiserver.WebhookMatchCondition{}
-	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, false)
-	})
-	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, false)
-	})
-}
-
 func BenchmarkNoCELExpressionFeatureOn(b *testing.B) {
 	expressions := []apiserver.WebhookMatchCondition{}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithOneCELExpressions(b *testing.B) {
@@ -958,10 +931,10 @@ func BenchmarkWithOneCELExpressions(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithOneCELExpressionsFalse(b *testing.B) {
@@ -971,10 +944,10 @@ func BenchmarkWithOneCELExpressionsFalse(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithTwoCELExpressions(b *testing.B) {
@@ -987,10 +960,10 @@ func BenchmarkWithTwoCELExpressions(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithTwoCELExpressionsFalse(b *testing.B) {
@@ -1003,10 +976,10 @@ func BenchmarkWithTwoCELExpressionsFalse(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithManyCELExpressions(b *testing.B) {
@@ -1037,10 +1010,10 @@ func BenchmarkWithManyCELExpressions(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 func BenchmarkWithManyCELExpressionsFalse(b *testing.B) {
@@ -1071,14 +1044,14 @@ func BenchmarkWithManyCELExpressionsFalse(b *testing.B) {
 		},
 	}
 	b.Run("compile", func(b *testing.B) {
-		benchmarkNewWebhookAuthorizer(b, expressions, true)
+		benchmarkNewWebhookAuthorizer(b, expressions)
 	})
 	b.Run("authorize", func(b *testing.B) {
-		benchmarkWebhookAuthorize(b, expressions, true)
+		benchmarkWebhookAuthorize(b, expressions)
 	})
 }
 
-func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.WebhookMatchCondition, featureEnabled bool) {
+func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.WebhookMatchCondition) {
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()
@@ -1087,12 +1060,11 @@ func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.Webhook
 		b.Fatal(err)
 	}
 	defer s.Close()
-	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create an authorizer with or without expressions to compile
-		_, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), expressions, "")
+		_, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), expressions, "")
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -1100,7 +1072,7 @@ func benchmarkNewWebhookAuthorizer(b *testing.B, expressions []apiserver.Webhook
 	b.StopTimer()
 }
 
-func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatchCondition, featureEnabled bool) {
+func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatchCondition) {
 	attr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
 			Name:   "alice",
@@ -1120,9 +1092,8 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 		b.Fatal(err)
 	}
 	defer s.Close()
-	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, featureEnabled)
 	// Create an authorizer with or without expressions to compile
-	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), expressions, "")
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), expressions, "")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1140,7 +1111,6 @@ func benchmarkWebhookAuthorize(b *testing.B, expressions []apiserver.WebhookMatc
 
 // TestV1WebhookMatchConditions verifies cel expressions are compiled and evaluated correctly
 func TestV1WebhookMatchConditions(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
 	service := new(mockV1Service)
 	service.statusCode = 200
 	service.Allow()
@@ -1409,7 +1379,7 @@ func TestV1WebhookMatchConditions(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), test.expressions, "")
+			wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0, noopAuthorizerMetrics(), authorizationcel.NewDefaultCompiler(), test.expressions, "")
 			if len(test.expectedCompileErr) > 0 && err == nil {
 				t.Fatalf("%d: Expected compile error", i)
 			} else if len(test.expectedCompileErr) == 0 && err != nil {
@@ -1448,12 +1418,12 @@ func noopAuthorizerMetrics() metrics.AuthorizerMetrics {
 
 func celAuthorizerMetrics() metrics.AuthorizerMetrics {
 	return celAuthorizerMetricsType{
-		MatcherMetrics: celmetrics.NewMatcherMetrics(),
+		MatcherMetrics: authorizationcel.NewMatcherMetrics(),
 	}
 }
 
 type celAuthorizerMetricsType struct {
 	metrics.NoopRequestMetrics
 	metrics.NoopWebhookMetrics
-	celmetrics.MatcherMetrics
+	authorizationcel.MatcherMetrics
 }

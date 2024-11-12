@@ -719,19 +719,16 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 }
 
 func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
+	ginkgo.GinkgoHelper()
+
 	ginkgo.By("checking the devices known to the kubelet")
 	resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
-	framework.ExpectNoErrorWithOffset(1, err)
-	devs := resp.GetDevices()
-	var cpus []int
-	for _, cpuid := range resp.GetCpuIds() {
-		cpus = append(cpus, int(cpuid))
-	}
-	allocatableCPUs := cpuset.New(cpus...)
+	framework.ExpectNoError(err, "cannot get allocatable CPUs from podresources")
+	allocatableCPUs, devs := demuxCPUsAndDevicesFromGetAllocatableResources(resp)
 
 	if onlineCPUs.Size() == 0 {
 		ginkgo.By("expecting no CPUs reported")
-		gomega.ExpectWithOffset(1, onlineCPUs.Size()).To(gomega.Equal(reservedSystemCPUs.Size()), "with no online CPUs, no CPUs should be reserved")
+		gomega.Expect(onlineCPUs.Size()).To(gomega.Equal(reservedSystemCPUs.Size()), "with no online CPUs, no CPUs should be reserved")
 	} else {
 		ginkgo.By(fmt.Sprintf("expecting online CPUs reported - online=%v (%d) reserved=%v (%d)", onlineCPUs, onlineCPUs.Size(), reservedSystemCPUs, reservedSystemCPUs.Size()))
 		if reservedSystemCPUs.Size() > onlineCPUs.Size() {
@@ -740,21 +737,30 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 		expectedCPUs := onlineCPUs.Difference(reservedSystemCPUs)
 
 		ginkgo.By(fmt.Sprintf("expecting CPUs '%v'='%v'", allocatableCPUs, expectedCPUs))
-		gomega.ExpectWithOffset(1, allocatableCPUs.Equals(expectedCPUs)).To(gomega.BeTrue(), "mismatch expecting CPUs")
+		gomega.Expect(allocatableCPUs.Equals(expectedCPUs)).To(gomega.BeTrueBecause("mismatch expecting CPUs"))
 	}
 
 	if sd == nil { // no devices in the environment, so expect no devices
 		ginkgo.By("expecting no devices reported")
-		gomega.ExpectWithOffset(1, devs).To(gomega.BeEmpty(), fmt.Sprintf("got unexpected devices %#v", devs))
+		gomega.Expect(devs).To(gomega.BeEmpty(), fmt.Sprintf("got unexpected devices %#v", devs))
 		return
 	}
 
 	ginkgo.By(fmt.Sprintf("expecting some %q devices reported", sd.resourceName))
-	gomega.ExpectWithOffset(1, devs).ToNot(gomega.BeEmpty())
+	gomega.Expect(devs).ToNot(gomega.BeEmpty())
 	for _, dev := range devs {
 		gomega.Expect(dev.ResourceName).To(gomega.Equal(sd.resourceName))
-		gomega.ExpectWithOffset(1, dev.DeviceIds).ToNot(gomega.BeEmpty())
+		gomega.Expect(dev.DeviceIds).ToNot(gomega.BeEmpty())
 	}
+}
+
+func demuxCPUsAndDevicesFromGetAllocatableResources(resp *kubeletpodresourcesv1.AllocatableResourcesResponse) (cpuset.CPUSet, []*kubeletpodresourcesv1.ContainerDevices) {
+	devs := resp.GetDevices()
+	var cpus []int
+	for _, cpuid := range resp.GetCpuIds() {
+		cpus = append(cpus, int(cpuid))
+	}
+	return cpuset.New(cpus...), devs
 }
 
 func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubeletpodresourcesv1.PodResourcesListerClient, sidecarContainersEnabled bool) {
@@ -1140,7 +1146,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					expectPodResources(ctx, 1, cli, []podDesc{desc})
 
 					ginkgo.By("Restarting Kubelet")
-					restartKubelet(true)
+					restartKubelet(ctx, true)
 
 					// we need to wait for the node to be reported ready before we can safely query
 					// the podresources endpoint again. Otherwise we will have false negatives.
@@ -1315,7 +1321,7 @@ func teardownSampleDevicePluginOrFail(ctx context.Context, f *framework.Framewor
 	ginkgo.By(fmt.Sprintf("Delete sample device plugin pod %s/%s", pod.Namespace, pod.Name))
 	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, deleteOptions)
 
-	framework.ExpectNoError(err, "Failed to delete Pod %v in Namspace %v", pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "Failed to delete Pod %v in Namespace %v", pod.Name, pod.Namespace)
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
@@ -1326,7 +1332,7 @@ func waitForTopologyUnawareResources(ctx context.Context, f *framework.Framework
 		node := getLocalNode(ctx, f)
 		resourceAmount := CountSampleDeviceAllocatable(node)
 		return resourceAmount > 0
-	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected %q resources to be available, got no resources", defaultTopologyUnawareResourceName))
 }
 
 func getPodResourcesMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {

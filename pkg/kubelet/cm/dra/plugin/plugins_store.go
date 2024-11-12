@@ -42,7 +42,7 @@ func (s *pluginsStore) get(pluginName string) *Plugin {
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
 // This method is protected by a mutex.
-func (s *pluginsStore) add(pluginName string, p *Plugin) (replaced bool) {
+func (s *pluginsStore) add(p *Plugin) (replacedPlugin *Plugin, replaced bool) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -50,9 +50,14 @@ func (s *pluginsStore) add(pluginName string, p *Plugin) (replaced bool) {
 		s.store = make(map[string]*Plugin)
 	}
 
-	_, exists := s.store[pluginName]
-	s.store[pluginName] = p
-	return exists
+	replacedPlugin, exists := s.store[p.name]
+	s.store[p.name] = p
+
+	if replacedPlugin != nil && replacedPlugin.cancel != nil {
+		replacedPlugin.cancel(errors.New("plugin got replaced"))
+	}
+
+	return replacedPlugin, exists
 }
 
 // Delete lets you delete a DRA Plugin by name.

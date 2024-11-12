@@ -20,15 +20,15 @@ import (
 	"fmt"
 	"reflect"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -380,7 +380,7 @@ func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) e
 	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
 	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
 	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(1)
+		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 	}
 	return nil
 }
@@ -397,7 +397,7 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 	// Forcing the value of TerminationGracePeriodSeconds to 1 if it is negative.
 	// Just for Pod, not for PodSpec, because we don't want to change the behavior of the PodTemplate.
 	if in.Spec.TerminationGracePeriodSeconds != nil && *in.Spec.TerminationGracePeriodSeconds < 0 {
-		out.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(1)
+		out.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 	}
 	return nil
 }
@@ -553,4 +553,14 @@ func Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(in *core.Persi
 // This is needed because it is referenced from other APIs, but is invisible at code-generation time because of the build tags.
 func Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in *v1.PersistentVolumeSpec, out *core.PersistentVolumeSpec, s conversion.Scope) error {
 	return autoConvert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(in, out, s)
+}
+
+// Convert_Slice_string_To_Pointer_string is needed because decoding URL parameters requires manual assistance.
+func Convert_Slice_string_To_Pointer_string(in *[]string, out **string, s conversion.Scope) error {
+	if len(*in) == 0 {
+		return nil
+	}
+	temp := (*in)[0]
+	*out = &temp
+	return nil
 }

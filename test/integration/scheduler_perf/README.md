@@ -33,10 +33,10 @@ Currently the test suite has the following:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling"
+make test-integration WHAT=./test/integration/scheduler_perf/... ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling"
 ```
 
-The benchmark suite runs all the tests specified under config/performance-config.yaml.
+The benchmark suite runs all the tests specified under subdirectories split by topic (`<topic>/performance-config.yaml`).
 By default, it runs all workloads that have the "performance" label. In the configuration,
 labels can be added to a test case and/or individual workloads. Each workload also has
 all labels of its test case. The `perf-scheduling-label-filter` command line flag can
@@ -44,13 +44,14 @@ be used to select workloads. It works like GitHub label filtering: the flag acce
 a comma-separated list of label names. Each label may have a `+` or `-` as prefix. Labels with
 `+` or no prefix must be set for a workload for it to be run. `-` means that the label must not
 be set. For example, this runs all performance benchmarks except those that are labeled
-as "fast":
+as "integration-test":
 ```shell
-make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-fast"
+make test-integration WHAT=./test/integration/scheduler_perf/... ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test"
 ```
 
-Once the benchmark is finished, JSON file with metrics is available in the current directory (test/integration/scheduler_perf). Look for `BenchmarkPerfScheduling_benchmark_YYYY-MM-DDTHH:MM:SSZ.json`.
-You can use `-data-items-dir` to generate the metrics file elsewhere.
+Once the benchmark is finished, JSON files with metrics are available in the subdirectories (`test/integration/scheduler_perf/config/<topic>`). 
+Look for `BenchmarkPerfScheduling_benchmark_YYYY-MM-DDTHH:MM:SSZ.json`.
+You can use `-data-items-dir` to generate the metrics files elsewhere.
 
 In case you want to run a specific test in the suite, you can specify the test through `-bench` flag:
 
@@ -59,19 +60,19 @@ Otherwise, the golang benchmark framework will try to run a test more than once 
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule"
+make test-integration WHAT=./test/integration/scheduler_perf/... ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule"
 ```
 
 To produce a cpu profile:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf KUBE_TIMEOUT="-timeout=3600s" ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out"
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TIMEOUT="-timeout=3600s" ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-run=^$$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out"
 ```
 
 ### How to configure benchmark tests
 
-Configuration file located under `config/performance-config.yaml` contains a list of templates.
+Configuration files located under `<topic>/performance-config.yaml` contain a list of templates.
 Each template allows to set:
 - node manifest
 - manifests for initial and testing pod
@@ -85,7 +86,7 @@ for available operations to build `WorkloadTemplate`.
 Initial pods create a state of a cluster before the scheduler performance measurement can begin.
 Testing pods are then subject to performance measurement.
 
-The configuration file under `config/performance-config.yaml` contains a default list of templates to cover
+The configuration files under `<topic>/performance-config.yaml` contain a default list of templates to cover
 various scenarios. In case you want to add your own, you can extend the list with new templates.
 It's also possible to extend `op` data type, respectively its underlying data types
 to extend configuration of possible test cases.
@@ -102,14 +103,95 @@ performance.
 During interactive debugging sessions it is possible to enable per-test output
 via -use-testing-log.
 
+Log output can be quite large, in particular when running the large benchmarks
+and when not using -use-testing-log. For benchmarks, we want to produce that
+log output in a realistic way (= write to disk using the normal logging
+backends) and only capture the output of a specific test as part of the job
+results when that test failed. Therefore each test redirects its own output if
+the ARTIFACTS env variable is set to a `$ARTIFACTS/<test name>.log` file and
+removes that file only if the test passed.
+
+
 ### Integration tests
 
 To run integration tests, use:
 ```
-make test-integration WHAT=./test/integration/scheduler_perf KUBE_TEST_ARGS=-use-testing-log
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_TEST_ARGS=-use-testing-log
 ```
 
-Integration testing uses the same `config/performance-config.yaml` as
-benchmarking. By default, workloads labeled as `integration-test` are executed
-as part of integration testing. `-test-scheduling-label-filter` can be used to
-change that.
+Integration testing uses the same configs (`<topic>/performance-config.yaml`) as
+benchmarking. By default, workloads labeled as `integration-test`
+are executed as part of integration testing (in ci-kubernetes-integration-master job).
+`-test-scheduling-label-filter` can be used to change that.
+All test cases should have at least one workload labeled as `integration-test`.
+
+Running the integration tests with command above will only execute the workloads labeled as `short`.
+`SHORT=--short=false` variable added to the command can be used to disable this filtering.
+
+We should make each test case with `short` label very small,
+so that all tests with the label should take less than 5 min to complete.
+The test cases labeled as `short` are executed in pull-kubernetes-integration job.
+
+### Labels used by CI jobs
+
+| CI Job                           | Labels                 |
+|----------------------------------|------------------------|
+| ci-kubernetes-integration-master | integration-test       |
+| pull-kubernetes-integration      | integration-test,short |
+| ci-benchmark-scheduler-perf      | performance            |
+
+See the comment on [./misc/performance-config.yaml](./misc/performance-config.yaml) for the details.
+
+## Scheduling throughput thresholds
+
+Thresholds are used to capture scheduler performance regressions in a periodic ci-benchmark-scheduler-perf job. 
+Most test cases have a threshold set for the largest `performance` workloads. 
+By default, these are defined for the `Average` statistic of the `SchedulingThroughput` metric. 
+It is possible to use other metric by configuring `thresholdMetricSelector` per test case or workload. 
+
+### How to calculate the threshold
+
+The initial values for scheduling throughput thresholds were calculated through an analysis of historical data, 
+specifically focusing on the minimum, average, and standard deviation values for each workload 
+(see [#126871](https://github.com/kubernetes/kubernetes/pull/126871)). 
+Our goal is to set the thresholds somewhat pessimistically to minimize flakiness, 
+so it's recommended to set the threshold slightly below the observed historical minimum. 
+Depending on variability of data, the threshold can be lowered more. 
+
+Thresholds should be adjusted based on the flakiness level and minima observed in the future. 
+Remember to set the value for newly added test cases as well, 
+but after collecting some data on workload characteristics.
+
+### How to determine the failed workload
+
+When the workload's scheduling throughput doesn't exceed the threshold, 
+the ci-benchmark-scheduler-perf periodic job will fail with an error log such as:
+
+```
+--- FAIL: BenchmarkPerfScheduling/SchedulingBasic/5000Nodes_10000Pods
+    ...
+    scheduler_perf.go:1098: ERROR: op 2: SchedulingBasic/5000Nodes_10000Pods/namespace-2: expected SchedulingThroughput Average to be higher: got 256.12, want 270
+```
+
+This allows to analyze which workload failed. Make sure that the failure is not an outlier 
+by checking multiple runs of the job. If the failures are not related to any regression, 
+but to an incorrect threshold setting, it is reasonable to decrease it.
+
+### Visualization
+
+Some support for visualizing progress over time is built into the
+benchmarks. The measurement operation which creates pods writes .dat files like
+this:
+
+     test/integration/scheduler_perf/misc/SchedulingBasic_5000Nodes_2023-03-17T14:52:09Z.dat
+
+This file is in a text format that [gnuplot](http://www.gnuplot.info/) can
+read. A wrapper script selects some suitable parameters:
+
+     test/integration/scheduler_perf/gnuplot.sh test/integration/scheduler_perf/*/*.dat
+
+It plots in an interactive window by default. To write into a file, use
+
+    test/integration/scheduler_perf/gnuplot.sh \
+       -e 'set term png; set output "<output>.png"' \
+       test/integration/scheduler_perf/*/*.dat

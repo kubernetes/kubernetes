@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // IsPodAvailable returns true if a pod is available; false otherwise.
@@ -113,8 +114,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
-		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	if res := compareMaxContainerRestarts(s[i], s[j]); res != nil {
+		return *res
 	}
 	// 6. older pods < newer pods < empty timestamp pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
@@ -161,8 +162,8 @@ func (s ActivePods) Less(i, j int) bool {
 		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
 	}
 	// 7. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
-		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	if res := compareMaxContainerRestarts(s[i], s[j]); res != nil {
+		return *res
 	}
 	// 8. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
@@ -190,12 +191,41 @@ func podReadyTime(pod *corev1.Pod) *metav1.Time {
 	return &metav1.Time{}
 }
 
-func maxContainerRestarts(pod *corev1.Pod) int {
-	maxRestarts := 0
+func maxContainerRestarts(pod *corev1.Pod) (regularRestarts, sidecarRestarts int) {
 	for _, c := range pod.Status.ContainerStatuses {
-		maxRestarts = max(maxRestarts, int(c.RestartCount))
+		regularRestarts = max(regularRestarts, int(c.RestartCount))
 	}
-	return maxRestarts
+	names := sets.New[string]()
+	for _, c := range pod.Spec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy == corev1.ContainerRestartPolicyAlways {
+			names.Insert(c.Name)
+		}
+	}
+	for _, c := range pod.Status.InitContainerStatuses {
+		if names.Has(c.Name) {
+			sidecarRestarts = max(sidecarRestarts, int(c.RestartCount))
+		}
+	}
+	return
+}
+
+// We use *bool here to determine equality:
+// true: pi has a higher container restart count.
+// false: pj has a higher container restart count.
+// nil: Both have the same container restart count.
+func compareMaxContainerRestarts(pi *corev1.Pod, pj *corev1.Pod) *bool {
+	regularRestartsI, sidecarRestartsI := maxContainerRestarts(pi)
+	regularRestartsJ, sidecarRestartsJ := maxContainerRestarts(pj)
+	if regularRestartsI != regularRestartsJ {
+		res := regularRestartsI > regularRestartsJ
+		return &res
+	}
+	// If pods have the same restart count, an attempt is made to compare the restart counts of sidecar containers.
+	if sidecarRestartsI != sidecarRestartsJ {
+		res := sidecarRestartsI > sidecarRestartsJ
+		return &res
+	}
+	return nil
 }
 
 // ContainerType and VisitContainers are taken from

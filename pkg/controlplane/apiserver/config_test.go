@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	cliflag "k8s.io/component-base/cli/flag"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -45,7 +47,7 @@ func TestBuildGenericConfig(t *testing.T) {
 	s.BindPort = ln.Addr().(*net.TCPAddr).Port
 	opts.SecureServing = s
 
-	completedOptions, err := opts.Complete(nil, nil)
+	completedOptions, err := opts.Complete(context.TODO(), cliflag.NamedFlagSets{}, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to complete apiserver options: %v", err)
 	}

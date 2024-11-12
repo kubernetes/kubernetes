@@ -63,7 +63,19 @@ func BridgeVlanAdd(link Link, vid uint16, pvid, untagged, self, master bool) err
 // BridgeVlanAdd adds a new vlan filter entry
 // Equivalent to: `bridge vlan add dev DEV vid VID [ pvid ] [ untagged ] [ self ] [ master ]`
 func (h *Handle) BridgeVlanAdd(link Link, vid uint16, pvid, untagged, self, master bool) error {
-	return h.bridgeVlanModify(unix.RTM_SETLINK, link, vid, pvid, untagged, self, master)
+	return h.bridgeVlanModify(unix.RTM_SETLINK, link, vid, 0, pvid, untagged, self, master)
+}
+
+// BridgeVlanAddRange adds a new vlan filter entry
+// Equivalent to: `bridge vlan add dev DEV vid VID-VIDEND [ pvid ] [ untagged ] [ self ] [ master ]`
+func BridgeVlanAddRange(link Link, vid, vidEnd uint16, pvid, untagged, self, master bool) error {
+	return pkgHandle.BridgeVlanAddRange(link, vid, vidEnd, pvid, untagged, self, master)
+}
+
+// BridgeVlanAddRange adds a new vlan filter entry
+// Equivalent to: `bridge vlan add dev DEV vid VID-VIDEND [ pvid ] [ untagged ] [ self ] [ master ]`
+func (h *Handle) BridgeVlanAddRange(link Link, vid, vidEnd uint16, pvid, untagged, self, master bool) error {
+	return h.bridgeVlanModify(unix.RTM_SETLINK, link, vid, vidEnd, pvid, untagged, self, master)
 }
 
 // BridgeVlanDel adds a new vlan filter entry
@@ -75,10 +87,22 @@ func BridgeVlanDel(link Link, vid uint16, pvid, untagged, self, master bool) err
 // BridgeVlanDel adds a new vlan filter entry
 // Equivalent to: `bridge vlan del dev DEV vid VID [ pvid ] [ untagged ] [ self ] [ master ]`
 func (h *Handle) BridgeVlanDel(link Link, vid uint16, pvid, untagged, self, master bool) error {
-	return h.bridgeVlanModify(unix.RTM_DELLINK, link, vid, pvid, untagged, self, master)
+	return h.bridgeVlanModify(unix.RTM_DELLINK, link, vid, 0, pvid, untagged, self, master)
 }
 
-func (h *Handle) bridgeVlanModify(cmd int, link Link, vid uint16, pvid, untagged, self, master bool) error {
+// BridgeVlanDelRange adds a new vlan filter entry
+// Equivalent to: `bridge vlan del dev DEV vid VID-VIDEND [ pvid ] [ untagged ] [ self ] [ master ]`
+func BridgeVlanDelRange(link Link, vid, vidEnd uint16, pvid, untagged, self, master bool) error {
+	return pkgHandle.BridgeVlanDelRange(link, vid, vidEnd, pvid, untagged, self, master)
+}
+
+// BridgeVlanDelRange adds a new vlan filter entry
+// Equivalent to: `bridge vlan del dev DEV vid VID-VIDEND [ pvid ] [ untagged ] [ self ] [ master ]`
+func (h *Handle) BridgeVlanDelRange(link Link, vid, vidEnd uint16, pvid, untagged, self, master bool) error {
+	return h.bridgeVlanModify(unix.RTM_DELLINK, link, vid, vidEnd, pvid, untagged, self, master)
+}
+
+func (h *Handle) bridgeVlanModify(cmd int, link Link, vid, vidEnd uint16, pvid, untagged, self, master bool) error {
 	base := link.Attrs()
 	h.ensureIndex(base)
 	req := h.newNetlinkRequest(cmd, unix.NLM_F_ACK)
@@ -105,7 +129,20 @@ func (h *Handle) bridgeVlanModify(cmd int, link Link, vid uint16, pvid, untagged
 	if untagged {
 		vlanInfo.Flags |= nl.BRIDGE_VLAN_INFO_UNTAGGED
 	}
-	br.AddRtAttr(nl.IFLA_BRIDGE_VLAN_INFO, vlanInfo.Serialize())
+
+	if vidEnd != 0 {
+		vlanEndInfo := &nl.BridgeVlanInfo{Vid: vidEnd}
+		vlanEndInfo.Flags = vlanInfo.Flags
+
+		vlanInfo.Flags |= nl.BRIDGE_VLAN_INFO_RANGE_BEGIN
+		br.AddRtAttr(nl.IFLA_BRIDGE_VLAN_INFO, vlanInfo.Serialize())
+
+		vlanEndInfo.Flags |= nl.BRIDGE_VLAN_INFO_RANGE_END
+		br.AddRtAttr(nl.IFLA_BRIDGE_VLAN_INFO, vlanEndInfo.Serialize())
+	} else { 
+		br.AddRtAttr(nl.IFLA_BRIDGE_VLAN_INFO, vlanInfo.Serialize())
+	}
+
 	req.AddData(br)
 	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	return err

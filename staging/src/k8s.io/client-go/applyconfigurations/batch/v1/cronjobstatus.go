@@ -20,15 +20,15 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // CronJobStatusApplyConfiguration represents a declarative configuration of the CronJobStatus type for use
 // with apply.
 type CronJobStatusApplyConfiguration struct {
-	Active             []v1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
-	LastScheduleTime   *metav1.Time                           `json:"lastScheduleTime,omitempty"`
-	LastSuccessfulTime *metav1.Time                           `json:"lastSuccessfulTime,omitempty"`
+	Active             []corev1.ObjectReferenceApplyConfiguration `json:"active,omitempty"`
+	LastScheduleTime   *metav1.Time                               `json:"lastScheduleTime,omitempty"`
+	LastSuccessfulTime *metav1.Time                               `json:"lastSuccessfulTime,omitempty"`
 }
 
 // CronJobStatusApplyConfiguration constructs a declarative configuration of the CronJobStatus type for use with
@@ -40,7 +40,7 @@ func CronJobStatus() *CronJobStatusApplyConfiguration {
 // WithActive adds the given value to the Active field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Active field.
-func (b *CronJobStatusApplyConfiguration) WithActive(values ...*v1.ObjectReferenceApplyConfiguration) *CronJobStatusApplyConfiguration {
+func (b *CronJobStatusApplyConfiguration) WithActive(values ...*corev1.ObjectReferenceApplyConfiguration) *CronJobStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithActive")

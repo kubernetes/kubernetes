@@ -32,6 +32,12 @@ func init() {
 	dataConsistencyDetectionForListFromCacheEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR"))
 }
 
+// IsDataConsistencyDetectionForListEnabled returns true when
+// the KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
+func IsDataConsistencyDetectionForListEnabled() bool {
+	return dataConsistencyDetectionForListFromCacheEnabled
+}
+
 // CheckListFromCacheDataConsistencyIfRequested performs a data consistency check only when
 // the KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR environment variable was set during a binary startup
 // for requests that have a high chance of being served from the watch-cache.
@@ -50,7 +56,7 @@ func init() {
 // the cache (even though this might not be true for some requests)
 // and issue the second call to get data from etcd for comparison.
 func CheckListFromCacheDataConsistencyIfRequested[T runtime.Object](ctx context.Context, identity string, listItemsFn ListFunc[T], optionsUsedToReceiveList metav1.ListOptions, receivedList runtime.Object) {
-	if !dataConsistencyDetectionForListFromCacheEnabled {
+	if !IsDataConsistencyDetectionForListEnabled() {
 		return
 	}
 	checkListFromCacheDataConsistencyIfRequestedInternal(ctx, identity, listItemsFn, optionsUsedToReceiveList, receivedList)

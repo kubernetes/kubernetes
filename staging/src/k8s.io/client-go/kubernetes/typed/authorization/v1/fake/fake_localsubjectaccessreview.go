@@ -19,31 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-// FakeLocalSubjectAccessReviews implements LocalSubjectAccessReviewInterface
-type FakeLocalSubjectAccessReviews struct {
+// fakeLocalSubjectAccessReviews implements LocalSubjectAccessReviewInterface
+type fakeLocalSubjectAccessReviews struct {
+	*gentype.FakeClient[*v1.LocalSubjectAccessReview]
 	Fake *FakeAuthorizationV1
-	ns   string
 }
 
-var localsubjectaccessreviewsResource = v1.SchemeGroupVersion.WithResource("localsubjectaccessreviews")
-
-var localsubjectaccessreviewsKind = v1.SchemeGroupVersion.WithKind("LocalSubjectAccessReview")
-
-// Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the localSubjectAccessReview, and an error, if there is any.
-func (c *FakeLocalSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (result *v1.LocalSubjectAccessReview, err error) {
-	emptyResult := &v1.LocalSubjectAccessReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(localsubjectaccessreviewsResource, c.ns, localSubjectAccessReview, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakeLocalSubjectAccessReviews(fake *FakeAuthorizationV1, namespace string) authorizationv1.LocalSubjectAccessReviewInterface {
+	return &fakeLocalSubjectAccessReviews{
+		gentype.NewFakeClient[*v1.LocalSubjectAccessReview](
+			fake.Fake,
+			namespace,
+			v1.SchemeGroupVersion.WithResource("localsubjectaccessreviews"),
+			v1.SchemeGroupVersion.WithKind("LocalSubjectAccessReview"),
+			func() *v1.LocalSubjectAccessReview { return &v1.LocalSubjectAccessReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1.LocalSubjectAccessReview), err
 }

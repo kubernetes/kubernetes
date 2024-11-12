@@ -17,17 +17,18 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,10 +37,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/utils/pointer"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -78,45 +78,22 @@ var (
 		})
 		return pod
 	}()
-
-	podSchedulingContext = resourceapi.PodSchedulingContext{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testPodName,
-			Namespace: testNamespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "v1",
-					Kind:       "Pod",
-					Name:       testPodName,
-					UID:        testPodUID,
-					Controller: pointer.Bool(true),
-				},
-			},
-		},
-		Spec: resourceapi.PodSchedulingContextSpec{
-			SelectedNode: nodeName,
-		},
-	}
 )
-
-func init() {
-	klog.InitFlags(nil)
-}
 
 func TestSyncHandler(t *testing.T) {
 	tests := []struct {
-		name                          string
-		key                           string
-		claims                        []*resourceapi.ResourceClaim
-		claimsInCache                 []*resourceapi.ResourceClaim
-		pods                          []*v1.Pod
-		podsLater                     []*v1.Pod
-		templates                     []*resourceapi.ResourceClaimTemplate
-		expectedClaims                []resourceapi.ResourceClaim
-		expectedPodSchedulingContexts []resourceapi.PodSchedulingContext
-		expectedStatuses              map[string][]v1.PodResourceClaimStatus
-		expectedError                 bool
-		expectedMetrics               expectedMetrics
+		name               string
+		key                string
+		adminAccessEnabled bool
+		claims             []*resourceapi.ResourceClaim
+		claimsInCache      []*resourceapi.ResourceClaim
+		pods               []*v1.Pod
+		podsLater          []*v1.Pod
+		templates          []*resourceapi.ResourceClaimTemplate
+		expectedClaims     []resourceapi.ResourceClaim
+		expectedStatuses   map[string][]v1.PodResourceClaimStatus
+		expectedError      bool
+		expectedMetrics    expectedMetrics
 	}{
 		{
 			name:           "create",
@@ -186,19 +163,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
 					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
-				},
-			},
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
-			name:           "find-existing-claim-by-name",
-			pods:           []*v1.Pod{testPodWithResource},
-			key:            podKey(testPodWithResource),
-			claims:         []*resourceapi.ResourceClaim{testClaim},
-			expectedClaims: []resourceapi.ResourceClaim{*testClaim},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithResource.Name: {
-					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &testClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0},
@@ -281,18 +245,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:   "clear-reserved",
-			pods:   []*v1.Pod{},
-			key:    claimKey(testClaimReserved),
-			claims: []*resourceapi.ResourceClaim{testClaimReserved},
-			expectedClaims: func() []resourceapi.ResourceClaim {
-				claim := testClaimAllocated.DeepCopy()
-				claim.Status.DeallocationRequested = true
-				return []resourceapi.ResourceClaim{*claim}
-			}(),
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
 			name:   "clear-reserved-structured",
 			pods:   []*v1.Pod{},
 			key:    claimKey(testClaimReserved),
@@ -369,7 +321,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: func() []resourceapi.ResourceClaim {
 				claims := []resourceapi.ResourceClaim{*testClaimAllocated.DeepCopy()}
 				claims[0].OwnerReferences = nil
-				claims[0].Status.DeallocationRequested = true
 				return claims
 			}(),
 			expectedMetrics: expectedMetrics{0, 0},
@@ -395,21 +346,6 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:           "trigger-allocation",
-			pods:           []*v1.Pod{testPodWithNodeName},
-			key:            podKey(testPodWithNodeName),
-			templates:      []*resourceapi.ResourceClaimTemplate{template},
-			claims:         []*resourceapi.ResourceClaim{generatedTestClaim},
-			expectedClaims: []resourceapi.ResourceClaim{*generatedTestClaim},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithNodeName.Name: {
-					{Name: testPodWithNodeName.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
-				},
-			},
-			expectedPodSchedulingContexts: []resourceapi.PodSchedulingContext{podSchedulingContext},
-			expectedMetrics:               expectedMetrics{0, 0},
-		},
-		{
 			name:           "add-reserved",
 			pods:           []*v1.Pod{testPodWithNodeName},
 			key:            podKey(testPodWithNodeName),
@@ -428,8 +364,8 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
+			tCtx = ktesting.WithCancel(tCtx)
 
 			var objects []runtime.Object
 			for _, pod := range tc.pods {
@@ -451,23 +387,22 @@ func TestSyncHandler(t *testing.T) {
 			setupMetrics()
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
-			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
-			templateInformer := informerFactory.Resource().V1alpha3().ResourceClaimTemplates()
+			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 
-			ec, err := NewController(klog.FromContext(ctx), fakeKubeClient, podInformer, podSchedulingInformer, claimInformer, templateInformer)
+			ec, err := NewController(tCtx.Logger(), tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(ctx.Done())
+			informerFactory.Start(tCtx.Done())
 			stopInformers := func() {
-				cancel()
+				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSync(tCtx.Done())
 
 			// Add claims that only exist in the mutation cache.
 			for _, claim := range tc.claimsInCache {
@@ -477,13 +412,13 @@ func TestSyncHandler(t *testing.T) {
 			// Simulate race: stop informers, add more pods that the controller doesn't know about.
 			stopInformers()
 			for _, pod := range tc.podsLater {
-				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error while creating pod: %v", err)
 				}
 			}
 
-			err = ec.syncHandler(ctx, tc.key)
+			err = ec.syncHandler(tCtx, tc.key)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}
@@ -491,13 +426,13 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("unexpected success")
 			}
 
-			claims, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := fakeKubeClient.ResourceV1beta1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
 			assert.Equal(t, normalizeClaims(tc.expectedClaims), normalizeClaims(claims.Items))
 
-			pods, err := fakeKubeClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+			pods, err := fakeKubeClient.CoreV1().Pods("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing pods: %v", err)
 			}
@@ -513,15 +448,98 @@ func TestSyncHandler(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectedStatuses, actualStatuses, "pod resource claim statuses")
 
-			scheduling, err := fakeKubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
-			if err != nil {
-				t.Fatalf("unexpected error while listing claims: %v", err)
-			}
-			assert.Equal(t, normalizeScheduling(tc.expectedPodSchedulingContexts), normalizeScheduling(scheduling.Items))
-
 			expectMetrics(t, tc.expectedMetrics)
 		})
 	}
+}
+
+func TestResourceClaimEventHandler(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx = ktesting.WithCancel(tCtx)
+
+	fakeKubeClient := createTestClient()
+	setupMetrics()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informerFactory.Core().V1().Pods()
+	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
+	templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
+	claimClient := fakeKubeClient.ResourceV1beta1().ResourceClaims(testNamespace)
+
+	_, err := NewController(tCtx.Logger(), false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	tCtx.ExpectNoError(err, "creating ephemeral controller")
+
+	informerFactory.Start(tCtx.Done())
+	stopInformers := func() {
+		tCtx.Cancel("stopping informers")
+		informerFactory.Shutdown()
+	}
+	defer stopInformers()
+
+	var em numMetrics
+
+	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
+	em.claims++
+	ktesting.Step(tCtx, "create claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	modifiedClaim := testClaim.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar"}
+	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
+	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Consistently(tCtx)
+	})
+
+	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
+	em.allocated++
+	ktesting.Step(tCtx, "allocate claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	modifiedClaim = testClaimAllocated.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
+	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
+	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Consistently(tCtx)
+	})
+
+	otherClaimAllocated := testClaimAllocated.DeepCopy()
+	otherClaimAllocated.Name += "2"
+	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
+	em.claims++
+	em.allocated++
+	ktesting.Step(tCtx, "create allocated claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
+	em.allocated--
+	ktesting.Step(tCtx, "deallocate claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
+	em.claims--
+	ktesting.Step(tCtx, "delete deallocated claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
+	em.claims--
+	em.allocated--
+	ktesting.Step(tCtx, "delete allocated claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	em.Consistently(tCtx)
 }
 
 func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
@@ -640,14 +658,6 @@ func normalizeClaims(claims []resourceapi.ResourceClaim) []resourceapi.ResourceC
 	return claims
 }
 
-func normalizeScheduling(scheduling []resourceapi.PodSchedulingContext) []resourceapi.PodSchedulingContext {
-	sort.Slice(scheduling, func(i, j int) bool {
-		return scheduling[i].Namespace < scheduling[j].Namespace ||
-			scheduling[i].Name < scheduling[j].Name
-	})
-	return scheduling
-}
-
 func createTestClient(objects ...runtime.Object) *fake.Clientset {
 	fakeClient := fake.NewSimpleClientset(objects...)
 	fakeClient.PrependReactor("create", "resourceclaims", createResourceClaimReactor())
@@ -673,6 +683,34 @@ func createResourceClaimReactor() func(action k8stesting.Action) (handled bool, 
 
 // Metrics helpers
 
+type numMetrics struct {
+	claims    float64
+	allocated float64
+}
+
+func getNumMetric() (em numMetrics, err error) {
+	em.claims, err = testutil.GetGaugeMetricValue(metrics.NumResourceClaims)
+	if err != nil {
+		return
+	}
+	em.allocated, err = testutil.GetGaugeMetricValue(metrics.NumAllocatedResourceClaims)
+	return
+}
+
+func (em numMetrics) Eventually(tCtx ktesting.TContext) {
+	g := gomega.NewWithT(tCtx)
+	tCtx.Helper()
+
+	g.Eventually(getNumMetric).WithTimeout(5 * time.Second).Should(gomega.Equal(em))
+}
+
+func (em numMetrics) Consistently(tCtx ktesting.TContext) {
+	g := gomega.NewWithT(tCtx)
+	tCtx.Helper()
+
+	g.Consistently(getNumMetric).WithTimeout(time.Second).Should(gomega.Equal(em))
+}
+
 type expectedMetrics struct {
 	numCreated  int
 	numFailures int
@@ -681,12 +719,12 @@ type expectedMetrics struct {
 func expectMetrics(t *testing.T, em expectedMetrics) {
 	t.Helper()
 
-	actualCreated, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.ResourceClaimCreateAttempts)
+	actualCreated, err := testutil.GetCounterMetricValue(metrics.ResourceClaimCreateAttempts)
 	handleErr(t, err, "ResourceClaimCreate")
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected claims to be created %d, got %v", em.numCreated, actualCreated)
 	}
-	actualConflicts, err := testutil.GetCounterMetricValue(ephemeralvolumemetrics.ResourceClaimCreateFailures)
+	actualConflicts, err := testutil.GetCounterMetricValue(metrics.ResourceClaimCreateFailures)
 	handleErr(t, err, "ResourceClaimCreate/Conflict")
 	if actualConflicts != float64(em.numFailures) {
 		t.Errorf("Expected claims to have conflicts %d, got %v", em.numFailures, actualConflicts)
@@ -700,7 +738,9 @@ func handleErr(t *testing.T, err error, metricName string) {
 }
 
 func setupMetrics() {
-	ephemeralvolumemetrics.RegisterMetrics()
-	ephemeralvolumemetrics.ResourceClaimCreateAttempts.Reset()
-	ephemeralvolumemetrics.ResourceClaimCreateFailures.Reset()
+	metrics.RegisterMetrics()
+	metrics.ResourceClaimCreateAttempts.Reset()
+	metrics.ResourceClaimCreateFailures.Reset()
+	metrics.NumResourceClaims.Set(0)
+	metrics.NumAllocatedResourceClaims.Set(0)
 }
