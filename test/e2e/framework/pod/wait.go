@@ -871,7 +871,7 @@ func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, name
 
 // WaitForContainerRestartedNTimes waits for the given Pod container to have restarted N times
 func WaitForContainerRestartedNTimes(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration, target int) error {
-	conditionDesc := fmt.Sprintf("container %s restarted %d times", containerName, target)
+	conditionDesc := fmt.Sprintf("container %s restarted at least %d times", containerName, target)
 	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
 		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
 			for _, cs := range statuses {

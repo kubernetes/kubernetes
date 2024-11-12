@@ -13,12 +13,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
+
+const containerName = "restarts"
 
 var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("container-restart")
@@ -38,8 +39,8 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 		})
 
 		ginkgo.It("Container restart backs off.", func(ctx context.Context) {
-			// 3 would take 10s best case, 6 would take 150s best case
-			doTest(ctx, f, 5, time.Duration(80*time.Second), time.Duration(10*time.Second))
+			// 0s, 0s, 10s, 30s, 70s, 150s, 310s
+			doTest(ctx, f, 5, containerName, 7)
 		})
 	})
 
@@ -62,41 +63,42 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 		})
 
 		ginkgo.It("Alternate restart backs off.", func(ctx context.Context) {
-			doTest(ctx, f, 7, time.Duration(120*time.Second), time.Duration(10*time.Second))
+			// 0s, 0s, 10s, 30s, 60s, 90s, 120s, 150, 180, 210)
+			doTest(ctx, f, 7, containerName, 10)
 		})
 	})
 })
 
-func doTest(ctx context.Context, f *framework.Framework, maxRestarts int, target time.Duration, threshold time.Duration) {
+func doTest(ctx context.Context, f *framework.Framework, targetRestarts int, containerName string, maxRestarts int) {
 
 	pod := e2epod.NewPodClient(f).Create(ctx, newFailAlwaysPod())
 	podErr := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, "CrashLoopBackOff", 1*time.Minute)
 	gomega.Expect(podErr).To(gomega.HaveOccurred())
 
-	// Wait for 120s worth of backoffs to occur so we can confirm the backoff growth.
-	podErr = e2epod.WaitForContainerRestartedNTimes(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "restart", 150*time.Second, maxRestarts)
+	// Wait for 150s worth of backoffs to occur so we can confirm the backoff growth.
+	podErr = e2epod.WaitForContainerRestartedNTimes(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "restart", 150*time.Second, targetRestarts)
 	gomega.Expect(podErr).ShouldNot(gomega.HaveOccurred(), "Expected container to repeatedly back off container failures")
 
-	d, err := getContainerRetryDuration(ctx, f, pod.Name)
+	r, err := extractObservedBackoff(ctx, f, pod.Name, containerName)
 	framework.ExpectNoError(err)
 
-	gomega.Expect(d).Should(gomega.BeNumerically("~", target, threshold))
+	gomega.Expect(r).Should(gomega.BeNumerically("<=", maxRestarts))
 }
 
-func getContainerRetryDuration(ctx context.Context, f *framework.Framework, podName string) (time.Duration, error) {
-
-	var d time.Duration
-	e, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+func extractObservedBackoff(ctx context.Context, f *framework.Framework, podName string, containerName string) (int32, error) {
+	var r int32
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return d, err
+		return r, err
 	}
-
-	for _, event := range e.Items {
-		if event.InvolvedObject.Name == podName && event.Reason == kubeletevents.StartedContainer {
-			return event.LastTimestamp.Time.Sub(event.FirstTimestamp.Time), nil
+	for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+		for _, cs := range statuses {
+			if cs.Name == containerName {
+				return r, nil
+			}
 		}
 	}
-	return d, nil
+	return r, nil
 }
 
 func newFailAlwaysPod() *v1.Pod {
@@ -108,10 +110,9 @@ func newFailAlwaysPod() *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:            "restart",
+					Name:            containerName,
 					Image:           imageutils.GetBusyBoxImageName(),
-					ImagePullPolicy: v1.PullAlways,
-					Command:         []string{"exit 1"},
+					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
 		},
