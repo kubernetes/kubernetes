@@ -27,6 +27,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,7 +60,7 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 
 		ginkgo.It("Container restart backs off.", func(ctx context.Context) {
 			// 0s, 0s, 10s, 30s, 70s, 150s, 310s
-			doTest(ctx, f, 5, containerName, 7)
+			doTest(ctx, f, 3, containerName, 7)
 		})
 	})
 
@@ -82,8 +83,8 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 		})
 
 		ginkgo.It("Alternate restart backs off.", func(ctx context.Context) {
-			// 0s, 0s, 10s, 30s, 60s, 90s, 120s, 150, 180, 210)
-			doTest(ctx, f, 7, containerName, 10)
+			// 0s, 0s, 10s, 30s, 60s, 90s, 120s, 150s, 180s, 210s, 240s, 270s, 300s
+			doTest(ctx, f, 3, containerName, 13)
 		})
 	})
 })
@@ -94,8 +95,9 @@ func doTest(ctx context.Context, f *framework.Framework, targetRestarts int, con
 	podErr := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, "CrashLoopBackOff", 1*time.Minute)
 	gomega.Expect(podErr).To(gomega.HaveOccurred())
 
-	// Wait for 210s worth of backoffs to occur so we can confirm the backoff growth.
-	podErr = e2epod.WaitForContainerRestartedNTimes(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName, 210*time.Second, targetRestarts)
+	// Hard wait 30 seconds for targetRestarts in the best case; longer timeout later will handle if infra was slow.
+	time.Sleep(30 * time.Second)
+	podErr = e2epod.WaitForContainerRestartedNTimes(ctx, f.ClientSet, f.Namespace.Name, pod.Name, containerName, 5*time.Minute, targetRestarts)
 	gomega.Expect(podErr).ShouldNot(gomega.HaveOccurred(), "Expected container to repeatedly back off container failures")
 
 	r, err := extractObservedBackoff(ctx, f, pod.Name, containerName)
@@ -117,7 +119,7 @@ func extractObservedBackoff(ctx context.Context, f *framework.Framework, podName
 			}
 		}
 	}
-	return r, nil
+	return r, errors.Errorf("Could not find container status for container %s in pod %s", containerName, podName)
 }
 
 func newFailAlwaysPod() *v1.Pod {

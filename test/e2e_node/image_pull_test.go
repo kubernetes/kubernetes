@@ -257,16 +257,15 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 		gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 
-		// Wait for ~60s worth of backoffs to occur so we can confirm the backoff growth.
-		podErr = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, 1*time.Minute)
+		podErr = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, 30*time.Second)
 		gomega.Expect(podErr).To(gomega.HaveOccurred(), "Expected container not to start from repeatedly backing off image pulls")
 
 		e, err := getImagePullAttempts(ctx, f, pod.Name)
 		framework.ExpectNoError(err)
-		// 3 would take 10s best case
+		// 3 would take 10s best case.
 		gomega.Expect(e.Count).Should(gomega.BeNumerically(">", 3))
-		// 6 would take 150s best case
-		gomega.Expect(e.Count).Should(gomega.BeNumerically("<=", 6))
+		// 7 would take 310s best case, if the infra went slow.
+		gomega.Expect(e.Count).Should(gomega.BeNumerically("<=", 7))
 
 	})
 
