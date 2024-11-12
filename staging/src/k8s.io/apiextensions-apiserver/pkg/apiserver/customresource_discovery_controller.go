@@ -316,7 +316,7 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struc
 		}
 		return true, nil
 	}); err != nil {
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for initial discovery sync"))
 			return
 		}

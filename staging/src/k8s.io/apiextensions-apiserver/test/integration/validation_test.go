@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -1540,7 +1541,7 @@ properties:
 					}
 					return true, nil
 				})
-				if err != context.DeadlineExceeded {
+				if !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("expected no NonStructuralSchema condition, but got one: %v", cond)
 				}
 				return
