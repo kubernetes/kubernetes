@@ -355,11 +355,6 @@ func GetPauseImageName() string {
 	return GetE2EImage(Pause)
 }
 
-// GetBusyBoxImageName returns the busybox image name with proper version
-func GetBusyBoxImageName() string {
-	return GetE2EImage(BusyBox)
-}
-
 // ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one based
 // on the configured registries.
 func ReplaceRegistryInImageURL(imageURL string) (string, error) {

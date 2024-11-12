@@ -132,7 +132,7 @@ func newFailAlwaysPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            containerName,
-					Image:           imageutils.GetBusyBoxImageName(),
+					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
