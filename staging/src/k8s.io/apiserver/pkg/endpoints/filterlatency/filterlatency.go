@@ -76,8 +76,8 @@ func trackStarted(handler http.Handler, tp trace.TracerProvider, name string, cl
 	// This is a noop if the tracing is disabled, since tp will be a NoopTracerProvider
 	tracer := tp.Tracer("k8s.op/apiserver/pkg/endpoints/filterlatency")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, _ := tracer.Start(r.Context(), name)
-		defer trace.SpanFromContext(ctx).End()
+		ctx, span := tracer.Start(r.Context(), name)
+		defer span.End()
 		if fr := requestFilterRecordFrom(ctx); fr != nil {
 			fr.name = name
 			fr.startedTimestamp = clock.Now()
