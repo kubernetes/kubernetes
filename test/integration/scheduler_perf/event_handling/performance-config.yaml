@@ -228,13 +228,20 @@
     stageRequirement: Attempted
     labelSelector:
       type: unsched
-  # Update blocker pods' labels and scale down their resource requests 
-  # to make the unschedulable pods schedulable.
+  # Update blocker pods' labels to make the unschedulable pods schedulable.
   - opcode: updateAny
     countParam: $blockerPods
     templatePath: templates/podupdate-pod-blocker-update.yaml
     updatePerSecond: 100
     namespace: blocker
+  # Scale down blocker pods' resource requests to make the unschedulable pods schedulable.
+  - opcode: updateAny
+    countParam: $blockerPods
+    templatePath: templates/podupdate-pod-blocker-scale-down.yaml
+    updatePerSecond: 100
+    namespace: blocker
+    subresources:
+      - resize
   # Update pods blocked by SchedulingGates by removing the gate from themselves.
   - opcode: updateAny
     countParam: $measurePods
