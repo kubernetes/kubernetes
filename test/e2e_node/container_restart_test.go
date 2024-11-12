@@ -113,7 +113,7 @@ func extractObservedBackoff(ctx context.Context, f *framework.Framework, podName
 	for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
 		for _, cs := range statuses {
 			if cs.Name == containerName {
-				return r, nil
+				return cs.RestartCount, nil
 			}
 		}
 	}
