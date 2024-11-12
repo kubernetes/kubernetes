@@ -191,7 +191,10 @@ func podReadyTime(pod *corev1.Pod) *metav1.Time {
 	return &metav1.Time{}
 }
 
-func maxContainerRestarts(pod *corev1.Pod) (regularRestarts, sidecarRestarts int) {
+// MaxContainerRestarts iterates through all the normal containers and sidecar
+// containers in a Pod object and reports the highest restart count observed per
+// category.
+func MaxContainerRestarts(pod *corev1.Pod) (regularRestarts, sidecarRestarts int) {
 	for _, c := range pod.Status.ContainerStatuses {
 		regularRestarts = max(regularRestarts, int(c.RestartCount))
 	}
@@ -214,8 +217,8 @@ func maxContainerRestarts(pod *corev1.Pod) (regularRestarts, sidecarRestarts int
 // false: pj has a higher container restart count.
 // nil: Both have the same container restart count.
 func compareMaxContainerRestarts(pi *corev1.Pod, pj *corev1.Pod) *bool {
-	regularRestartsI, sidecarRestartsI := maxContainerRestarts(pi)
-	regularRestartsJ, sidecarRestartsJ := maxContainerRestarts(pj)
+	regularRestartsI, sidecarRestartsI := MaxContainerRestarts(pi)
+	regularRestartsJ, sidecarRestartsJ := MaxContainerRestarts(pj)
 	if regularRestartsI != regularRestartsJ {
 		res := regularRestartsI > regularRestartsJ
 		return &res

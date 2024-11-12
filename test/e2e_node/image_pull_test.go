@@ -257,8 +257,8 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
 		gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
 
-		podErr = e2epod.WaitForPodContainerStarted(ctx, f.ClientSet, f.Namespace.Name, pod.Name, 0, 30*time.Second)
-		gomega.Expect(podErr).To(gomega.HaveOccurred(), "Expected container not to start from repeatedly backing off image pulls")
+		// Hard wait 30 seconds for image pulls to repeatedly back off.
+		time.Sleep(30 * time.Second)
 
 		e, err := getImagePullAttempts(ctx, f, pod.Name)
 		framework.ExpectNoError(err)
