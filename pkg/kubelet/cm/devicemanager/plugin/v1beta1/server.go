@@ -110,7 +110,9 @@ type server struct {
 	clients    map[string]Client
 
 	// isStarted indicates whether the service has started successfully.
-	isStarted        bool
+	//
+	isStarted atomic.Bool
+	// exceptionMonitor is used to count the number of retry attempts after a gRPC serve failure.
 	exceptionMonitor atomic.Int32
 }
 
@@ -337,29 +339,24 @@ func (s *server) Name() string {
 
 func (s *server) Check(_ *http.Request) error {
 	currentFails := s.exceptionMonitor.Load()
-	s.exceptionMonitor.Store(0)
-	if !s.isStarted && currentFails >= maxServeFails {
+	if !s.isStarted.Load() && currentFails >= maxServeFails {
+		// Health check failure requires both conditions to be met: isStarted is false and
+		// the number of failed retry attempts exceeds maxServeFails.
+		// After obtaining a failed health check result, the exception counter exceptionMonitor should be initialized to 0.
+		// The purpose of this is to ensure that the number of retry attempts after a gRPC serve failure reaches maxServeFails.
+		s.exceptionMonitor.Store(0)
 		return fmt.Errorf("device plugin registration gRPC server failed and no device plugins can register")
 	}
 	return nil
 }
 
-//// latestExceptionTime returns the time of the last GRPC server exception.
-//func (s *server) latestExceptionTime() time.Time {
-//	val := s.exceptionMonitor.Load()
-//	if val == nil {
-//		return time.Time{}
-//	}
-//	return val.(time.Time)
-//}
-
 // setHealthy sets the health status of the gRPC server.
 func (s *server) setHealthy() {
-	s.isStarted = true
+	s.isStarted.Store(true)
 }
 
 // setUnhealthy sets the health status of the gRPC server to unhealthy.
 func (s *server) setUnhealthy() {
-	s.isStarted = false
+	s.isStarted.Store(false)
 	s.exceptionMonitor.Add(1)
 }
