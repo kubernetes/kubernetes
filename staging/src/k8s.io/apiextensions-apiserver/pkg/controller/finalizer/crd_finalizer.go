@@ -235,7 +235,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 	// now we need to wait until all the resources are deleted.  Start with a simple poll before we do anything fancy.
 	// TODO not all servers are synchronized on caches.  It is possible for a stale one to still be creating things.
 	// Once we have a mechanism for servers to indicate their states, we should check that for concurrence.
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		listObj, err := crClient.List(ctx, nil)
 		if err != nil {
 			return false, err
