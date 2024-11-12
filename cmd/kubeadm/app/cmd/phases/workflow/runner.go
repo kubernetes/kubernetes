@@ -111,7 +111,11 @@ func NewRunner() *Runner {
 
 // AppendPhase adds the given phase to the ordered sequence of phases managed by the runner.
 func (e *Runner) AppendPhase(t Phase) {
-	e.Phases = append(e.Phases, t)
+	e.AppendPhases(t)
+}
+
+func (e *Runner) AppendPhases(phases ...Phase) {
+	e.Phases = append(e.Phases, phases...)
 }
 
 // computePhaseRunFlags return a map defining which phase should be run and which not.
