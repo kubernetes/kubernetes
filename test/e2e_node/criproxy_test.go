@@ -147,8 +147,6 @@ func getFailedToPullImageMsg(ctx context.Context, f *framework.Framework, podNam
 	return "", fmt.Errorf("failed to find FailedToPullImage event for pod: %s", podName)
 }
 
-
-
 func getPodImagePullDuration(ctx context.Context, f *framework.Framework, podName string) (time.Duration, error) {
 	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
