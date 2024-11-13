@@ -2028,6 +2028,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			for _, r := range result.SyncResults {
 				if errors.Is(r.Error, images.ErrImagePull) {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets: %v", failedPullSecretNames)
+					break
 				}
 			}
 		}
