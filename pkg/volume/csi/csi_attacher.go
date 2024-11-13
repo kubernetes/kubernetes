@@ -71,6 +71,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", errors.New("missing spec")
 	}
 
+	// Get the PersistentVolumeSource from the spec
 	pvSrc, err := getPVSourceFromSpec(spec)
 	if err != nil {
 		return "", errors.New(log("attacher.Attach failed to get CSIPersistentVolumeSource: %v", err))
@@ -79,31 +80,29 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	node := string(nodeName)
 	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
 
+	// Check if the attachment already exists
 	attachment, err := c.plugin.volumeAttachmentLister.Get(attachID)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", errors.New(log("failed to get volume attachment from lister: %v", err))
 	}
 
+	// If attachment doesn't exist, create it
 	if attachment == nil {
 		var vaSrc storage.VolumeAttachmentSource
 		if spec.InlineVolumeSpecForCSIMigration {
-			// inline PV scenario - use PV spec to populate VA source.
-			// The volume spec will be populated by CSI translation API
-			// for inline volumes. This allows fields required by the CSI
-			// attacher such as AccessMode and MountOptions (in addition to
-			// fields in the CSI persistent volume source) to be populated
-			// as part of CSI translation for inline volumes.
+			// Inline volume scenario - use PV spec to populate VA source
 			vaSrc = storage.VolumeAttachmentSource{
 				InlineVolumeSpec: &spec.PersistentVolume.Spec,
 			}
 		} else {
-			// regular PV scenario - use PV name to populate VA source
+			// Regular volume scenario - use PV name to populate VA source
 			pvName := spec.PersistentVolume.GetName()
 			vaSrc = storage.VolumeAttachmentSource{
 				PersistentVolumeName: &pvName,
 			}
 		}
 
+		// Define the volume attachment object
 		attachment := &storage.VolumeAttachment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: attachID,
@@ -115,26 +114,33 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 			},
 		}
 
-		_, err = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
-		if err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return "", errors.New(log("attacher.Attach failed: %v", err))
+		// Retry logic for creating the volume attachment
+		var retryCount int
+		var createErr error
+		for retryCount < 3 {
+			_, createErr = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+			if createErr == nil || apierrors.IsAlreadyExists(createErr) {
+				break
 			}
-			klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, pvSrc.VolumeHandle))
-		} else {
-			klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
+			retryCount++
+			klog.V(2).Infof("Failed to create volume attachment, retrying (%d/3): %v", retryCount, createErr)
+			time.Sleep(time.Second * time.Duration(retryCount)) // Exponential backoff (simple)
 		}
+
+		// If the creation failed after retries, return an error
+		if createErr != nil {
+			return "", errors.New(log("attacher.Attach failed to create volume attachment: %v", createErr))
+		}
+
+		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
 	}
 
-	// Attach and detach functionality is exclusive to the CSI plugin that runs in the AttachDetachController,
-	// and has access to a VolumeAttachment lister that can be polled for the current status.
+	// Proceed to wait for the attachment to complete
 	if err := c.waitForVolumeAttachmentWithLister(spec, pvSrc.VolumeHandle, attachID, c.watchTimeout); err != nil {
 		return "", err
 	}
 
 	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
-
-	// Don't return attachID as a devicePath. We can reconstruct the attachID using getAttachmentName()
 	return "", nil
 }
 
@@ -144,30 +150,39 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 // exist or is not attached, the function will return an error. And then the caller (kubelet) should retry it.
 // We can get rid of watching it that serves no purpose. More details in https://issues.k8s.io/124398
 func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, _ time.Duration) (string, error) {
-	source, err := getPVSourceFromSpec(spec)
-	if err != nil {
-		return "", errors.New(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
-	}
+    source, err := getPVSourceFromSpec(spec)
+    if err != nil {
+        return "", errors.New(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
+    }
 
-	volumeHandle := source.VolumeHandle
-	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
+    volumeHandle := source.VolumeHandle
+    attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
 
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
-	if err != nil {
-		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
-		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
-	}
+    // Retry logic for getting the attachment status
+    var retryCount int
+    var attach *storage.VolumeAttachment
+    for retryCount < 3 {
+        attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
+        if err == nil {
+            break
+        }
+        retryCount++
+        klog.V(2).Infof("Failed to get attachment, retrying (%d/3): %v", retryCount, err)
+        time.Sleep(time.Second * time.Duration(retryCount)) // Exponential backoff
+    }
 
-	successful, err := verifyAttachmentStatus(attach, volumeHandle)
-	if err != nil {
-		return "", err
-	}
-	if !successful {
-		klog.Error(log("attacher.WaitForAttach failed for volume [%s] attached (will continue to try)", volumeHandle))
-		return "", fmt.Errorf("volume %v is not attached for volume attachment %v", volumeHandle, attachID)
-	}
-	return attach.Name, nil
+    if err != nil {
+        return "", fmt.Errorf("failed to get volume attachment: %v", err)
+    }
+
+    successful, err := verifyAttachmentStatus(attach, volumeHandle)
+    if err != nil || !successful {
+        return "", fmt.Errorf("volume %v is not attached or verification failed", volumeHandle)
+    }
+
+    return attach.Name, nil
 }
+
 
 func (c *csiAttacher) waitForVolumeAttachmentWithLister(spec *volume.Spec, volumeHandle, attachID string, timeout time.Duration) error {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
