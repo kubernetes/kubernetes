@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	helpers "k8s.io/component-helpers/resource"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -250,86 +249,22 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 	return utilerrors.NewAggregate(errs)
 }
 
-func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
-	ginkgo.GinkgoHelper()
-	if podOnCgroupv2Node == nil {
-		value := IsPodOnCgroupv2Node(f, pod)
-		podOnCgroupv2Node = &value
+func verifyContainerCgroupValues(f *framework.Framework, pod *v1.Pod, tc *v1.Container, podOnCgroupv2 bool) error {
+	if err := VerifyContainerMemoryLimit(f, pod, tc.Name, &tc.Resources, podOnCgroupv2); err != nil {
+		return err
 	}
-	cgroupMemLimit := Cgroupv2MemLimit
-	cgroupCPULimit := Cgroupv2CPULimit
-	cgroupCPURequest := Cgroupv2CPURequest
-	if !*podOnCgroupv2Node {
-		cgroupMemLimit = CgroupMemLimit
-		cgroupCPULimit = CgroupCPUQuota
-		cgroupCPURequest = CgroupCPUShares
+	if err := VerifyContainerCPULimit(f, pod, tc.Name, &tc.Resources, podOnCgroupv2); err != nil {
+		return err
 	}
-
-	var podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes int64
-	var errs []error
-	for _, ci := range tcInfo {
-		tc := makeResizableContainer(ci)
-		var expectedCPUShares int64
-		var expectedCPULimitString, expectedMemLimitString string
-		expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
-		cpuRequest := tc.Resources.Requests.Cpu()
-		cpuLimit := tc.Resources.Limits.Cpu()
-		if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-			expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
-		} else {
-			expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
-		}
-
-		cpuQuota := int64(-1)
-		if !cpuLimit.IsZero() {
-			cpuQuota = kubecm.MilliCPUToQuota(cpuLimit.MilliValue(), kubecm.QuotaPeriod)
-		}
-		expectedCPULimitString = strconv.FormatInt(cpuQuota, 10)
-		expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
-		if *podOnCgroupv2Node {
-			if expectedCPULimitString == "-1" {
-				expectedCPULimitString = "max"
-			}
-			expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
-			if expectedMemLimitString == "0" {
-				expectedMemLimitString = "max"
-			}
-			// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
-			// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-			expectedCPUShares = 1 + ((expectedCPUShares-2)*9999)/262142
-		}
-		if expectedMemLimitString != "0" {
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
-		}
-		errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimitString))
-		errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
-		// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
-		// See https://github.com/opencontainers/runc/pull/4669
-
-		// Accumulate container resources for verifying pod
-		podCPURequestMilliValue += cpuRequest.MilliValue()
-		if podCPULimitMilliValue >= 0 {
-			if cpuLimit.IsZero() {
-				podCPULimitMilliValue = -1
-			} else {
-				podCPULimitMilliValue += cpuLimit.MilliValue()
-			}
-		}
-		if podMemoryLimitInBytes >= 0 {
-			if expectedMemLimitInBytes == 0 {
-				podMemoryLimitInBytes = -1
-			} else {
-				podMemoryLimitInBytes += expectedMemLimitInBytes
-			}
-		}
+	if err := VerifyContainerCPUWeight(f, pod, tc.Name, &tc.Resources, podOnCgroupv2); err != nil {
+		return err
 	}
+	// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
+	// See https://github.com/opencontainers/runc/pull/4669
+	return nil
+}
 
-	if !*podOnCgroupv2Node {
-		// cgroup v1 is in maintenance mode. Skip verifying pod cgroup
-		return utilerrors.NewAggregate(errs)
-	}
-
-	// Verify pod cgroup
+func buildPodResourceInfo(podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes int64) ContainerResources {
 	podResourceInfo := ContainerResources{}
 	if podCPURequestMilliValue > 0 {
 		podResourceInfo.CPUReq = fmt.Sprintf("%dm", podCPURequestMilliValue)
@@ -340,6 +275,46 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 	if podMemoryLimitInBytes > 0 {
 		podResourceInfo.MemLim = fmt.Sprintf("%d", podMemoryLimitInBytes)
 	}
+	return podResourceInfo
+}
+
+func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
+	ginkgo.GinkgoHelper()
+	if podOnCgroupv2Node == nil {
+		value := IsPodOnCgroupv2Node(f, pod)
+		podOnCgroupv2Node = &value
+	}
+
+	var podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes int64
+	var errs []error
+	for _, ci := range tcInfo {
+		tc := makeResizableContainer(ci)
+		errs = append(errs, verifyContainerCgroupValues(f, pod, &tc, *podOnCgroupv2Node))
+
+		// Accumulate container resources for verifying pod
+		podCPURequestMilliValue += tc.Resources.Requests.Cpu().MilliValue()
+		if podCPULimitMilliValue >= 0 {
+			if tc.Resources.Limits.Cpu().IsZero() {
+				podCPULimitMilliValue = -1
+			} else {
+				podCPULimitMilliValue += tc.Resources.Limits.Cpu().MilliValue()
+			}
+		}
+		if podMemoryLimitInBytes >= 0 {
+			if tc.Resources.Limits.Memory().IsZero() {
+				podMemoryLimitInBytes = -1
+			} else {
+				podMemoryLimitInBytes += tc.Resources.Limits.Memory().Value()
+			}
+		}
+	}
+
+	if !*podOnCgroupv2Node {
+		// cgroup v1 is in maintenance mode. Skip verifying pod cgroup
+		return utilerrors.NewAggregate(errs)
+	}
+
+	podResourceInfo := buildPodResourceInfo(podCPURequestMilliValue, podCPULimitMilliValue, podMemoryLimitInBytes)
 	errs = append(errs, VerifyPodCgroups(ctx, f, pod, &podResourceInfo))
 
 	return utilerrors.NewAggregate(errs)
