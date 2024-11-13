@@ -96,16 +96,21 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 }
 
 // WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
-func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
-	kubeletDir, err := GetKubeletDir(dryRun)
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
+	var (
+		err        error
+		kubeletDir = kubeadmconstants.KubeletRunDirectory
+	)
+	// If dry-running, this will return a directory under /etc/kubernetes/tmp or kubeletConfigDir.
+	if dryRun {
+		kubeletDir, err = kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-upgrade-dryrun")
+	}
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
-
-	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
-	backupDir, err := kubeadmconstants.CreateTempDir("", "kubeadm-kubelet-config")
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeletConfigDir.
+	backupDir, err := kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-kubelet-config")
 	if err != nil {
 		return err
 	}
@@ -176,14 +181,6 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 		}
 	}
 	return nil
-}
-
-// GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
-func GetKubeletDir(dryRun bool) (string, error) {
-	if dryRun {
-		return kubeadmconstants.CreateTempDir("", "kubeadm-upgrade-dryrun")
-	}
-	return kubeadmconstants.KubeletRunDirectory, nil
 }
 
 // UpdateKubeletLocalMode changes the Server URL in the kubelets kubeconfig to the local API endpoint if it is currently
