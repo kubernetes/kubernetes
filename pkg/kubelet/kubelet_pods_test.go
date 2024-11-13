@@ -4797,22 +4797,33 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			},
 		},
 		"BurstableQoSPod with below min CPU": {
-			Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100M"),
-				v1.ResourceCPU:    resource.MustParse("1m"),
-			}},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100M"),
+					v1.ResourceCPU:    resource.MustParse("1m"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("5m"),
+				},
+			},
 			ActualResources: &kubecontainer.ContainerResources{
 				CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
+				CPULimit:   resource.NewMilliQuantity(10, resource.DecimalSI),
 			},
 			OldStatus: v1.ContainerStatus{
 				Name:    testContainerName,
 				Image:   "img",
 				ImageID: "img1234",
 				State:   v1.ContainerState{Running: &v1.ContainerStateRunning{}},
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("100M"),
-					v1.ResourceCPU:    resource.MustParse("1m"),
-				}},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("100M"),
+						v1.ResourceCPU:    resource.MustParse("1m"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("5m"),
+					},
+				},
 			},
 			Expected: v1.ContainerStatus{
 				Name:        testContainerName,
@@ -4824,10 +4835,15 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 					v1.ResourceMemory: resource.MustParse("100M"),
 					v1.ResourceCPU:    resource.MustParse("1m"),
 				},
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceMemory: resource.MustParse("100M"),
-					v1.ResourceCPU:    resource.MustParse("1m"),
-				}},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("100M"),
+						v1.ResourceCPU:    resource.MustParse("1m"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("5m"),
+					},
+				},
 			},
 		},
 		"GuaranteedQoSPod with CPU and memory CRI status, with ephemeral storage": {
@@ -6788,6 +6804,36 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 		},
 		statusResources: &kubecontainer.ContainerResources{
 			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
+		},
+		expectMatch: true,
+	}, {
+		name: "burstable: min cpu limit",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("10m"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("10m"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(10, resource.DecimalSI),
+			CPULimit:   resource.NewMilliQuantity(10, resource.DecimalSI),
+		},
+		expectMatch: true,
+	}, {
+		name: "burstable: below min cpu limit",
+		allocatedResources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5m"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("5m"),
+			},
+		},
+		statusResources: &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(5, resource.DecimalSI),
+			CPULimit:   resource.NewMilliQuantity(10, resource.DecimalSI),
 		},
 		expectMatch: true,
 	}, {

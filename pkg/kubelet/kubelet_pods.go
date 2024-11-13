@@ -1806,7 +1806,9 @@ func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontaine
 					if !cpuLim.IsZero() {
 						return false
 					}
-				} else if !cpuLim.Equal(*cs.Resources.CPULimit) {
+				} else if !cpuLim.Equal(*cs.Resources.CPULimit) &&
+					(cpuLim.MilliValue() > cm.MinMilliCPULimit || cs.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit) {
+					// If both allocated & status CPU limits are at or below the minimum limit, then they are considered equal.
 					return false
 				}
 			}
@@ -2152,7 +2154,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		resources := alloc
 		if resources.Limits != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
-				resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
+				// allocated value in the API to avoid confusion and simplify comparisons.
+				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
+					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
+					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
+				}
 			} else {
 				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
 			}

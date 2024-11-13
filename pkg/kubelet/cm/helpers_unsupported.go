@@ -20,7 +20,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -31,8 +31,9 @@ const (
 	SharesPerCPU  = 0
 	MilliCPUToCPU = 0
 
-	QuotaPeriod    = 0
-	MinQuotaPeriod = 0
+	QuotaPeriod      = 0
+	MinQuotaPeriod   = 0
+	MinMilliCPULimit = 0
 )
 
 // MilliCPUToQuota converts milliCPU and period to CFS quota values.
