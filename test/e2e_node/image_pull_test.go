@@ -263,7 +263,7 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		e, err := getImagePullAttempts(ctx, f, pod.Name)
 		framework.ExpectNoError(err)
 		// 3 would take 10s best case.
-		gomega.Expect(e.Count).Should(gomega.BeNumerically(">", 3))
+		gomega.Expect(e.Count).Should(gomega.BeNumerically(">=", 3))
 		// 7 would take 310s best case, if the infra went slow.
 		gomega.Expect(e.Count).Should(gomega.BeNumerically("<=", 7))
 
