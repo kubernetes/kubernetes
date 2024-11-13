@@ -3173,8 +3173,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	require.ErrorContains(t, err, "ErrImagePull", "Image pull must fail for missing pull secret event to be emitted")
 
 	events := make([]string, 0, 10)
-	done := false
-	for !done {
+	for done := false; !done; {
 		select {
 		case event := <-fakeRecorder.Events:
 			events = append(events, event)
