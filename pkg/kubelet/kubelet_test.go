@@ -3116,7 +3116,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	fakeRuntime.ImageService.InjectError("PullImage", errors.New("Test pull failed"))
 	logger := klog.Background()
 	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 		kubelet.recorder,
@@ -3152,7 +3152,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		ImagePullSecrets: []v1.LocalObjectReference{
