@@ -308,7 +308,19 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 		defer utilruntime.HandleCrash()
 		// This blocks until the connection is closed.
 		// Client should not send anything.
-		wsstream.IgnoreReceives(ws, 0)
+		frame, err := ws.NewFrameReader()
+		if err == nil {
+			for {
+				frame, err = ws.HandleFrame(frame)
+				if err != nil {
+					break
+				}
+				if frame.PayloadType() == websocket.CloseFrame {
+					ws.Close()
+					break
+				}
+			}
+		}
 		// Once the client closes, we should also close
 		close(done)
 	}()
