@@ -59,21 +59,17 @@ function kube::protoc::protoc() {
   local package=${1}
   gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
-  (
-    cd "${package}"
-
-    # This invocation of --gogo_out produces its output in the current
-    # directory (despite gogo docs saying it would be source-relative, it
-    # isn't).  The inputs to this function do not all have a common root, so
-    # this works best for all inputs.
-    PATH="${gogopath}:${PATH}" protoc \
-      --proto_path="$(pwd -P)" \
-      --proto_path="${KUBE_ROOT}/vendor" \
-      --proto_path="${KUBE_ROOT}/staging/src" \
-      --proto_path="${KUBE_ROOT}/third_party/protobuf" \
-      --gogo_out=paths=source_relative,plugins=grpc:. \
-      api.proto
-  )
+  # This invocation of --gogo_out produces its output in the current
+  # directory (despite gogo docs saying it would be source-relative, it
+  # isn't).  The inputs to this function do not all have a common root, so
+  # this works best for all inputs.
+  PATH="${gogopath}:${PATH}" protoc \
+    --proto_path="$(pwd -P)" \
+    --proto_path="${KUBE_ROOT}/vendor" \
+    --proto_path="${KUBE_ROOT}/staging/src" \
+    --proto_path="${KUBE_ROOT}/third_party/protobuf" \
+    --gogo_out=paths=source_relative,plugins=grpc:. \
+    "${package}/api.proto"
 }
 
 # Formats $1/api.pb.go, adds the boilerplate comments and run gofmt on it
