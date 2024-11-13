@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -230,6 +231,44 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 		})
 
 	})
+
+	ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
+		// inject PullImage failed to trigger backoff
+		expectedErr := fmt.Errorf("PullImage failed")
+		err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
+			if apiName == criproxy.PullImage {
+				return expectedErr
+			}
+			return nil
+		})
+		framework.ExpectNoError(err)
+
+		pod := e2epod.NewPodClient(f).Create(ctx, newPullImageAlwaysPod())
+		podErr := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "ImagePullBackOff", 1*time.Minute, func(pod *v1.Pod) (bool, error) {
+			if len(pod.Status.ContainerStatuses) > 0 && pod.Status.Reason == images.ErrImagePullBackOff.Error() {
+				return true, nil
+			}
+			return false, nil
+		})
+		gomega.Expect(podErr).To(gomega.HaveOccurred())
+
+		eventMsg, err := getFailedToPullImageMsg(ctx, f, pod.Name)
+		framework.ExpectNoError(err)
+		isExpectedErrMsg := strings.Contains(eventMsg, expectedErr.Error())
+		gomega.Expect(isExpectedErrMsg).To(gomega.BeTrueBecause("we injected an exception into the PullImage interface of the cri proxy"))
+
+		// Hard wait 30 seconds for image pulls to repeatedly back off.
+		time.Sleep(30 * time.Second)
+
+		e, err := getImagePullAttempts(ctx, f, pod.Name)
+		framework.ExpectNoError(err)
+		// 3 would take 10s best case.
+		gomega.Expect(e.Count).Should(gomega.BeNumerically(">=", 3))
+		// 7 would take 310s best case, if the infra went slow.
+		gomega.Expect(e.Count).Should(gomega.BeNumerically("<=", 7))
+
+	})
+
 })
 
 func getPodImagePullDurations(ctx context.Context, f *framework.Framework, testpods []*v1.Pod) (map[string]*pulledStruct, map[string]metav1.Time, map[string]metav1.Time, error) {
@@ -342,4 +381,19 @@ func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 		pulledDuration:               pulledDuration,
 		pulledIncludeWaitingDuration: pulledIncludeWaitingDuration,
 	}, nil
+}
+
+func getImagePullAttempts(ctx context.Context, f *framework.Framework, podName string) (v1.Event, error) {
+	event := v1.Event{}
+	e, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return event, err
+	}
+
+	for _, event := range e.Items {
+		if event.InvolvedObject.Name == podName && event.Reason == kubeletevents.PullingImage {
+			return event, nil
+		}
+	}
+	return event, nil
 }
