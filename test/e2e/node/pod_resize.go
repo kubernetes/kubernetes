@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -112,6 +113,7 @@ func doPodResizeAdmissionPluginsTests() {
 
 	for _, tc := range testcases {
 		f := framework.NewDefaultFramework(tc.name)
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // for using HostPath
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			containers := []e2epod.ResizableContainerInfo{
@@ -140,7 +142,7 @@ func doPodResizeAdmissionPluginsTests() {
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			testPod1 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
-			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+			e2epod.ConfigureHostPathForPodCgroup(testPod1)
 			testPod2 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
 			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 
