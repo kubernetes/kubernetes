@@ -606,7 +606,12 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		// then consider these equal.
 		desiredResources.cpuRequest = currentResources.cpuRequest
 	}
-
+	// Special case for minimum CPU limit
+	if desiredResources.cpuLimit <= cm.MinMilliCPULimit && currentResources.cpuLimit <= cm.MinMilliCPULimit {
+		// If both desired & current CPU limit are at or below the minimum effective limit,
+		// then consider these equal.
+		desiredResources.cpuLimit = currentResources.cpuLimit
+	}
 	if currentResources == desiredResources {
 		// No resize required.
 		return true
@@ -848,14 +853,13 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				actualRequest := nonNilQuantity(status.Resources.CPURequest)
 				desiredLimit := container.Resources.Limits.Cpu()
 				desiredRequest := container.Resources.Requests.Cpu()
-				if !actualLimit.Equal(*desiredLimit) {
-					return false // limits don't match
-				} else if actualRequest.Equal(*desiredRequest) {
-					return true // requests & limits both match
-				}
+				// Consider limits equal if both are at or below the effective minimum limit.
+				equalLimits := actualLimit.Equal(*desiredLimit) || (actualLimit.MilliValue() <= cm.MinMilliCPULimit &&
+					desiredLimit.MilliValue() <= cm.MinMilliCPULimit)
 				// Consider requests equal if both are at or below MinShares.
-				return actualRequest.MilliValue() <= cm.MinShares &&
-					desiredRequest.MilliValue() <= cm.MinShares
+				equalRequests := actualRequest.Equal(*desiredRequest) || (actualRequest.MilliValue() <= cm.MinShares &&
+					desiredRequest.MilliValue() <= cm.MinShares)
+				return equalLimits && equalRequests
 			default:
 				return true // Shouldn't happen.
 			}

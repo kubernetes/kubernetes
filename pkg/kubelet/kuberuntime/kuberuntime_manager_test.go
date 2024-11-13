@@ -2215,6 +2215,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 	cpu1m := resource.MustParse("1m")
 	cpu2m := resource.MustParse("2m")
+	cpu10m := resource.MustParse("10m")
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
@@ -2406,10 +2407,12 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
+					Limits:   v1.ResourceList{v1.ResourceCPU: cpu1m},
 				}
 				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
 					cStatus.Resources = &kubecontainer.ContainerResources{
 						CPURequest: ptr.To(cpu2m.DeepCopy()),
+						CPULimit:   ptr.To(cpu10m.DeepCopy()),
 					}
 				}
 			},
