@@ -584,20 +584,20 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu requests - resize with equivalent request",
+			name: "Burstable QoS pod, one container with cpu requests and limits - resize with equivalents",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "2m"},
+					Resources: &e2epod.ContainerResources{CPUReq: "2m", CPULim: "10m"},
 				},
 			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"1m"}}}
+						{"name":"c1", "resources":{"requests":{"cpu":"1m"},"limits":{"cpu":"5m"}}}
 					]}}`,
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "1m"},
+					Resources: &e2epod.ContainerResources{CPUReq: "1m", CPULim: "5m"},
 				},
 			},
 		},
