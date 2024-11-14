@@ -3069,6 +3069,8 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 }
 
 func TestPullErrorReportsMissingSecrets(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
 	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets: [missing]"
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -3114,7 +3116,6 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	kubelet.runtimeService = runtimeSvc
 
 	fakeRuntime.ImageService.InjectError("PullImage", errors.New("Test pull failed"))
-	logger := klog.Background()
 	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
 	require.NoError(t, err)
 
@@ -3169,7 +3170,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 		},
 		EnableServiceLinks: ptr.To(false),
 	})
-	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
+	_, err = kubelet.SyncPod(ctx, kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
 	require.ErrorContains(t, err, "ErrImagePull", "Image pull must fail for missing pull secret event to be emitted")
 
 	events := make([]string, 0, 10)
