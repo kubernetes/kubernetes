@@ -3095,11 +3095,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	kubelet.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, "TEST", "")
 
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
-		SyncFrequency: metav1.Duration{Duration: time.Minute},
-		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
-		ContainerLogMaxSize:                       "10Mi",
-		ContainerLogMaxFiles:                      5,
-		MemoryThrottlingFactor:                    ptr.To[float64](0),
+		MemoryThrottlingFactor: ptr.To[float64](0),
 	}
 
 	exp := tracetest.NewInMemoryExporter()
