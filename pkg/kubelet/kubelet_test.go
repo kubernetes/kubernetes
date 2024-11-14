@@ -3098,10 +3098,7 @@ func TestPullErrorReportsMissingSecrets(t *testing.T) {
 		MemoryThrottlingFactor: ptr.To[float64](0),
 	}
 
-	exp := tracetest.NewInMemoryExporter()
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(exp),
-	)
+	tp := noopoteltrace.NewTracerProvider()
 	kubelet.tracer = tp.Tracer(instrumentationScope)
 
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
