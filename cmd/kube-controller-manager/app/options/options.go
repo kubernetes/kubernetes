@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/zpages/flagz"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/klog/v2"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
@@ -108,6 +109,9 @@ type KubeControllerManagerOptions struct {
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
+
+	// Parsedflags holds the parsed CLI flags.
+	ParsedFlags *cliflag.NamedFlagSets
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -509,6 +513,12 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 	s.Metrics.Apply()
+
+	if s.ParsedFlags != nil {
+		c.Flagz = flagz.NamedFlagSetsReader{
+			FlagSets: *s.ParsedFlags,
+		}
+	}
 
 	return c, nil
 }
