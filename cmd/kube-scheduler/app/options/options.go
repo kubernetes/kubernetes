@@ -46,6 +46,8 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	utilversion "k8s.io/component-base/version"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -259,6 +261,11 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
 	if o.Deprecated != nil {
 		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if o.Flags != nil {
+			c.Flagz = flagz.NamedFlagSetsReader{FlagSets: *o.Flags}
+		}
 	}
 
 	return nil
