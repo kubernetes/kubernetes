@@ -180,12 +180,6 @@ func validateTLSSecurityProfileType(fieldPath *field.Path, profile *configv1.TLS
 
 	errs := field.ErrorList{}
 
-	availableTypes := []string{
-		string(configv1.TLSProfileOldType),
-		string(configv1.TLSProfileIntermediateType),
-		string(configv1.TLSProfileCustomType),
-	}
-
 	switch profile.Type {
 	case "":
 		if profile.Old != nil || profile.Intermediate != nil || profile.Modern != nil || profile.Custom != nil {
@@ -200,13 +194,15 @@ func validateTLSSecurityProfileType(fieldPath *field.Path, profile *configv1.TLS
 			errs = append(errs, field.Required(fieldPath.Child("intermediate"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
 		}
 	case configv1.TLSProfileModernType:
-		errs = append(errs, field.NotSupported(fieldPath.Child("type"), profile.Type, availableTypes))
+		if profile.Modern == nil {
+			errs = append(errs, field.Required(fieldPath.Child("modern"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
+		}
 	case configv1.TLSProfileCustomType:
 		if profile.Custom == nil {
 			errs = append(errs, field.Required(fieldPath.Child("custom"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
 		}
 	default:
-		errs = append(errs, field.Invalid(typePath, profile.Type, fmt.Sprintf("unknown type, valid values are: %v", availableTypes)))
+		errs = append(errs, field.Invalid(typePath, profile.Type, fmt.Sprintf("unknown type, valid values are: [Old Intermediate Modern Custom]")))
 	}
 
 	return errs
@@ -214,6 +210,13 @@ func validateTLSSecurityProfileType(fieldPath *field.Path, profile *configv1.TLS
 
 func validateCipherSuites(fieldPath *field.Path, suites []string, version configv1.TLSProtocolVersion) field.ErrorList {
 	errs := field.ErrorList{}
+
+	if version == configv1.VersionTLS13 {
+		if len(suites) != 0 {
+			errs = append(errs, field.Invalid(fieldPath, suites, "TLS 1.3 cipher suites are not configurable"))
+		}
+		return errs
+	}
 
 	if ianaSuites := libgocrypto.OpenSSLToIANACipherSuites(suites); len(ianaSuites) == 0 {
 		errs = append(errs, field.Invalid(fieldPath, suites, "no supported cipher suite found"))
@@ -224,7 +227,7 @@ func validateCipherSuites(fieldPath *field.Path, suites []string, version config
 	// configuration to return an error when http2 required cipher suites aren't
 	// provided.
 	// See: go/x/net/http2.ConfigureServer for futher information.
-	if version < configv1.VersionTLS13 && !haveRequiredHTTP2CipherSuites(suites) {
+	if !haveRequiredHTTP2CipherSuites(suites) {
 		errs = append(errs, field.Invalid(fieldPath, suites, "http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of ECDHE-RSA-AES128-GCM-SHA256 or ECDHE-ECDSA-AES128-GCM-SHA256)"))
 	}
 
@@ -246,14 +249,8 @@ func haveRequiredHTTP2CipherSuites(suites []string) bool {
 
 func validateMinTLSVersion(fieldPath *field.Path, version configv1.TLSProtocolVersion) field.ErrorList {
 	errs := field.ErrorList{}
-
-	if version == configv1.VersionTLS13 {
-		return append(errs, field.NotSupported(fieldPath, version, []string{string(configv1.VersionTLS10), string(configv1.VersionTLS11), string(configv1.VersionTLS12)}))
-	}
-
 	if _, err := libgocrypto.TLSVersion(string(version)); err != nil {
 		errs = append(errs, field.Invalid(fieldPath, version, err.Error()))
 	}
-
 	return errs
 }

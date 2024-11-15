@@ -144,19 +144,12 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			},
 		},
 		{
-			name: "modern type - currently unsupported",
+			name: "modern type - supported",
 			profile: &configv1.TLSSecurityProfile{
 				Type:   configv1.TLSProfileModernType,
 				Modern: &configv1.ModernTLSProfile{},
 			},
-			want: field.ErrorList{
-				field.NotSupported(rootFieldPath.Child("type"), configv1.TLSProfileModernType,
-					[]string{
-						string(configv1.TLSProfileOldType),
-						string(configv1.TLSProfileIntermediateType),
-						string(configv1.TLSProfileCustomType),
-					}),
-			},
+			want: field.ErrorList{},
 		},
 		{
 			name: "unknown type",
@@ -164,7 +157,7 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 				Type: "something",
 			},
 			want: field.ErrorList{
-				field.Invalid(rootFieldPath.Child("type"), "something", "unknown type, valid values are: [Old Intermediate Custom]"),
+				field.Invalid(rootFieldPath.Child("type"), "something", "unknown type, valid values are: [Old Intermediate Modern Custom]"),
 			},
 		},
 		{
@@ -212,19 +205,16 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			},
 		},
 		{
-			name: "min tls 1.3 - currently unsupported",
+			name: "min tls 1.3 - supported",
 			profile: &configv1.TLSSecurityProfile{
 				Type: "Custom",
 				Custom: &configv1.CustomTLSProfile{
 					TLSProfileSpec: configv1.TLSProfileSpec{
-						Ciphers:       []string{"ECDHE-ECDSA-CHACHA20-POLY1305"},
 						MinTLSVersion: configv1.VersionTLS13,
 					},
 				},
 			},
-			want: field.ErrorList{
-				field.NotSupported(rootFieldPath.Child("custom", "minTLSVersion"), configv1.VersionTLS13, []string{string(configv1.VersionTLS10), string(configv1.VersionTLS11), string(configv1.VersionTLS12)}),
-			},
+			want: field.ErrorList{},
 		},
 		{
 			name: "custom profile missing required http2 ciphers",
@@ -247,6 +237,19 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 			},
 		},
 		{
+			name: "custom profile required http2 ciphers tls 1.3",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers:       []string{},
+						MinTLSVersion: configv1.VersionTLS13,
+					},
+				},
+			},
+			want: field.ErrorList{},
+		},
+		{
 			name: "custom profile with one required http2 ciphers",
 			profile: &configv1.TLSSecurityProfile{
 				Type: "Custom",
@@ -264,6 +267,21 @@ func Test_validateTLSSecurityProfile(t *testing.T) {
 				},
 			},
 			want: field.ErrorList{},
+		},
+		{
+			name: "custom profile min tls 1.3 cannot customize",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers:       []string{"TLS_AES_128_GCM_SHA256"},
+						MinTLSVersion: configv1.VersionTLS13,
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string{"TLS_AES_128_GCM_SHA256"}, "TLS 1.3 cipher suites are not configurable"),
+			},
 		},
 	}
 	for _, tt := range tests {
