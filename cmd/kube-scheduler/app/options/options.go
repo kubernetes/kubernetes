@@ -46,6 +46,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	utilversion "k8s.io/component-base/version"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -298,6 +299,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c := &schedulerappconfig.Config{}
+	c.Flagz = flagz.NamedFlagSetsReader{FlagSets: *o.Flags}
 	if err := o.ApplyTo(logger, c); err != nil {
 		return nil, err
 	}
