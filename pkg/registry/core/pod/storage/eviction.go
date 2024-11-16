@@ -275,6 +275,8 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 					_, _, updateErr := r.store.Update(ctx, pod.Name, podUpdatedObjectInfo, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 					if updateErr != nil {
 						//just log here? or actually mutate err to append details?
+						statusErr := err.(*errors.StatusError)
+						statusErr.ErrStatus.Message = fmt.Sprintf("%s and failed to updated pod conditon: %s", statusErr.ErrStatus.Message, err.Error())
 					}
 				}
 				return err
