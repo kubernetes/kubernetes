@@ -81,6 +81,8 @@ fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
 KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+# Set to 'false' to disable reduction of the JUnit file to only the top level tests.
+KUBE_PRUNE_JUNIT_TESTS=${KUBE_PRUNE_JUNIT_TESTS:-true}
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -234,7 +236,7 @@ runTests() {
     && rc=$? || rc=$?
 
   if [[ -n "${junit_filename_prefix}" ]]; then
-    prune-junit-xml "${junit_filename_prefix}.xml"
+    prune-junit-xml -prune-tests="${KUBE_PRUNE_JUNIT_TESTS}" "${junit_filename_prefix}.xml"
   fi
 
   if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then
