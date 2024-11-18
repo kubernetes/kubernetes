@@ -23,7 +23,6 @@
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -91,6 +90,19 @@
       measurePods: 1000
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -108,7 +120,6 @@
 - name: SteadyStateClusterResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
-    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -177,6 +188,19 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: empty_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: empty_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -199,6 +223,19 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: half_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 2500
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: half_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -221,6 +258,19 @@
       maxClaimsPerNode: 10
       duration: 10s
   - name: full_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 4990
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: full_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
