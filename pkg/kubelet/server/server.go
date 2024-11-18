@@ -107,8 +107,11 @@ const (
 	debugFlagPath       = "/debug/flags/v"
 	podsPath            = "/pods"
 	runningPodsPath     = "/runningpods/"
+)
 
-	kubeletComponent = "kubelet"
+const (
+	// Kubelet component name
+	ComponentKubelet = "kubelet"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -411,7 +414,8 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont, checkers...)
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.restfulCont, kubeletComponent, statusz.NewRegistry())
+		s.addMetricsBucketMatcher("statusz")
+		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry())
 	}
 
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
