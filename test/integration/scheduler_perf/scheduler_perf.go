@@ -207,9 +207,9 @@ var (
 	}
 )
 
-var UseTestingLog *bool
-var PerfSchedulingLabelFilter *string
-var TestSchedulingLabelFilter *string
+var UseTestingLog bool
+var PerfSchedulingLabelFilter string
+var TestSchedulingLabelFilter string
 
 // InitTests should be called in a TestMain in each config subdirectory.
 func InitTests() error {
@@ -235,9 +235,9 @@ func InitTests() error {
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 			"Options are:\n"+strings.Join(LoggingFeatureGate.KnownFeatures(), "\n"))
 
-	UseTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
-	PerfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
-	TestSchedulingLabelFilter = flag.String("test-scheduling-label-filter", "integration-test,-performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
+	flag.BoolVar(&UseTestingLog, "use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
+	flag.StringVar(&PerfSchedulingLabelFilter, "perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
+	flag.StringVar(&TestSchedulingLabelFilter, "test-scheduling-label-filter", "integration-test,-performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by TestScheduling")
 
 	// This would fail if we hadn't removed the logging flags above.
 	logsapi.AddGoFlags(LoggingConfig, flag.CommandLine)
@@ -988,7 +988,7 @@ func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
 
 func initTestOutput(tb testing.TB) io.Writer {
 	var output io.Writer
-	if *UseTestingLog {
+	if UseTestingLog {
 		output = framework.NewTBWriter(tb)
 	} else {
 		tmpDir := tb.TempDir()
@@ -1020,9 +1020,9 @@ func initTestOutput(tb testing.TB) io.Writer {
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
 func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
-	tCtx := ktesting.Init(t, initoption.PerTestOutput(*UseTestingLog))
+	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
-	if !*UseTestingLog && doArtifacts {
+	if !UseTestingLog && doArtifacts {
 		// Reconfigure logging so that it goes to a separate file per
 		// test instead of stderr. If the test passes, the file gets
 		// deleted. The overall output can be very large (> 200 MB for
@@ -1130,9 +1130,9 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 	}
 
 	if testing.Short() {
-		*PerfSchedulingLabelFilter += ",+short"
+		PerfSchedulingLabelFilter += ",+short"
 	}
-	testcaseLabelSelectors := strings.Split(*PerfSchedulingLabelFilter, ",")
+	testcaseLabelSelectors := strings.Split(PerfSchedulingLabelFilter, ",")
 
 	output := initTestOutput(b)
 
@@ -1150,7 +1150,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
-						b.Skipf("disabled by label filter %v", PerfSchedulingLabelFilter)
+						b.Skipf("disabled by label filter %q", PerfSchedulingLabelFilter)
 					}
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
@@ -1244,16 +1244,16 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 	}
 
 	if testing.Short() {
-		*TestSchedulingLabelFilter += ",+short"
+		TestSchedulingLabelFilter += ",+short"
 	}
-	testcaseLabelSelectors := strings.Split(*TestSchedulingLabelFilter, ",")
+	testcaseLabelSelectors := strings.Split(TestSchedulingLabelFilter, ",")
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			for _, w := range tc.Workloads {
 				t.Run(w.Name, func(t *testing.T) {
 					if !enabled(testcaseLabelSelectors, append(tc.Labels, w.Labels...)...) {
-						t.Skipf("disabled by label filter %q", *TestSchedulingLabelFilter)
+						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
