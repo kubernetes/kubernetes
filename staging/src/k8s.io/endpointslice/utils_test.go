@@ -631,6 +631,43 @@ func TestGetEndpointPorts(t *testing.T) {
 				Protocol: &protoTCP,
 			}},
 		},
+		"service with same named port for regular and restartable init container": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+							Protocol:   protoTCP,
+						}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "http",
+							ContainerPort: int32(8080),
+							Protocol:      protoTCP,
+						}},
+						RestartPolicy: &restartPolicyAlways,
+					}},
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "http",
+							ContainerPort: int32(8090),
+							Protocol:      protoTCP,
+						}},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:     pointer.String("http"),
+				Port:     pointer.Int32(8090),
+				Protocol: &protoTCP,
+			}},
+		},
 	}
 
 	for name, tc := range testCases {
