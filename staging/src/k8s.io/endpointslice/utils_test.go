@@ -515,6 +515,7 @@ func TestServiceControllerKey(t *testing.T) {
 
 func TestGetEndpointPorts(t *testing.T) {
 	protoTCP := v1.ProtocolTCP
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	testCases := map[string]struct {
 		service       *v1.Service
@@ -583,6 +584,51 @@ func TestGetEndpointPorts(t *testing.T) {
 				Port:        pointer.Int32(443),
 				Protocol:    &protoTCP,
 				AppProtocol: pointer.String("https"),
+			}},
+		},
+		"service with named port for restartable init container": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Name:       "http-sidecar",
+						Port:       8080,
+						TargetPort: intstr.FromInt32(8080),
+						Protocol:   protoTCP,
+					}, {
+						Name:       "http",
+						Port:       8090,
+						TargetPort: intstr.FromString("http"),
+						Protocol:   protoTCP,
+					}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "http-sidecar",
+							ContainerPort: int32(8080),
+							Protocol:      protoTCP,
+						}},
+						RestartPolicy: &restartPolicyAlways,
+					}},
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "http",
+							ContainerPort: int32(8090),
+							Protocol:      protoTCP,
+						}},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:     pointer.String("http-sidecar"),
+				Port:     pointer.Int32(8080),
+				Protocol: &protoTCP,
+			}, {
+				Name:     pointer.String("http"),
+				Port:     pointer.Int32(8090),
+				Protocol: &protoTCP,
 			}},
 		},
 	}
