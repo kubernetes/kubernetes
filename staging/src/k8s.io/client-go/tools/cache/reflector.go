@@ -823,12 +823,12 @@ loop:
 			resourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
-				err := store.Add(event.Object)
+				err = store.Add(event.Object)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("%s: unable to add watch event object (%#v) to store: %v", name, event.Object, err))
 				}
 			case watch.Modified:
-				err := store.Update(event.Object)
+				err = store.Update(event.Object)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("%s: unable to update watch event object (%#v) to store: %v", name, event.Object, err))
 				}
@@ -836,7 +836,7 @@ loop:
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
-				err := store.Delete(event.Object)
+				err = store.Delete(event.Object)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", name, event.Object, err))
 				}
@@ -847,6 +847,10 @@ loop:
 				}
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
+			}
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("%s: handle watch event %#v error: %w", name, event, err))
+				return false, err
 			}
 			setLastSyncResourceVersion(resourceVersion)
 			if rvu, ok := store.(ResourceVersionUpdater); ok {
