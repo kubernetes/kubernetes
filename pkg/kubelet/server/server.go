@@ -67,6 +67,8 @@ import (
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -109,6 +111,7 @@ const (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
+	flagz                flagz.Reader
 	auth                 AuthInterface
 	host                 HostInterface
 	restfulCont          containerInterface
@@ -287,6 +290,7 @@ func NewServer(
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
 	server := Server{
+		flagz:                kubeCfg.Flagz,
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
 		auth:                 auth,
@@ -405,6 +409,12 @@ func (s *Server) InstallDefaultHandlers() {
 	}
 	checkers = append(checkers, s.extendedCheckers...)
 	healthz.InstallHandler(s.restfulCont, checkers...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
+	}
 
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
 

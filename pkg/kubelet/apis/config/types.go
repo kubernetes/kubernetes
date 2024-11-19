@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	"k8s.io/component-base/zpages/flagz"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -82,6 +83,8 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// Flagz is the Reader interface to get flags for flagz page.
+	Flagz flagz.Reader
 	// enableServer enables Kubelet's secured server.
 	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
 	EnableServer bool
