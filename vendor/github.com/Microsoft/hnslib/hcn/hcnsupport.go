@@ -7,8 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/Microsoft/hnslib/internal/log"
 )
 
 var (
@@ -121,7 +119,7 @@ func getSupportedFeatures() (SupportedFeatures, error) {
 	features.ModifyLoadbalancer = isFeatureSupported(globals.Version, ModifyLoadbalancerVersion)
 	features.Accelnet = isFeatureSupported(globals.Version, AccelnetVersion)
 
-	log.L.WithFields(logrus.Fields{
+	logrus.WithFields(logrus.Fields{
 		"version":           globals.Version,
 		"supportedFeatures": features,
 	}).Info("HCN feature check")

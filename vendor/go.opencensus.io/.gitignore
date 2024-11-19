@@ -1,9 +1,0 @@
-/.idea/
-
-# go.opencensus.io/exporter/aws
-/exporter/aws/
-
-# Exclude vendor, use dep ensure after checkout:
-/vendor/github.com/
-/vendor/golang.org/
-/vendor/google.golang.org/

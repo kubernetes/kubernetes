@@ -156,9 +156,7 @@
         "k8s.io/metrics"
       ],
       "github.com/golang/groupcache": [
-        "github.com/Microsoft/hnslib",
-        "go.etcd.io/etcd/server/v3",
-        "go.opencensus.io"
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go",
@@ -177,9 +175,6 @@
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
-      "go.opencensus.io": [
-        "github.com/Microsoft/hnslib"
       ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
@@ -246,7 +241,6 @@
     "unwantedVendored": [
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
-      "github.com/golang/groupcache",
       "github.com/google/gofuzz",
       "github.com/google/shlex",
       "github.com/gregjones/httpcache",
@@ -255,7 +249,6 @@
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/pkg/errors",
-      "go.opencensus.io",
       "golang.org/x/exp",
       "google.golang.org/genproto"
     ]
