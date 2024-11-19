@@ -233,6 +233,10 @@ var _ = SIGDescribe("Pull Image", feature.CriProxy, framework.WithSerial(), func
 	})
 
 	ginkgo.It("Image pull retry backs off on error.", func(ctx context.Context) {
+		if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+			ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+		}
+
 		// inject PullImage failed to trigger backoff
 		expectedErr := fmt.Errorf("PullImage failed")
 		err := addCRIProxyInjector(e2eCriProxy, func(apiName string) error {
