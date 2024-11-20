@@ -540,7 +540,7 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
