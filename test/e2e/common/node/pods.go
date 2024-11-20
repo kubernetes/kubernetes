@@ -307,7 +307,7 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
 		var lastPod *v1.Pod
-		timer := time.After(e2epod.DefaultPodDeletionTimeout)
+		timer := time.After(f.Timeouts.PodDelete)
 		for !deleted {
 			select {
 			case event := <-w.ResultChan():
