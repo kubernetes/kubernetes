@@ -14,22 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpoints
+package network
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-// PortsByPodUID is a map that maps pod UID to container ports.
-type PortsByPodUID map[types.UID][]int
-
-// FullPortsByPodUID is a map that maps pod UID to container ports.
-type FullPortsByPodUID map[types.UID][]v1.ContainerPort
-
-// GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
-func GetContainerPortsByPodUID(ep *v1.Endpoints) PortsByPodUID {
-	m := PortsByPodUID{}
+// getContainerPortsByPodUID returns a portsByPodUID map on the given endpoints.
+func getContainerPortsByPodUID(ep *v1.Endpoints) portsByPodUID {
+	m := portsByPodUID{}
 	for _, ss := range ep.Subsets {
 		for _, port := range ss.Ports {
 			for _, addr := range ss.Addresses {
@@ -44,9 +37,9 @@ func GetContainerPortsByPodUID(ep *v1.Endpoints) PortsByPodUID {
 	return m
 }
 
-// GetFullContainerPortsByPodUID returns a FullPortsByPodUID map on the given endpoints with all the port data.
-func GetFullContainerPortsByPodUID(ep *v1.Endpoints) FullPortsByPodUID {
-	m := FullPortsByPodUID{}
+// getFullContainerPortsByPodUID returns a fullPortsByPodUID map on the given endpoints with all the port data.
+func getFullContainerPortsByPodUID(ep *v1.Endpoints) fullPortsByPodUID {
+	m := fullPortsByPodUID{}
 	for _, ss := range ep.Subsets {
 		for _, port := range ss.Ports {
 			containerPort := v1.ContainerPort{

@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +67,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
-	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -1538,10 +1539,10 @@ metadata:
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					ep, err := c.CoreV1().Endpoints(ns).Get(ctx, name, metav1.GetOptions{})
+					slices, err := c.DiscoveryV1().EndpointSlices(ns).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, name)})
 					if err != nil {
 						// log the real error
-						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
+						framework.Logf("List endpointslices failed (interval %v): %v", framework.Poll, err)
 
 						// if the error is API not found or could not find default credentials or TLS handshake timeout, try again
 						if apierrors.IsNotFound(err) ||
@@ -1552,7 +1553,7 @@ metadata:
 						return false, err
 					}
 
-					uidToPort := e2eendpoints.GetContainerPortsByPodUID(ep)
+					uidToPort := e2eendpointslice.GetContainerPortsByPodUID(slices.Items)
 					if len(uidToPort) == 0 {
 						framework.Logf("No endpoint found, retrying")
 						return false, nil

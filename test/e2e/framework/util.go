@@ -53,7 +53,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	netutils "k8s.io/utils/net"
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -411,29 +410,12 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
-// Some components use EndpointSlices other Endpoints, we must verify that both objects meet the requirements.
+// WaitForServiceEndpointsNum waits until there are EndpointSlices for serviceName
+// containing a total of expectNum endpoints. (If the service is dual-stack, expectNum
+// must count the endpoints of both IP families.)
 func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
-		endpoint, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-		if err != nil {
-			Logf("Unexpected error trying to get Endpoints for %s : %v", serviceName, err)
-			return false, nil
-		}
-
-		if countEndpointsNum(endpoint) != expectNum {
-			Logf("Unexpected number of Endpoints, got %d, expected %d", countEndpointsNum(endpoint), expectNum)
-			return false, nil
-		}
-
-		// Endpoints are single family but EndpointSlices can have dual stack addresses,
-		// so we verify the number of addresses that matches the same family on both.
-		addressType := discoveryv1.AddressTypeIPv4
-		if isIPv6Endpoint(endpoint) {
-			addressType = discoveryv1.AddressTypeIPv6
-		}
-
 		esList, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
 		if err != nil {
 			Logf("Unexpected error trying to get EndpointSlices for %s : %v", serviceName, err)
@@ -445,44 +427,18 @@ func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, name
 			return false, nil
 		}
 
-		if countEndpointsSlicesNum(esList, addressType) != expectNum {
-			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList, addressType), expectNum)
+		if countEndpointsSlicesNum(esList) != expectNum {
+			Logf("Unexpected number of Endpoints on Slices, got %d, expected %d", countEndpointsSlicesNum(esList), expectNum)
 			return false, nil
 		}
 		return true, nil
 	})
 }
 
-func countEndpointsNum(e *v1.Endpoints) int {
-	num := 0
-	for _, sub := range e.Subsets {
-		num += len(sub.Addresses)
-	}
-	return num
-}
-
-// isIPv6Endpoint returns true if the Endpoint uses IPv6 addresses
-func isIPv6Endpoint(e *v1.Endpoints) bool {
-	for _, sub := range e.Subsets {
-		for _, addr := range sub.Addresses {
-			if len(addr.IP) == 0 {
-				continue
-			}
-			// Endpoints are single family, so it is enough to check only one address
-			return netutils.IsIPv6String(addr.IP)
-		}
-	}
-	// default to IPv4 an Endpoint without IP addresses
-	return false
-}
-
-func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList, addressType discoveryv1.AddressType) int {
+func countEndpointsSlicesNum(epList *discoveryv1.EndpointSliceList) int {
 	// EndpointSlices can contain the same address on multiple Slices
 	addresses := sets.Set[string]{}
 	for _, epSlice := range epList.Items {
-		if epSlice.AddressType != addressType {
-			continue
-		}
 		for _, ep := range epSlice.Endpoints {
 			if len(ep.Addresses) > 0 {
 				addresses.Insert(ep.Addresses[0])
