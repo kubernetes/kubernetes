@@ -73,11 +73,11 @@ func (si *threadedStoreIndexer) Delete(obj interface{}) error {
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	oldObj := si.store.deleteElem(storeElem)
-	if oldObj == nil {
+	oldObj, existed := si.store.deleteElem(storeElem)
+	if !existed {
 		return nil
 	}
-	return si.indexer.updateElem(storeElem.Key, oldObj.(*storeElement), nil)
+	return si.indexer.updateElem(storeElem.Key, oldObj, nil)
 }
 
 func (si *threadedStoreIndexer) List() []interface{} {
@@ -128,12 +128,14 @@ func (si *threadedStoreIndexer) ByIndex(indexName, indexValue string) ([]interfa
 
 func newBtreeStore(degree int) btreeStore {
 	return btreeStore{
-		tree: btree.New(degree),
+		tree: btree.NewG(degree, func(a, b *storeElement) bool {
+			return a.Key < b.Key
+		}),
 	}
 }
 
 type btreeStore struct {
-	tree *btree.BTree
+	tree *btree.BTreeG[*storeElement]
 }
 
 func (s *btreeStore) Add(obj interface{}) error {
@@ -172,14 +174,14 @@ func (s *btreeStore) Delete(obj interface{}) error {
 	return nil
 }
 
-func (s *btreeStore) deleteElem(storeElem *storeElement) interface{} {
+func (s *btreeStore) deleteElem(storeElem *storeElement) (*storeElement, bool) {
 	return s.tree.Delete(storeElem)
 }
 
 func (s *btreeStore) List() []interface{} {
 	items := make([]interface{}, 0, s.tree.Len())
-	s.tree.Ascend(func(i btree.Item) bool {
-		items = append(items, i.(interface{}))
+	s.tree.Ascend(func(item *storeElement) bool {
+		items = append(items, item)
 		return true
 	})
 	return items
@@ -187,8 +189,8 @@ func (s *btreeStore) List() []interface{} {
 
 func (s *btreeStore) ListKeys() []string {
 	items := make([]string, 0, s.tree.Len())
-	s.tree.Ascend(func(i btree.Item) bool {
-		items = append(items, i.(*storeElement).Key)
+	s.tree.Ascend(func(item *storeElement) bool {
+		items = append(items, item.Key)
 		return true
 	})
 	return items
@@ -199,11 +201,8 @@ func (s *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err er
 	if !ok {
 		return nil, false, fmt.Errorf("obj is not a storeElement")
 	}
-	item = s.tree.Get(storeElem)
-	if item == nil {
-		return nil, false, nil
-	}
-	return item, true, nil
+	item, exists = s.tree.Get(storeElem)
+	return item, exists, nil
 }
 
 func (s *btreeStore) GetByKey(key string) (item interface{}, exists bool, err error) {
@@ -225,17 +224,14 @@ func (s *btreeStore) Replace(objs []interface{}, _ string) error {
 // addOrUpdateLocked assumes a lock is held and is used for Add
 // and Update operations.
 func (s *btreeStore) addOrUpdateElem(storeElem *storeElement) *storeElement {
-	oldObj := s.tree.ReplaceOrInsert(storeElem)
-	if oldObj == nil {
-		return nil
-	}
-	return oldObj.(*storeElement)
+	oldObj, _ := s.tree.ReplaceOrInsert(storeElem)
+	return oldObj
 }
 
 func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err error) {
 	keyElement := &storeElement{Key: key}
-	item = s.tree.Get(keyElement)
-	return item, item != nil, nil
+	item, exists = s.tree.Get(keyElement)
+	return item, exists, nil
 }
 
 func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interface{}, bool) {
@@ -250,9 +246,8 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interf
 	if limit == 0 {
 		limit = math.MaxInt
 	}
-	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(i btree.Item) bool {
-		elementKey := i.(*storeElement).Key
-		if !strings.HasPrefix(elementKey, prefix) {
+	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
+		if !strings.HasPrefix(item.Key, prefix) {
 			return false
 		}
 		// TODO: Might be worth to lookup one more item to provide more accurate HasMore.
@@ -260,7 +255,7 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interf
 			hasMore = true
 			return false
 		}
-		result = append(result, i.(interface{}))
+		result = append(result, item)
 		return true
 	})
 	return result, hasMore
@@ -270,9 +265,8 @@ func (s *btreeStore) Count(prefix, continueKey string) (count int) {
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(i btree.Item) bool {
-		elementKey := i.(*storeElement).Key
-		if !strings.HasPrefix(elementKey, prefix) {
+	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
+		if !strings.HasPrefix(item.Key, prefix) {
 			return false
 		}
 		count++
