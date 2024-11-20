@@ -28,8 +28,10 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"golang.org/x/time/rate"
 	"net"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -193,7 +195,8 @@ type Proxier struct {
 	// which proxier is operating on, can be directly consumed by knftables.
 	serviceCIDRs string
 
-	logger klog.Logger
+	logger         klog.Logger
+	logRateLimiter *rate.Limiter
 
 	clusterIPs          *nftElementStorage
 	serviceIPs          *nftElementStorage
@@ -266,6 +269,7 @@ func NewProxier(ctx context.Context,
 		networkInterfacer:   proxyutil.RealNetwork{},
 		staleChains:         make(map[string]time.Time),
 		logger:              logger,
+		logRateLimiter:      rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
 		serviceIPs:          newNFTElementStorage("map", serviceIPsMap),
 		firewallIPs:         newNFTElementStorage("map", firewallIPsMap),
@@ -1136,6 +1140,21 @@ func (s *nftElementStorage) cleanupLeftoverKeys(tx *knftables.Transaction) {
 	s.resetLeftoverKeys()
 }
 
+// logFailure logs the transaction and the full table with a rate limit.
+func (proxier *Proxier) logFailure(tx *knftables.Transaction) {
+	if klogV4 := klog.V(4); klogV4.Enabled() && proxier.logRateLimiter.Allow() {
+		klogV4.InfoS("Failed transaction", "transaction", tx.String())
+		// knftables doesn't supporting listing the full table yet, this is a workaround.
+		cmd := exec.Command("nft", "list", "table", kubeProxyTable)
+		out, err := cmd.Output()
+		if err != nil {
+			klogV4.InfoS("Listing full table failed", "error", err)
+		} else {
+			klogV4.InfoS("Listing full table", "result", string(out))
+		}
+	}
+}
+
 // This is where all of the nftables calls happen.
 // This assumes proxier.mu is NOT held
 func (proxier *Proxier) syncProxyRules() {
@@ -1209,6 +1228,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
 				metrics.NFTablesCleanupFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+				tryPartialSync = false
+
+				// Log failed transaction and list full kube-proxy table.
+				proxier.logFailure(tx)
 			}
 		}
 	}
@@ -1808,6 +1831,8 @@ func (proxier *Proxier) syncProxyRules() {
 		// staleChains is now incorrect since we didn't actually flush the
 		// chains in it. We can recompute it next time.
 		clear(proxier.staleChains)
+		// Log failed transaction and list full kube-proxy table.
+		proxier.logFailure(tx)
 		return
 	}
 	success = true
