@@ -309,23 +309,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 			ct.TerminationMessagePolicy = "File"
-			// Match defaulting in pkg/apis/core/v1/defaults.go.
-			_, hasCPUReq := ct.Resources.Requests[core.ResourceCPU]
-			_, hasCPULim := ct.Resources.Limits[core.ResourceCPU]
-			_, hasMemReq := ct.Resources.Requests[core.ResourceMemory]
-			_, hasMemLim := ct.Resources.Limits[core.ResourceMemory]
-			if hasCPUReq || hasCPULim {
-				ct.ResizePolicy = append(ct.ResizePolicy, core.ContainerResizePolicy{
-					ResourceName:  core.ResourceCPU,
-					RestartPolicy: core.NotRequired,
-				})
-			}
-			if hasMemReq || hasMemLim {
-				ct.ResizePolicy = append(ct.ResizePolicy, core.ContainerResizePolicy{
-					ResourceName:  core.ResourceMemory,
-					RestartPolicy: core.NotRequired,
-				})
-			}
 		},
 		func(ep *core.EphemeralContainer, c fuzz.Continue) {
 			c.FuzzNoCustom(ep)                                                                   // fuzz self without calling this function again
