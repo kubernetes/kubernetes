@@ -714,17 +714,6 @@ func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
 	return nil
 }
 
-// NonBlockingRun spawns the secure http server. An error is
-// returned if the secure port cannot be listened on.
-// The returned channel is closed when the (asynchronous) termination is finished.
-//
-// Deprecated: use RunWithContext instead. Run will not get removed to avoid
-// breaking consumers, but should not be used in new code.
-func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
-	ctx := wait.ContextForChannel(stopCh)
-	return s.NonBlockingRunWithContext(ctx, shutdownTimeout)
-}
-
 // NonBlockingRunWithContext spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
