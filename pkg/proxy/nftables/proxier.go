@@ -472,13 +472,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	// will be recreated. Otherwise, altering properties (e.g. priority) of these
 	// chains would fail the transaction.
 	if !proxier.flushed {
-		for _, bc := range nftablesBaseChains {
-			chain := &knftables.Chain{
-				Name: bc.name,
-			}
-			tx.Add(chain)
-			tx.Delete(chain)
-		}
+		tx.Flush(&knftables.Table{})
 		proxier.flushed = true
 	}
 
@@ -1209,6 +1203,8 @@ func (proxier *Proxier) syncProxyRules() {
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
 				metrics.NFTablesCleanupFailuresTotal.Inc()
+				proxier.flushed = false
+				tryPartialSync = false
 			}
 		}
 	}
