@@ -652,13 +652,14 @@ func TestQuotaLimitResourceClaim(t *testing.T) {
 			defer wg.Done()
 
 			ns := framework.CreateNamespaceOrDie(clientset, "quota-"+utilrand.String(5), t)
+			t.Logf("created namespace %s", ns.Name)
 			defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 			// Creating the first resource claim should succeed
 			resourceClaim := newResourceClaim("claim-0")
-			_, err = clientset.ResourceV1beta1().ResourceClaims(ns.Name).Create(tCtx, resourceClaim, metav1.CreateOptions{})
+			_, err := clientset.ResourceV1beta1().ResourceClaims(ns.Name).Create(tCtx, resourceClaim, metav1.CreateOptions{})
 			if err != nil {
-				t.Errorf("creating first ResourceClaim should not have returned error: %v", err)
+				t.Errorf("creating first ResourceClaim in namespace %s should not have returned error: %v", ns.Name, err)
 			}
 
 			// now create a covering quota
@@ -703,13 +704,14 @@ func newResourceClaim(name string) *resourceapi.ResourceClaim {
 func testResourceClaimForbidden(clientset clientset.Interface, namespace string, resourceClaim *resourceapi.ResourceClaim, t *testing.T) {
 	_, err := clientset.ResourceV1beta1().ResourceClaims(namespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
 	if apierrors.IsForbidden(err) {
+		t.Logf("namespace %s OK", namespace)
 		return
 	}
 
 	if err == nil {
-		t.Error("creating ResourceClaim should have returned error but got nil")
+		t.Errorf("creating ResourceClaim should have returned error but got nil in namespace %s", namespace)
 		return
 	}
 
-	t.Errorf("creating ResourceClaim should return Forbidden due to resource quota limits but got: %v", err)
+	t.Errorf("creating ResourceClaim in namespace %s should return Forbidden due to resource quota limits but got: %v", namespace, err)
 }
