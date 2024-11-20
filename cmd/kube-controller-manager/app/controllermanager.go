@@ -209,13 +209,16 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
+	serverShutdownCh := make(<-chan struct{})
+	listenerStoppedCh := make(<-chan struct{})
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		var err error
+		serverShutdownCh, listenerStoppedCh, err = c.SecureServing.Serve(handler, 0, stopCh)
+		if err != nil {
 			return err
 		}
 	}
@@ -359,6 +362,13 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	<-stopCh
+
+	// for graceful shutdown
+	if c.SecureServing != nil {
+		<-serverShutdownCh
+		<-listenerStoppedCh
+	}
+
 	return nil
 }
 
