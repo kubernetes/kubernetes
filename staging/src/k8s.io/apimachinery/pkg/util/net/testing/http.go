@@ -83,14 +83,6 @@ func (h *HTTPProxyHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// CONNECT proxy
 
-	sconn, err := net.Dial("tcp", req.Host)
-	if err != nil {
-		h.t.Logf("Failed to dial proxy backend, host=%s: %v", req.Host, err)
-		rw.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer sconn.Close()
-
 	hj, ok := rw.(http.Hijacker)
 	if !ok {
 		h.t.Logf("Can't switch protocols using non-Hijacker ResponseWriter: type=%T, host=%s", rw, req.Host)

@@ -1,0 +1,38 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <script src="wasm_exec.js"></script>
+    <script type="module">
+        const kubeconfigText = `
+apiVersion: v1
+clusters:
+- name: "k8s-par-cool-robinson"
+  cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM1ekNDQWMrZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJMU1EZ3lNVEUxTlRNMU1sb1hEVE0xTURneU1URTFOVE0xTWxvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTFVpCnhUZnY1L3BBbjRaTHBqYnRORUxKMDZaWGRLREIvRURZRVVMQ28wa0UrTm90a2VXS3hKOXQ0THo3Q09oUTFBNU0KazVhVEVwVEJSK0QxTXJGMXNMbklobjgzUXp5bEQyNHphdVR6aW1aTUxGTld2YUlxdSsxVU80VWdIOFU4Ni9kdApmWko4RSt2aGVtemdRZXd4V09vNncwV0krUS96NUtlMWJQMzZoTlVZVis5VytGMjJGSU8vNFlpUHJkcnpqbkY2CjF4dzBSNnhRL3U0MlNRNmo1a09vYTU2d1V3RWpnZVpMT3UwRldxdzJOZG1yMUt1bjRiWklzQkZLSHprcjRVdjUKMm43Lyt1c0xleEt2eVUxMmo3RzJSVzFYaFR2ajZQV0Nha0E2eW82R3ZnWVZlYlR0QW1EMnJGWkRERXc5c3YzZQpnTVlscC8xbmVLMEN1d0o5a0EwQ0F3RUFBYU5DTUVBd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZGL0N1Y2hPQy9DQXZDY000QjZUdmEyUHBwU0dNQTBHQ1NxR1NJYjMKRFFFQkN3VUFBNElCQVFDaTRLZE9oYUxvaU5ya2pESGpwb2tUV3JYc2NWNGpNOWt5SmtYY1hwd0swNFFGbldhcApIcG9rSzZDQnlSaytFLzZXVXh5ZlkydzZ0K21vcDN1VWJ4YkZRNW9DSlFackxMUXBHeGRia3JJcjlKWS9ha1Q4Ckl4VFdGczNJYldqVGcyd0x5emJnT2MwMDlaOHpsQXc2Q2oxaE1zblg2UjdnZ1hVUGdsRnlmUk1xdUIzUUROdFkKRU5pMHFacmY1dVBQNXJ0Q2FZazVTckJGR1dIamhhdW9BeGd4SGtjRHpkeFBncVNrWXVHUTBvMmhVWDRLVFE0bAp1WWVqYWhXakltaFZzVDZnY2tBWE90bkcyS0VxQzhmNkpFdTBWQkpHR3NQYWY1VnFBZWgrTmVQVy9rUWxTU3Y3Ck1VQ1RydXVMdGVGUE5aSitvK05hczJTRUJaU1o0ZnFYMS9FRQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+    server: https://e196300b-8a44-44c0-b52d-464502404f92.api.k8s.fr-par.scw.cloud:6443
+contexts:
+- name: admin@k8s-par-cool-robinson
+  context:
+    cluster: "k8s-par-cool-robinson"
+    user: k8s-par-cool-robinson-admin
+current-context: admin@k8s-par-cool-robinson
+kind: Config
+preferences: {}
+users:
+- name: k8s-par-cool-robinson-admin
+  user:
+    token: foobar
+`.trim();
+
+        const go = new Go();
+        go.argv = ["kubectl", "-v=8", "get", "nodes"];
+        go.env = { "KUBERC": "off", "RAW_KUBECONFIG": kubeconfigText}; // optional env vars
+        WebAssembly.instantiateStreaming(fetch("kubectl.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+        });
+
+    </script>
+
+</head>
+<body></body>
+</html>

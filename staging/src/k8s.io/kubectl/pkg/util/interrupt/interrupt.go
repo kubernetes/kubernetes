@@ -25,7 +25,7 @@ import (
 
 // terminationSignals are signals that cause the program to exit in the
 // supported platforms (linux, darwin, windows).
-var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
+var terminationSignals = []os.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
 
 // Handler guarantees execution of notifications after a critical section (the function passed
 // to a Run method), even in the presence of process termination. It guarantees exactly once
