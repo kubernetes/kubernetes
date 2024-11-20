@@ -21,22 +21,26 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -592,4 +596,120 @@ func newService(name string, svcType v1.ServiceType, allocateNodePort bool) *v1.
 			}},
 		},
 	}
+}
+
+func TestQuotaLimitResourceClaim(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Set up an API server
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+			opts.APIEnablement.RuntimeConfig = flag.ConfigurationMap{
+				resourceapi.SchemeGroupVersion.String(): "true",
+			}
+		},
+	})
+	defer tearDownFn()
+
+	clientset := clientset.NewForConfigOrDie(kubeConfig)
+
+	informers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+
+	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
+	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+	informersStarted := make(chan struct{})
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
+		QuotaClient:               clientset.CoreV1(),
+		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
+		ResyncPeriod:              controller.NoResyncPeriodFunc,
+		InformerFactory:           informers,
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      qc.IgnoredResources,
+		InformersStarted:          informersStarted,
+		Registry:                  generic.NewRegistry(qc.Evaluators()),
+	}
+	resourceQuotaController, err := resourcequotacontroller.NewController(tCtx, resourceQuotaControllerOptions)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	go resourceQuotaController.Run(tCtx, 2)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(tCtx, discoveryFunc, 30*time.Second)
+
+	informers.Start(tCtx.Done())
+	close(informersStarted)
+
+	wg := new(sync.WaitGroup)
+	namespaces := 500
+	for range namespaces {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			ns := framework.CreateNamespaceOrDie(clientset, "quota-"+utilrand.String(5), t)
+			defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+			// Creating the first resource claim should succeed
+			resourceClaim := newResourceClaim("claim-0")
+			_, err = clientset.ResourceV1beta1().ResourceClaims(ns.Name).Create(tCtx, resourceClaim, metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("creating first ResourceClaim should not have returned error: %v", err)
+			}
+
+			// now create a covering quota
+			quota := &v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "quota",
+					Namespace: ns.Name,
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						"count/resourceclaims.resource.k8s.io": resource.MustParse("1"),
+					},
+				},
+			}
+
+			waitForQuota(t, quota, clientset)
+
+			// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
+			expectedQuotaUsed := v1.ResourceList{
+				"count/resourceclaims.resource.k8s.io": resource.MustParse("1"),
+			}
+			waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+
+			// Creating another ResourceClaim using node ports should fail because node prot quota is exceeded
+			resourceClaim2 := newResourceClaim("claim-1")
+			testResourceClaimForbidden(clientset, ns.Name, resourceClaim2, t)
+		}()
+	}
+
+	wg.Wait()
+}
+
+func newResourceClaim(name string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
+
+// testResourceClaimForbidden attempts to create a ResourceClaim expecting 403 Forbidden due to resource quota limits being exceeded.
+func testResourceClaimForbidden(clientset clientset.Interface, namespace string, resourceClaim *resourceapi.ResourceClaim, t *testing.T) {
+	_, err := clientset.ResourceV1beta1().ResourceClaims(namespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+	if apierrors.IsForbidden(err) {
+		return
+	}
+
+	if err == nil {
+		t.Error("creating ResourceClaim should have returned error but got nil")
+		return
+	}
+
+	t.Errorf("creating ResourceClaim should return Forbidden due to resource quota limits but got: %v", err)
 }

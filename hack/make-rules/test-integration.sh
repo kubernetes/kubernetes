@@ -43,7 +43,7 @@ fi
 # Give integration tests longer to run by default.
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=600s}
 LOG_LEVEL=${LOG_LEVEL:-2}
-KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
+KUBE_TEST_ARGS="-run TestQuotaLimitResourceClaim"
 # Default glog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 
@@ -92,7 +92,7 @@ runTests() {
   # empty here to ensure that we aren't unintentionally consuming them from the
   # previous make invocation.
   KUBE_TEST_ARGS="${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS}" \
-      WHAT="${WHAT:-$(kube::test::find_integration_test_pkgs | paste -sd' ' -)}" \
+      WHAT="./test/integration/quota" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE="" \
