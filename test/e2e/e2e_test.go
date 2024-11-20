@@ -46,24 +46,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/nodefeature"
 
 	// test sources
-	_ "k8s.io/kubernetes/test/e2e/apimachinery"
-	_ "k8s.io/kubernetes/test/e2e/apps"
-	_ "k8s.io/kubernetes/test/e2e/architecture"
-	_ "k8s.io/kubernetes/test/e2e/auth"
-	_ "k8s.io/kubernetes/test/e2e/autoscaling"
-	_ "k8s.io/kubernetes/test/e2e/cloud"
-	_ "k8s.io/kubernetes/test/e2e/common"
-	_ "k8s.io/kubernetes/test/e2e/dra"
-	_ "k8s.io/kubernetes/test/e2e/instrumentation"
-	_ "k8s.io/kubernetes/test/e2e/kubectl"
-	_ "k8s.io/kubernetes/test/e2e/lifecycle"
-	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
-	_ "k8s.io/kubernetes/test/e2e/network"
-	_ "k8s.io/kubernetes/test/e2e/node"
-	_ "k8s.io/kubernetes/test/e2e/scheduling"
-	_ "k8s.io/kubernetes/test/e2e/storage"
-	_ "k8s.io/kubernetes/test/e2e/storage/csimock"
-	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/windows"
 
 	// reconfigure framework

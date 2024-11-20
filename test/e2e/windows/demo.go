@@ -125,7 +125,7 @@ var _ = sigDescribe(feature.Windows, "Windows tests", skipUnlessWindows(func() {
 				framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 			}
 
-			pod1 := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, "name", volumeMountPath,
+			pod1 := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
 				"--file_content=/etc/configmap-volume/path/to/data-2", "--file_mode=/etc/configmap-volume/path/to/data-2")
 			one1 := int64(1)
 			pod1.Spec.TerminationGracePeriodSeconds = &one1
@@ -137,20 +137,24 @@ var _ = sigDescribe(feature.Windows, "Windows tests", skipUnlessWindows(func() {
 			}
 			pod1.Spec.Containers[0].Command = []string{
 				"powershell.exe",
-				"Get-Acl",
-				"-Path",
-				"/etc/configmap-volume/path/to/data-2",
-				"|",
-				"Format-List",
+				"-Command",
+				"Get-Acl -Path /etc/configmap-volume/path/to/data-2 | Format-List",
 			}
+			pod1.Spec.Containers[0].Args = []string{}
+
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod1.Name, pod1.Spec.Containers[0].Name)
+				framework.ExpectNoError(err)
+				framework.Logf("Pod 1 logs: \n%s", logs)
+			})
 
 			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod1, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, "name", f.Namespace.Name)
+			err = e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod1.Name, f.Namespace.Name)
 			framework.ExpectNoError(err)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod1.Name, pod1.Spec.Containers[0].Name)
 			framework.ExpectNoError(err)
-			framework.Logf("Pod logs: \n%s", logs)
+			framework.Logf("Pod 1 logs: \n%s", logs)
 
 			pod2 := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
 				"--file_content=/etc/configmap-volume/path/to/data-2", "--file_mode=/etc/configmap-volume/path/to/data-2")
@@ -164,9 +168,9 @@ var _ = sigDescribe(feature.Windows, "Windows tests", skipUnlessWindows(func() {
 			}
 
 			output := []string{
-				"content of file \"/etc/projected-configmap-volume/path/to/data-2\": value-2",
+				"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
 			}
-			fileModeRegexp := getFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", nil)
+			fileModeRegexp := getFileModeRegex("/etc/configmap-volume/path/to/data-2", nil)
 			output = append(output, fileModeRegexp)
 			e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume configMaps", pod2, 0, output)
 		})
