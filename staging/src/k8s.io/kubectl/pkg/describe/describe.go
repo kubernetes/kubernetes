@@ -97,7 +97,7 @@ const (
 
 var (
 	// globally skipped annotations
-	skipAnnotations = sets.NewString(corev1.LastAppliedConfigAnnotation)
+	skipAnnotations = sets.New[string](corev1.LastAppliedConfigAnnotation)
 
 	// DescriberFn gives a way to easily override the function for unit testing if needed
 	DescriberFn DescriberFunc = Describer
@@ -1449,10 +1449,10 @@ func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w Pre
 }
 
 func printCSIPersistentVolumeAttributesMultiline(w PrefixWriter, title string, annotations map[string]string) {
-	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.NewString())
+	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.New[string]())
 }
 
-func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.String) {
+func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.Set[string]) {
 	w.Write(LEVEL_2, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if len(attributes) == 0 {
@@ -2128,8 +2128,8 @@ func describeVolumeClaimTemplates(templates []corev1.PersistentVolumeClaim, w Pr
 	for _, pvc := range templates {
 		w.Write(LEVEL_1, "Name:\t%s\n", pvc.Name)
 		w.Write(LEVEL_1, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(&pvc))
-		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.NewString())
-		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.NewString())
+		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.New[string]())
+		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.New[string]())
 		if capacity, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
 		} else {
@@ -3340,7 +3340,7 @@ func describeEndpointSliceV1beta1(eps *discoveryv1beta1.EndpointSlice, events *c
 					w.Write(LEVEL_2, "TargetRef:\t%s/%s\n", endpoint.TargetRef.Kind, endpoint.TargetRef.Name)
 				}
 
-				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.NewString())
+				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.New[string]())
 			}
 		}
 
@@ -3368,7 +3368,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 	// missingSecrets is the set of all secrets present in the
 	// serviceAccount but not present in the set of existing secrets.
-	missingSecrets := sets.NewString()
+	missingSecrets := sets.New[string]()
 	secrets := corev1.SecretList{}
 	err = runtimeresource.FollowContinue(&metav1.ListOptions{Limit: describerSettings.ChunkSize},
 		func(options metav1.ListOptions) (runtime.Object, error) {
@@ -3385,7 +3385,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	if err == nil {
 		// existingSecrets is the set of all secrets remaining on a
 		// service account that are not present in the "tokens" slice.
-		existingSecrets := sets.NewString()
+		existingSecrets := sets.New[string]()
 
 		for _, s := range secrets.Items {
 			if s.Type == corev1.SecretTypeServiceAccountToken {
@@ -3418,7 +3418,7 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 	return describeServiceAccount(serviceAccount, tokens, missingSecrets, events)
 }
 
-func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.String, events *corev1.EventList) (string, error) {
+func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []corev1.Secret, missingSecrets sets.Set[string], events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", serviceAccount.Name)
@@ -3452,7 +3452,7 @@ func describeServiceAccount(serviceAccount *corev1.ServiceAccount, tokens []core
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for _, header := range sets.StringKeySet(types).List() {
+		for _, header := range sets.List(sets.KeySet(types)) {
 			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
@@ -5150,11 +5150,11 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 
 // printLabelsMultiline prints multiple labels with a proper alignment.
 func printLabelsMultiline(w PrefixWriter, title string, labels map[string]string) {
-	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.NewString())
+	printLabelsMultilineWithIndent(w, "", title, "\t", labels, sets.New[string]())
 }
 
 // printLabelsMultiline prints multiple labels with a user-defined alignment.
-func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
+func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.Set[string]) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
 	if len(labels) == 0 {
@@ -5568,7 +5568,7 @@ func backendStringer(backend *networkingv1beta1.IngressBackend) string {
 // * a node-role.kubernetes.io/<role>="" label
 // * a kubernetes.io/role="<role>" label
 func findNodeRoles(node *corev1.Node) []string {
-	roles := sets.NewString()
+	roles := sets.New[string]()
 	for k, v := range node.Labels {
 		switch {
 		case strings.HasPrefix(k, LabelNodeRolePrefix):
@@ -5580,14 +5580,14 @@ func findNodeRoles(node *corev1.Node) []string {
 			roles.Insert(v)
 		}
 	}
-	return roles.List()
+	return sets.List(roles)
 }
 
 // ingressLoadBalancerStatusStringerV1 behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
-	result := sets.NewString()
+	result := sets.New[string]()
 	for i := range ingress {
 		if ingress[i].IP != "" {
 			result.Insert(ingress[i].IP)
@@ -5596,7 +5596,7 @@ func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatu
 		}
 	}
 
-	r := strings.Join(result.List(), ",")
+	r := strings.Join(sets.List(result), ",")
 	if !wide && len(r) > LoadBalancerWidth {
 		r = r[0:(LoadBalancerWidth-3)] + "..."
 	}
@@ -5607,7 +5607,7 @@ func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatu
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
 func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
-	result := sets.NewString()
+	result := sets.New[string]()
 	for i := range ingress {
 		if ingress[i].IP != "" {
 			result.Insert(ingress[i].IP)
@@ -5616,7 +5616,7 @@ func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBal
 		}
 	}
 
-	r := strings.Join(result.List(), ",")
+	r := strings.Join(sets.List(result), ",")
 	if !wide && len(r) > LoadBalancerWidth {
 		r = r[0:(LoadBalancerWidth-3)] + "..."
 	}
