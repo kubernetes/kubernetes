@@ -3137,6 +3137,59 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+func (kl *Kubelet) GetCheckpoint(podFullName, containerName string) ([]byte, error) {
+	checkpointDir := "/var/lib/kubelet/checkpoints"
+	files, err := os.ReadDir(checkpointDir)
+	if err != nil {
+		return nil, fmt.Errorf("checkpoint directory not found")
+	}
+
+	// Get the file name with the latest time
+	var checkpointTimes []time.Time
+	fileNamePrefix := fmt.Sprintf(
+		"checkpoint-%s-%s-",
+		podFullName,
+		containerName,
+	)
+	fileExtension := ".tar"
+
+	for _, file := range files {
+		curr := file.Name()
+		if strings.HasPrefix(curr, fileNamePrefix) && strings.HasSuffix(curr, fileExtension) {
+			// get the timestamp portion of "<podFullname>-<containerName>-<timestamp>.tar"
+			formattedTime := curr[len(fileNamePrefix) : len(curr)-len(fileExtension)]
+			parsedTime, err := time.Parse(time.RFC3339, formattedTime)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse time from checkpoint file name %v", curr)
+			}
+
+			checkpointTimes = append(checkpointTimes, parsedTime)
+		}
+	}
+
+	if len(checkpointTimes) == 0 {
+		return nil, fmt.Errorf("checkpoint not found")
+	}
+
+	sort.Slice(checkpointTimes, func(i, j int) bool {
+		return checkpointTimes[i].Before(checkpointTimes[j])
+	})
+
+	latestCheckpointFileName := fmt.Sprintf(
+		"checkpoint-%s-%s-%s.tar",
+		podFullName,
+		containerName,
+		checkpointTimes[len(checkpointTimes)-1].Format(time.RFC3339),
+	)
+
+	checkpoint, err := os.ReadFile(checkpointDir + "/" + latestCheckpointFileName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read checkpoint file %v", latestCheckpointFileName)
+	}
+
+	return checkpoint, nil
+}
+
 // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 func (kl *Kubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return kl.containerRuntime.ListMetricDescriptors(ctx)
