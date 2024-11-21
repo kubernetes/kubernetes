@@ -23,11 +23,9 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 
-	"github.com/munnerz/goautoneg"
-
+	"k8s.io/component-base/zpages/httputil"
 	"k8s.io/klog/v2"
 )
 
@@ -40,8 +38,7 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 )
 
 var (
-	flagzSeparators         = []string{":", ": ", "=", " "}
-	errUnsupportedMediaType = fmt.Errorf("media type not acceptable, must be: text/plain")
+	delimiters = []string{":", ": ", "=", " "}
 )
 
 type registry struct {
@@ -64,8 +61,8 @@ func (reg *registry) installHandler(m mux, componentName string, flagReader Read
 
 func (reg *registry) handleFlags(componentName string, flagReader Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !acceptableMediaType(r) {
-			http.Error(w, errUnsupportedMediaType.Error(), http.StatusNotAcceptable)
+		if !httputil.AcceptableMediaType(r) {
+			http.Error(w, httputil.ErrUnsupportedMediaType.Error(), http.StatusNotAcceptable)
 			return
 		}
 
@@ -76,8 +73,8 @@ func (reg *registry) handleFlags(componentName string, flagReader Reader) http.H
 				return
 			}
 
-			randomIndex := rand.Intn(len(flagzSeparators))
-			separator := flagzSeparators[randomIndex]
+			randomIndex := rand.Intn(len(delimiters))
+			separator := delimiters[randomIndex]
 			// Randomize the delimiter for printing to prevent scraping of the response.
 			printSortedFlags(&reg.response, flagReader.GetFlagz(), separator)
 		})
@@ -88,29 +85,6 @@ func (reg *registry) handleFlags(componentName string, flagReader Reader) http.H
 			http.Error(w, "error writing response", http.StatusInternalServerError)
 		}
 	}
-}
-
-func acceptableMediaType(r *http.Request) bool {
-	accepts := goautoneg.ParseAccept(r.Header.Get("Accept"))
-	for _, accept := range accepts {
-		if !mediaTypeMatches(accept) {
-			continue
-		}
-		if len(accept.Params) == 0 {
-			return true
-		}
-		if len(accept.Params) == 1 {
-			if charset, ok := accept.Params["charset"]; ok && strings.EqualFold(charset, "utf-8") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func mediaTypeMatches(a goautoneg.Accept) bool {
-	return (a.Type == "text" || a.Type == "*") &&
-		(a.SubType == "plain" || a.SubType == "*")
 }
 
 func printSortedFlags(w io.Writer, flags map[string]string, separator string) {
