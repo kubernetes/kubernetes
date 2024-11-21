@@ -43,6 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 )
 
 const (
@@ -238,6 +240,27 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
+func calcAccessibleSwap(pods []*v1.Pod, swapLimitCalculator swap.LimitCalculator) (uint64, error) {
+	accessibleSwap := uint64(0)
+	for _, pod := range pods {
+		podAccessibleSwap := uint64(0)
+		for _, container := range pod.Spec.Containers {
+			containerAccessibleSwap, err := swapLimitCalculator.CalcContainerSwapLimit(*pod, container)
+			if err != nil {
+				klog.V(5).ErrorS(err, "failed calculating swap limit", "pod", pod.Name, "container", container.Name)
+			}
+
+			klog.V(5).InfoS("Accessible swap", "pod", pod.Name, "container", container.Name, "container request", container.Resources.Requests.Memory().String(), "accessible swap", containerAccessibleSwap)
+			podAccessibleSwap += uint64(containerAccessibleSwap)
+		}
+		klog.V(5).InfoS("pod accessible swap", "name", pod.Name, "accessible swap", podAccessibleSwap)
+		accessibleSwap += podAccessibleSwap
+	}
+
+	klog.V(5).InfoS("Node's accessible swap", "number of pods", len(pods), "accessible swap", accessibleSwap)
+	return accessibleSwap, nil
+}
+
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) ([]*v1.Pod, error) {
@@ -246,6 +269,30 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 && !m.localStorageCapacityIsolation {
 		return nil, nil
+	}
+
+	updateStats := true
+	summary, err := m.summaryProvider.Get(ctx, updateStats)
+	if err != nil {
+		klog.ErrorS(err, "Eviction manager: failed to get summary stats")
+		return nil, nil
+	}
+
+	var swapLimitCalculator swap.LimitCalculator
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		if summary != nil && summary.Node.Memory != nil && summary.Node.Swap != nil && summary.Node.Memory.AvailableBytes != nil &&
+			summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Swap.SwapUsageBytes != nil && summary.Node.Swap.SwapAvailableBytes != nil {
+			nodeTotalMemory := *summary.Node.Memory.AvailableBytes + *summary.Node.Memory.WorkingSetBytes
+			nodeTotalSwap := *summary.Node.Swap.SwapAvailableBytes + *summary.Node.Swap.SwapUsageBytes
+
+			swapLimitCalculator, err = swap.NewLimitCalculator(nodeTotalMemory, nodeTotalSwap, !util.IsCgroup2UnifiedMode(), m.config.SwapConfig.SwapBehavior)
+			klog.V(5).InfoS("initializing swap limit calculator", "node memory capacity", nodeTotalMemory, "swap capacity", nodeTotalSwap, "error", err)
+		}
+	}
+
+	if swapLimitCalculator == nil {
+		klog.V(2).InfoS("skipping swap calculation assuming no swap is available")
+		swapLimitCalculator = swap.NewNoSwapCalculator()
 	}
 
 	klog.V(3).InfoS("Eviction manager: synchronize housekeeping")
@@ -286,12 +333,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	klog.V(3).InfoS("FileSystem detection", "DedicatedImageFs", m.dedicatedImageFs, "SplitImageFs", m.splitContainerImageFs)
 	activePods := podFunc()
-	updateStats := true
-	summary, err := m.summaryProvider.Get(ctx, updateStats)
-	if err != nil {
-		klog.ErrorS(err, "Eviction manager: failed to get summary stats")
-		return nil, nil
-	}
 
 	if m.clock.Since(m.thresholdsLastUpdated) > notifierRefreshInterval {
 		m.thresholdsLastUpdated = m.clock.Now()
@@ -302,8 +343,18 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		}
 	}
 
+	accessibleSwap := uint64(0)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		accessibleSwap, err = calcAccessibleSwap(activePods, swapLimitCalculator)
+		if err != nil {
+			// if we fail to calculate accessible swap, we continue the sync loop with accessible swap set to zero having no effect.
+			accessibleSwap = 0
+			klog.V(2).ErrorS(err, "Eviction manager: failed to calculate accessible swap, falling back to zero")
+		}
+	}
+
 	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc := makeSignalObservations(summary)
+	observations, statsFunc := makeSignalObservations(summary, accessibleSwap)
 	debugLogObservations("observations", observations)
 
 	// determine the set of thresholds met independent of grace period
@@ -379,7 +430,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
-	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim) {
+	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim, accessibleSwap) {
 		klog.InfoS("Eviction manager: able to reduce resource pressure without evicting pods.", "resourceName", resourceToReclaim)
 		return nil, nil
 	}
@@ -464,7 +515,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName) bool {
+func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName, accessibleSwap uint64) bool {
 	nodeReclaimFuncs := m.signalToNodeReclaimFuncs[signalToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
@@ -481,7 +532,7 @@ func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToRec
 		}
 
 		// make observations and get a function to derive pod usage stats relative to those observations.
-		observations, _ := makeSignalObservations(summary)
+		observations, _ := makeSignalObservations(summary, accessibleSwap)
 		debugLogObservations("observations after resource reclaim", observations)
 
 		// evaluate all thresholds independently of their grace period to see if with
