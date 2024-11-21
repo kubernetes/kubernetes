@@ -56,11 +56,6 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-const (
-	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
-)
-
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
 const (
 	// PodListTimeout is how long to wait for the pod to be listable.
@@ -678,38 +673,6 @@ func GetNodeExternalIPs(node *v1.Node) (ips []string) {
 	return
 }
 
-// getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
-// If any of these is unavailable, empty slices are returned.
-func getControlPlaneAddresses(ctx context.Context, c clientset.Interface) ([]string, []string, []string) {
-	var externalIPs, internalIPs, hostnames []string
-
-	// Populate the internal IPs.
-	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
-	if err != nil {
-		Failf("Failed to get kubernetes endpoints: %v", err)
-	}
-	for _, subset := range eps.Subsets {
-		for _, address := range subset.Addresses {
-			if address.IP != "" {
-				internalIPs = append(internalIPs, address.IP)
-			}
-		}
-	}
-
-	// Populate the external IP/hostname.
-	hostURL, err := url.Parse(TestContext.Host)
-	if err != nil {
-		Failf("Failed to parse hostname: %v", err)
-	}
-	if netutils.ParseIPSloppy(hostURL.Host) != nil {
-		externalIPs = append(externalIPs, hostURL.Host)
-	} else {
-		hostnames = append(hostnames, hostURL.Host)
-	}
-
-	return externalIPs, internalIPs, hostnames
-}
-
 // GetControlPlaneNodes returns a list of control plane nodes
 func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeList {
 	allNodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -735,30 +698,6 @@ func GetControlPlaneNodes(ctx context.Context, c clientset.Interface) *v1.NodeLi
 	}
 
 	return &cpNodes
-}
-
-// GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
-// It may return internal and external IPs, even if we expect for
-// e.g. internal IPs to be used (issue #56787), so that we can be
-// sure to block the control plane fully during tests.
-func GetControlPlaneAddresses(ctx context.Context, c clientset.Interface) []string {
-	externalIPs, internalIPs, _ := getControlPlaneAddresses(ctx, c)
-
-	ips := sets.NewString()
-	switch TestContext.Provider {
-	case "gce":
-		for _, ip := range externalIPs {
-			ips.Insert(ip)
-		}
-		for _, ip := range internalIPs {
-			ips.Insert(ip)
-		}
-	case "aws":
-		ips.Insert(awsMasterIP)
-	default:
-		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
-	}
-	return ips.List()
 }
 
 // PrettyPrintJSON converts metrics to JSON format.
