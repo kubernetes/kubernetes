@@ -110,6 +110,12 @@ var (
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
+	// owning-sig: sig-node
+	// kep: https://kep.k8s.io/4009
+	// DevicePluginCDIDevices tests the CDI feature which is GA.
+	// This label is used for https://testgrid.k8s.io/sig-node-cri-o#ci-crio-cdi-device-plugins
+	DevicePluginCDIDevices = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginCDIDevices"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	EphemeralStorage = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
 
@@ -207,6 +213,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
 
+	// owning-sig: sig-node
+	// Marks a disruptive test for lock contention
+	LockContention = framework.WithFeature(framework.ValidFeatures.Add("LockContention"))
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
 

@@ -201,7 +201,7 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, "[NodeSpecialFeature:HugePages]", func() {
+var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
