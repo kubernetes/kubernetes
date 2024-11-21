@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -645,21 +644,31 @@ func TestQuotaLimitResourceClaim(t *testing.T) {
 	close(informersStarted)
 
 	wg := new(sync.WaitGroup)
-	namespaces := 500
+	namespaces := 800
 	for range namespaces {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			ns := framework.CreateNamespaceOrDie(clientset, "quota-"+utilrand.String(5), t)
-			t.Logf("created namespace %s", ns.Name)
-			defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+			ns, err := clientset.CoreV1().Namespaces().Create(tCtx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "quota-"}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("Failed to create namespace: %v", err)
+				return
+			}
+			// t.Logf("created namespace %s", ns.Name)
+			defer func() {
+				err := clientset.CoreV1().Namespaces().Delete(tCtx, ns.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Errorf("Failed to delete namespace %s: %v", ns.Name, err)
+				}
+			}()
 
 			// Creating the first resource claim should succeed
 			resourceClaim := newResourceClaim("claim-0")
-			_, err := clientset.ResourceV1beta1().ResourceClaims(ns.Name).Create(tCtx, resourceClaim, metav1.CreateOptions{})
+			_, err = clientset.ResourceV1beta1().ResourceClaims(ns.Name).Create(tCtx, resourceClaim, metav1.CreateOptions{})
 			if err != nil {
 				t.Errorf("creating first ResourceClaim in namespace %s should not have returned error: %v", ns.Name, err)
+				return
 			}
 
 			// now create a covering quota
@@ -675,17 +684,26 @@ func TestQuotaLimitResourceClaim(t *testing.T) {
 				},
 			}
 
-			waitForQuota(t, quota, clientset)
+			if err := waitForQuotaErr(quota, clientset); err != nil {
+				t.Error(err)
+				return
+			}
 
 			// wait for ResourceQuota status to be updated before proceeding, otherwise the test will race with resource quota controller
 			expectedQuotaUsed := v1.ResourceList{
 				"count/resourceclaims.resource.k8s.io": resource.MustParse("1"),
 			}
-			waitForUsedResourceQuota(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed)
+			if err := waitForUsedResourceQuotaErr(t, clientset, quota.Namespace, quota.Name, expectedQuotaUsed); err != nil {
+				t.Error(err)
+				return
+			}
 
 			// Creating another ResourceClaim using node ports should fail because node prot quota is exceeded
 			resourceClaim2 := newResourceClaim("claim-1")
-			testResourceClaimForbidden(clientset, ns.Name, resourceClaim2, t)
+			if err := testResourceClaimForbidden(clientset, ns.Name, resourceClaim2); err != nil {
+				t.Error(err)
+				return
+			}
 		}()
 	}
 
@@ -701,17 +719,81 @@ func newResourceClaim(name string) *resourceapi.ResourceClaim {
 }
 
 // testResourceClaimForbidden attempts to create a ResourceClaim expecting 403 Forbidden due to resource quota limits being exceeded.
-func testResourceClaimForbidden(clientset clientset.Interface, namespace string, resourceClaim *resourceapi.ResourceClaim, t *testing.T) {
+func testResourceClaimForbidden(clientset clientset.Interface, namespace string, resourceClaim *resourceapi.ResourceClaim) error {
 	_, err := clientset.ResourceV1beta1().ResourceClaims(namespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
 	if apierrors.IsForbidden(err) {
-		t.Logf("namespace %s OK", namespace)
-		return
+		return nil
 	}
 
 	if err == nil {
-		t.Errorf("creating ResourceClaim should have returned error but got nil in namespace %s", namespace)
-		return
+		return fmt.Errorf("creating ResourceClaim should have returned error but got nil in namespace %s", namespace)
 	}
 
-	t.Errorf("creating ResourceClaim in namespace %s should return Forbidden due to resource quota limits but got: %v", namespace, err)
+	return fmt.Errorf("creating ResourceClaim in namespace %s should return Forbidden due to resource quota limits but got: %v", namespace, err)
+}
+
+func waitForQuotaErr(quota *v1.ResourceQuota, clientset *clientset.Clientset) error {
+	w, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: quota.Name}))
+	if err != nil {
+		return fmt.Errorf("failed to watch ResourceQuota %s/%s: %w", quota.Namespace, quota.Name, err)
+	}
+
+	if _, err := clientset.CoreV1().ResourceQuotas(quota.Namespace).Create(context.TODO(), quota, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to watch ResourceQuota %s/%s: %w", quota.Namespace, quota.Name, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Modified:
+		default:
+			return false, nil
+		}
+		switch cast := event.Object.(type) {
+		case *v1.ResourceQuota:
+			if len(cast.Status.Hard) > 0 {
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to watch ResourceQuota %s/%s: %w", quota.Namespace, quota.Name, err)
+	}
+	return nil
+}
+
+func waitForUsedResourceQuotaErr(t *testing.T, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
+	err := wait.Poll(1*time.Second, resourceQuotaTimeout, func() (bool, error) {
+		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// used may not yet be calculated
+		if resourceQuota.Status.Used == nil {
+			return false, nil
+		}
+
+		// verify that the quota shows the expected used resource values
+		for k, v := range used {
+			actualValue, found := resourceQuota.Status.Used[k]
+			if !found {
+				t.Logf("resource %s was not found in ResourceQuota status", k)
+				return false, nil
+			}
+
+			if !actualValue.Equal(v) {
+				t.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting or ResourceQuota status: %v", err)
+	}
+	return nil
 }
