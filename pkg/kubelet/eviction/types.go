@@ -19,6 +19,7 @@ package eviction
 
 import (
 	"context"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -54,6 +55,8 @@ type Config struct {
 	KernelMemcgNotification bool
 	// PodCgroupRoot is the cgroup which contains all pods.
 	PodCgroupRoot string
+	// SwapConfig is the configuration for swap.
+	SwapConfig config.MemorySwapConfiguration
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.

@@ -1243,7 +1243,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				return
 			}
 
-			swapLimitCalculator, err := swap.NewLimitCalculator(int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity), tc.cgroupVersion == cgroupV1, tc.swapBehavior)
+			swapLimitCalculator, err := swap.NewLimitCalculator(m.machineInfo.MemoryCapacity, m.machineInfo.SwapCapacity, tc.cgroupVersion == cgroupV1, tc.swapBehavior)
 			require.NoError(t, err)
 			c1ExpectedSwap, err := swapLimitCalculator.CalcContainerSwapLimit(*pod, pod.Spec.Containers[0])
 			require.NoError(t, err)
