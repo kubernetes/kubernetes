@@ -1717,3 +1717,42 @@ func TestConditionFuncFor(t *testing.T) {
 		})
 	}
 }
+
+// Test condition that ensures that wait for create continues polling when no resources are found
+func TestWaitForCreateSimple(t *testing.T) {
+	tests := []struct {
+		name        string
+		waitOptions *WaitOptions
+	}{
+		{
+			name: "missing resource for create",
+			waitOptions: &WaitOptions{
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(&resource.Info{
+					Name: "test-resource",
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "v1", Resource: "tests"},
+					},
+				}).WithError(
+					apierrors.NewNotFound(schema.GroupResource{Group: "group", Resource: "tests"}, "test-resource"),
+				),
+				DynamicClient: dynamicfakeclient.NewSimpleDynamicClient(runtime.NewScheme()),
+				Timeout:       1 * time.Second,
+				ForCondition:  "create",
+				Printer:       printers.NewDiscardingPrinter(),
+				ConditionFn:   IsCreated,
+				IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.waitOptions.RunWait()
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), "timed out waiting for the condition") {
+				t.Fatalf("expected timeout error, got %v", err)
+			}
+		})
+	}
+}
