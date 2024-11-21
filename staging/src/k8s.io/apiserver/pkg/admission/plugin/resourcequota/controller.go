@@ -196,6 +196,10 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 		}
 		return
 	}
+	klog.Infof("checking usage against %d quotas", len(quotas))
+	for _, q := range quotas {
+		klog.Infof("checking usage against quota %+v", q)
+	}
 	// if limited resources are disabled, we can just return safely when there are no quotas.
 	limitedResourcesDisabled := len(e.config.LimitedResources) == 0
 	if len(quotas) == 0 && limitedResourcesDisabled {

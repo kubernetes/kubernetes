@@ -21,9 +21,11 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -536,6 +538,8 @@ func NewTransformingIndexerInformer(
 	return clientState, newInformer(clientState, options)
 }
 
+var APIServerStore Store
+
 // Multiplexes updates in the form of a list of Deltas into a Store, and informs
 // a given handler of events OnUpdate, OnAdd, OnDelete
 func processDeltas(
@@ -557,6 +561,11 @@ func processDeltas(
 				}
 				handler.OnUpdate(old, obj)
 			} else {
+				if _, ok := obj.(*v1.ResourceQuota); ok && clientState == APIServerStore {
+					klog.Info("delaying add")
+					time.Sleep(1 * time.Second)
+				}
+				klog.Infof("Adding obj to store %p", clientState)
 				if err := clientState.Add(obj); err != nil {
 					return err
 				}

@@ -392,6 +392,7 @@ func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.R
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
+		klog.Infof("updating used quota from %+v to %+v", resourceQuota.Status.Used, usage.Status.Used)
 		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(ctx, usage, metav1.UpdateOptions{})
 		if err != nil {
 			errs = append(errs, err)
