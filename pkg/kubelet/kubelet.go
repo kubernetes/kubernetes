@@ -497,6 +497,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		Thresholds:               thresholds,
 		KernelMemcgNotification:  kernelMemcgNotification,
 		PodCgroupRoot:            kubeDeps.ContainerManager.GetPodCgroupRoot(),
+		SwapConfig:               kubeCfg.MemorySwap,
 	}
 
 	var serviceLister corelisters.ServiceLister

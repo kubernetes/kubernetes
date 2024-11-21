@@ -411,7 +411,7 @@ type swapConfigurationHelper struct {
 }
 
 func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo, swapBehavior string) (*swapConfigurationHelper, error) {
-	limitCalculator, err := swap.NewLimitCalculator(int64(machineInfo.MemoryCapacity), int64(machineInfo.SwapCapacity), !isCgroup2UnifiedMode(), swapBehavior)
+	limitCalculator, err := swap.NewLimitCalculator(machineInfo.MemoryCapacity, machineInfo.SwapCapacity, !isCgroup2UnifiedMode(), swapBehavior)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create swap limit calculator: %v", err)
 	}
