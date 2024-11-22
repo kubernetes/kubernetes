@@ -747,8 +747,8 @@ func TestEmulatedVersion(t *testing.T) {
 		fg := featuregate.NewVersionedFeatureGate(version.MustParse("1.32"))
 		utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 			"kubeA": {
-				{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 				{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+				{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 			},
 			"kubeB": {
 				{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},

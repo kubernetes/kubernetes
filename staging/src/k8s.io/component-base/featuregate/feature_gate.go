@@ -423,6 +423,37 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
 	}
 
+	// Validate new specs are well-formed
+	for name, specs := range features {
+		var lastVersion *version.Version
+		var wasBeta, wasGA bool
+		for i, spec := range specs {
+			if spec.Version == nil {
+				return fmt.Errorf("feature %q did not provide a version", name)
+			}
+			// gates that begin as deprecated must indicate their prior state
+			if i == 0 && spec.PreRelease == Deprecated && spec.Version.Minor() != 0 {
+				return fmt.Errorf("feature %q introduced as deprecated must provide a 1.0 entry indicating initial state", name)
+			}
+			if i > 0 {
+				// versions must strictly increase
+				if !lastVersion.LessThan(spec.Version) {
+					return fmt.Errorf("feature %q lists version transitions in non-increasing order (%s <= %s)", name, spec.Version, lastVersion)
+				}
+				// stability must not regress from ga --> {beta,alpha} or beta --> alpha
+				switch {
+				case spec.PreRelease == Alpha && (wasBeta || wasGA):
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				case spec.PreRelease == Beta && wasGA:
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				}
+			}
+			lastVersion = spec.Version
+			wasBeta = wasBeta || spec.PreRelease == Beta
+			wasGA = wasGA || spec.PreRelease == GA
+		}
+	}
+
 	// Copy existing state
 	known := f.GetAllVersioned()
 
