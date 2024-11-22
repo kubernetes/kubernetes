@@ -23,3 +23,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438

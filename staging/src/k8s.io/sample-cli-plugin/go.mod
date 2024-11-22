@@ -62,7 +62,7 @@ require (
 	k8s.io/apimachinery v0.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
+	k8s.io/utils v0.0.0-20241122195242-e2275527d438 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
@@ -75,4 +75,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438
 )

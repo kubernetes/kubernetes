@@ -13,7 +13,7 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/sys v0.26.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/utils v0.0.0-20241122195242-e2275527d438
 )
 
 require (
@@ -25,3 +25,5 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438

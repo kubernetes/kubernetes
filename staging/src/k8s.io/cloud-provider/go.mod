@@ -19,7 +19,7 @@ require (
 	k8s.io/component-helpers v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/utils v0.0.0-20241122195242-e2275527d438
 )
 
 require (
@@ -118,4 +118,5 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
+	k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438
 )

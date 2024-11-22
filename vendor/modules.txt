@@ -1122,7 +1122,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/system-validators v1.9.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+# k8s.io/utils v0.0.0-20241122195242-e2275527d438 => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438
 ## explicit; go 1.18
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -1250,3 +1250,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438

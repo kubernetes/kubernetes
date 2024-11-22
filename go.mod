@@ -118,7 +118,7 @@ require (
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.9.1
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/utils v0.0.0-20241122195242-e2275527d438
 	sigs.k8s.io/knftables v0.0.17
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2
 	sigs.k8s.io/yaml v1.4.0
@@ -252,4 +252,5 @@ replace (
 	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
+	k8s.io/utils => github.com/antoninbas/k8s-utils v0.0.0-20241122195242-e2275527d438
 )
