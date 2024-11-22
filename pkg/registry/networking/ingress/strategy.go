@@ -124,7 +124,7 @@ func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 // WarningsOnUpdate returns warnings for the given update.
 func (ingressStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return []string{}
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
@@ -172,5 +172,5 @@ func (ingressStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 
 // WarningsOnUpdate returns warnings for the given update.
 func (ingressStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return []string{}
 }

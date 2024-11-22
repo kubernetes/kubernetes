@@ -72,7 +72,7 @@ func (ingressClassStrategy) Validate(ctx context.Context, obj runtime.Object) fi
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (ingressClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	return []string{}
 }
 
 // Canonicalize normalizes the object after validation.
@@ -95,7 +95,7 @@ func (ingressClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 
 // WarningsOnUpdate returns warnings for the given update.
 func (ingressClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return []string{}
 }
 
 // AllowUnconditionalUpdate is the default update policy for IngressClass
