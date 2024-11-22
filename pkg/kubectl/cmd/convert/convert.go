@@ -35,6 +35,8 @@ import (
 	"k8s.io/kubectl/pkg/validation"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 )
 
 var (
@@ -60,6 +62,10 @@ var (
 		# Convert all files under current directory to latest version and create them all.
 		kubectl convert -f . | kubectl create -f -`))
 )
+
+func init() {
+	install.Install(scheme.Scheme)
+}
 
 // ConvertOptions have the data required to perform the convert operation
 type ConvertOptions struct {
