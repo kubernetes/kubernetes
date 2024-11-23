@@ -71,7 +71,7 @@ var ProberDuration = metrics.NewHistogramVec(
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
 	// pod created.
-	AddPod(pod *v1.Pod, getEnvVarsFunc getEnvVarsFunc)
+	AddPod(pod *v1.Pod, getEnvVarsFunc GetEnvVarsFunc)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -178,7 +178,7 @@ func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 	return restartableInitContainers
 }
 
-func (m *manager) AddPod(pod *v1.Pod, getEnvVarsFunc getEnvVarsFunc) {
+func (m *manager) AddPod(pod *v1.Pod, getEnvVarsFunc GetEnvVarsFunc) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 

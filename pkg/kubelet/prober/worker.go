@@ -57,7 +57,7 @@ type worker struct {
 	initialValue results.Result
 
 	// Func to get environment variables' values used in httpGet path expansion
-	getEnvVarsFunc getEnvVarsFunc
+	getEnvVarsFunc GetEnvVarsFunc
 	// Map to store environment variables used in httpGet path expansion
 	envVars map[string]string
 
@@ -86,7 +86,7 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
-type getEnvVarsFunc func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error)
+type GetEnvVarsFunc func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error)
 
 // Creates and starts a new probe worker.
 func newWorker(
@@ -94,7 +94,7 @@ func newWorker(
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container,
-	getEnvVarsFunc getEnvVarsFunc) *worker {
+	getEnvVarsFunc GetEnvVarsFunc) *worker {
 
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
