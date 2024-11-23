@@ -56,6 +56,11 @@ type worker struct {
 	// The probe value during the initial delay.
 	initialValue results.Result
 
+	// Func to get environment variables' values used in httpGet path expansion
+	getEnvVarsFunc getEnvVarsFunc
+	// Map to store environment variables used in httpGet path expansion
+	envVars map[string]string
+
 	// Where to store this workers results.
 	resultsManager results.Manager
 	probeManager   *manager
@@ -81,12 +86,15 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
+type getEnvVarsFunc func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error)
+
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
 	probeType probeType,
 	pod *v1.Pod,
-	container v1.Container) *worker {
+	container v1.Container,
+	getEnvVarsFunc getEnvVarsFunc) *worker {
 
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
@@ -95,6 +103,8 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
+		getEnvVarsFunc:  getEnvVarsFunc,
+		envVars:         make(map[string]string),
 	}
 
 	switch probeType {
@@ -171,6 +181,9 @@ func (w *worker) run() {
 		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
 	}()
 
+	// Get environment variables to use in httpGet path expansion
+	w.getEnvVars()
+
 probeLoop:
 	for w.doProbe(ctx) {
 		// Wait for next probe tick.
@@ -185,6 +198,25 @@ probeLoop:
 			probeTicker.Reset(probeTickerPeriod)
 			klog.V(4).InfoS("Triggerd Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
+		}
+	}
+}
+
+// Get environment variables to use in httpGet path expansion
+func (w *worker) getEnvVars() {
+	podIP := ""
+	podIPs := make([]string, 0)
+	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
+	if ok {
+		podIP = status.PodIP
+		for _, podIP := range status.PodIPs {
+			podIPs = append(podIPs, podIP.IP)
+		}
+	}
+	envVarsList, err := w.getEnvVarsFunc(w.pod, &w.container, podIP, podIPs)
+	if err == nil {
+		for _, envVar := range envVarsList {
+			w.envVars[envVar.Name] = w.envVars[envVar.Value]
 		}
 	}
 }

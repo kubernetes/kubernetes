@@ -2016,8 +2016,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
+	// Func to get environment variables' values to use in httpGet path expansion
+	getEnvVarsFunc := func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+		return kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
+	}
 	// Ensure the pod is being probed
-	kl.probeManager.AddPod(pod)
+	kl.probeManager.AddPod(pod, getEnvVarsFunc)
 
 	// TODO(#113606): use cancellation from the incoming context parameter, which comes from the pod worker.
 	// Currently, using cancellation from that context causes test failures. To remove this WithoutCancel,
