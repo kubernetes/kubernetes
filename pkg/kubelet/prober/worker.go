@@ -213,10 +213,10 @@ func (w *worker) getEnvVars() {
 			podIPs = append(podIPs, podIP.IP)
 		}
 	}
-	envVarsList, err := w.getEnvVarsFunc(w.pod, &w.container, podIP, podIPs)
+	envVars, err := w.getEnvVarsFunc(w.pod, &w.container, podIP, podIPs)
 	if err == nil {
-		for _, envVar := range envVarsList {
-			w.envVars[envVar.Name] = w.envVars[envVar.Value]
+		for _, envVar := range envVars {
+			w.envVars[envVar.Name] = envVar.Value
 		}
 	}
 }

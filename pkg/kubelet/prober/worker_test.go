@@ -18,7 +18,10 @@ package prober
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"os"
 	"testing"
 	"time"
@@ -578,4 +581,32 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestGetEnvVars(t *testing.T) {
+	testCases := []struct {
+		envVars   []kubecontainer.EnvVar
+		err       error
+		expected  map[string]string
+		podStatus *v1.PodStatus
+	}{
+		{nil, nil, map[string]string{}, nil},
+		{[]kubecontainer.EnvVar{}, nil, map[string]string{}, &v1.PodStatus{}},
+		{[]kubecontainer.EnvVar{{"k1", "v1"}, {"k2", "v2"}}, nil, map[string]string{"k1": "v1", "k2": "v2"}, &v1.PodStatus{}},
+		{[]kubecontainer.EnvVar{{"k1", "v1"}, {"k2", "v2"}}, nil, map[string]string{"k1": "v1", "k2": "v2"}, &v1.PodStatus{PodIP: "127.0.0.1", PodIPs: []v1.PodIP{{"127.0.0.1"}, {"127.0.0.2"}}}},
+		{nil, errors.New("GetEnvVarsFunc failed"), map[string]string{}, &v1.PodStatus{}},
+	}
+	for _, test := range testCases {
+		m := newTestManager()
+		w := newTestWorker(m, startup, v1.Probe{})
+		w.getEnvVarsFunc = func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+			return test.envVars, test.err
+		}
+		if test.podStatus != nil {
+			m.statusManager.SetPodStatus(w.pod, *test.podStatus)
+		}
+
+		w.getEnvVars()
+		assert.Equal(t, test.expected, w.envVars, "Environment variable map doesn't match expected value. Expected: %v, got: %v", test.expected, w.envVars)
+	}
 }
