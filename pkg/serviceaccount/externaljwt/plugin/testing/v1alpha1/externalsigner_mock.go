@@ -150,6 +150,7 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 	keys := []*v1alpha1.Key{}
 
 	m.supportedKeysLock.RLock()
+	defer m.supportedKeysLock.RUnlock()
 	for id, k := range m.supportedKeys {
 		keys = append(keys, &v1alpha1.Key{
 			KeyId:                    id,
@@ -158,7 +159,6 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 		})
 	}
 	m.supportedKeysFetched.Broadcast()
-	m.supportedKeysLock.RUnlock()
 
 	return &v1alpha1.FetchKeysResponse{
 		RefreshHintSeconds: 5,

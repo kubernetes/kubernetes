@@ -180,6 +180,8 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
 				mockSigner.SetSupportedKeys(cpy)
 				mockSigner.WaitForSupportedKeysFetch()
+				// allow some time for plugin to be ready with new keys before proceeding
+				time.Sleep(2 * time.Second)
 			},
 			shouldPassAuth: true,
 		},
