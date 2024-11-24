@@ -474,14 +474,18 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 			result, err = filterPrefixAndOrder(key, result)
 			return listResp{
 				Items:           result,
+				HasMore:         false,
+				ItemCount:       int64(len(result)),
 				ResourceVersion: w.resourceVersion,
 			}, matchValue.IndexName, err
 		}
 	}
 	if store, ok := w.store.(orderedLister); ok {
-		result, _ := store.ListPrefix(key, "", 0)
+		result, hasMore := store.ListPrefix(key, "", 0)
 		return listResp{
 			Items:           result,
+			HasMore:         hasMore,
+			ItemCount:       int64(len(result)),
 			ResourceVersion: w.resourceVersion,
 		}, "", nil
 	}
@@ -489,6 +493,8 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	result, err = filterPrefixAndOrder(key, result)
 	return listResp{
 		Items:           result,
+		HasMore:         false,
+		ItemCount:       int64(len(result)),
 		ResourceVersion: w.resourceVersion,
 	}, "", err
 }
