@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -204,10 +205,15 @@ func RemoveExtendedResource(ctx context.Context, clientSet clientset.Interface, 
 	extendedResource := v1.ResourceName(extendedResourceName)
 
 	ginkgo.By("Removing a custom resource")
-	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
-	delete(node.Status.Capacity, extendedResource)
-	delete(node.Status.Allocatable, extendedResource)
-	_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s: %w", nodeName, err)
+		}
+		delete(node.Status.Capacity, extendedResource)
+		delete(node.Status.Allocatable, extendedResource)
+		_, err = clientSet.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		return err
+	})
 	framework.ExpectNoError(err)
 }
