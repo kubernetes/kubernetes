@@ -56,9 +56,9 @@ type worker struct {
 	// The probe value during the initial delay.
 	initialValue results.Result
 
-	// Func to get environment variables' values used in httpGet path expansion
+	// Func to get environment variables to use in httpGet path expansion
 	getEnvVarsFunc GetEnvVarsFunc
-	// Map to store environment variables used in httpGet path expansion
+	// Map to store environment variables to use in httpGet path expansion
 	envVars map[string]string
 
 	// Where to store this workers results.
