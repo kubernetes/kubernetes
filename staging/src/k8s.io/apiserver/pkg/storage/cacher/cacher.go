@@ -752,7 +752,11 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 			return listResp{}, "", err
 		}
 		if exists {
-			return listResp{Items: []interface{}{obj}, ResourceVersion: readResourceVersion}, "", nil
+			return listResp{
+				Items:           []interface{}{obj},
+				ItemCount:       1,
+				ResourceVersion: readResourceVersion,
+			}, "", nil
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
@@ -760,7 +764,10 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 }
 
 type listResp struct {
-	Items           []interface{}
+	Items   []interface{}
+	HasMore bool
+	// Return ItemCount but only if pred.Empty()
+	ItemCount       int64
 	ResourceVersion uint64
 }
 
@@ -819,19 +826,21 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	//   so we try to delay this action as much as possible
 	var selectedObjects []runtime.Object
 	var lastSelectedObjectKey string
-	var hasMoreListItems bool
+	hasMoreListItems := resp.HasMore
 	limit := computeListLimit(opts)
 	for i, obj := range resp.Items {
 		elem, ok := obj.(*storeElement)
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if pred.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
 		if limit > 0 && int64(len(selectedObjects)) >= limit {
-			hasMoreListItems = i < len(resp.Items)-1
+			if i < len(resp.Items)-1 {
+				hasMoreListItems = true
+			}
 			break
 		}
 	}
@@ -848,7 +857,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), int64(len(resp.Items)), hasMoreListItems, opts)
+		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), resp.ItemCount, hasMoreListItems, opts)
 		if err != nil {
 			return err
 		}
