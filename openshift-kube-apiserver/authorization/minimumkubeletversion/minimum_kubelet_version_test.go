@@ -94,8 +94,8 @@ func TestAuthorize(t *testing.T) {
 				Namespace:       "ns",
 				User:            nodeUser,
 			},
-			expectedAllowed: kauthorizer.DecisionNoOpinion,
-			expectedMsg:     `failed to get node node0: node "node0" not found`,
+			expectedAllowed: kauthorizer.DecisionDeny,
+			expectedErr:     `node "node0" not found`,
 			node:            &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}},
 		},
 		{
@@ -107,7 +107,7 @@ func TestAuthorize(t *testing.T) {
 				User:            nodeUser,
 			},
 			expectedAllowed: kauthorizer.DecisionDeny,
-			expectedMsg:     `failed to parse node version bogus: No Major.Minor.Patch elements found`,
+			expectedErr:     `failed to parse node version bogus: No Major.Minor.Patch elements found`,
 			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"},
 				Status: v1.NodeStatus{
 					NodeInfo: v1.NodeSystemInfo{
