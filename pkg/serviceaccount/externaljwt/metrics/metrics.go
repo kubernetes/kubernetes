@@ -116,8 +116,8 @@ func RecordTokenGenAttempt(err error) {
 	tokenGenReqTotal.WithLabelValues(getErrorCode(err)).Inc()
 }
 
-func RecordKeyDataTimeStamp(timestamp int64) {
-	dataTimeStamp.WithLabelValues().Set(float64(timestamp))
+func RecordKeyDataTimeStamp(timestamp float64) {
+	dataTimeStamp.WithLabelValues().Set(timestamp)
 }
 
 type gRPCError interface {

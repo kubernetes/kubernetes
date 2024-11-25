@@ -195,13 +195,13 @@ func TestTokenGenMetrics(t *testing.T) {
 
 func TestRecordKeyDataTimeStamp(t *testing.T) {
 
-	dataTimeStamp1 := time.Now().Unix()
-	dataTimeStamp2 := time.Now().Add(time.Second * 1200).Unix()
+	dataTimeStamp1 := float64(time.Now().Unix())
+	dataTimeStamp2 := float64(time.Now().Add(time.Second * 1200).Unix())
 
 	testCases := []struct {
 		desc    string
 		metrics []string
-		want    int64
+		want    float64
 		emit    func()
 	}{
 		{
