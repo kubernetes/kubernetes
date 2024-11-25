@@ -710,7 +710,7 @@ func TestAddSpecialVerb(t *testing.T) {
 				if len(resources) != 1 {
 					t.Errorf("new verb should only contain one resource resources:%#v", resources)
 				}
-				if reflect.DeepEqual(tc.resource, resources[0]) {
+				if !reflect.DeepEqual(tc.resource, resources[0]) {
 					t.Errorf("miss expected resource:%#v", tc.resource)
 				}
 				return
