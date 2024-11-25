@@ -355,7 +355,7 @@
       measurePods: 500
   - name: 5000Nodes
     labels: [performance]
-    threshold: 200
+    threshold: 160
     featureGates:
       SchedulerQueueingHints: false
       SchedulerAsyncPreemption: false
@@ -364,7 +364,7 @@
       initPods: 20000
       measurePods: 5000
   - name: 5000Nodes_AsyncPreemptionEnabled
-    threshold: 200
+    threshold: 160
     labels: [performance]
     featureGates:
       SchedulerAsyncPreemption: true
@@ -376,7 +376,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 120
+    threshold: 160
     params:
       initNodes: 5000
       initPods: 20000
@@ -425,7 +425,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 200
+    threshold: 140
     params:
       initNodes: 5000
       measurePods: 10000
@@ -433,7 +433,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 250
+    threshold: 170
     params:
       initNodes: 5000
       measurePods: 10000
