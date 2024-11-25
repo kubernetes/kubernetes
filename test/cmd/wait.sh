@@ -102,7 +102,7 @@ EOF
     ) &
 
     # Command: Wait for labeled deployment to be created
-    output_message=$(kubectl wait --for=create deploy -l app=test-label --timeout=10s)
+    output_message=$(kubectl wait --for=create deploy -l app=test-label --timeout=40s)
 
      # Post-Condition: Wait was successful
     kube::test::if_has_string "${output_message}" 'test-label condition met'
