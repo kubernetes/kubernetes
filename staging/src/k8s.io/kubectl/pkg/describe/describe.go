@@ -317,7 +317,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 		switch typedValue := value.(type) {
 		case map[string]interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -325,7 +325,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		case []interface{}:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
@@ -340,7 +340,7 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 
 		default:
 			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slice.ContainsString(skip, skipExpr, nil) {
+			if slice.Contains[string](skip, skipExpr, nil) {
 				continue
 			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
@@ -365,7 +365,7 @@ func smartLabelFor(field string) string {
 			continue
 		}
 
-		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
+		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
 			part = strings.Title(part)
