@@ -900,3 +900,23 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
 	}
 }
+
+func TestServiceCacheLeaks(t *testing.T) {
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+
+	service := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "TCP", 1235, 5321, 0)
+	})
+	fp.addService(service)
+	if len(fp.serviceChanges.items) != 1 {
+		t.Errorf("Found %d items on the cache, 1 expected", len(fp.serviceChanges.items))
+	}
+
+	fp.deleteService(service)
+	if len(fp.serviceChanges.items) > 0 {
+		t.Errorf("Found %d items on the cache, 0 expected", len(fp.serviceChanges.items))
+	}
+}
