@@ -31,6 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -63,6 +65,8 @@ type Options struct {
 	proxyServer proxyRun
 	// errCh is the channel that errors will be sent
 	errCh chan error
+	// flagz is the Reader interface to get flags for the flagz page.
+	flagz flagz.Reader
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
 	// config.KubeProxyConfiguration.
@@ -233,7 +237,21 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		return err
 	}
 
-	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
+		return err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		nfs := cliflag.NamedFlagSets{
+			FlagSets: make(map[string]*pflag.FlagSet),
+		}
+		nfs.FlagSets["generic"] = fs
+		o.flagz = flagz.NamedFlagSetsReader{
+			FlagSets: nfs,
+		}
+	}
+
+	return nil
 }
 
 // copyLogsFromFlags applies the logging flags from the given flag set to the given
@@ -353,7 +371,7 @@ func (o *Options) Run(ctx context.Context) error {
 	// We ignore err otherwise; the cleanup is best-effort, and the backends will have
 	// logged messages if they failed in interesting ways.
 
-	proxyServer, err := newProxyServer(ctx, o.config, o.master, o.InitAndExit)
+	proxyServer, err := newProxyServer(ctx, o.config, o.master, o.InitAndExit, o.flagz)
 	if err != nil {
 		return err
 	}
