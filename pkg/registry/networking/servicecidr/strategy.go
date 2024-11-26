@@ -54,6 +54,9 @@ func (serviceCIDRStrategy) NamespaceScoped() bool {
 // and should not be modified by the user.
 func (serviceCIDRStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"networking/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 		"networking/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
@@ -129,6 +132,9 @@ var StatusStrategy = serviceCIDRStatusStrategy{Strategy}
 // and should not be modified by the user.
 func (serviceCIDRStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"networking/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
 		"networking/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
