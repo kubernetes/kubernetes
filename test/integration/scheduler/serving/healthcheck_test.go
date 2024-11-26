@@ -31,9 +31,14 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 )
 
 func TestHealthEndpoints(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -78,6 +83,12 @@ func TestHealthEndpoints(t *testing.T) {
 		{
 			"/livez",
 			"/livez",
+			false,
+			http.StatusOK,
+		},
+		{
+			"/statusz",
+			"/statusz",
 			false,
 			http.StatusOK,
 		},
@@ -138,6 +149,9 @@ func TestHealthEndpoints(t *testing.T) {
 				t.Fatalf("Failed to get client from test server: %v", err)
 			}
 			req, err := http.NewRequest("GET", base+tt.path, nil)
+			if tt.path == "/statusz" {
+				req.Header.Set("Accept", "text/plain")
+			}
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
 			}

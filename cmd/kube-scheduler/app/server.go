@@ -56,6 +56,8 @@ import (
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
@@ -66,6 +68,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+)
+
+const (
+	// KubeScheduler defines variable used internally when referring to kube-scheduler component
+	KubeScheduler = "kube-scheduler"
 )
 
 func init() {
@@ -85,7 +92,7 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
-		Use: "kube-scheduler",
+		Use: KubeScheduler,
 		Long: `The Kubernetes scheduler is a control plane process which assigns
 Pods to Nodes. The scheduler determines which Nodes are valid placements for
 each Pod in the scheduling queue according to constraints and available
@@ -224,7 +231,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			cc.Client,
 			metav1.NamespaceSystem,
 			cc.LeaderElection.Lock.Identity(),
-			"kube-scheduler",
+			KubeScheduler,
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
 			coordinationv1.OldestEmulationVersion,
@@ -348,7 +355,7 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux, informers inform
 // embed the metrics handler.
 // TODO: healthz check is deprecated, please use livez and readyz instead. Will be removed in the future.
 func newHealthEndpointsAndMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, informers informers.SharedInformerFactory, isLeader func() bool, healthzChecks, readyzChecks []healthz.HealthChecker) http.Handler {
-	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
+	pathRecorderMux := mux.NewPathRecorderMux(KubeScheduler)
 	healthz.InstallHandler(pathRecorderMux, healthzChecks...)
 	healthz.InstallLivezHandler(pathRecorderMux)
 	healthz.InstallReadyzHandler(pathRecorderMux, readyzChecks...)
@@ -362,6 +369,11 @@ func newHealthEndpointsAndMetricsHandler(config *kubeschedulerconfig.KubeSchedul
 		}
 		routes.DebugFlags{}.Install(pathRecorderMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(pathRecorderMux, KubeScheduler, statusz.NewRegistry())
+	}
+
 	return pathRecorderMux
 }
 
