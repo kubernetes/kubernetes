@@ -1611,14 +1611,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Introduce some small jittering to ensure that over time the requests won't start
 		// accumulating at approximately the same time from the set of nodes due to priority and
 		// fairness effect.
-		go wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+		go wait.JitterUntilWithContext(ctx, kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true)
 		go kl.fastStatusUpdateOnce()
 
 		// start syncing lease
 		go kl.nodeLeaseController.Run(context.Background())
 	}
-	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
-
+	go wait.UntilWithContext(ctx, kl.updateRuntimeUp, 5*time.Second)
 	// Set up iptables util rules
 	if kl.makeIPTablesUtilChains {
 		kl.initNetworkUtil()
@@ -2849,10 +2848,9 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 // the runtime dependent modules when the container runtime first comes up,
 // and returns an error if the status check fails.  If the status check is OK,
 // update the container runtime uptime in the kubelet runtimeState.
-func (kl *Kubelet) updateRuntimeUp() {
+func (kl *Kubelet) updateRuntimeUp(ctx context.Context) {
 	kl.updateRuntimeMux.Lock()
 	defer kl.updateRuntimeMux.Unlock()
-	ctx := context.Background()
 
 	s, err := kl.containerRuntime.Status(ctx)
 	if err != nil {
@@ -2951,10 +2949,11 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 // Function is executed only during Kubelet start which improves latency to ready node by updating
 // kubelet state, runtime status and node statuses ASAP.
 func (kl *Kubelet) fastStatusUpdateOnce() {
-	ctx := context.Background()
 	start := kl.clock.Now()
 	stopCh := make(chan struct{})
 
+	ctx, cancel := context.WithTimeout(context.Background(), nodeReadyGracePeriod)
+	defer cancel()
 	// Keep trying to make fast node status update until either timeout is reached or an update is successful.
 	wait.Until(func() {
 		// fastNodeStatusUpdate returns true when it succeeds or when the grace period has expired
