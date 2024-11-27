@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/cadvisor/utils/oomparser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeStreamer struct {
@@ -65,7 +66,7 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
 	}
-	assert.NoError(t, oomWatcher.Start(tCtx, node))
+	require.NoError(t, oomWatcher.Start(tCtx, node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Len(t, eventsRecorded, numExpectedOomEvents)
@@ -125,7 +126,7 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
 	}
-	assert.NoError(t, oomWatcher.Start(tCtx, node))
+	require.NoError(t, oomWatcher.Start(tCtx, node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Len(t, eventsRecorded, numExpectedOomEvents)
@@ -162,7 +163,7 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 		recorder:    fakeRecorder,
 		oomStreamer: fakeStreamer,
 	}
-	assert.NoError(t, oomWatcher.Start(tCtx, node))
+	require.NoError(t, oomWatcher.Start(tCtx, node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 
