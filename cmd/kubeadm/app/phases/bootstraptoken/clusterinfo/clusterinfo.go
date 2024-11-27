@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -40,17 +40,18 @@ const (
 )
 
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
-func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
+func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, kubeconfig *clientcmdapi.Config) error {
 
 	fmt.Printf("[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
-	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
-	adminConfig, err := clientcmd.LoadFromFile(file)
-	if err != nil {
-		return errors.Wrap(err, "failed to load admin kubeconfig")
-	}
-	if err = clientcmdapi.FlattenConfig(adminConfig); err != nil {
+	// Clone the kubeconfig so that it's not mutated.
+	adminConfig := kubeconfig.DeepCopy()
+	if err := clientcmdapi.FlattenConfig(adminConfig); err != nil {
 		return err
+	}
+
+	if adminConfig.Contexts[adminConfig.CurrentContext] == nil {
+		return errors.New("invalid kubeconfig")
 	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
