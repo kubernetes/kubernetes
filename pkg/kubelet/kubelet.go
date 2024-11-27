@@ -2849,10 +2849,9 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 // the runtime dependent modules when the container runtime first comes up,
 // and returns an error if the status check fails.  If the status check is OK,
 // update the container runtime uptime in the kubelet runtimeState.
-func (kl *Kubelet) updateRuntimeUp() {
+func (kl *Kubelet) updateRuntimeUp(ctx context.Context) {
 	kl.updateRuntimeMux.Lock()
 	defer kl.updateRuntimeMux.Unlock()
-	ctx := context.Background()
 
 	s, err := kl.containerRuntime.Status(ctx)
 	if err != nil {
@@ -2951,7 +2950,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 // Function is executed only during Kubelet start which improves latency to ready node by updating
 // kubelet state, runtime status and node statuses ASAP.
 func (kl *Kubelet) fastStatusUpdateOnce() {
-	ctx := context.Background()
 	start := kl.clock.Now()
 	stopCh := make(chan struct{})
 
@@ -2960,6 +2958,8 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 		// fastNodeStatusUpdate returns true when it succeeds or when the grace period has expired
 		// (status was not updated within nodeReadyGracePeriod and the second argument below gets true),
 		// then we close the channel and abort the loop.
+		ctx, cancel := context.WithTimeout(context.Background(), nodeReadyGracePeriod)
+		defer cancel()
 		if kl.fastNodeStatusUpdate(ctx, kl.clock.Since(start) >= nodeReadyGracePeriod) {
 			close(stopCh)
 		}

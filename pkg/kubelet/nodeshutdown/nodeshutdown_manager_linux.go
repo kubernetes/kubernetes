@@ -21,6 +21,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -283,7 +284,8 @@ func (m *managerImpl) start() (chan struct{}, error) {
 
 				if isShuttingDown {
 					// Update node status and ready condition
-					go m.syncNodeStatus()
+					ctx := context.Background()
+					go m.syncNodeStatus(ctx)
 
 					m.processShutdownEvent()
 				} else {

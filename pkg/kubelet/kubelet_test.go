@@ -2742,7 +2742,8 @@ func TestSyncLabels(t *testing.T) {
 			test.existingNode.Name = string(kl.nodeName)
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{test.existingNode}}
-			go func() { kl.syncNodeStatus() }()
+			ctx := context.Background()
+			go func() { kl.syncNodeStatus(ctx) }()
 
 			err := retryWithExponentialBackOff(
 				100*time.Millisecond,

@@ -290,7 +290,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				},
 			}
 
-			kubelet.updateRuntimeUp()
+			kubelet.updateRuntimeUp(context.Background())
 			assert.NoError(t, kubelet.updateNodeStatus(ctx))
 			actions := kubeClient.Actions()
 			require.Len(t, actions, 2)
@@ -479,7 +479,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 
 	actions := kubeClient.Actions()
@@ -720,17 +720,17 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// TODO(random-liu): Refactor the unit test to be table driven test.
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet ready if the runtime check is updated
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet not ready if the runtime check failed
@@ -738,19 +738,19 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// Inject error into fake runtime status check, node should be NotReady
 	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
 	clock.SetTime(time.Now())
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	fakeRuntime.StatusErr = nil
 
 	// Should report node not ready if runtime status is nil.
 	fakeRuntime.RuntimeStatus = nil
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if runtime status is empty.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if RuntimeReady is false.
@@ -760,7 +760,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 
 	// Should report node ready if RuntimeReady is true.
@@ -770,7 +770,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionTrue, "KubeletReady")
 
 	// Should report node not ready if NetworkReady is false.
@@ -780,7 +780,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			{Type: kubecontainer.NetworkReady, Status: false},
 		},
 	}
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	checkNodeStatus(v1.ConditionFalse, "KubeletNotReady")
 }
 
@@ -916,7 +916,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 
 	// Update node status when node status is created.
 	// Report node status.
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 
 	actions := kubeClient.Actions()
@@ -1563,7 +1563,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		},
 	}
 
-	kubelet.updateRuntimeUp()
+	kubelet.updateRuntimeUp(context.Background())
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 2)
