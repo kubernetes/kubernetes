@@ -331,7 +331,10 @@ func TestFindSANameForDisk(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Skipping this test due to failing ci but not removing to keep for future reference if needed
+// GH Issue: https://github.com/kubernetes/kubernetes/issues/129007
 func TestCreateBlobDisk(t *testing.T) {
+	t.Skip("skipping test due some Azure API changes and failing ci")
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	b := GetTestBlobDiskController(t)
