@@ -206,7 +206,7 @@ inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 # be non-zero if there are incompatible changes.
 #
 # The report is Markdown-formatted and can be copied into a PR comment verbatim.
-res=0
+failures=()
 echo
 compare () {
     what="$1"
@@ -226,7 +226,7 @@ compare () {
     fi
     incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1) || true
     if [ -n "$incompatible" ]; then
-        res=1
+        failures+=("${what}")
     fi
 }
 
@@ -263,7 +263,11 @@ tryBuild () {
     )
 }
 
-if [ $res -ne 0 ]; then
+res=0
+if [ ${#failures[@]} -gt 0 ]; then
+    res=1
+    echo "Detected incompatible changes on modules:"
+    printf '%s\n' "${failures[@]}"
     cat <<EOF
 
 Some notes about API differences:
