@@ -232,6 +232,11 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 	return s, nil
 }
 
+type topologyPairCount struct {
+	topologyPair topologyPair
+	count        int
+}
+
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
 	constraints, err := pl.getConstraints(pod)
@@ -253,7 +258,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		TpPairToMatchNum:     make(map[topologyPair]int, sizeHeuristic(len(allNodes), constraints)),
 	}
 
-	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
+	tpCountsByNode := make([][]topologyPairCount, len(allNodes))
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
@@ -272,7 +277,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			return
 		}
 
-		tpCounts := make(map[topologyPair]int, len(constraints))
+		tpCounts := make([]topologyPairCount, 0, len(constraints))
 		for _, c := range constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
 				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
@@ -281,15 +286,18 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
-			tpCounts[pair] = count
+			tpCounts = append(tpCounts, topologyPairCount{
+				topologyPair: pair,
+				count:        count,
+			})
 		}
 		tpCountsByNode[i] = tpCounts
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for _, tpCounts := range tpCountsByNode {
-		for tp, count := range tpCounts {
-			s.TpPairToMatchNum[tp] += count
+		for _, tpCount := range tpCounts {
+			s.TpPairToMatchNum[tpCount.topologyPair] += tpCount.count
 		}
 	}
 	s.TpKeyToDomainsNum = make(map[string]int, len(constraints))
