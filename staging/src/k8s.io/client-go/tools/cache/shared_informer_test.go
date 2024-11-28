@@ -29,12 +29,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	fcache "k8s.io/client-go/tools/cache/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -123,7 +124,7 @@ func isRegistered(i SharedInformer, h ResourceEventHandlerRegistration) bool {
 func TestIndexer(t *testing.T) {
 	assert := assert.New(t)
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: map[string]string{"a": "a-val", "b": "b-val1"}}}
 	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: map[string]string{"b": "b-val2"}}}
 	pod3 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod3", Labels: map[string]string{"a": "a-val2"}}}
@@ -197,7 +198,7 @@ func TestIndexer(t *testing.T) {
 
 func TestListenerResyncPeriods(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
@@ -284,7 +285,7 @@ func TestListenerResyncPeriods(t *testing.T) {
 
 func TestResyncCheckPeriod(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// create the shared informer and resync every 12 hours
 	informer := NewSharedInformer(source, &v1.Pod{}, 12*time.Hour).(*sharedIndexInformer)
@@ -356,7 +357,7 @@ func TestResyncCheckPeriod(t *testing.T) {
 
 // verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
 func TestSharedInformerInitializationRace(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 	listener := newTestListener("raceListener", 0)
 
@@ -371,7 +372,7 @@ func TestSharedInformerInitializationRace(t *testing.T) {
 // resync and no resync see the expected state.
 func TestSharedInformerWatchDisruption(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1", ResourceVersion: "1"}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "2"}})
@@ -446,7 +447,7 @@ func TestSharedInformerWatchDisruption(t *testing.T) {
 }
 
 func TestSharedInformerErrorHandling(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 	source.ListError = fmt.Errorf("Access Denied")
 
@@ -474,7 +475,7 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 // TestSharedInformerStartRace is a regression test to ensure there is no race between
 // Run and SetWatchErrorHandler, and Run and SetTransform.
 func TestSharedInformerStartRace(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 	stop := make(chan struct{})
 	go func() {
@@ -500,7 +501,7 @@ func TestSharedInformerStartRace(t *testing.T) {
 
 func TestSharedInformerTransformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1", ResourceVersion: "1"}})
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "2"}})
@@ -531,7 +532,7 @@ func TestSharedInformerTransformer(t *testing.T) {
 }
 
 func TestSharedInformerRemoveHandler(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
@@ -569,12 +570,12 @@ func TestSharedInformerRemoveHandler(t *testing.T) {
 }
 
 func TestSharedInformerRemoveForeignHandler(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
-	source2 := fcache.NewFakeControllerSource()
+	source2 := newFakeControllerSource(t)
 	source2.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer2 := NewSharedInformer(source2, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -651,7 +652,7 @@ func TestSharedInformerRemoveForeignHandler(t *testing.T) {
 }
 
 func TestSharedInformerMultipleRegistration(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -719,7 +720,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 }
 
 func TestRemovingRemovedSharedInformer(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -751,7 +752,7 @@ func TestRemovingRemovedSharedInformer(t *testing.T) {
 // listeners without tripping it up. There are not really many assertions in this
 // test. Meant to be run with -race to find race conditions
 func TestSharedInformerHandlerAbuse(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -865,7 +866,7 @@ func TestSharedInformerHandlerAbuse(t *testing.T) {
 }
 
 func TestStateSharedInformer(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -914,7 +915,7 @@ func TestStateSharedInformer(t *testing.T) {
 }
 
 func TestAddOnStoppedSharedInformer(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -947,7 +948,7 @@ func TestAddOnStoppedSharedInformer(t *testing.T) {
 }
 
 func TestRemoveOnStoppedSharedInformer(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -976,7 +977,7 @@ func TestRemoveOnStoppedSharedInformer(t *testing.T) {
 
 func TestRemoveWhileActive(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// create the shared informer and resync every 12 hours
 	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
@@ -1012,7 +1013,7 @@ func TestRemoveWhileActive(t *testing.T) {
 
 func TestAddWhileActive(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// create the shared informer and resync every 12 hours
 	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
@@ -1071,4 +1072,53 @@ func TestAddWhileActive(t *testing.T) {
 		t.Errorf("events on listener1 did not occur")
 		return
 	}
+}
+
+// TestShutdown depends on goleak.VerifyTestMain in main_test.go to verify that
+// all goroutines really have stopped in the different scenarios.
+func TestShutdown(t *testing.T) {
+	t.Run("no-context", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		stop := make(chan struct{})
+		defer close(stop)
+
+		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+			AddFunc: func(_ any) {},
+		})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, informer.RemoveEventHandler(handler))
+		}()
+		go informer.Run(stop)
+		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+	})
+
+	t.Run("no-context-later", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		stop := make(chan struct{})
+		defer close(stop)
+
+		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+		go informer.Run(stop)
+		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+
+		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+			AddFunc: func(_ any) {},
+		})
+		require.NoError(t, err)
+		assert.NoError(t, informer.RemoveEventHandler(handler))
+	})
+
+	t.Run("no-run", func(t *testing.T) {
+		source := newFakeControllerSource(t)
+		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+		_, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+			AddFunc: func(_ any) {},
+		})
+		require.NoError(t, err)
+
+		// At this point, neither informer nor handler have any goroutines running
+		// and it doesn't matter that nothing gets stopped or removed.
+	})
 }

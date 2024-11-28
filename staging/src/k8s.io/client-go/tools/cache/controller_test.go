@@ -39,6 +39,7 @@ import (
 func Example() {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
+	defer source.Shutdown()
 
 	// This will hold the downstream state, as we know it.
 	downstream := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
@@ -128,6 +129,7 @@ func Example() {
 func ExampleNewInformer() {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
+	defer source.Shutdown()
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -189,7 +191,7 @@ func TestHammerController(t *testing.T) {
 	// race detector.
 
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// Let's do threadsafe output to get predictable test results.
 	outputSetLock := sync.Mutex{}
@@ -300,7 +302,7 @@ func TestUpdate(t *testing.T) {
 	// call to update.
 
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	const (
 		FROM = "from"
@@ -410,7 +412,7 @@ func TestUpdate(t *testing.T) {
 
 func TestPanicPropagated(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// Make a controller that just panic if the AddFunc is called.
 	_, controller := NewInformer(
@@ -456,7 +458,7 @@ func TestPanicPropagated(t *testing.T) {
 
 func TestTransformingInformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	makePod := func(name, generation string) *v1.Pod {
 		return &v1.Pod{
@@ -578,7 +580,7 @@ func TestTransformingInformer(t *testing.T) {
 
 func TestTransformingInformerRace(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	label := "to-be-transformed"
 	makePod := func(name string) *v1.Pod {
