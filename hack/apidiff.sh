@@ -158,8 +158,9 @@ run () {
         (
             cd "${d}"
             apidiff -m -w "${out}/$(output_name "${d}")" .
-        )
+        ) &
     done
+    wait
 }
 
 # inWorktree checks out a specific revision, then invokes the given
