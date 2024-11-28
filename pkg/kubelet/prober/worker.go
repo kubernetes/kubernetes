@@ -18,6 +18,7 @@ package prober
 
 import (
 	"context"
+	"k8s.io/kubernetes/pkg/probe/http"
 	"math/rand"
 	"time"
 
@@ -57,9 +58,9 @@ type worker struct {
 	initialValue results.Result
 
 	// Func to get environment variables to use in httpGet path expansion
-	getEnvVarsFunc GetEnvVarsFunc
+	getEnvsFunc http.GetEnvsFunc
 	// Map to store environment variables to use in httpGet path expansion
-	envVars map[string]string
+	envs map[string]string
 
 	// Where to store this workers results.
 	resultsManager results.Manager
@@ -86,15 +87,13 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
-type GetEnvVarsFunc func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error)
-
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container,
-	getEnvVarsFunc GetEnvVarsFunc) *worker {
+	getEnvsFunc http.GetEnvsFunc) *worker {
 
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
@@ -103,8 +102,7 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
-		getEnvVarsFunc:  getEnvVarsFunc,
-		envVars:         make(map[string]string),
+		getEnvsFunc:     getEnvsFunc,
 	}
 
 	switch probeType {
@@ -213,12 +211,7 @@ func (w *worker) getEnvVars() {
 			podIPs = append(podIPs, podIP.IP)
 		}
 	}
-	envVars, err := w.getEnvVarsFunc(w.pod, &w.container, podIP, podIPs)
-	if err == nil {
-		for _, envVar := range envVars {
-			w.envVars[envVar.Name] = envVar.Value
-		}
-	}
+	w.envs = w.getEnvsFunc(w.pod, &w.container, podIP, podIPs)
 }
 
 // stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
@@ -321,7 +314,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, w.envVars)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, w.envs)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

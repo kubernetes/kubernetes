@@ -594,12 +594,12 @@ func TestGetEnvVars(t *testing.T) {
 		{[]kubecontainer.EnvVar{}, nil, map[string]string{}, &v1.PodStatus{}},
 		{[]kubecontainer.EnvVar{{"k1", "v1"}, {"k2", "v2"}}, nil, map[string]string{"k1": "v1", "k2": "v2"}, &v1.PodStatus{}},
 		{[]kubecontainer.EnvVar{{"k1", "v1"}, {"k2", "v2"}}, nil, map[string]string{"k1": "v1", "k2": "v2"}, &v1.PodStatus{PodIP: "127.0.0.1", PodIPs: []v1.PodIP{{"127.0.0.1"}, {"127.0.0.2"}}}},
-		{nil, errors.New("GetEnvVarsFunc failed"), map[string]string{}, &v1.PodStatus{}},
+		{nil, errors.New("GetEnvsFunc failed"), map[string]string{}, &v1.PodStatus{}},
 	}
 	for _, test := range testCases {
 		m := newTestManager()
 		w := newTestWorker(m, startup, v1.Probe{})
-		w.getEnvVarsFunc = func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+		w.getEnvsFunc = func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
 			return test.envVars, test.err
 		}
 		if test.podStatus != nil {
@@ -607,6 +607,6 @@ func TestGetEnvVars(t *testing.T) {
 		}
 
 		w.getEnvVars()
-		assert.Equal(t, test.expected, w.envVars, "Environment variable map doesn't match expected value. Expected: %v, got: %v", test.expected, w.envVars)
+		assert.Equal(t, test.expected, w.envs, "Environment variable map doesn't match expected value. Expected: %v, got: %v", test.expected, w.envs)
 	}
 }

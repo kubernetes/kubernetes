@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"math/rand"
 	"net/url"
 	"os"
@@ -312,14 +313,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 			ID:   containerID,
 		}
 
-		// this func used to expand path in http probe
-		getEnvsVarsFunc := func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (envVars []kubecontainer.EnvVar, err error) {
-			for _, env := range containerConfig.Envs {
-				envVars = append(envVars, kubecontainer.EnvVar{Name: env.Key, Value: env.Value})
-			}
-			return envVars, nil
+		// this func is used to expand path in http probe
+		getEnvsFunc := func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) map[string]string {
+			return httpprobe.KeyValuesToMap(containerConfig.Envs)
 		}
-		msg, handlerErr := m.runner.Run(ctx, kubeContainerID, pod, container, container.Lifecycle.PostStart, getEnvsVarsFunc)
+		msg, handlerErr := m.runner.Run(ctx, kubeContainerID, pod, container, container.Lifecycle.PostStart, getEnvsFunc)
 		if handlerErr != nil {
 			klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
 				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
@@ -696,10 +694,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	go func() {
 		defer close(done)
 		defer utilruntime.HandleCrash()
-		getEnvVarsFunc := func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
-			return m.runtimeHelper.MakeEnvironmentVariables(pod, container, podIP, podIPs)
-		}
-		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop, getEnvVarsFunc); err != nil {
+		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop, httpprobe.GetEnvsHelperFunc(m.runtimeHelper)); err != nil {
 			klog.ErrorS(err, "PreStop hook failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 				"containerName", containerSpec.Name, "containerID", containerID.String())
 			// do not record the message in the event so that secrets won't leak from the server.
