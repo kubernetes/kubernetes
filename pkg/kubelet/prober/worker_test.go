@@ -581,7 +581,7 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	expectResult(t, w, results.Success, msg)
 }
 
-func TestGetEnvVars(t *testing.T) {
+func TestGetEnvs(t *testing.T) {
 	testCases := []struct {
 		envs      map[string]string
 		expected  map[string]string

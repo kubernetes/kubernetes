@@ -431,12 +431,12 @@ type GetEnvsHelper interface {
 // GetEnvsHelperFunc helper variable to create GetEnvsFunc using GetEnvsHelper
 var GetEnvsHelperFunc = func(helper GetEnvsHelper) GetEnvsFunc {
 	return func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) map[string]string {
+		envs := make(map[string]string)
 		envVars, err := helper.MakeEnvironmentVariables(pod, container, podIP, podIPs)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get environment variables", "podUID", pod.UID, "container", container)
-			return nil
+			klog.ErrorS(err, "Failed to get environment variables", "podName", pod.Name, "containerName", container.Name)
+			return envs
 		}
-		envs := make(map[string]string)
 		for _, envVar := range envVars {
 			envs[envVar.Name] = envVar.Value
 		}
