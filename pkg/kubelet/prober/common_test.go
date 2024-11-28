@@ -41,8 +41,8 @@ const (
 )
 
 var testContainerID = kubecontainer.ContainerID{Type: "test", ID: "cOnTaInEr_Id"}
-var testGetEnvVarsFunc = func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
-	return make([]kubecontainer.EnvVar, 0), nil
+var testGetEnvVarsFunc = func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) map[string]string {
+	return make(map[string]string)
 }
 
 func getTestRunningStatus() v1.PodStatus {

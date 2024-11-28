@@ -18,7 +18,6 @@ package prober
 
 import (
 	"context"
-	"k8s.io/kubernetes/pkg/probe/http"
 	"math/rand"
 	"time"
 
@@ -58,7 +57,7 @@ type worker struct {
 	initialValue results.Result
 
 	// Func to get environment variables to use in httpGet path expansion
-	getEnvsFunc http.GetEnvsFunc
+	getEnvsFunc kubecontainer.GetEnvsFunc
 	// Map to store environment variables to use in httpGet path expansion
 	envs map[string]string
 
@@ -93,7 +92,7 @@ func newWorker(
 	probeType probeType,
 	pod *v1.Pod,
 	container v1.Container,
-	getEnvsFunc http.GetEnvsFunc) *worker {
+	getEnvsFunc kubecontainer.GetEnvsFunc) *worker {
 
 	w := &worker{
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
@@ -180,7 +179,7 @@ func (w *worker) run() {
 	}()
 
 	// Get environment variables to use in httpGet path expansion
-	w.getEnvVars()
+	w.getEnvs()
 
 probeLoop:
 	for w.doProbe(ctx) {
@@ -201,7 +200,7 @@ probeLoop:
 }
 
 // Get environment variables to use in httpGet path expansion
-func (w *worker) getEnvVars() {
+func (w *worker) getEnvs() {
 	podIP := ""
 	podIPs := make([]string, 0)
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
@@ -313,7 +312,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
-	// Note, exec probe does NOT have access to pod environment variables or downward API
+	// Note, exec probe does NOT have access to downward API
 	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, w.envs)
 	if err != nil {
 		// Prober error, throw away the result.

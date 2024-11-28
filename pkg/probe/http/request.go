@@ -18,9 +18,6 @@ package http
 
 import (
 	"fmt"
-	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	"net"
 	"net/http"
@@ -41,7 +38,7 @@ func NewProbeRequest(url *url.URL, headers http.Header) (*http.Request, error) {
 
 // NewRequestForHTTPGetAction returns an http.Request derived from httpGet.
 // When httpGet.Host is empty, podIP will be used instead.
-func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Container, podIP string, userAgentFragment string, envVars map[string]string) (*http.Request, error) {
+func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Container, podIP string, userAgentFragment string, envs map[string]string) (*http.Request, error) {
 	scheme := strings.ToLower(string(httpGet.Scheme))
 	if scheme == "" {
 		scheme = "http"
@@ -57,7 +54,7 @@ func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Contain
 		return nil, err
 	}
 
-	path := expandPath(httpGet.Path, envVars)
+	path := expandPath(httpGet.Path, envs)
 	url := formatURL(scheme, host, port, path)
 	headers := v1HeaderToHTTPHeader(httpGet.HTTPHeaders)
 
@@ -126,33 +123,4 @@ func v1HeaderToHTTPHeader(headerList []v1.HTTPHeader) http.Header {
 func expandPath(path string, envVars map[string]string) string {
 	mappingFunc := expansion.MappingFuncFor(envVars)
 	return expansion.Expand(path, mappingFunc)
-}
-
-type GetEnvsFunc func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) map[string]string
-
-type GetEnvsHelper interface {
-	MakeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error)
-}
-
-var GetEnvsHelperFunc = func(helper GetEnvsHelper) GetEnvsFunc {
-	return func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) map[string]string {
-		envVars, err := helper.MakeEnvironmentVariables(pod, container, podIP, podIPs)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get environment variables", "podUID", pod.UID, "container", container)
-			return nil
-		}
-		envs := make(map[string]string)
-		for _, envVar := range envVars {
-			envs[envVar.Name] = envVar.Value
-		}
-		return envs
-	}
-}
-
-func KeyValuesToMap(kvs []*kubeapi.KeyValue) map[string]string {
-	mp := make(map[string]string)
-	for _, kv := range kvs {
-		mp[kv.Key] = kv.Value
-	}
-	return mp
 }

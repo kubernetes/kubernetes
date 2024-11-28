@@ -69,7 +69,7 @@ func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.C
 	}
 }
 
-func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, getEnvsFunc httpprobe.GetEnvsFunc) (string, error) {
+func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, getEnvsFunc kubecontainer.GetEnvsFunc) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -142,7 +142,7 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 	}
 }
 
-func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder, getEnvsFunc httpprobe.GetEnvsFunc) error {
+func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder, getEnvsFunc kubecontainer.GetEnvsFunc) error {
 	host := handler.HTTPGet.Host
 	podIP := host
 	podIPs := make([]string, 0)
