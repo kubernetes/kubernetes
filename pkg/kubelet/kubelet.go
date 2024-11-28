@@ -2018,7 +2018,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Func to get environment variables to use in httpGet path expansion
 	getEnvVarsFunc := func(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
-		return kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
+		return kl.MakeEnvironmentVariables(pod, container, podIP, podIPs)
 	}
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod, getEnvVarsFunc)

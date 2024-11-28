@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -69,7 +70,7 @@ func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.C
 	}
 }
 
-func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
+func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, getEnvVarsFunc prober.GetEnvVarsFunc) (string, error) {
 	switch {
 	case handler.Exec != nil:
 		var msg string
@@ -81,7 +82,7 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
-		err := hr.runHTTPHandler(ctx, pod, container, handler, hr.eventRecorder)
+		err := hr.runHTTPHandler(ctx, pod, container, handler, hr.eventRecorder, getEnvVarsFunc)
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v", handler.HTTPGet.Path, container.Name, format.Pod(pod), err)
@@ -142,9 +143,10 @@ func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) err
 	}
 }
 
-func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
+func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder, getEnvVarsFunc prober.GetEnvVarsFunc) error {
 	host := handler.HTTPGet.Host
 	podIP := host
+	podIPs := make([]string, 0)
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
@@ -156,9 +158,17 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 		}
 		host = status.IPs[0]
 		podIP = host
+		podIPs = status.IPs
 	}
 
-	req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle", make(map[string]string))
+	envs := make(map[string]string)
+	envVars, err := getEnvVarsFunc(pod, container, podIP, podIPs)
+	if err == nil {
+		for _, env := range envVars {
+			envs[env.Name] = env.Value
+		}
+	}
+	req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle", envs)
 	if err != nil {
 		return err
 	}
