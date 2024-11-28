@@ -52,12 +52,6 @@ const (
 	// after receiving a 'too high resource version' error.
 	resourceVersionTooHighRetrySeconds = 1
 
-	// eventFreshDuration is time duration of events we want to keep.
-	// We set it to `defaultBookmarkFrequency` plus epsilon to maximize
-	// chances that last bookmark was sent within kept history, at the
-	// same time, minimizing the needed memory usage.
-	defaultEventFreshDuration = 75 * time.Second
-
 	// defaultLowerBoundCapacity is a default value for event cache capacity's lower bound.
 	// TODO: Figure out, to what value we can decreased it.
 	defaultLowerBoundCapacity = 100

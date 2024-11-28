@@ -180,6 +180,10 @@ func BuildGenericConfig(
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
+	if genericConfig.RequestTimeout > 0 {
+		s.Etcd.StorageConfig.EventsHistoryWindow = genericConfig.RequestTimeout + 15*time.Second
+	}
+
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
