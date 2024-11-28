@@ -19,15 +19,22 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 )
 
 func TestHandleCrash(t *testing.T) {
@@ -119,6 +126,72 @@ func TestHandleCrashLog(t *testing.T) {
 	}
 }
 
+func TestHandleCrashContextual(t *testing.T) {
+	for name, handleCrash := range map[string]func(logger klog.Logger, trigger func(), additionalHandlers ...func(context.Context, interface{})){
+		"WithLogger": func(logger klog.Logger, trigger func(), additionalHandlers ...func(context.Context, interface{})) {
+			logger = logger.WithCallDepth(2) // This function *and* the trigger helper.
+			defer HandleCrashWithLogr(logger, additionalHandlers...)
+			trigger()
+		},
+		"WithContext": func(logger klog.Logger, trigger func(), additionalHandlers ...func(context.Context, interface{})) {
+			logger = logger.WithCallDepth(2)
+			defer HandleCrashWithContext(klog.NewContext(context.Background(), logger), additionalHandlers...)
+			trigger()
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for name, tt := range map[string]struct {
+				trigger     func()
+				expectPanic string
+			}{
+				"no-panic": {
+					trigger:     func() {},
+					expectPanic: "",
+				},
+				"string-panic": {
+					trigger:     func() { panic("fake") },
+					expectPanic: "fake",
+				},
+				"int-panic": {
+					trigger:     func() { panic(42) },
+					expectPanic: "42",
+				},
+			} {
+				t.Run(name, func(t *testing.T) {
+					var buffer bytes.Buffer
+					timeInUTC := time.Date(2009, 12, 1, 13, 30, 40, 42000, time.UTC)
+					timeString := "1201 13:30:40.000042"
+					logger := textlogger.NewLogger(textlogger.NewConfig(
+						textlogger.FixedTime(timeInUTC),
+						textlogger.Output(&buffer),
+					))
+					ReallyCrash = false
+					defer func() { ReallyCrash = true }()
+
+					handler := func(ctx context.Context, r interface{}) {
+						// Same formatting as in HandleCrash.
+						str, ok := r.(string)
+						if !ok {
+							str = fmt.Sprintf("%v", r)
+						}
+						klog.FromContext(ctx).Info("handler called", "panic", str)
+					}
+
+					_, _, line, _ := runtime.Caller(0)
+					handleCrash(logger, tt.trigger, handler)
+					if tt.expectPanic != "" {
+						assert.Contains(t, buffer.String(), fmt.Sprintf(`E%s  %d runtime_test.go:%d] "Observed a panic" panic=%q`, timeString, os.Getpid(), line+1, tt.expectPanic))
+						assert.Contains(t, buffer.String(), fmt.Sprintf(`I%s  %d runtime_test.go:%d] "handler called" panic=%q
+`, timeString, os.Getpid(), line+1, tt.expectPanic))
+					} else {
+						assert.Empty(t, buffer.String())
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestHandleCrashLogSilenceHTTPErrAbortHandler(t *testing.T) {
 	log, err := captureStderr(func() {
 		defer func() {
@@ -182,5 +255,54 @@ func Test_rudimentaryErrorBackoff_OnError_ParallelSleep(t *testing.T) {
 
 	if since := time.Since(st); since > 5*time.Second {
 		t.Errorf("OnError slept for too long: %s", since)
+	}
+}
+
+func TestHandleError(t *testing.T) {
+	for name, handleError := range map[string]func(logger klog.Logger, err error, msg string, keysAndValues ...interface{}){
+		"WithLogger": func(logger klog.Logger, err error, msg string, keysAndValues ...interface{}) {
+			helper, logger := logger.WithCallStackHelper()
+			helper()
+			HandleErrorWithLogr(logger, err, msg, keysAndValues...)
+		},
+		"WithContext": func(logger klog.Logger, err error, msg string, keysAndValues ...interface{}) {
+			helper, logger := logger.WithCallStackHelper()
+			helper()
+			HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, msg, keysAndValues...)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for name, tc := range map[string]struct {
+				err           error
+				msg           string
+				keysAndValues []interface{}
+				expectLog     string
+			}{
+				"no-error": {
+					msg:       "hello world",
+					expectLog: `"hello world" logger="UnhandledError"`,
+				},
+				"complex": {
+					err:           errors.New("fake error"),
+					msg:           "ignore",
+					keysAndValues: []interface{}{"a", 1, "b", "c"},
+					expectLog:     `"ignore" err="fake error" logger="UnhandledError" a=1 b="c"`,
+				},
+			} {
+				t.Run(name, func(t *testing.T) {
+					var buffer bytes.Buffer
+					timeInUTC := time.Date(2009, 12, 1, 13, 30, 40, 42000, time.UTC)
+					timeString := "1201 13:30:40.000042"
+					logger := textlogger.NewLogger(textlogger.NewConfig(
+						textlogger.FixedTime(timeInUTC),
+						textlogger.Output(&buffer),
+					))
+
+					_, _, line, _ := runtime.Caller(0)
+					handleError(logger, tc.err, tc.msg, tc.keysAndValues...)
+					assert.Equal(t, fmt.Sprintf("E%s  %d runtime_test.go:%d] %s\n", timeString, os.Getpid(), line+1, tc.expectLog), buffer.String())
+				})
+			}
+		})
 	}
 }
