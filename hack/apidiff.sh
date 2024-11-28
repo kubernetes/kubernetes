@@ -82,23 +82,16 @@ shift $((OPTIND - 1))
 # Check specific directory or everything.
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
-    # This lists all entries in the go.work file as absolute directory paths.
-    kube::util::read-array targets < <(go list -f '{{.Dir}}' -m)
+    shopt -s globstar
+    # Modules are discovered by looking for go.mod rather than asking go
+    # to ensure that modules that aren't part of the workspace and/or are
+    # not dependencies are checked too.
+    # . and staging are listed explicitly here to avoid _output
+    for module in ./go.mod ./staging/**/go.mod; do
+        module="${module%/go.mod}"
+        targets+=("$module")
+    done
 fi
-
-# Sanitize paths:
-# - We need relative paths because we will invoke apidiff in
-#   different work trees.
-# - Must start with a dot.
-for (( i=0; i<${#targets[@]}; i++ )); do
-    d="${targets[i]}"
-    d=$(realpath -s --relative-to="$(pwd)" "${d}")
-    if [ "${d}" != "." ]; then
-        # sub-directories have to have a leading dot.
-        d="./${d}"
-    fi
-    targets[i]="${d}"
-done
 
 # Must be a something that git can resolve to a commit.
 # "git rev-parse --verify" checks that and prints a detailed
