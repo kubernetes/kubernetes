@@ -109,6 +109,11 @@ const (
 	runningPodsPath     = "/runningpods/"
 )
 
+const (
+	// Kubelet component name
+	ComponentKubelet = "kubelet"
+)
+
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
 	flagz                flagz.Reader
@@ -412,6 +417,7 @@ func (s *Server) InstallDefaultHandlers() {
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
 			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
 		}
 	}
