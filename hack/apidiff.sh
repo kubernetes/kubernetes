@@ -149,6 +149,10 @@ run () {
     out="$1"
     mkdir -p "$out"
     for d in "${targets[@]}"; do
+        if ! [ -d "${d}" ]; then
+            echo "module ${d} does not exist, skipping ..."
+            continue
+        fi
         # cd to the path for modules that are intree but not part of the go workspace
         # per example staging/src/k8s.io/code-generator/examples
         (
@@ -208,6 +212,10 @@ compare () {
     what="$1"
     before="$2"
     after="$3"
+    if [ ! -f "${before}" ] || [ ! -f "${after}" ]; then
+        echo "can not compare changes, module didn't exist before or after"
+        return
+    fi
     changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
     echo "## ${what}"
     if [ -z "$changes" ]; then
