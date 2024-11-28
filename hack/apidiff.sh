@@ -156,7 +156,12 @@ run () {
     out="$1"
     mkdir -p "$out"
     for d in "${targets[@]}"; do
-        apidiff -m -w "${out}/$(output_name "${d}")" "${d}"
+        # cd to the path for modules that are intree but not part of the go workspace
+        # per example staging/src/k8s.io/code-generator/examples
+        (
+            cd "${d}"
+            apidiff -m -w "${out}/$(output_name "${d}")" .
+        )
     done
 }
 
