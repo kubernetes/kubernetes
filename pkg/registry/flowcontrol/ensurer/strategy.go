@@ -290,8 +290,8 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 		return nil
 	}
 
-	if _, err = ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
-		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, cmp.Diff(current, bootstrap))
+	if updated, err := ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
+		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, cmp.Diff(current, updated))
 		return nil
 	}
 
