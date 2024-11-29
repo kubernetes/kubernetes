@@ -56,6 +56,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/component-base/zpages/flagz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -3301,6 +3302,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		map[string]string{},
 		1024,
 		false,
+		flagz.NamedFlagSetsReader{},
 	)
 	assert.NoError(t, err, "NewMainKubelet should succeed")
 	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")

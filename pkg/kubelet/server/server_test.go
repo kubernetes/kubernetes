@@ -331,7 +331,6 @@ func newServerTest() *serverTestFramework {
 
 func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
-		Flagz:                   flagz.NamedFlagSetsReader{},
 		EnableDebuggingHandlers: enableDebugging,
 		EnableSystemLogHandler:  enableDebugging,
 		EnableProfilingHandler:  enableDebugging,
@@ -374,6 +373,7 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		[]healthz.HealthChecker{},
+		flagz.NamedFlagSetsReader{},
 		fw.fakeAuth,
 		kubeCfg,
 	)
@@ -1884,8 +1884,8 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	}
 	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
 
-	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
-	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
+	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
+	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
 
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")
