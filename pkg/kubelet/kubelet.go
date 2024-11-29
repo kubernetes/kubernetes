@@ -3052,7 +3052,7 @@ func (kl *Kubelet) ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfigur
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), address, port, tp)
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, address, port, tp)
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service

@@ -211,11 +211,12 @@ func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	address net.IP,
 	port uint,
 	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, checkers, nil, nil, nil)
+	s := NewServer(host, resourceAnalyzer, checkers, flagz, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
