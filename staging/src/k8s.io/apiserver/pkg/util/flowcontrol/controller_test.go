@@ -389,13 +389,14 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		QueueSetFactory:        cts,
 	})
 
-	stopCh, controllerCompletedCh := make(chan struct{}), make(chan struct{})
-	var controllerErr error
-
-	informerFactory.Start(stopCh)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	controllerCompletedCh := make(chan struct{})
+	var controllerErr error
+
+	informerFactory.Start(ctx.Done())
+
 	status := informerFactory.WaitForCacheSync(ctx.Done())
 	if names := unsynced(status); len(names) > 0 {
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
@@ -403,7 +404,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 
 	go func() {
 		defer close(controllerCompletedCh)
-		controllerErr = controller.Run(stopCh)
+		controllerErr = controller.Run(ctx)
 	}()
 
 	// ensure that the controller has run its first loop.
@@ -414,7 +415,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		t.Errorf("expected the controller to reconcile the priority level configuration object: %s, error: %s", plName, err)
 	}
 
-	close(stopCh)
+	cancel()
 	t.Log("waiting for the controller Run function to shutdown gracefully")
 	<-controllerCompletedCh
 

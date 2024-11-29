@@ -911,7 +911,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
 		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(hookContext PostStartHookContext) error {
-			go c.FlowControl.Run(hookContext.Done())
+			go c.FlowControl.Run(hookContext)
 			return nil
 		})
 		if err != nil {

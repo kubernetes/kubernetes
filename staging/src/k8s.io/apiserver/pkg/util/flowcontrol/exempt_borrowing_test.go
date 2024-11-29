@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -31,6 +32,9 @@ import (
 )
 
 func TestUpdateBorrowing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
 	startTime := time.Now()
 	clk, _ := testeventclock.NewFake(startTime, 0, nil)
 	plcExempt := fcboot.MandatoryPriorityLevelConfigurationExempt
@@ -75,7 +79,7 @@ func TestUpdateBorrowing(t *testing.T) {
 	stateMid.seatDemandIntegrator.Set(float64(serverCL + 100))
 	stateLow.seatDemandIntegrator.Set(float64(serverCL + 100))
 	clk.SetTime(startTime.Add(borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing()
+	ctlr.updateBorrowing(ctx)
 	if expected, actual := serverCL+100, stateExempt.currentCL; expected != actual {
 		t.Errorf("Scenario 1: expected %d, got %d for exempt", expected, actual)
 	} else {
@@ -104,9 +108,9 @@ func TestUpdateBorrowing(t *testing.T) {
 	expectedExempt := serverCL - (expectedHigh + expectedMid + expectedLow)
 	stateExempt.seatDemandIntegrator.Set(float64(expectedExempt))
 	clk.SetTime(startTime.Add(2 * borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing()
+	ctlr.updateBorrowing(ctx)
 	clk.SetTime(startTime.Add(3 * borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing()
+	ctlr.updateBorrowing(context.Background())
 	if expected, actual := expectedExempt, stateExempt.currentCL; expected != actual {
 		t.Errorf("Scenario 2: expected %d, got %d for exempt", expected, actual)
 	} else {
@@ -137,9 +141,9 @@ func TestUpdateBorrowing(t *testing.T) {
 	stateExempt.seatDemandIntegrator.Set(float64(expectedExempt))
 	stateMid.seatDemandIntegrator.Set(float64(1))
 	clk.SetTime(startTime.Add(4 * borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing()
+	ctlr.updateBorrowing(ctx)
 	clk.SetTime(startTime.Add(5 * borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing()
+	ctlr.updateBorrowing(ctx)
 	if expected, actual := expectedExempt, stateExempt.currentCL; expected != actual {
 		t.Errorf("Scenario 3: expected %d, got %d for exempt", expected, actual)
 	} else {

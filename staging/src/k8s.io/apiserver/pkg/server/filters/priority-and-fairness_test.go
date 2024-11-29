@@ -115,7 +115,7 @@ func (t fakeApfFilter) Handle(ctx context.Context,
 	}
 }
 
-func (t fakeApfFilter) Run(stopCh <-chan struct{}) error {
+func (t fakeApfFilter) Run(_ context.Context) error {
 	return nil
 }
 
@@ -407,7 +407,7 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	f.inflight--
 }
 
-func (f *fakeWatchApfFilter) Run(stopCh <-chan struct{}) error {
+func (f *fakeWatchApfFilter) Run(_ context.Context) error {
 	return nil
 }
 
@@ -695,8 +695,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		ctx, cancel := context.WithCancel(context.Background())
+		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		// we will raise a panic for the first request.
@@ -750,7 +750,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected the server handler to have completed: %q", secondRequestPathShouldWork)
 		}
 
-		close(stopCh)
+		cancel()
 		t.Log("Waiting for the controller to shutdown")
 
 		controllerErr := <-controllerCompletedCh
@@ -769,8 +769,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		ctx, cancel := context.WithCancel(context.Background())
+		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		rquestTimesOutPath := "/request/time-out-as-designed"
@@ -823,7 +823,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
 
-		close(stopCh)
+		cancel()
 		t.Log("Waiting for the controller to shutdown")
 
 		controllerErr := <-controllerCompletedCh
@@ -842,8 +842,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		ctx, cancel := context.WithCancel(context.Background())
+		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
@@ -902,7 +902,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
 
-		close(stopCh)
+		cancel()
 		t.Log("Waiting for the controller to shutdown")
 
 		controllerErr := <-controllerCompletedCh
@@ -921,8 +921,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		ctx, cancel := context.WithCancel(context.Background())
+		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		rquestTimesOutPath := "/request/time-out-as-designed"
@@ -974,7 +974,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		expectResetStreamError(t, err)
 
-		close(stopCh)
+		cancel()
 		t.Log("Waiting for the controller to shutdown")
 
 		controllerErr := <-controllerCompletedCh
@@ -999,8 +999,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
-		stopCh := make(chan struct{})
-		controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		ctx, cancel := context.WithCancel(context.Background())
+		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
 		headerMatcher := headerMatcher{}
 		firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-designed", "/request/second/enqueued-as-designed"
@@ -1110,7 +1110,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected HTTP status code: %d or %d for request: %q, but got: %#+v", http.StatusTooManyRequests, http.StatusGatewayTimeout, secondRequestEnqueuedPath, secondReqResult.response)
 		}
 
-		close(stopCh)
+		cancel()
 		t.Log("Waiting for the controller to shutdown")
 
 		controllerErr := <-controllerCompletedCh
@@ -1124,14 +1124,14 @@ func fmtError(err error) string {
 	return fmt.Sprintf("%#+v=%q", err, err.Error())
 }
 
-func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
+func startAPFController(t *testing.T, ctx context.Context, apfConfiguration []runtime.Object, serverConcurrency int,
 	plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency)
 
-	factory.Start(stopCh)
+	factory.Start(ctx.Done())
 
 	// wait for the informer cache to sync.
 	timeout, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
@@ -1144,7 +1144,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	controllerCompletedCh := make(chan error)
 	var controllerErr error
 	go func() {
-		controllerErr = controller.Run(stopCh)
+		controllerErr = controller.Run(ctx)
 		controllerCompletedCh <- controllerErr
 	}()
 

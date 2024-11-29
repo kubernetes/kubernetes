@@ -150,10 +150,9 @@ func TestBorrowing(t *testing.T) {
 			})
 
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-			stopCh := ctx.Done()
 			controllerCompletionCh := make(chan error)
 
-			informerFactory.Start(stopCh)
+			informerFactory.Start(ctx.Done())
 
 			status := informerFactory.WaitForCacheSync(ctx.Done())
 			if names := unsynced(status); len(names) > 0 {
@@ -161,7 +160,7 @@ func TestBorrowing(t *testing.T) {
 			}
 
 			go func() {
-				controllerCompletionCh <- controller.Run(stopCh)
+				controllerCompletionCh <- controller.Run(ctx)
 			}()
 
 			// ensure that the controller has run its first loop.

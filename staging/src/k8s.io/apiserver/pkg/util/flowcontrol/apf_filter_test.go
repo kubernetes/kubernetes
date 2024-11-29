@@ -115,17 +115,17 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
-	informerFactory.Start(stopCh)
-	status := informerFactory.WaitForCacheSync(stopCh)
+	informerFactory.Start(ctx.Done())
+	status := informerFactory.WaitForCacheSync(ctx.Done())
 	if names := unsynced(status); len(names) > 0 {
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 	}
 
 	go func() {
-		controller.Run(stopCh)
+		controller.Run(ctx)
 	}()
 
 	// ensure that the controller has run its first loop.
@@ -153,7 +153,7 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 	// Add 1 second to the fake clock during QueueNoteFn
 	newTime := startTime.Add(time.Second)
 	qnf := fq.QueueNoteFn(func(bool) { clk.FakePassiveClock.SetTime(newTime) })
-	ctx := request.WithLatencyTrackers(context.Background())
+	ctx = request.WithLatencyTrackers(ctx)
 	controller.Handle(ctx, rd, noteFn, workEstr, qnf, func() {})
 
 	latencyTracker, ok := request.LatencyTrackersFrom(ctx)

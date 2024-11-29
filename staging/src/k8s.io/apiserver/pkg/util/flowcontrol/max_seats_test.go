@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -130,7 +131,7 @@ func Test_GetMaxSeats(t *testing.T) {
 					},
 				},
 			}
-			if _, err := c.digestConfigObjects([]*flowcontrolv1.PriorityLevelConfiguration{testPriorityLevel}, nil); err != nil {
+			if _, err := c.digestConfigObjects(context.Background(), []*flowcontrolv1.PriorityLevelConfiguration{testPriorityLevel}, nil); err != nil {
 				t.Errorf("unexpected error from digestConfigObjects: %v", err)
 			}
 			maxSeats := c.GetMaxSeats("test-pl")

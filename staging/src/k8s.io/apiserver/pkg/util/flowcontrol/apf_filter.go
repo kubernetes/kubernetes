@@ -70,7 +70,7 @@ type Interface interface {
 	// Run monitors config objects from the main apiservers and causes
 	// any needed changes to local behavior.  This method ceases
 	// activity and returns after the given channel is closed.
-	Run(stopCh <-chan struct{}) error
+	Run(ctx context.Context) error
 
 	// Install installs debugging endpoints to the web-server.
 	Install(c *mux.PathRecorderMux)
