@@ -341,8 +341,8 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 					return nil, fmt.Errorf("got an unauthenticated request")
 				}
 
-				// this is likely the KAS checking the OpenAPI endpoints
-				if gotUser.GetName() == "system:anonymous" || gotUser.GetName() == "system:aggregator" {
+				// this is likely the KAS checking the OpenAPI endpoints, discovery or availability probing
+				if gotUser.GetName() == "system:anonymous" || gotUser.GetName() == "system:aggregator" || gotUser.GetName() == "system:kube-aggregator" {
 					return rt.RoundTrip(req)
 				}
 
