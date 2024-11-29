@@ -219,12 +219,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 				if err != nil {
 					return fmt.Errorf("failed to load kubelet config file, path: %s, error: %w", kubeletFlags.KubeletConfigFile, err)
 				}
-				if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-					if cleanFlagSet != nil {
-						namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
-						kubeletConfig.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
-					}
-				}
 			}
 			// Merge the kubelet configurations if --config-dir is set
 			if len(kubeletFlags.KubeletDropinConfigDirectory) > 0 {
@@ -267,6 +261,13 @@ is checked every 20 seconds (also configurable with a flag).`,
 			kubeletServer := &options.KubeletServer{
 				KubeletFlags:         *kubeletFlags,
 				KubeletConfiguration: *kubeletConfig,
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+				if cleanFlagSet != nil {
+					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
+					kubeletServer.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
+				}
 			}
 
 			// use kubeletServer to construct the default KubeletDeps
@@ -1341,7 +1342,8 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.RegisterSchedulable,
 		kubeServer.NodeLabels,
 		kubeServer.NodeStatusMaxImages,
-		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault)
+		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault,
+		kubeServer.Flagz)
 	if err != nil {
 		return nil, err
 	}

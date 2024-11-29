@@ -167,6 +167,7 @@ func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
@@ -175,7 +176,7 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, checkers, auth, kubeCfg)
+	handler := NewServer(host, resourceAnalyzer, checkers, flagz, auth, kubeCfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		handler.InstallTracingFilter(tp)
@@ -214,7 +215,7 @@ func ListenAndServeKubeletReadOnlyServer(
 	port uint,
 	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, checkers, nil, nil)
+	s := NewServer(host, resourceAnalyzer, checkers, nil, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
@@ -291,11 +292,12 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	auth AuthInterface,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
 	server := Server{
-		flagz:                kubeCfg.Flagz,
+		flagz:                flagz,
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
 		auth:                 auth,

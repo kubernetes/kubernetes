@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -229,6 +230,7 @@ func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
+	Flagz flagz.Reader
 	KubeletFlags
 	kubeletconfig.KubeletConfiguration
 }
