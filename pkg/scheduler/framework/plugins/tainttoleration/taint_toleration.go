@@ -67,7 +67,7 @@ func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.Clus
 			// the scheduling queue uses Pod/Update Queueing Hint
 			// to determine whether a Pod's update makes the Pod schedulable or not.
 			// https://github.com/kubernetes/kubernetes/pull/122234
-			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
 		}, nil
 	}
 

@@ -133,7 +133,7 @@
       measurePods: 500 # Must be initNodes * 10
 
 # This test case is used to measure the performance of queuing hints when handling the pod update events: 
-# UpdatePodLabel, UpdatePodScaleDown, UpdatePodTolerations and UpdatePodSchedulingGatesEliminated.
+# UpdatePodLabel, UpdatePodScaleDown, UpdatePodToleration and UpdatePodSchedulingGatesEliminated.
 # It has a few stages, but general idea is to make a node and block some pods on it
 # or to create additional blocker pods that will prevent the other ones from being scheduled.
 # Then, updating the blocker pods or the unschedulable pods themselves generate cluster events,
