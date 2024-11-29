@@ -225,7 +225,7 @@ compare () {
         echo "$changes"
         echo
     fi
-    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1) || true
+    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
     if [ -n "$incompatible" ]; then
         failures+=("${what}")
     fi
