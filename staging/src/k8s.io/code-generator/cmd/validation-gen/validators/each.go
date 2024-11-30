@@ -107,19 +107,6 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 	return Validations{}, nil
 }
 
-func realType(t *types.Type) *types.Type {
-	for {
-		if t.Kind == types.Alias {
-			t = t.Underlying
-		} else if t.Kind == types.Pointer {
-			t = t.Elem
-		} else {
-			break
-		}
-	}
-	return t
-}
-
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:         lttv.TagName(),
