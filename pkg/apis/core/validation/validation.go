@@ -6324,7 +6324,7 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 	if spec.Replicas == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("replicas"), ""))
 	} else {
-		allErrs = append(allErrs, ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+		allErrs = append(allErrs, ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas")).MarkCoveredByDeclarative()...)
 	}
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, fldPath.Child("template"), opts)...)
 	return allErrs

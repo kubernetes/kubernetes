@@ -22,7 +22,15 @@ limitations under the License.
 package v1
 
 import (
+	context "context"
+	fmt "fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +38,63 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+		if len(subresources) == 0 {
+			return Validate_ReplicationController(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationController), safe.Cast[*corev1.ReplicationController](oldObj))
+		}
+		if len(subresources) == 1 && subresources[0] == "status" {
+			return nil // corev1.ReplicationControllerStatus has no validation
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+	})
+	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+		if len(subresources) == 0 {
+			return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+	})
 	return nil
+}
+
+func Validate_ReplicationController(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationController) (errs field.ErrorList) {
+	// field corev1.ReplicationController.TypeMeta has no validation
+	// field corev1.ReplicationController.ObjectMeta has no validation
+
+	// field corev1.ReplicationController.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
+			errs = append(errs, Validate_ReplicationControllerSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.ReplicationController) *corev1.ReplicationControllerSpec { return &oldObj.Spec }))...)
+
+	// field corev1.ReplicationController.Status has no validation
+	return errs
+}
+
+func Validate_ReplicationControllerList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerList) (errs field.ErrorList) {
+	// field corev1.ReplicationControllerList.TypeMeta has no validation
+	// field corev1.ReplicationControllerList.ListMeta has no validation
+
+	// field corev1.ReplicationControllerList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []corev1.ReplicationController) (errs field.ErrorList) {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_ReplicationController)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerList) []corev1.ReplicationController { return oldObj.Items }))...)
+
+	return errs
+}
+
+func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
+	// field corev1.ReplicationControllerSpec.Replicas
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			return
+		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }))...)
+
+	// field corev1.ReplicationControllerSpec.MinReadySeconds has no validation
+	// field corev1.ReplicationControllerSpec.Selector has no validation
+	// field corev1.ReplicationControllerSpec.Template has no validation
+	return errs
 }
