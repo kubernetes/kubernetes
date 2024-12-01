@@ -2913,6 +2913,45 @@ func TestCompleteAndValidate(t *testing.T) {
 			args:      "node/mynode --target --image=busybox",
 			wantError: true,
 		},
+		{
+			name: "Remove: valid with -i",
+			args: "node/mynode --rm -i --image=busybox",
+			wantOpts: &DebugOptions{
+				Args:               []string{},
+				Attach:             true,
+				Image:              "busybox",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"node/mynode"},
+				TTY:                false,
+				Remove:             true,
+			},
+		},
+		{
+			name: "Remove: valid with --attach",
+			args: "node/mynode --rm --attach --image=busybox",
+			wantOpts: &DebugOptions{
+				Args:               []string{},
+				Attach:             true,
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Interactive:        false,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"node/mynode"},
+				TTY:                false,
+				Remove:             true,
+			},
+		},
+		{
+			name:      "Remove: invalid without -i or --attach ",
+			args:      "mypod --rm --image=busybox",
+			wantError: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -3001,6 +3040,34 @@ func TestRun(t *testing.T) {
 			attachError:    true,
 			wantEphemerals: 1,
 			wantError:      true,
+		},
+		{
+			name: "remove debug pod for pod with -i --rm --copy-to",
+			modifier: func(o *DebugOptions) {
+				o.Interactive = true
+				o.Remove = true
+				o.CopyTo = "copied"
+			},
+			arg:           podName,
+			wantDebugPods: 0, // should be removed
+		},
+		{
+			name: "remove debug pod for node with --rm --attach",
+			modifier: func(o *DebugOptions) {
+				o.Attach = true
+				o.Remove = true
+			},
+			arg:           "node/" + nodeName,
+			wantDebugPods: 0, // should be removed
+		},
+		{
+			name: "error when debug pod with -i --rm but without --copy-to",
+			modifier: func(o *DebugOptions) {
+				o.Interactive = true
+				o.Remove = true
+			},
+			arg:       podName,
+			wantError: true, // ephemeral containers cannot be removed
 		},
 	}
 

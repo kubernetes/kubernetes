@@ -19,6 +19,7 @@ package debug
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"time"
@@ -141,6 +142,7 @@ type DebugOptions struct {
 	CustomProfileFile  string
 	CustomProfile      *corev1.Container
 	Applier            ProfileApplier
+	Remove             bool
 
 	explicitNamespace     bool
 	attachChanged         bool
@@ -213,6 +215,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
 	cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
+	cmd.Flags().BoolVar(&o.Remove, "rm", o.Remove, i18n.T("Delete the debug pod automatically on exit. Only valid when debugging a node or a pod with '--copy-to', as ephemeral containers cannot be deleted. Requires '--attach' or '-i/--stdin'."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -402,6 +405,11 @@ func (o *DebugOptions) Validate() error {
 		fmt.Fprintln(o.ErrOut, `--profile=legacy is deprecated and will be removed in the future. It is recommended to explicitly specify a profile, for example "--profile=general".`)
 	}
 
+	// Remove
+	if o.Remove && !o.Attach {
+		return fmt.Errorf("--rm should only be used for attached containers")
+	}
+
 	return nil
 }
 
@@ -433,6 +441,9 @@ func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, 
 		case *corev1.Node:
 			debugPod, containerName, visitErr = o.visitNode(ctx, obj)
 		case *corev1.Pod:
+			if o.CopyTo == "" && o.Remove {
+				return fmt.Errorf("--rm should only be used when debugging a node or a pod with --copy-to")
+			}
 			debugPod, containerName, visitErr = o.visitPod(ctx, obj)
 		default:
 			visitErr = fmt.Errorf("%q not supported by debug", info.Mapping.GroupVersionKind)
@@ -442,7 +453,13 @@ func (o *DebugOptions) Run(restClientGetter genericclioptions.RESTClientGetter, 
 		}
 
 		if o.Attach && len(containerName) > 0 && o.AttachFunc != nil {
-			if err := o.AttachFunc(ctx, restClientGetter, cmd.Parent().CommandPath(), debugPod.Namespace, debugPod.Name, containerName); err != nil {
+			err := o.AttachFunc(ctx, restClientGetter, cmd.Parent().CommandPath(), debugPod.Namespace, debugPod.Name, containerName)
+			if o.Remove {
+				if removeErr := o.removeDebugPod(ctx, debugPod); removeErr != nil {
+					err = goerrors.Join(fmt.Errorf("failed to remove debug pod: %w", removeErr))
+				}
+			}
+			if err != nil {
 				return err
 			}
 		}
@@ -984,5 +1001,18 @@ func logOpts(ctx context.Context, restClientGetter genericclioptions.RESTClientG
 		}
 	}
 
+	return nil
+}
+
+func (o *DebugOptions) removeDebugPod(ctx context.Context, pod *corev1.Pod) error {
+	err := o.podClient.Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(o.ErrOut, "pod \"%s\" deleted\n", pod.Name)
 	return nil
 }
