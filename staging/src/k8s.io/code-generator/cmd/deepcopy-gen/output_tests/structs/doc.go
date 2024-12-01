@@ -17,7 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // This is a test package.
-package structs
+package structs // import "k8s.io/code-generator/cmd/deepcopy-gen/output_tests/structs"
 
 type Inner struct {
 	Byte byte

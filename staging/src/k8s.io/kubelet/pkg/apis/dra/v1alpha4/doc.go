@@ -18,4 +18,4 @@ limitations under the License.
 // interface. Support for it in kubelet is provided via conversion.
 //
 // +k8s:conversion-gen=k8s.io/kubelet/pkg/apis/dra/v1beta1
-package v1alpha4
+package v1alpha4 // import "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
