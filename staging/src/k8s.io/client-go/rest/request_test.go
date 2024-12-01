@@ -1510,11 +1510,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	clock := testingclock.FakeClock{}
 	request.backoff = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
-		Backoff: flowcontrol.NewFakeBackOff(
-			time.Duration(1)*time.Second,
-			time.Duration(200)*time.Second,
-			&clock,
-		)}
+		Backoff: flowcontrol.NewBackOffWithClock(1*time.Second, 200*time.Second, &clock)}
 
 	for _, sec := range seconds {
 		thisBackoff := request.backoff.CalculateBackoff(request.URL())
