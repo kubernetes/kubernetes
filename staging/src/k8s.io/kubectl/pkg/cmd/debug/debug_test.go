@@ -17,7 +17,10 @@ limitations under the License.
 package debug
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -28,8 +31,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/kubernetes/fake"
+	restfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/ptr"
 )
 
@@ -2940,5 +2949,161 @@ func TestCompleteAndValidate(t *testing.T) {
 				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
+	}
+}
+
+func TestRun(t *testing.T) {
+	const (
+		ns       = "myns"
+		podName  = "mypod"
+		nodeName = "mynode"
+	)
+
+	tests := []struct {
+		name           string
+		arg            string
+		modifier       func(*DebugOptions)
+		attachError    bool
+		wantEphemerals int
+		wantDebugPods  int
+		wantError      bool
+	}{
+		{
+			name:           "add ephemeral container to pod",
+			arg:            podName,
+			wantEphemerals: 1,
+		},
+		{
+			name:          "create debug pod with --copy-to",
+			arg:           podName,
+			modifier:      func(o *DebugOptions) { o.CopyTo = "copied" },
+			wantDebugPods: 1,
+		},
+		{
+			name:          "create debug pod for node",
+			arg:           "node/" + nodeName,
+			wantDebugPods: 1,
+		},
+		{
+			name:      "error for non-existent pod",
+			arg:       "not-exist",
+			wantError: true,
+		},
+		{
+			name:      "error for non-existent node",
+			arg:       "node/not-exist",
+			wantError: true,
+		},
+		{
+			name:           "error when attach fails",
+			arg:            podName,
+			modifier:       func(o *DebugOptions) { o.Attach = true },
+			attachError:    true,
+			wantEphemerals: 1,
+			wantError:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := &cobra.Command{}
+			cmd := &cobra.Command{}
+			root.AddCommand(cmd) // Run calls cmd.Parent()
+
+			o := NewDebugOptions(genericiooptions.NewTestIOStreamsDiscard())
+			o.AddFlags(cmd)
+			o.Namespace = ns
+			o.Image = "busybox"
+
+			if tt.modifier != nil {
+				tt.modifier(o)
+			}
+
+			// debug targets
+			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: podName},
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}}}}
+			node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+
+			tf := cmdtesting.NewTestFactory().WithNamespace(ns)
+			tf.Client = newFakeRESTClient(pod, node)
+
+			if err := o.Complete(tf, cmd, []string{tt.arg}); err != nil {
+				t.Fatalf("Complete() unexpected error = %v", err)
+			}
+
+			if err := o.Validate(); err != nil {
+				t.Fatalf("Validate() unexpected error = %v", err)
+			}
+
+			// replace with fakes
+			o.Builder = tf.NewBuilder()
+			o.podClient = fake.NewSimpleClientset(pod, node).CoreV1()
+			o.AttachFunc = func(_ context.Context, _ genericclioptions.RESTClientGetter, _ string, _, _, _ string) error {
+				if tt.attachError {
+					return errors.New("attach error")
+				}
+				return nil
+			}
+
+			err := o.Run(tf, cmd)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("Run() error = %v, expected error: %v", err, tt.wantError)
+			}
+
+			// The details of ephemeral containers and debug pods are tested elsewhere.
+			// This test only checks their presence.
+			updatedPod, err := o.podClient.Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get pod: %v", err)
+			}
+
+			if l := len(updatedPod.Spec.EphemeralContainers); l != tt.wantEphemerals {
+				t.Errorf("expect %d ephemeral containers, but got %d", tt.wantEphemerals, l)
+			}
+
+			pods, err := o.podClient.Pods(ns).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				t.Fatalf("failed to list pods: %v", err)
+			}
+
+			var debugPods []string
+			for _, po := range pods.Items {
+				if po.Name != podName {
+					debugPods = append(debugPods, po.Name)
+				}
+			}
+
+			if tt.wantDebugPods != len(debugPods) {
+				t.Errorf("expect %v debug pods remained, got %v", tt.wantDebugPods, debugPods)
+			}
+		})
+	}
+}
+
+func newFakeRESTClient(pod *corev1.Pod, node *corev1.Node) cmdtesting.RESTClient {
+	codec := runtime.NewCodec(scheme.DefaultJSONEncoder(),
+		scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
+
+	f := func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodGet {
+			return nil, fmt.Errorf("unexpected method: %#v", req)
+		}
+
+		var obj runtime.Object
+		switch req.URL.Path {
+		case fmt.Sprintf("/namespaces/%s/pods/%s", pod.Namespace, pod.Name):
+			obj = pod
+		case fmt.Sprintf("/nodes/%s", node.Name):
+			obj = node
+		default:
+			return nil, fmt.Errorf("unexpected resource: %#v", req)
+		}
+		return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(),
+			Body: cmdtesting.ObjBody(codec, obj)}, nil
+	}
+
+	return &restfake.RESTClient{
+		GroupVersion: schema.GroupVersion{Version: "v1"}, NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: restfake.CreateHTTPClient(f),
 	}
 }
