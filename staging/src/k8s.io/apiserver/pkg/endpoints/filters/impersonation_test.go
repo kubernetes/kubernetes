@@ -465,6 +465,29 @@ func TestImpersonationFilter(t *testing.T) {
 			},
 			expectedCode: http.StatusOK,
 		},
+		{
+			name: "disallowed-user-impersonation-with-blocked-header",
+			user: &user.DefaultInfo{
+				Name: "system:admin",
+				Groups: []string{
+					"everything-impersonater",
+				},
+			},
+			impersonationUser: "system:admin",
+
+			impersonationUserExtras: map[string][]string{
+				// percent-encoded for: sigs.k8s.io/myAuthnId
+				"Si%67s.k8s.io%2fmyAuthnId": {"AROVVZ2ZR7MVEJWA5BNCZ"},
+			},
+
+			expectedUser: &user.DefaultInfo{
+				Name:   "system:admin",
+				UID:    "",
+				Groups: []string{"everything-impersonater"},
+				Extra:  map[string][]string(nil),
+			},
+			expectedCode: http.StatusForbidden,
+		},
 	}
 
 	var ctx context.Context

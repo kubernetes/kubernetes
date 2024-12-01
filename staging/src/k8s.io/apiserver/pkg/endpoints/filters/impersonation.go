@@ -103,6 +103,13 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				actingAsAttributes.Resource = "userextras"
 				actingAsAttributes.Subresource = extraKey
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
+				for _, prefix := range getForbiddenNamespaces() {
+					if strings.HasPrefix(extraKey, prefix) {
+						klog.V(4).InfoS("UserInfo extra keys cannot use reserved namespace " + prefix)
+						responsewriters.Forbidden(ctx, actingAsAttributes, w, req, "UserInfo extra keys cannot use reserved namespace "+prefix, s)
+						return
+					}
+				}
 
 			case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
 				uid = string(impersonationRequest.Name)
@@ -271,4 +278,8 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 	}
 
 	return impersonationRequests, nil
+}
+
+func getForbiddenNamespaces() []string {
+	return []string{"sigs.k8s.io/", "kubernetes.io/", "k8s.io/"}
 }
