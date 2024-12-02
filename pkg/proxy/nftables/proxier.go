@@ -201,6 +201,8 @@ type Proxier struct {
 	noEndpointServices  *nftElementStorage
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
+
+	failedYet bool
 }
 
 // Proxier implements proxy.Provider
@@ -1202,6 +1204,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		if deleted > 0 {
 			proxier.logger.Info("Deleting stale nftables chains", "numChains", deleted)
+			if !proxier.failedYet {
+				proxier.logger.Info("Running nftables transaction", "transaction", tx.String())
+			}
 			err := proxier.nftables.Run(context.TODO(), tx)
 			if err != nil {
 				// We already deleted the entries from staleChains, but if
@@ -1209,6 +1214,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
 				metrics.NFTablesCleanupFailuresTotal.Inc()
+				proxier.failedYet = true
 			}
 		}
 	}
@@ -1798,6 +1804,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	if klogV9 := klog.V(9); klogV9.Enabled() {
 		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+	} else if !proxier.failedYet {
+		proxier.logger.Info("Running nftables transaction", "transaction", tx.String())
 	}
 
 	err = proxier.nftables.Run(context.TODO(), tx)
