@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package audit contains implementations for pkg/audit/AuditBackend interface
-package audit // import "k8s.io/apiserver/plugin/pkg/audit"
+package audit

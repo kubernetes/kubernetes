@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/api/networking/v1alpha1
 // +groupName=networking.k8s.io
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/networking/v1alpha1"
+package v1alpha1

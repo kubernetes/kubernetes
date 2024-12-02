@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/api/resource/v1beta1
 
 // Package v1beta1 is the v1beta1 version of the resource API.
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/resource/v1beta1"
+package v1beta1

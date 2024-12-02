@@ -23,4 +23,4 @@ limitations under the License.
 // +groupName=apiextensions.k8s.io
 
 // Package v1 is the v1 version of the API.
-package v1 // import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+package v1

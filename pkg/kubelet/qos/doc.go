@@ -22,4 +22,4 @@ limitations under the License.
 // when available.
 // Best-Effort containers, which don't specify a request, can use resources only if not being used
 // by other pods.
-package qos // import "k8s.io/kubernetes/pkg/kubelet/qos"
+package qos

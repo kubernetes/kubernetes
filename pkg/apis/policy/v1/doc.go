@@ -21,4 +21,4 @@ limitations under the License.
 
 // Package policy is for any kind of policy object. Currently, this only
 // includes policyv1.PodDisruptionBudget
-package v1 // import "k8s.io/kubernetes/pkg/apis/policy/v1"
+package v1

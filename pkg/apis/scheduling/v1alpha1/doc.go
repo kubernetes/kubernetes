@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/scheduling/v1alpha1
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
+package v1alpha1

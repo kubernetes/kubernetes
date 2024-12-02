@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/client-go/scale/scheme
 // +k8s:conversion-gen-external-types=k8s.io/api/apps/v1beta2
 
-package appsv1beta2 // import "k8s.io/client-go/scale/scheme/appsv1beta2"
+package appsv1beta2

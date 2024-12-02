@@ -18,4 +18,4 @@ limitations under the License.
 // to manage containers. For example, they contain functions to configure containers' cgroups,
 // ensure containers run with the desired QoS, and allocate compute resources like cpus, memory,
 // devices...
-package cm // import "k8s.io/kubernetes/pkg/kubelet/cm"
+package cm

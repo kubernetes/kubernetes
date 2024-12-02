@@ -29,4 +29,4 @@ limitations under the License.
 //     with the CertificateExpirationInfo structure.
 //   - Introduce a (breaking) change to the UpgradePlan structure used by "kubeadm upgrade plan".
 //     UpgradePlan now contains a list of AvailableUpgrade structures.
-package v1alpha3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
+package v1alpha3

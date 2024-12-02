@@ -282,4 +282,4 @@ limitations under the License.
 // node only (e.g. the node ip).
 //
 // - APIEndpoint, that represents the endpoint of the instance of the API server to be eventually deployed on this node.
-package v1beta3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+package v1beta3

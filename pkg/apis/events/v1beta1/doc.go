@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=events.k8s.io
 
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/events/v1beta1"
+package v1beta1

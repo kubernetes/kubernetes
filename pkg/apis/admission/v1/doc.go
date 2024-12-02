@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=admission.k8s.io
 
-package v1 // import "k8s.io/kubernetes/pkg/apis/admission/v1"
+package v1

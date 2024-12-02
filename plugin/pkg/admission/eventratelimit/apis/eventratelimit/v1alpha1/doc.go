@@ -20,4 +20,4 @@ limitations under the License.
 // +groupName=eventratelimit.admission.k8s.io
 
 // Package v1alpha1 is the v1alpha1 version of the API.
-package v1alpha1 // import "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1"
+package v1alpha1
