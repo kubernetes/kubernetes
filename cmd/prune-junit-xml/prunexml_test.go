@@ -100,7 +100,10 @@ func TestPruneTESTS(t *testing.T) {
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000"></testcase>
+		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="30.050000">
+			<system-out>out A</system-out>
+			<system-err>err B</system-err>
+                </testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery2" name="TestSchedulerInformers" time="-0.000000">
 			<failure message="FailedA" type="">FailureContentA</failure>
 		</testcase>
@@ -114,9 +117,13 @@ func TestPruneTESTS(t *testing.T) {
 		</properties>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery3" name="TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watches" time="40.050000">
 			<failure message="Failed" type="">RUNNING TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watchesA&#xA;expected foo, got bar</failure>
+			<system-out>out A</system-out>
+			<system-err>err A</system-err>
                 </testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery3" name="TestWatchRestartsIfTimeoutNotReached/group" time="40.050000">
 			<failure message="Failed" type="">sub-test failed</failure>
+			<system-out>out B</system-out>
+			<system-err>err B</system-err>
 		</testcase>
 		<testcase classname="k8s.io/kubernetes/test/integration/apimachinery3" name="TestWatchRestartsIfTimeoutNotReached" time="40.050000">
 			<failure message="Failed" type="">sub-test failed</failure>
@@ -154,6 +161,8 @@ func TestPruneTESTS(t *testing.T) {
 		</properties>
 		<testcase classname="k8s.io/kubernetes/test/integration" name="apimachinery3" time="40.050000">
 			<failure message="Failed" type="">RUNNING TestWatchRestartsIfTimeoutNotReached/group/InformerWatcher_survives_closed_watchesA&#xA;expected foo, got bar&#xA;&#xA;sub-test failed</failure>
+			<system-out>out A&#xA;&#xA;out B</system-out>
+			<system-err>err A&#xA;&#xA;err B</system-err>
 		</testcase>
 	</testsuite>
 </testsuites>`

@@ -135,6 +135,8 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 		updatedTestcase.Classname = match[1]
 		updatedTestcase.Name = match[2]
 		updatedTestcase.Time = suite.Time
+		updatedSystemOut := ""
+		updatedSystemErr := ""
 		for _, testcase := range suite.TestCases {
 			// The top level testcase element in a JUnit xml file does not have the / character.
 			if testcase.Failure != nil {
@@ -142,10 +144,14 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 				updatedTestcaseFailure.Message = joinTexts(updatedTestcaseFailure.Message, testcase.Failure.Message)
 				updatedTestcaseFailure.Contents = joinTexts(updatedTestcaseFailure.Contents, testcase.Failure.Contents)
 				updatedTestcaseFailure.Type = joinTexts(updatedTestcaseFailure.Type, testcase.Failure.Type)
+				updatedSystemOut = joinTexts(updatedSystemOut, testcase.SystemOut)
+				updatedSystemErr = joinTexts(updatedSystemErr, testcase.SystemErr)
 			}
 		}
 		if failflag {
 			updatedTestcase.Failure = &updatedTestcaseFailure
+			updatedTestcase.SystemOut = updatedSystemOut
+			updatedTestcase.SystemErr = updatedSystemErr
 		}
 		suite.TestCases = append(updatedTestcases, updatedTestcase)
 		updatedTestsuites = append(updatedTestsuites, suite)
