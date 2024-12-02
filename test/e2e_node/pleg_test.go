@@ -54,7 +54,9 @@ var _ = SIGDescribe("PLEG", feature.CriProxy, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("pleg-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("EventedPLEG=true", func() {
+
+	// TODO, probably, the test is about PLEG and should work in Generic PLEG as well as Evented PLEG. 
+	ginkgo.Context("PLEG", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
@@ -64,21 +66,22 @@ var _ = SIGDescribe("PLEG", feature.CriProxy, framework.WithSerial(), func() {
 		runAllTests(f)
 	})
 
-	ginkgo.Context("EventedPLEG=false", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = make(map[string]bool)
-			}
-			initialConfig.FeatureGates["EventedPLEG"] = false
-		})
-		runAllTests(f)
-	})
+	// ginkgo.Context("EventedPLEG=false", func() {
+	// 	tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+	// 		if initialConfig.FeatureGates == nil {
+	// 			initialConfig.FeatureGates = make(map[string]bool)
+	// 		}
+	// 		initialConfig.FeatureGates["EventedPLEG"] = false
+	// 	})
+	// 	runAllTests(f)
+	// })
 })
 
 func runAllTests(f *framework.Framework) {
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		if err := resetCRIProxyInjector(); err != nil {
+		// TODO skip should follow other cri proxy injected testing
+		if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 			ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 		}
 		// cleanup the inject status
@@ -87,7 +90,7 @@ func runAllTests(f *framework.Framework) {
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
-		err := resetCRIProxyInjector()
+		err := resetCRIProxyInjector(e2eCriProxy)
 		framework.ExpectNoError(err)
 	})
 	ginkgo.It("should run with empty injector and first init container start timeout or failure", func(ctx context.Context) {
@@ -154,7 +157,7 @@ func runAllTests(f *framework.Framework) {
 
 		podPath = kubeletCfg.StaticPodPath
 
-		err := addCRIProxyInjector(firstStartContainerErrorInjector)
+		err := addCRIProxyInjector(e2eCriProxy, firstStartContainerErrorInjector)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("create the static pod")
@@ -166,7 +169,7 @@ func runAllTests(f *framework.Framework) {
 			return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 		}, 3*time.Minute, time.Second*4).Should(gomega.BeNil())
 
-		err = addCRIProxyInjector(firstStartContainerTimeoutInjector)
+		err = addCRIProxyInjector(e2eCriProxy, firstStartContainerTimeoutInjector)
 		framework.ExpectNoError(err)
 
 		staticPodName = "graceful-pod-" + string(uuid.NewUUID())
@@ -216,7 +219,7 @@ spec:
 }
 
 func podRunningWithInject(f *framework.Framework, ctx context.Context, testpod *v1.Pod, timeout time.Duration, injector func(apiName string) error) {
-	err := addCRIProxyInjector(injector)
+	err := addCRIProxyInjector(e2eCriProxy, injector)
 	framework.ExpectNoError(err)
 	pod := e2epod.NewPodClient(f).Create(ctx, testpod)
 	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Running", timeout, func(pod *v1.Pod) (bool, error) {
