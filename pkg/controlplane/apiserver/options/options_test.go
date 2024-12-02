@@ -345,15 +345,10 @@ func TestCompleteForServiceAccount(t *testing.T) {
 		t.Fatalf("Failed to encode private key: %v", err)
 	}
 
-	// create and start mock signer.
-	socketPath := "@mock-external-jwt-signer.sock"
-	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
-	defer mockSigner.CleanUp()
-
 	testCases := []struct {
 		desc                     string
 		issuers                  []string
-		signingEndpoint          string
+		externalSigner           bool
 		signingKeyFiles          string
 		maxExpiration            time.Duration
 		externalMaxExpirationSec int64
@@ -366,11 +361,11 @@ func TestCompleteForServiceAccount(t *testing.T) {
 		externalPublicKeyGetterPresent bool
 	}{
 		{
-			desc: "no endpoint or key file",
+			desc: "endpoint and key file",
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint: socketPath,
+			externalSigner:  true,
 			signingKeyFiles: "private_key.pem",
 			maxExpiration:   time.Second * 3600,
 
@@ -381,7 +376,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint: socketPath,
+			externalSigner:  true,
 			signingKeyFiles: "private_key.pem",
 			maxExpiration:   time.Second * 10,
 
@@ -392,7 +387,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint: "",
+			externalSigner:  false,
 			signingKeyFiles: "private_key.pem",
 			maxExpiration:   time.Second * 3600,
 
@@ -405,7 +400,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint:          socketPath,
+			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            0,
 			externalMaxExpirationSec: 600, // 10m
@@ -419,7 +414,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint:          socketPath,
+			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            time.Second * 3600,
 			externalMaxExpirationSec: 600, // 10m
@@ -431,7 +426,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint:          socketPath,
+			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            0,
 			externalMaxExpirationSec: 300, // 5m
@@ -443,7 +438,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint:          socketPath,
+			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            0,
 			externalMaxExpirationSec: 900, // 15m
@@ -456,7 +451,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			issuers: []string{
 				"iss",
 			},
-			signingEndpoint:          socketPath,
+			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            0,
 			externalMaxExpirationSec: 900, // 15m
@@ -468,8 +463,20 @@ func TestCompleteForServiceAccount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+
 			options := NewOptions()
-			options.ServiceAccountSigningEndpoint = tc.signingEndpoint
+			if tc.externalSigner {
+				// create and start mock signer.
+				socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
+				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+				defer mockSigner.CleanUp()
+
+				mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec
+				mockSigner.MetadataError = tc.metadataError
+				mockSigner.FetchError = tc.fetchError
+
+				options.ServiceAccountSigningEndpoint = socketPath
+			}
 			options.ServiceAccountSigningKeyFile = tc.signingKeyFiles
 			options.Authentication = &kubeoptions.BuiltInAuthenticationOptions{
 				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
@@ -478,16 +485,13 @@ func TestCompleteForServiceAccount(t *testing.T) {
 				},
 			}
 
-			_ = mockSigner.Reset()
-			mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec
-			mockSigner.MetadataError = tc.metadataError
-			mockSigner.FetchError = tc.fetchError
-
 			co := completedOptions{
 				Options: *options,
 			}
 
-			err := options.completeServiceAccountOptions(context.Background(), &co)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err := options.completeServiceAccountOptions(ctx, &co)
 
 			if tc.wantError != nil {
 				if err == nil || tc.wantError.Error() != err.Error() {
