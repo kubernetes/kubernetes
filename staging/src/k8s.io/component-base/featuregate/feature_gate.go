@@ -268,7 +268,6 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 	f.enabledRaw.Store(map[string]bool{})
 	f.emulationVersion.Store(emulationVersion)
 	f.queriedFeatures.Store(sets.Set[Feature]{})
-	klog.V(1).Infof("new feature gate with emulationVersion=%s", f.emulationVersion.Load().String())
 	return f
 }
 
