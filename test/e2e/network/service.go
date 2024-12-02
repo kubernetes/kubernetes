@@ -142,7 +142,7 @@ func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (t
 	interval := 2 * AffinityConfirmCount * time.Second
 
 	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
-	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
+	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 --max-time 60 http://%s/`, serviceIPPort)
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	getHosts := func() []string {
 		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
