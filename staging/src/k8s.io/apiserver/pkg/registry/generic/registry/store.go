@@ -1426,11 +1426,9 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	}
 	predicate := e.PredicateFunc(label, field)
 
-	resourceVersion := ""
-	resourceVersion = options.ResourceVersion
 	predicate.AllowWatchBookmarks = options.AllowWatchBookmarks
 
-	return e.WatchPredicate(ctx, predicate, resourceVersion, options.SendInitialEvents)
+	return e.WatchPredicate(ctx, predicate, options.ResourceVersion, options.SendInitialEvents)
 }
 
 // WatchPredicate starts a watch for the items that matches.
