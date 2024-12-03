@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -185,9 +186,9 @@ func TestBasicResponseProtobuf(t *testing.T) {
 	assert.EqualValues(t, &apis, decoded, "decoded value should equal input")
 }
 
-// V2Beta1 should still be served
+// V2Beta1 should only be served on emulated version < 1.33
 func TestV2Beta1SkewSupport(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager("apis")
+	manager := discoveryendpoint.NewResourceManagerWithEmulatedVersion("apis", utilversion.MustParse("1.32"))
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Items)

@@ -232,7 +232,7 @@ func BuildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
+		genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManagerWithEmulatedVersion("apis", genericConfig.EffectiveVersion.EmulationVersion())
 	}
 
 	return
