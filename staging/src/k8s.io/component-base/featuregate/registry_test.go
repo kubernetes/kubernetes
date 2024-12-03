@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	baseversion "k8s.io/component-base/version"
@@ -60,16 +61,16 @@ func testRegistry(t *testing.T) *componentGlobalsRegistry {
 	fgKube := NewVersionedFeatureGate(version.MustParse("0.0"))
 	err := fgKube.AddVersioned(map[Feature]VersionedSpecs{
 		"kubeA": {
-			{Version: version.MustParse("1.31"), Default: true, LockToDefault: true, PreRelease: GA},
-			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.31"), Default: true, LockToDefault: true, PreRelease: GA},
 		},
 		"kubeB": {
 			{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
 		},
 		"commonC": {
-			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 		},
 	})
 	if err != nil {
@@ -80,16 +81,16 @@ func testRegistry(t *testing.T) *componentGlobalsRegistry {
 	fgTest := NewVersionedFeatureGate(version.MustParse("0.0"))
 	err = fgTest.AddVersioned(map[Feature]VersionedSpecs{
 		"testA": {
-			{Version: version.MustParse("2.10"), Default: true, PreRelease: GA},
-			{Version: version.MustParse("2.8"), Default: false, PreRelease: Beta},
 			{Version: version.MustParse("2.7"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("2.8"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("2.10"), Default: true, PreRelease: GA},
 		},
 		"testB": {
 			{Version: version.MustParse("2.9"), Default: false, PreRelease: Alpha},
 		},
 		"commonC": {
-			{Version: version.MustParse("2.9"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("2.7"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("2.9"), Default: true, PreRelease: Beta},
 		},
 	})
 	if err != nil {

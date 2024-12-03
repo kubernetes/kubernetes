@@ -1017,20 +1017,20 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 			}
 			err := f.AddVersioned(map[Feature]VersionedSpecs{
 				testGAGate: {
-					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
-					{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 					{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
 				},
 				testAlphaGate: {
 					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
 				},
 				testBetaGate: {
-					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 				},
 				testLockedFalseGate: {
-					{Version: version.MustParse("1.29"), Default: false, PreRelease: GA, LockToDefault: true},
 					{Version: version.MustParse("1.28"), Default: false, PreRelease: GA},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: GA, LockToDefault: true},
 				},
 			})
 			require.NoError(t, err)
@@ -1076,8 +1076,8 @@ func TestVersionedFeatureGateOverride(t *testing.T) {
 			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
 		},
 		testBetaGate: {
-			{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 		},
 	})
 	require.NoError(t, err)
@@ -1127,17 +1127,17 @@ func TestVersionedFeatureGateFlagDefaults(t *testing.T) {
 
 	err := f.AddVersioned(map[Feature]VersionedSpecs{
 		testGAGate: {
-			{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
-			{Version: version.MustParse("1.27"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("1.25"), Default: true, PreRelease: Alpha},
+			{Version: version.MustParse("1.27"), Default: true, PreRelease: Beta},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
 		},
 		testAlphaGate: {
 			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
 		},
 		testBetaGate: {
-			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
-			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 		},
 	})
 	require.NoError(t, err)
@@ -1207,8 +1207,8 @@ func TestVersionedFeatureGateKnownFeatures(t *testing.T) {
 			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 		},
 		testDeprecatedGate: {
-			{Version: version.MustParse("1.28"), Default: true, PreRelease: Deprecated},
 			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Deprecated},
 		},
 	})
 	require.NoError(t, err)
@@ -1264,12 +1264,12 @@ func TestVersionedFeatureGateMetrics(t *testing.T) {
 			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 		},
 		testBetaGate: {
-			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta},
 		},
 		testBetaDisabled: {
-			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: Beta},
 		},
 	})
 	require.NoError(t, err)
@@ -1528,9 +1528,10 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 }
 
 func TestFeatureSpecAtEmulationVersion(t *testing.T) {
-	specs := VersionedSpecs{{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+	specs := VersionedSpecs{
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+		{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
 	}
 	sort.Sort(specs)
 	tests := []struct {
@@ -1660,8 +1661,8 @@ func TestExplicitlySet(t *testing.T) {
 					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
 				},
 				testBetaGate: {
-					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
 				},
 			})
 			require.NoError(t, err)
@@ -1699,8 +1700,8 @@ func TestResetFeatureValueToDefault(t *testing.T) {
 			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
 		},
 		testBetaGate: {
-			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
 		},
 	})
 	require.NoError(t, err)
@@ -1741,4 +1742,166 @@ func TestResetFeatureValueToDefault(t *testing.T) {
 	assert.False(t, f.Enabled("AllBeta"))
 	assert.False(t, f.Enabled("TestAlpha"))
 	assert.False(t, f.Enabled("TestBeta"))
+}
+
+func TestAddVersioned(t *testing.T) {
+	// gates for testing
+	const testAGate Feature = "TestA"
+	const testBGate Feature = "TestB"
+	tests := []struct {
+		name        string
+		expectError bool
+		features    map[Feature]VersionedSpecs
+	}{
+		{
+			name: "normal progression",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.31"), Default: true, PreRelease: Beta},
+					{Version: version.MustParse("1.32"), Default: true, PreRelease: GA},
+					{Version: version.MustParse("1.33"), Default: false, PreRelease: Deprecated},
+				},
+				testBGate: {
+					{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "conflicting specs",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testBGate: {
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "deprecated feature with no prior state",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name: "deprecated feature with prior state",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.0"), Default: true, PreRelease: GA},
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name:        "duplicate version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+		},
+		{
+			name:        "decreasing version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+				},
+			},
+		},
+		{
+			name:        "Beta to Alpha",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "GA to Alpha",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Alpha},
+				},
+			},
+		},
+		{
+			name:        "GA to Beta",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: Beta},
+				},
+			},
+		},
+		{
+			name:        "Alpha to Deprecated to Beta",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Deprecated},
+					{Version: version.MustParse("1.31"), Default: true, PreRelease: Beta},
+				},
+			},
+		},
+		{
+			name: "Deprecated to Deprecated",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: true, PreRelease: Deprecated},
+					{Version: version.MustParse("1.31"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name: "always Deprecated",
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.0"), Default: false, PreRelease: Deprecated},
+				},
+			},
+		},
+		{
+			name:        "patch version",
+			expectError: true,
+			features: map[Feature]VersionedSpecs{
+				testAGate: {
+					{Version: version.MustParse("1.29.1"), Default: false, PreRelease: Alpha},
+					{Version: version.MustParse("1.30"), Default: false, PreRelease: Beta},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("AddVersioned-%s", test.name), func(t *testing.T) {
+			f := NewFeatureGate()
+			err := f.AddVersioned(map[Feature]VersionedSpecs{
+				testBGate: {
+					{Version: version.MustParse("1.27"), Default: false, PreRelease: Alpha},
+				},
+			})
+			require.NoError(t, err)
+			err = f.AddVersioned(test.features)
+			if err != nil && !test.expectError {
+				t.Errorf("expected no errors, error found %+v", err)
+			}
+
+			if err == nil && test.expectError {
+				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
 }
