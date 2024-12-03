@@ -35,7 +35,7 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 	f := framework.NewDefaultFramework("pod-rejection-status")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should reject pod when the node didn't have enough resource", func(ctx context.Context) {
+		framework.ConformanceIt("should reject pod when the node didn't have enough resource", func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
 
