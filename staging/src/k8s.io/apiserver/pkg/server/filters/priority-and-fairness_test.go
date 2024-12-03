@@ -292,7 +292,6 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 		preEnqueue.Wait()
 		if int(atomicReadOnlyWaiting) != concurrentRequests {
 			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
-
 		}
 		postEnqueue.Done()
 		postEnqueue.Wait()

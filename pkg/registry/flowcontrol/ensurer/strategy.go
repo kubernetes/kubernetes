@@ -251,6 +251,8 @@ func EnsureConfigurations[ObjectType configurationObjectType](ctx context.Contex
 
 // EnsureConfiguration applies the given maintenance strategy to the given object.
 func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context, ops ObjectOps[ObjectType], bootstrap ObjectType, strategy EnsureStrategy[ObjectType]) error {
+	logger := klog.FromContext(ctx)
+
 	name := bootstrap.GetName()
 	configurationType := strategy.Name()
 
@@ -267,36 +269,36 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 
 		// we always re-create a missing configuration object
 		if _, err = ops.Create(ctx, ops.DeepCopy(bootstrap), metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully created %T", bootstrap), "type", configurationType, "name", name)
+			logger.V(2).Info(fmt.Sprintf("Successfully created %T", bootstrap), "type", configurationType, "name", name)
 			return nil
 		}
 
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("cannot create %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 		}
-		klog.V(5).InfoS(fmt.Sprintf("Something created the %T concurrently", bootstrap), "type", configurationType, "name", name)
+		logger.V(5).Info(fmt.Sprintf("Something created the %T concurrently", bootstrap), "type", configurationType, "name", name)
 	}
 
-	klog.V(5).InfoS(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap), "type", configurationType, "name", name)
+	logger.V(5).Info(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap), "type", configurationType, "name", name)
 	newObject, update, err := strategy.ReviseIfNeeded(ops, current, bootstrap)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether auto-update is required for %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 	}
 	if !update {
-		if klogV := klog.V(5); klogV.Enabled() {
-			klogV.InfoS("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
+		if v5 := logger.V(5); v5.Enabled() {
+			v5.Info("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
 				"diff", cmp.Diff(current, bootstrap))
 		}
 		return nil
 	}
 
 	if updated, err := ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
-		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, cmp.Diff(current, updated))
+		logger.V(2).Info(fmt.Sprintf("Updated the %T", bootstrap), "type", configurationType, "name", name, "diff", cmp.Diff(current, updated))
 		return nil
 	}
 
 	if apierrors.IsConflict(err) {
-		klog.V(2).InfoS(fmt.Sprintf("Something updated the %T concurrently, I will check its spec later", bootstrap), "type", configurationType, "name", name)
+		logger.V(2).Info(fmt.Sprintf("Something updated the %T concurrently, I will check its spec later", bootstrap), "type", configurationType, "name", name)
 		return nil
 	}
 
@@ -308,6 +310,8 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 // have a name in the given set.  A refusal due to concurrent update is logged
 // and not considered an error; the object will be reconsidered later.
 func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Context, objectOps ObjectOps[ObjectType], boots []ObjectType) error {
+	logger := klog.FromContext(ctx)
+
 	current, err := objectOps.List(labels.Everything())
 	if err != nil {
 		return err
@@ -325,27 +329,27 @@ func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Conte
 			// the configuration object does not have the annotation key,
 			// it's probably a user defined configuration object,
 			// so we can skip it.
-			klog.V(5).InfoS("Skipping deletion of APF object with no "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name)
+			logger.V(5).Info("Skipping deletion of APF object with no "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name)
 			continue
 		}
 		autoUpdate, err = strconv.ParseBool(value)
 		if err != nil {
 			// Log this because it is not an expected situation.
-			klog.V(4).InfoS("Skipping deletion of APF object with malformed "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name, "annotationValue", value, "parseError", err)
+			logger.V(4).Info("Skipping deletion of APF object with malformed "+flowcontrolv1.AutoUpdateAnnotationKey+" annotation", "name", name, "annotationValue", value, "parseError", err)
 			continue
 		}
 		if !autoUpdate {
-			klog.V(5).InfoS("Skipping deletion of APF object with "+flowcontrolv1.AutoUpdateAnnotationKey+"=false annotation", "name", name)
+			logger.V(5).Info("Skipping deletion of APF object with "+flowcontrolv1.AutoUpdateAnnotationKey+"=false annotation", "name", name)
 			continue
 		}
 		// TODO: expectedResourceVersion := object.GetResourceVersion()
 		err = objectOps.Delete(ctx, object.GetName(), metav1.DeleteOptions{ /* TODO: expectedResourceVersion */ })
 		if err == nil {
-			klog.V(2).InfoS(fmt.Sprintf("Successfully deleted the unwanted %s", object.GetObjectKind().GroupVersionKind().Kind), "name", name)
+			logger.V(2).Info(fmt.Sprintf("Successfully deleted the unwanted %s", object.GetObjectKind().GroupVersionKind().Kind), "name", name)
 			continue
 		}
 		if apierrors.IsNotFound(err) {
-			klog.V(5).InfoS("Unwanted APF object was concurrently deleted", "name", name)
+			logger.V(5).Info("Unwanted APF object was concurrently deleted", "name", name)
 		} else {
 			return fmt.Errorf("failed to delete unwatned APF object %q - %w", name, err)
 		}
