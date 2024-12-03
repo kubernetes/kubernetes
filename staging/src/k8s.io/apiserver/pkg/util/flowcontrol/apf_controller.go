@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
@@ -367,15 +366,16 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-func (cfgCtlr *configController) Run(ctx context.Context) error {
-	defer utilruntime.HandleCrash()
-
-	// Let the config worker stop when we are done
-	defer cfgCtlr.configQueue.ShutDown()
+func (cfgCtlr *configController) Start(ctx context.Context) error {
+	go func() {
+		<-ctx.Done()
+		// Let the config worker stop when we are done
+		defer cfgCtlr.configQueue.ShutDown()
+	}()
 
 	klog.Info("Starting API Priority and Fairness config controller")
 	if ok := cache.WaitForCacheSync(ctx.Done(), cfgCtlr.plInformerSynced, cfgCtlr.fsInformerSynced); !ok {
-		return fmt.Errorf("Never achieved initial sync")
+		return fmt.Errorf("never achieved initial sync")
 	}
 
 	klog.Info("Running API Priority and Fairness config worker")
@@ -384,8 +384,6 @@ func (cfgCtlr *configController) Run(ctx context.Context) error {
 	klog.Info("Running API Priority and Fairness periodic rebalancing process")
 	go wait.UntilWithContext(ctx, cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod)
 
-	<-ctx.Done()
-	klog.Info("Shutting down API Priority and Fairness config worker")
 	return nil
 }
 

@@ -115,7 +115,7 @@ func (t fakeApfFilter) Handle(ctx context.Context,
 	}
 }
 
-func (t fakeApfFilter) Run(_ context.Context) error {
+func (t fakeApfFilter) Start(_ context.Context) error {
 	return nil
 }
 
@@ -407,7 +407,7 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	f.inflight--
 }
 
-func (f *fakeWatchApfFilter) Run(_ context.Context) error {
+func (f *fakeWatchApfFilter) Start(_ context.Context) error {
 	return nil
 }
 
@@ -696,7 +696,11 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		ctx, cancel := context.WithCancel(context.Background())
-		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		defer cancel()
+		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		if err != nil {
+			t.Fatalf("Failed to start the controller: %v", err)
+		}
 
 		headerMatcher := headerMatcher{}
 		// we will raise a panic for the first request.
@@ -723,7 +727,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		// we send two requests synchronously, one at a time
 		//  - first request is expected to panic as designed
 		//  - second request is expected to succeed
-		_, err := requestGetter(firstRequestPathPanic)
+		_, err = requestGetter(firstRequestPathPanic)
 
 		// did the server handler panic, as expected?
 		select {
@@ -749,14 +753,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		case <-time.After(wait.ForeverTestTimeout):
 			t.Errorf("Expected the server handler to have completed: %q", secondRequestPathShouldWork)
 		}
-
-		cancel()
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
 	})
 
 	t.Run("priority level concurrency is set to 1, request times out and inner handler hasn't written to the response yet", func(t *testing.T) {
@@ -770,7 +766,11 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		ctx, cancel := context.WithCancel(context.Background())
-		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		defer cancel()
+		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		if err != nil {
+			t.Fatalf("Failed to start the controller: %v", err)
+		}
 
 		headerMatcher := headerMatcher{}
 		rquestTimesOutPath := "/request/time-out-as-designed"
@@ -795,10 +795,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		// send a request synchronously with a client timeout of 1m,  this minimizes the
 		// chance of a flake in ci, the cient waits long enough for the server to send a
 		// timeout response to the client.
-		var (
-			response *http.Response
-			err      error
-		)
+		var response *http.Response
 		func() {
 			defer close(callerRoundTripDoneCh)
 
@@ -822,14 +819,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		if response.StatusCode != http.StatusGatewayTimeout {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
-
-		cancel()
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
 	})
 
 	t.Run("priority level concurrency is set to 1, inner handler panics after the request times out", func(t *testing.T) {
@@ -843,7 +832,11 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		ctx, cancel := context.WithCancel(context.Background())
-		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		defer cancel()
+		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		if err != nil {
+			t.Fatalf("Failed to start the controller: %v", err)
+		}
 
 		headerMatcher := headerMatcher{}
 		reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
@@ -872,10 +865,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		// send a request synchronously with a client timeout of 1m, this minimizes the
 		// chance of a flake in ci, the cient waits long enough for the server to send a
 		// timeout response to the client.
-		var (
-			response *http.Response
-			err      error
-		)
+		var response *http.Response
 		func() {
 			defer close(callerRoundTripDoneCh)
 			t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
@@ -901,14 +891,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		if response.StatusCode != http.StatusGatewayTimeout {
 			t.Errorf("Expected HTTP status code: %d for request: %q, but got: %#v", http.StatusGatewayTimeout, rquestTimesOutPath, response)
 		}
-
-		cancel()
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
 	})
 
 	t.Run("priority level concurrency is set to 1, inner handler writes to the response before request times out", func(t *testing.T) {
@@ -922,7 +904,11 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		ctx, cancel := context.WithCancel(context.Background())
-		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		defer cancel()
+		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		if err != nil {
+			t.Fatalf("Failed to start the controller: %v", err)
+		}
 
 		headerMatcher := headerMatcher{}
 		rquestTimesOutPath := "/request/time-out-as-designed"
@@ -952,7 +938,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		// send a request synchronously with a client timeout of 1m, this minimizes the
 		// chance of a flake in ci, the cient waits long enough for the server to send a
 		// timeout response to the client.
-		var err error
 		func() {
 			defer close(callerRoundTripDoneCh)
 			t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
@@ -973,14 +958,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		}
 
 		expectResetStreamError(t, err)
-
-		cancel()
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
-		}
 	})
 
 	t.Run("priority level concurrency is set to 1, queue length is 1, first request should time out and second (enqueued) request should time out as well", func(t *testing.T) {
@@ -1000,7 +977,11 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 		ctx, cancel := context.WithCancel(context.Background())
-		controller, controllerCompletedCh := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		defer cancel()
+		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
+		if err != nil {
+			t.Fatalf("Failed to start the controller: %v", err)
+		}
 
 		headerMatcher := headerMatcher{}
 		firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-designed", "/request/second/enqueued-as-designed"
@@ -1109,14 +1090,6 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		} else if !(secondReqResult.response.StatusCode == http.StatusTooManyRequests || secondReqResult.response.StatusCode == http.StatusGatewayTimeout) {
 			t.Errorf("Expected HTTP status code: %d or %d for request: %q, but got: %#+v", http.StatusTooManyRequests, http.StatusGatewayTimeout, secondRequestEnqueuedPath, secondReqResult.response)
 		}
-
-		cancel()
-		t.Log("Waiting for the controller to shutdown")
-
-		controllerErr := <-controllerCompletedCh
-		if controllerErr != nil {
-			t.Errorf("Expected no error from the controller, but got: %s", fmtError(controllerErr))
-		}
 	})
 }
 
@@ -1125,7 +1098,7 @@ func fmtError(err error) string {
 }
 
 func startAPFController(t *testing.T, ctx context.Context, apfConfiguration []runtime.Object, serverConcurrency int,
-	plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
+	plName string, plConcurrency int) (utilflowcontrol.Interface, error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
@@ -1141,12 +1114,9 @@ func startAPFController(t *testing.T, ctx context.Context, apfConfiguration []ru
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 	}
 
-	controllerCompletedCh := make(chan error)
-	var controllerErr error
-	go func() {
-		controllerErr = controller.Run(ctx)
-		controllerCompletedCh <- controllerErr
-	}()
+	if err := controller.Start(ctx); err != nil {
+		return nil, err
+	}
 
 	// make sure that apf controller syncs the priority level configuration object we are using in this test.
 	// read the metrics and ensure the concurrency limit for our priority level is set to the expected value.
@@ -1161,7 +1131,7 @@ func startAPFController(t *testing.T, ctx context.Context, apfConfiguration []ru
 		t.Fatalf("expected the apf controller to sync the priotity level configuration object: %s", plName)
 	}
 
-	return controller, controllerCompletedCh
+	return controller, nil
 }
 
 // returns a started http2 server, with a client function to send request to the server.

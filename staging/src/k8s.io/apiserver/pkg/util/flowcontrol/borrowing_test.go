@@ -150,8 +150,7 @@ func TestBorrowing(t *testing.T) {
 			})
 
 			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
-			controllerCompletionCh := make(chan error)
-
+			defer cancel()
 			informerFactory.Start(ctx.Done())
 
 			status := informerFactory.WaitForCacheSync(ctx.Done())
@@ -159,9 +158,9 @@ func TestBorrowing(t *testing.T) {
 				t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 			}
 
-			go func() {
-				controllerCompletionCh <- controller.Run(ctx)
-			}()
+			if err := controller.Start(ctx); err != nil {
+				t.Fatalf("error starting controller: %v", err)
+			}
 
 			// ensure that the controller has run its first loop.
 			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
@@ -222,12 +221,6 @@ func TestBorrowing(t *testing.T) {
 
 			// Do the checking
 
-			t.Log("waiting for the controller Run function to shutdown gracefully")
-			controllerErr := <-controllerCompletionCh
-			close(controllerCompletionCh)
-			if controllerErr != nil {
-				t.Errorf("expected nil error from controller Run function, but got: %#v", controllerErr)
-			}
 			if results0.Average < 15.5 || results0.Average > 16.1 {
 				t.Errorf("Flow 0 got average concurrency of %v but expected about 16", results0.Average)
 			} else {

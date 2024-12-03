@@ -911,7 +911,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
 		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(hookContext PostStartHookContext) error {
-			go c.FlowControl.Run(hookContext)
+			if err := c.FlowControl.Start(hookContext); err != nil {
+				klog.ErrorS(err, "failed starting flow control")
+				return nil // don't klog.Fatal. This only happens when context is cancelled or informers don't get ready.
+			}
 			return nil
 		})
 		if err != nil {
