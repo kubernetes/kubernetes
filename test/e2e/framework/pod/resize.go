@@ -28,7 +28,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -70,10 +69,7 @@ type patchSpec struct {
 	} `json:"spec"`
 }
 
-func getTestResourceInfo(tcInfo ResizableContainerInfo) (res v1.ResourceRequirements, resizePol []v1.ContainerResizePolicy) {
-	if tcInfo.Resources != nil {
-		res = *tcInfo.Resources.ResourceRequirements()
-	}
+func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
 	if tcInfo.CPUPolicy != nil {
 		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: *tcInfo.CPUPolicy}
 		resizePol = append(resizePol, cpuPol)
@@ -82,21 +78,16 @@ func getTestResourceInfo(tcInfo ResizableContainerInfo) (res v1.ResourceRequirem
 		memPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: *tcInfo.MemPolicy}
 		resizePol = append(resizePol, memPol)
 	}
-	return res, resizePol
+	return resizePol
 }
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
-	res, resizePol := getTestResourceInfo(tcInfo)
-
-	tc := v1.Container{
-		Name:         tcInfo.Name,
-		Image:        imageutils.GetE2EImage(imageutils.BusyBox),
-		Command:      []string{"/bin/sh"},
-		Args:         []string{"-c", cmd},
-		Resources:    res,
-		ResizePolicy: resizePol,
-	}
+	resizePol := getTestResizePolicy(tcInfo)
+	tc := MakeContainerWithResources(tcInfo.Name, tcInfo.Resources)
+	tc.Command = []string{"/bin/sh"}
+	tc.Args = []string{"-c", cmd}
+	tc.ResizePolicy = resizePol
 	if tcInfo.RestartPolicy != "" {
 		tc.RestartPolicy = &tcInfo.RestartPolicy
 	}
