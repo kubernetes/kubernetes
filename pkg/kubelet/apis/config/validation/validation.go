@@ -342,6 +342,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s"))
 	}
 
+	if kc.ContainerLogMaxFiles <= 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMaxFiles must be greater than 1"))
+	}
+
 	if kc.PodLogsDir == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podLogsDir was not specified"))
 	}
