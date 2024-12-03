@@ -370,7 +370,8 @@ func (cfgCtlr *configController) Start(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		// Let the config worker stop when we are done
-		defer cfgCtlr.configQueue.ShutDown()
+		klog.Info("Shutting down API Priority and Fairness config worker")
+		cfgCtlr.configQueue.ShutDown()
 	}()
 
 	klog.Info("Starting API Priority and Fairness config controller")
@@ -605,7 +606,7 @@ func (cfgCtlr *configController) digestConfigObjects(ctx context.Context, newPLs
 		// if we are going to issue an update, be sure we track every name we update so we know if we update it too often.
 		currResult.updatedItems.Insert(fsu.flowSchema.Name)
 		logger.V(4).Info("Writing Condition to FlowSchema", "controller", cfgCtlr.name,
-			"flowSchema", fsu.flowSchema.Name, "condition", fsu.condition, "oldValue", fsu.oldValue, "newValue", fsu.condition)
+			"flowSchema", fsu.flowSchema.Name, "condition", fsu.condition, "rv", fsu.flowSchema.ResourceVersion, "oldValue", fsu.oldValue, "newValue", fsu.condition)
 
 		if err := apply(cfgCtlr.flowcontrolClient.FlowSchemas(), fsu, cfgCtlr.asFieldManager); err != nil {
 			if apierrors.IsNotFound(err) {

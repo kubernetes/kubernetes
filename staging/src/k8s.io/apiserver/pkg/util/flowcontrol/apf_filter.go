@@ -67,8 +67,8 @@ type Interface interface {
 		execFn func(),
 	)
 
-	// Start monitors config objects from the main apiservers and causes
-	// any needed changes to local behavior. This method does not block.
+	// Start forks goroutines that monitor config objects from the main apiservers
+	// and causes any needed changes to local behavior. This method does not block.
 	Start(ctx context.Context) error
 
 	// Install installs debugging endpoints to the web-server.

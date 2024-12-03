@@ -51,6 +51,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 
@@ -201,8 +202,7 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(t, decisionSkipFilter)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, ctx := ktesting.NewTestContext(t)
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	// send a watch request to test skipping long running request
@@ -216,8 +216,7 @@ func TestApfRejectRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(t, decisionReject)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, ctx := ktesting.NewTestContext(t)
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
@@ -234,8 +233,7 @@ func TestApfExemptRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(t, decisionNoQueuingExecute)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, ctx := ktesting.NewTestContext(t)
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
@@ -252,8 +250,7 @@ func TestApfExecuteRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(t, decisionQueuingExecute)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, ctx := ktesting.NewTestContext(t)
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
@@ -315,8 +312,7 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	server := newApfServerWithHooks(t, decisionQueuingExecute, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc)
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, ctx := ktesting.NewTestContext(t)
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	var wg sync.WaitGroup
@@ -695,8 +691,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		_, ctx := ktesting.NewTestContext(t)
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -765,8 +760,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		_, ctx := ktesting.NewTestContext(t)
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -831,8 +825,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		_, ctx := ktesting.NewTestContext(t)
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -903,8 +896,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		_, ctx := ktesting.NewTestContext(t)
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -976,8 +968,7 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 		)
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		_, ctx := ktesting.NewTestContext(t)
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -1115,7 +1106,7 @@ func startAPFController(t *testing.T, ctx context.Context, apfConfiguration []ru
 	}
 
 	if err := controller.Start(ctx); err != nil {
-		return nil, err
+		t.Fatalf("Failed to start the controller: %v", err)
 	}
 
 	// make sure that apf controller syncs the priority level configuration object we are using in this test.

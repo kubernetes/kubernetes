@@ -251,10 +251,10 @@ func EnsureConfigurations[ObjectType configurationObjectType](ctx context.Contex
 
 // EnsureConfiguration applies the given maintenance strategy to the given object.
 func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context, ops ObjectOps[ObjectType], bootstrap ObjectType, strategy EnsureStrategy[ObjectType]) error {
-	logger := klog.FromContext(ctx)
-
 	name := bootstrap.GetName()
 	configurationType := strategy.Name()
+
+	logger := klog.FromContext(ctx).WithValues("type", configurationType, "name", bootstrap.GetName())
 
 	var current ObjectType
 	var err error
@@ -269,36 +269,37 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 
 		// we always re-create a missing configuration object
 		if _, err = ops.Create(ctx, ops.DeepCopy(bootstrap), metav1.CreateOptions{FieldManager: fieldManager}); err == nil {
-			logger.V(2).Info(fmt.Sprintf("Successfully created %T", bootstrap), "type", configurationType, "name", name)
+			logger.V(2).Info(fmt.Sprintf("Successfully created %T", bootstrap))
 			return nil
 		}
 
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("cannot create %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 		}
-		logger.V(5).Info(fmt.Sprintf("Something created the %T concurrently", bootstrap), "type", configurationType, "name", name)
+		logger.V(5).Info(fmt.Sprintf("Something created the %T concurrently", bootstrap))
 	}
 
-	logger.V(5).Info(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap), "type", configurationType, "name", name)
+	logger.V(5).Info(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap))
 	newObject, update, err := strategy.ReviseIfNeeded(ops, current, bootstrap)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether auto-update is required for %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 	}
 	if !update {
-		if v5 := logger.V(5); v5.Enabled() {
-			v5.Info("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
-				"diff", cmp.Diff(current, bootstrap))
+		if loggerV := logger.V(5); loggerV.Enabled() {
+			loggerV.Info("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind)
 		}
 		return nil
 	}
 
 	if updated, err := ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
-		logger.V(2).Info(fmt.Sprintf("Updated the %T", bootstrap), "type", configurationType, "name", name, "diff", cmp.Diff(current, updated))
+		if loggerV := logger.V(3); loggerV.Enabled() {
+			loggerV.Info(fmt.Sprintf("Updated the %T", bootstrap), "diff", cmp.Diff(current, updated))
+		} else {
+			logger.V(2).Info(fmt.Sprintf("Updated the %T", bootstrap), "old", current, "updated", updated)
+		}
 		return nil
-	}
-
-	if apierrors.IsConflict(err) {
-		logger.V(2).Info(fmt.Sprintf("Something updated the %T concurrently, I will check its spec later", bootstrap), "type", configurationType, "name", name)
+	} else if apierrors.IsConflict(err) {
+		logger.V(2).Info(fmt.Sprintf("Something updated the %T concurrently, I will check its spec later", bootstrap))
 		return nil
 	}
 
@@ -345,7 +346,7 @@ func RemoveUnwantedObjects[ObjectType configurationObjectType](ctx context.Conte
 		// TODO: expectedResourceVersion := object.GetResourceVersion()
 		err = objectOps.Delete(ctx, object.GetName(), metav1.DeleteOptions{ /* TODO: expectedResourceVersion */ })
 		if err == nil {
-			logger.V(2).Info(fmt.Sprintf("Successfully deleted the unwanted %s", object.GetObjectKind().GroupVersionKind().Kind), "name", name)
+			logger.V(2).Info("Successfully deleted the unwanted object", "kind", object.GetObjectKind().GroupVersionKind().Kind, "name", name)
 			continue
 		}
 		if apierrors.IsNotFound(err) {

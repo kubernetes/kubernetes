@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 	testclocks "k8s.io/utils/clock/testing"
 )
@@ -74,7 +75,8 @@ type fightTest struct {
 
 func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *fightTest {
 	now := time.Now()
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	ft := &fightTest{
 		t:              t,
 		ctx:            ctx,

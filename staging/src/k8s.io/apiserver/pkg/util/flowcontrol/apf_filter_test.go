@@ -33,6 +33,7 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -115,8 +116,7 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	_, ctx := ktesting.NewTestContext(t)
 
 	informerFactory.Start(ctx.Done())
 	status := informerFactory.WaitForCacheSync(ctx.Done())

@@ -17,7 +17,6 @@ limitations under the License.
 package flowcontrol
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -27,13 +26,13 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 )
 
 func TestUpdateBorrowing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	_, ctx := ktesting.NewTestContext(t)
 
 	startTime := time.Now()
 	clk, _ := testeventclock.NewFake(startTime, 0, nil)
@@ -110,7 +109,7 @@ func TestUpdateBorrowing(t *testing.T) {
 	clk.SetTime(startTime.Add(2 * borrowingAdjustmentPeriod))
 	ctlr.updateBorrowing(ctx)
 	clk.SetTime(startTime.Add(3 * borrowingAdjustmentPeriod))
-	ctlr.updateBorrowing(context.Background())
+	ctlr.updateBorrowing(ctx)
 	if expected, actual := expectedExempt, stateExempt.currentCL; expected != actual {
 		t.Errorf("Scenario 2: expected %d, got %d for exempt", expected, actual)
 	} else {
