@@ -17,6 +17,10 @@ limitations under the License.
 package state
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	"k8s.io/utils/cpuset"
 )
 
@@ -33,6 +37,46 @@ func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 		}
 	}
 	return ret
+}
+
+// String returns a string representation of ContainerCPUAssignments.
+// Pod and container names are sorted alphabetically to ensure deterministic output.
+// The sorting overhead is acceptable since this method is used for logging and debugging only.
+func (as ContainerCPUAssignments) String() string {
+	var sb strings.Builder
+	sb.WriteString("{")
+
+	// Sort pods alphabetically
+	pods := make([]string, 0, len(as))
+	for pod := range as {
+		pods = append(pods, pod)
+	}
+	sort.Strings(pods)
+
+	for i, pod := range pods {
+		containerMap := as[pod]
+		sb.WriteString(fmt.Sprintf("%q:{", pod))
+
+		// Sort containers alphabetically
+		containers := make([]string, 0, len(containerMap))
+		for container := range containerMap {
+			containers = append(containers, container)
+		}
+		sort.Strings(containers)
+
+		for j, container := range containers {
+			sb.WriteString(fmt.Sprintf("%q:%q", container, containerMap[container].String()))
+			if j < len(containers)-1 {
+				sb.WriteString(",")
+			}
+		}
+		sb.WriteString("}")
+		if i < len(pods)-1 {
+			sb.WriteString(",")
+		}
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 // Reader interface used to read current cpu/pod assignment state
