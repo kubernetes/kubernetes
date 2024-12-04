@@ -90,12 +90,15 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 
 // NewCommandStartWardleServer provides a CLI handler for 'start master' command
 // with a default WardleServerOptions.
-func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOptions) *cobra.Command {
+func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOptions, skipDefaultComponentGlobalsRegistrySet bool) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
 		PersistentPreRunE: func(*cobra.Command, []string) error {
+			if skipDefaultComponentGlobalsRegistrySet {
+				return nil
+			}
 			return featuregate.DefaultComponentGlobalsRegistry.Set()
 		},
 		RunE: func(c *cobra.Command, args []string) error {

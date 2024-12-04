@@ -306,6 +306,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	genericfeatures.RemoteRequestHeaderUID: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	genericfeatures.ResilientWatchCacheInitialization: {
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
