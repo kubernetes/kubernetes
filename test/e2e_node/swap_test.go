@@ -467,6 +467,15 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 		if isNewMax {
 			maxSwapUsageBytes = *summary.Node.Swap.SwapUsageBytes
 		}
+
+		cmd := exec.Command("free", "-h")
+		// Get the output of the command
+		output, err := cmd.Output()
+		if err != nil {
+			framework.Logf("Error executing command: %v", err)
+			return
+		}
+		framework.Logf("DEBUG free -h output:\n" + string(output))
 	}
 
 	setupTest := func(getEvictionThreshold func(memoryCapacity, swapCapacity resource.Quantity) (memoryHardEvictionThreshold resource.Quantity)) {
