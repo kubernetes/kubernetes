@@ -34,7 +34,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/transport"
 
@@ -53,8 +55,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -130,6 +135,8 @@ func TestProxyHandler(t *testing.T) {
 		expectedBody       string
 		expectedCalled     bool
 		expectedHeaders    map[string][]string
+
+		enableFeatureGates []featuregate.Feature
 	}{
 		"no target": {
 			expectedStatusCode: http.StatusNotFound,
@@ -179,6 +186,40 @@ func TestProxyHandler(t *testing.T) {
 				"X-Forwarded-Uri":   {"/request/path"},
 				"X-Forwarded-For":   {"127.0.0.1"},
 				"X-Remote-User":     {"username"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"[RemoteRequestHeaderUID] proxy with user, insecure": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Group:                 "foo",
+					Version:               "v1",
+					InsecureSkipTLSVerify: true,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
+			expectedStatusCode: http.StatusOK,
+			expectedCalled:     true,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
 				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
 				"User-Agent":        {"Go-http-client/1.1"},
 				"Accept-Encoding":   {"gzip"},
@@ -206,6 +247,40 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
+			expectedStatusCode: http.StatusOK,
+			expectedCalled:     true,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"[RemoteRequestHeaderUID] proxy with user, cabundle": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
 			expectedStatusCode: http.StatusOK,
 			expectedCalled:     true,
 			expectedHeaders: map[string][]string{
@@ -320,7 +395,11 @@ func TestProxyHandler(t *testing.T) {
 		target.Reset()
 		legacyregistry.Reset()
 
-		func() {
+		t.Run(name, func(t *testing.T) {
+			for _, f := range tc.enableFeatureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
+			}
+
 			targetServer := httptest.NewUnstartedServer(target)
 			serviceCert := tc.serviceCertOverride
 			if serviceCert == nil {
@@ -354,37 +433,37 @@ func TestProxyHandler(t *testing.T) {
 
 			resp, err := http.Get(server.URL + tc.path)
 			if err != nil {
-				t.Errorf("%s: %v", name, err)
+				t.Errorf("%v", err)
 				return
 			}
 			if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
 				body, _ := httputil.DumpResponse(resp, true)
-				t.Logf("%s: %v", name, string(body))
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Logf("%v", string(body))
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 			bytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				t.Errorf("%s: %v", name, err)
+				t.Errorf("%v", err)
 				return
 			}
 			if !strings.Contains(string(bytes), tc.expectedBody) {
-				t.Errorf("%s: expected %q, got %q", name, tc.expectedBody, string(bytes))
+				t.Errorf("expected %q, got %q", tc.expectedBody, string(bytes))
 				return
 			}
 
 			if e, a := tc.expectedCalled, target.called; e != a {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 			// this varies every test
 			delete(target.headers, "X-Forwarded-Host")
 			if e, a := tc.expectedHeaders, target.headers; !reflect.DeepEqual(e, a) {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected != got %v", cmp.Diff(e, a))
 				return
 			}
 			if e, a := targetServer.Listener.Addr().String(), target.host; tc.expectedCalled && !reflect.DeepEqual(e, a) {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 
@@ -397,7 +476,7 @@ func TestProxyHandler(t *testing.T) {
 					t.Errorf("expected the x509_missing_san_total to be 1, but it's %d", errorCounter)
 				}
 			}
-		}()
+		})
 	}
 }
 
