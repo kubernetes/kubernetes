@@ -6,6 +6,10 @@ go 1.23.0
 
 godebug default=go1.23
 
+godebug winreadlinkvolume=0
+
+godebug winsymlink=0
+
 require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cloud-provider v0.0.0
