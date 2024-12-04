@@ -306,14 +306,12 @@ func TestImpersonationRoundTripper(t *testing.T) {
 func TestAuthProxyRoundTripper(t *testing.T) {
 	for n, tc := range map[string]struct {
 		username      string
-		uid           string
 		groups        []string
 		extra         map[string][]string
 		expectedExtra map[string][]string
 	}{
 		"allfields": {
 			username: "user",
-			uid:      "7db46926-e803-4337-9a29-f9c1fab7d34a",
 			groups:   []string{"groupA", "groupB"},
 			extra: map[string][]string{
 				"one": {"alpha", "bravo"},
@@ -326,7 +324,6 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 		},
 		"escaped extra": {
 			username: "user",
-			uid:      "7db46926-e803-4337-9a29-f9c1fab7d34a",
 			groups:   []string{"groupA", "groupB"},
 			extra: map[string][]string{
 				"one":             {"alpha", "bravo"},
@@ -339,7 +336,6 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 		},
 		"double escaped extra": {
 			username: "user",
-			uid:      "7db46926-e803-4337-9a29-f9c1fab7d34a",
 			groups:   []string{"groupA", "groupB"},
 			extra: map[string][]string{
 				"one":                     {"alpha", "bravo"},
@@ -353,7 +349,7 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 	} {
 		rt := &testRoundTripper{}
 		req := &http.Request{}
-		_, _ = NewAuthProxyRoundTripper(tc.username, tc.uid, tc.groups, tc.extra, rt).RoundTrip(req)
+		NewAuthProxyRoundTripper(tc.username, tc.groups, tc.extra, rt).RoundTrip(req)
 		if rt.Request == nil {
 			t.Errorf("%s: unexpected nil request: %v", n, rt)
 			continue
@@ -369,15 +365,6 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 			continue
 		}
 		if e, a := []string{tc.username}, actualUsernames; !reflect.DeepEqual(e, a) {
-			t.Errorf("%s expected %v, got %v", n, e, a)
-			continue
-		}
-		actualUID, ok := rt.Request.Header["X-Remote-Uid"]
-		if !ok {
-			t.Errorf("%s missing value", n)
-			continue
-		}
-		if e, a := []string{tc.uid}, actualUID; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s expected %v, got %v", n, e, a)
 			continue
 		}
