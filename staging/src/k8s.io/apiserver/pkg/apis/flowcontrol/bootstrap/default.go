@@ -409,7 +409,7 @@ var (
 			Subjects: groups(user.AllAuthenticated), // the nodes group
 			ResourceRules: []flowcontrol.ResourcePolicyRule{
 				resourceRule(
-					[]string{"create", "update", "delete"},
+					[]string{"create", "update", "patch", "delete"},
 					[]string{corev1.GroupName, eventsv1.GroupName},
 					[]string{"events"},
 					[]string{flowcontrol.NamespaceEvery},
