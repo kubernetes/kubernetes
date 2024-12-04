@@ -30,11 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
@@ -95,9 +98,36 @@ func TestWriteClientCAs(t *testing.T) {
 		preexistingObjs    []runtime.Object
 		expectedConfigMaps map[string]*corev1.ConfigMap
 		expectCreate       bool
+		uidGate            bool
 	}{
 		{
 			name: "basic",
+			clusterAuthInfo: ClusterAuthenticationInfo{
+				ClientCA:                         someRandomCAProvider,
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{"alfa", "bravo", "charlie"},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"golf", "hotel", "india"},
+				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{"delta"},
+				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{"echo", "foxtrot"},
+				RequestHeaderCA:                  anotherRandomCAProvider,
+				RequestHeaderAllowedNames:        headerrequest.StaticStringSlice{"first", "second"},
+			},
+			expectedConfigMaps: map[string]*corev1.ConfigMap{
+				"extension-apiserver-authentication": {
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"client-ca-file":                     string(someRandomCA),
+						"requestheader-username-headers":     `["alfa","bravo","charlie"]`,
+						"requestheader-group-headers":        `["delta"]`,
+						"requestheader-extra-headers-prefix": `["echo","foxtrot"]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `["first","second"]`,
+					},
+				},
+			},
+			expectCreate: true,
+		},
+		{
+			name: "basic with feature gate",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				ClientCA:                         someRandomCAProvider,
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{"alfa", "bravo", "charlie"},
@@ -122,6 +152,7 @@ func TestWriteClientCAs(t *testing.T) {
 				},
 			},
 			expectCreate: true,
+			uidGate:      true,
 		},
 		{
 			name: "skip extension-apiserver-authentication",
@@ -134,7 +165,6 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -169,7 +199,6 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -205,7 +234,6 @@ func TestWriteClientCAs(t *testing.T) {
 			name: "overwrite extension-apiserver-authentication requestheader",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
-				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -216,7 +244,6 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(someRandomCA),
@@ -229,7 +256,6 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(someRandomCA) + string(anotherRandomCA),
@@ -260,7 +286,6 @@ func TestWriteClientCAs(t *testing.T) {
 			name: "skip on no change",
 			clusterAuthInfo: ClusterAuthenticationInfo{
 				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
-				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
 				RequestHeaderCA:                  anotherRandomCAProvider,
@@ -271,7 +296,6 @@ func TestWriteClientCAs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
 						"requestheader-username-headers":     `[]`,
-						"requestheader-uid-headers":          `[]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -282,10 +306,126 @@ func TestWriteClientCAs(t *testing.T) {
 			expectedConfigMaps: map[string]*corev1.ConfigMap{},
 			expectCreate:       false,
 		},
+		{
+			name: "drop uid without feature gate",
+			clusterAuthInfo: ClusterAuthenticationInfo{
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"panda"},
+				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
+				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
+				RequestHeaderCA:                  anotherRandomCAProvider,
+				RequestHeaderAllowedNames:        headerrequest.StaticStringSlice{},
+			},
+			preexistingObjs: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `["snorlax"]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectedConfigMaps: map[string]*corev1.ConfigMap{
+				"extension-apiserver-authentication": {
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectCreate: false,
+		},
+		{
+			name: "add uid with feature gate",
+			clusterAuthInfo: ClusterAuthenticationInfo{
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"panda"},
+				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
+				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
+				RequestHeaderCA:                  anotherRandomCAProvider,
+				RequestHeaderAllowedNames:        headerrequest.StaticStringSlice{},
+			},
+			preexistingObjs: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectedConfigMaps: map[string]*corev1.ConfigMap{
+				"extension-apiserver-authentication": {
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `["panda"]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectCreate: false,
+			uidGate:      true,
+		},
+		{
+			name: "append uid with feature gate",
+			clusterAuthInfo: ClusterAuthenticationInfo{
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"panda"},
+				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
+				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
+				RequestHeaderCA:                  anotherRandomCAProvider,
+				RequestHeaderAllowedNames:        headerrequest.StaticStringSlice{},
+			},
+			preexistingObjs: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `["snorlax"]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectedConfigMaps: map[string]*corev1.ConfigMap{
+				"extension-apiserver-authentication": {
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-uid-headers":          `["snorlax","panda"]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       string(anotherRandomCA),
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectCreate: false,
+			uidGate:      true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, test.uidGate)
+
 			client := fake.NewSimpleClientset(test.preexistingObjs...)
 			configMapIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			for _, obj := range test.preexistingObjs {
@@ -341,7 +481,6 @@ func TestWriteConfigMapDeleted(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 		Data: map[string]string{
 			"requestheader-username-headers":     `[]`,
-			"requestheader-uid-headers":          `[]`,
 			"requestheader-group-headers":        `[]`,
 			"requestheader-extra-headers-prefix": `[]`,
 			"requestheader-client-ca-file":       string(anotherRandomCA),
