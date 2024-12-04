@@ -591,14 +591,19 @@ func (p *staticPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, 
 		}
 	}()
 
-	if err := p.enforceSMTAlignment(s, numCPUs); err != nil {
-		return err
-	}
-
+	// Checking the checkpoint state before SMT alignment validation means that
+	// existing allocations are preserved even if they violate the current policy.
+	// For example, if kubelet previously ran with full-pcpus-only=false and is
+	// restarted with full-pcpus-only=true, checkpointed allocations that don't
+	// satisfy SMT alignment are accepted to avoid disrupting running workloads.
 	if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
 		p.updateCPUsToReuse(pod, container, cset)
 		logger.Info("Static policy: container already present in state, skipping")
 		return nil
+	}
+
+	if err := p.enforceSMTAlignment(s, numCPUs); err != nil {
+		return err
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
