@@ -53,9 +53,6 @@ type requestHeaderAuthRequestHandler struct {
 	// nameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
 	nameHeaders StringSliceProvider
 
-	// nameHeaders are the headers to check (in order, case-insensitively) for an identity UID. The first header with a value wins.
-	uidHeaders StringSliceProvider
-
 	// groupHeaders are the headers to check (case-insensitively) for group membership.  All values of all headers will be added.
 	groupHeaders StringSliceProvider
 
@@ -64,12 +61,8 @@ type requestHeaderAuthRequestHandler struct {
 	extraHeaderPrefixes StringSliceProvider
 }
 
-func New(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes []string) (authenticator.Request, error) {
+func New(nameHeaders, groupHeaders, extraHeaderPrefixes []string) (authenticator.Request, error) {
 	trimmedNameHeaders, err := trimHeaders(nameHeaders...)
-	if err != nil {
-		return nil, err
-	}
-	trimmedUIDHeaders, err := trimHeaders(uidHeaders...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,16 +77,14 @@ func New(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes []string) (a
 
 	return NewDynamic(
 		StaticStringSlice(trimmedNameHeaders),
-		StaticStringSlice(trimmedUIDHeaders),
 		StaticStringSlice(trimmedGroupHeaders),
 		StaticStringSlice(trimmedExtraHeaderPrefixes),
 	), nil
 }
 
-func NewDynamic(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+func NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
 	return &requestHeaderAuthRequestHandler{
 		nameHeaders:         nameHeaders,
-		uidHeaders:          uidHeaders,
 		groupHeaders:        groupHeaders,
 		extraHeaderPrefixes: extraHeaderPrefixes,
 	}
@@ -112,8 +103,8 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	return ret, nil
 }
 
-func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
-	headerAuthenticator := NewDynamic(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes)
+func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+	headerAuthenticator := NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes)
 
 	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
 }
@@ -123,28 +114,23 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	if len(name) == 0 {
 		return nil, false, nil
 	}
-	uid := headerValue(req.Header, a.uidHeaders.Value())
 	groups := allHeaderValues(req.Header, a.groupHeaders.Value())
 	extra := newExtra(req.Header, a.extraHeaderPrefixes.Value())
 
 	// clear headers used for authentication
-	ClearAuthenticationHeaders(req.Header, a.nameHeaders, a.uidHeaders, a.groupHeaders, a.extraHeaderPrefixes)
+	ClearAuthenticationHeaders(req.Header, a.nameHeaders, a.groupHeaders, a.extraHeaderPrefixes)
 
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   name,
-			UID:    uid,
 			Groups: groups,
 			Extra:  extra,
 		},
 	}, true, nil
 }
 
-func ClearAuthenticationHeaders(h http.Header, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) {
+func ClearAuthenticationHeaders(h http.Header, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) {
 	for _, headerName := range nameHeaders.Value() {
-		h.Del(headerName)
-	}
-	for _, headerName := range uidHeaders.Value() {
 		h.Del(headerName)
 	}
 	for _, headerName := range groupHeaders.Value() {

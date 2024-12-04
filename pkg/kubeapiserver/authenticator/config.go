@@ -110,7 +110,6 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
-			config.RequestHeaderConfig.UIDHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)

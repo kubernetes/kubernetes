@@ -45,7 +45,6 @@ const (
 // RequestHeaderAuthRequestProvider a provider that knows how to dynamically fill parts of RequestHeaderConfig struct
 type RequestHeaderAuthRequestProvider interface {
 	UsernameHeaders() []string
-	UIDHeaders() []string
 	GroupHeaders() []string
 	ExtraHeaderPrefixes() []string
 	AllowedClientNames() []string
@@ -55,7 +54,6 @@ var _ RequestHeaderAuthRequestProvider = &RequestHeaderAuthRequestController{}
 
 type requestHeaderBundle struct {
 	UsernameHeaders     []string
-	UIDHeaders          []string
 	GroupHeaders        []string
 	ExtraHeaderPrefixes []string
 	AllowedClientNames  []string
@@ -82,7 +80,6 @@ type RequestHeaderAuthRequestController struct {
 	exportedRequestHeaderBundle atomic.Value
 
 	usernameHeadersKey     string
-	uidHeadersKey          string
 	groupHeadersKey        string
 	extraHeaderPrefixesKey string
 	allowedClientNamesKey  string
@@ -93,7 +90,7 @@ func NewRequestHeaderAuthRequestController(
 	cmName string,
 	cmNamespace string,
 	client kubernetes.Interface,
-	usernameHeadersKey, uidHeadersKey, groupHeadersKey, extraHeaderPrefixesKey, allowedClientNamesKey string) *RequestHeaderAuthRequestController {
+	usernameHeadersKey, groupHeadersKey, extraHeaderPrefixesKey, allowedClientNamesKey string) *RequestHeaderAuthRequestController {
 	c := &RequestHeaderAuthRequestController{
 		name: "RequestHeaderAuthRequestController",
 
@@ -103,7 +100,6 @@ func NewRequestHeaderAuthRequestController(
 		configmapNamespace: cmNamespace,
 
 		usernameHeadersKey:     usernameHeadersKey,
-		uidHeadersKey:          uidHeadersKey,
 		groupHeadersKey:        groupHeadersKey,
 		extraHeaderPrefixesKey: extraHeaderPrefixesKey,
 		allowedClientNamesKey:  allowedClientNamesKey,
@@ -154,10 +150,6 @@ func NewRequestHeaderAuthRequestController(
 
 func (c *RequestHeaderAuthRequestController) UsernameHeaders() []string {
 	return c.loadRequestHeaderFor(c.usernameHeadersKey)
-}
-
-func (c *RequestHeaderAuthRequestController) UIDHeaders() []string {
-	return c.loadRequestHeaderFor(c.uidHeadersKey)
 }
 
 func (c *RequestHeaderAuthRequestController) GroupHeaders() []string {
@@ -286,11 +278,6 @@ func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap
 		return nil, err
 	}
 
-	uidHeaderCurrentValue, err := deserializeStrings(cm.Data[c.uidHeadersKey])
-	if err != nil {
-		return nil, err
-	}
-
 	groupHeadersCurrentValue, err := deserializeStrings(cm.Data[c.groupHeadersKey])
 	if err != nil {
 		return nil, err
@@ -309,7 +296,6 @@ func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap
 
 	return &requestHeaderBundle{
 		UsernameHeaders:     usernameHeaderCurrentValue,
-		UIDHeaders:          uidHeaderCurrentValue,
 		GroupHeaders:        groupHeadersCurrentValue,
 		ExtraHeaderPrefixes: extraHeaderPrefixesCurrentValue,
 		AllowedClientNames:  allowedClientNamesCurrentValue,
@@ -326,8 +312,6 @@ func (c *RequestHeaderAuthRequestController) loadRequestHeaderFor(key string) []
 	switch key {
 	case c.usernameHeadersKey:
 		return headerBundle.UsernameHeaders
-	case c.uidHeadersKey:
-		return headerBundle.UIDHeaders
 	case c.groupHeadersKey:
 		return headerBundle.GroupHeaders
 	case c.extraHeaderPrefixesKey:

@@ -285,7 +285,6 @@ func TestAuthenticateRequestError(t *testing.T) {
 func TestAuthenticateRequestClearHeaders(t *testing.T) {
 	testcases := map[string]struct {
 		nameHeaders        []string
-		uidHeaders         []string
 		groupHeaders       []string
 		extraPrefixHeaders []string
 		requestHeaders     http.Header
@@ -335,39 +334,13 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 				"X-Remote-Group": {"Users"},
 			},
 		},
-		"uid none": {
-			nameHeaders: []string{"X-Remote-User"},
-			uidHeaders:  []string{"X-Remote-Uid"},
-			requestHeaders: http.Header{
-				"X-Remote-User": {"Alice"},
-			},
-		},
-		"uid all matches": {
-			nameHeaders: []string{"X-Remote-User"},
-			uidHeaders:  []string{"X-Remote-Uid-1", "X-Remote-Uid-2"},
-			requestHeaders: http.Header{
-				"X-Remote-User":  {"Alice"},
-				"X-Remote-Uid-1": {"one"},
-				"X-Remote-Uid-2": {"two", "three"},
-			},
-		},
-		"uid case-insensitive": {
-			nameHeaders: []string{"X-Remote-USER"},
-			uidHeaders:  []string{"X-REMOTE-UID-1"},
-			requestHeaders: http.Header{
-				"X-Remote-User":  {"Alice"},
-				"X-Remote-Uid-1": {"one"},
-			},
-		},
 
 		"extra prefix matches case-insensitive": {
 			nameHeaders:        []string{"X-Remote-User"},
-			uidHeaders:         []string{"X-Remote-Uid-1"},
 			groupHeaders:       []string{"X-Remote-Group-1", "X-Remote-Group-2"},
 			extraPrefixHeaders: []string{"X-Remote-Extra-1-", "X-Remote-Extra-2-"},
 			requestHeaders: http.Header{
 				"X-Remote-User":         {"Bob"},
-				"X-Remote-Uid-1":        {"bobs-uid"},
 				"X-Remote-Group-1":      {"one-a", "one-b"},
 				"X-Remote-Group-2":      {"two-a", "two-b"},
 				"X-Remote-extra-1-key1": {"alfa", "bravo"},
@@ -381,15 +354,12 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 
 		"extra prefix matches case-insensitive with unrelated headers": {
 			nameHeaders:        []string{"X-Remote-User"},
-			uidHeaders:         []string{"X-Remote-Uid"},
 			groupHeaders:       []string{"X-Remote-Group-1", "X-Remote-Group-2"},
 			extraPrefixHeaders: []string{"X-Remote-Extra-1-", "X-Remote-Extra-2-"},
 			requestHeaders: http.Header{
 				"X-Group-Remote":        {"snorlax"}, // unrelated header
 				"X-Group-Bear":          {"panda"},   // another unrelated header
-				"X-Uid-Remote":          {"bobs-unrelated-uid"},
 				"X-Remote-User":         {"Bob"},
-				"X-Remote-Uid":          {"bobs-uid"},
 				"X-Remote-Group-1":      {"one-a", "one-b"},
 				"X-Remote-Group-2":      {"two-a", "two-b"},
 				"X-Remote-extra-1-key1": {"alfa", "bravo"},
@@ -402,18 +372,15 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 			finalHeaders: http.Header{
 				"X-Group-Remote": {"snorlax"},
 				"X-Group-Bear":   {"panda"},
-				"X-Uid-Remote":   {"bobs-unrelated-uid"},
 			},
 		},
 
 		"custom config but request contains standard headers": {
 			nameHeaders:        []string{"foo"},
-			uidHeaders:         []string{"footoo"},
 			groupHeaders:       []string{"bar"},
 			extraPrefixHeaders: []string{"baz"},
 			requestHeaders: http.Header{
 				"X-Remote-User":         {"Bob"},
-				"X-Remote-Uid":          {"bobs-uid"},
 				"X-Remote-Group-1":      {"one-a", "one-b"},
 				"X-Remote-Group-2":      {"two-a", "two-b"},
 				"X-Remote-extra-1-key1": {"alfa", "bravo"},
@@ -431,12 +398,10 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 
 		"custom config but request contains standard and custom headers": {
 			nameHeaders:        []string{"one"},
-			uidHeaders:         []string{"onetoo"},
 			groupHeaders:       []string{"two"},
 			extraPrefixHeaders: []string{"three-"},
 			requestHeaders: http.Header{
 				"X-Remote-User":         {"Bob"},
-				"X-Remote-Uid":          {"bobs-uid"},
 				"X-Remote-Group-3":      {"one-a", "one-b"},
 				"X-Remote-Group-4":      {"two-a", "two-b"},
 				"X-Remote-extra-1-key1": {"alfa", "bravo"},
@@ -457,12 +422,10 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 
 		"escaped extra keys": {
 			nameHeaders:        []string{"X-Remote-User"},
-			uidHeaders:         []string{"X-Remote-Uid"},
 			groupHeaders:       []string{"X-Remote-Group"},
 			extraPrefixHeaders: []string{"X-Remote-Extra-"},
 			requestHeaders: http.Header{
 				"X-Remote-User":                                            {"Bob"},
-				"X-Remote-Uid":                                             {"bobs-uid"},
 				"X-Remote-Group":                                           {"one-a", "one-b"},
 				"X-Remote-Extra-Alpha":                                     {"alphabetical"},
 				"X-Remote-Extra-Alph4num3r1c":                              {"alphanumeric"},
@@ -492,7 +455,6 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 				nil,
 				&authenticatorfactory.RequestHeaderConfig{
 					UsernameHeaders:     headerrequest.StaticStringSlice(testcase.nameHeaders),
-					UIDHeaders:          headerrequest.StaticStringSlice(testcase.uidHeaders),
 					GroupHeaders:        headerrequest.StaticStringSlice(testcase.groupHeaders),
 					ExtraHeaderPrefixes: headerrequest.StaticStringSlice(testcase.extraPrefixHeaders),
 				},
