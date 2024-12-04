@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"math/big"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -433,6 +434,15 @@ var _ = SIGDescribe("iholder SwapEviction", "[LinuxOnly]", framework.WithSerial(
 		if isNewMax {
 			swapUsageBytes = *summary.Node.Swap.SwapUsageBytes
 		}
+
+		cmd := exec.Command("free", "-h")
+		// Get the output of the command
+		output, err := cmd.Output()
+		if err != nil {
+			framework.Logf("Error executing command: %v", err)
+			return
+		}
+		framework.Logf("DEBUG free -h output:\n" + string(output))
 	}
 
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
