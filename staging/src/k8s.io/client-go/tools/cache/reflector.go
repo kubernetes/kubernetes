@@ -74,7 +74,7 @@ type Reflector struct {
 	// The destination to sync up with the watch source
 	store Store
 	// listerWatcher is used to perform lists and watches.
-	listerWatcher ListerWatcher
+	listerWatcher ListerWatcherWithContext
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
 	resyncPeriod   time.Duration
@@ -248,7 +248,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		resyncPeriod:    options.ResyncPeriod,
 		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
-		listerWatcher:   lw,
+		listerWatcher:   ListerWatcher2Context(lw),
 		store:           store,
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
@@ -377,7 +377,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 // and then use the resource version to watch.
 // It returns error if ListAndWatchWithContext didn't even try to initialize watch.
 func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
-	stopCh := ctx.Done()
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Listing and watching", "type", r.typeDescription, "reflector", r.name)
 	var err error
@@ -400,7 +399,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	}
 
 	if fallbackToList {
-		err = r.list(stopCh)
+		err = r.list(ctx)
 		if err != nil {
 			return err
 		}
@@ -491,7 +490,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 				AllowWatchBookmarks: true,
 			}
 
-			w, err = r.listerWatcher.Watch(options)
+			w, err = r.listerWatcher.WatchWithContext(ctx, options)
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
 					logger.V(4).Info("Watch failed - backing off", "reflector", r.name, "type", r.typeDescription, "err", err)
@@ -542,7 +541,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
-func (r *Reflector) list(stopCh <-chan struct{}) error {
+func (r *Reflector) list(ctx context.Context) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
@@ -562,7 +561,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
 		// list request will return the full response.
 		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
-			return r.listerWatcher.List(opts)
+			return r.listerWatcher.ListWithContext(ctx, opts)
 		}))
 		switch {
 		case r.WatchListPageSize != 0:
@@ -601,7 +600,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		close(listCh)
 	}()
 	select {
-	case <-stopCh:
+	case <-ctx.Done():
 		return nil
 	case r := <-panicCh:
 		panic(r)
@@ -718,7 +717,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		}
 		start := r.clock.Now()
 
-		w, err = r.listerWatcher.Watch(options)
+		w, err = r.listerWatcher.WatchWithContext(ctx, options)
 		if err != nil {
 			if isErrorRetriableWithSideEffectsFn(err) {
 				continue
@@ -750,7 +749,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 	// we utilize the temporaryStore to ensure independence from the current store implementation.
 	// as of today, the store is implemented as a queue and will be drained by the higher-level
 	// component as soon as it finishes replacing the content.
-	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, wrapListFuncWithContext(r.listerWatcher.List), temporaryStore.List)
+	checkWatchListDataConsistencyIfRequested(ctx, r.name, resourceVersion, r.listerWatcher.ListWithContext, temporaryStore.List)
 
 	if err := r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %w", err)
@@ -1033,13 +1032,6 @@ func isWatchErrorRetriable(err error) bool {
 		return true
 	}
 	return false
-}
-
-// wrapListFuncWithContext simply wraps ListFunction into another function that accepts a context and ignores it.
-func wrapListFuncWithContext(listFn ListFunc) func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-	return func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
-		return listFn(options)
-	}
 }
 
 // initialEventsEndBookmarkTicker a ticker that produces a warning if the bookmark event
