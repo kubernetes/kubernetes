@@ -6,6 +6,10 @@ go 1.23.0
 
 godebug default=go1.23
 
+godebug winreadlinkvolume=0
+
+godebug winsymlink=0
+
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/blang/semver/v4 v4.0.0
