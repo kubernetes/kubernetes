@@ -134,7 +134,7 @@ func TestDefaultFlags(t *testing.T) {
 			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     []string{"x-remote-user"},
-				UIDHeaders:          nil,
+				UIDHeaders:          []string{"x-remote-uid"},
 				GroupHeaders:        []string{"x-remote-group"},
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			},
@@ -295,7 +295,7 @@ func TestAddFlags(t *testing.T) {
 			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     []string{"x-remote-user"},
-				UIDHeaders:          nil,
+				UIDHeaders:          []string{"x-remote-uid"},
 				GroupHeaders:        []string{"x-remote-group"},
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			},
