@@ -237,16 +237,18 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start up the healthz server.
-	serverShutdownCh := make(<-chan struct{})
-	listenerStoppedCh := make(<-chan struct{})
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newHealthEndpointsAndMetricsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		var err error
-		serverShutdownCh, listenerStoppedCh, err = cc.SecureServing.Serve(handler, 0, ctx.Done())
+		serverShutdownCh, listenerStoppedCh, err := cc.SecureServing.Serve(handler, 0, ctx.Done())
 		if err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start secure server: %v", err)
 		}
+		defer func() {
+			// for graceful shutdown
+			<-serverShutdownCh
+			<-listenerStoppedCh
+		}()
 	}
 
 	startInformersAndWaitForSync := func(ctx context.Context) {
@@ -310,21 +312,12 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 		leaderElector.Run(ctx)
 
-		// for graceful shutdown
-		<-serverShutdownCh
-		<-listenerStoppedCh
-
 		return fmt.Errorf("lost lease")
 	}
 
 	// Leader election is disabled, so runCommand inline until done.
 	close(waitingForLeader)
 	sched.Run(ctx)
-
-	if cc.SecureServing == nil {
-		<-serverShutdownCh
-		<-listenerStoppedCh
-	}
 
 	return fmt.Errorf("finished without leader elect")
 }

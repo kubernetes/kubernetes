@@ -179,36 +179,40 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 		checks = append(checks, electionChecker)
 	}
 
-	webhookServerShutdownCh := make(<-chan struct{})
-	webhookListenerStoppedCh := make(<-chan struct{})
 	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
 		if len(webhooks) > 0 {
 			klog.Info("Webhook Handlers enabled: ", webhooks)
 			handler := newHandler(webhooks)
-			var err error
-			webhookServerShutdownCh, webhookListenerStoppedCh, err = c.WebhookSecureServing.Serve(handler, 0, stopCh)
+			webhookServerShutdownCh, webhookListenerStoppedCh, err := c.WebhookSecureServing.Serve(handler, 0, stopCh)
 			if err != nil {
 				return err
 			}
+			defer func() {
+				// for graceful shutdown
+				<-webhookServerShutdownCh
+				<-webhookListenerStoppedCh
+			}()
 		}
 	}
 
 	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
 
 	// Start the controller manager HTTP server
-	serverShutdownCh := make(<-chan struct{})
-	listenerStoppedCh := make(<-chan struct{})
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		var err error
-		serverShutdownCh, listenerStoppedCh, err = c.SecureServing.Serve(handler, 0, stopCh)
+		serverShutdownCh, listenerStoppedCh, err := c.SecureServing.Serve(handler, 0, stopCh)
 		if err != nil {
 			return err
 		}
+		defer func() {
+			// for graceful shutdown
+			<-serverShutdownCh
+			<-listenerStoppedCh
+		}()
 	}
 
 	run := func(ctx context.Context, controllerInitializers map[string]InitFunc) {
@@ -297,18 +301,6 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	<-stopCh
-
-	// for graceful shutdown
-	if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.CloudControllerManagerWebhook) {
-		if len(webhooks) > 0 {
-			<-webhookServerShutdownCh
-			<-webhookListenerStoppedCh
-		}
-	}
-	if c.SecureServing != nil {
-		<-serverShutdownCh
-		<-listenerStoppedCh
-	}
 
 	return nil
 }
