@@ -178,13 +178,20 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	DynamicResourceAllocation: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
+	DRAPartitionableDevices: {
+		// TODO: After rebasing onto master after the 1.32 release, bump this to 1.33.
+		// It cannot be 1.33 yet ("cannot set feature gate DRAPartitionableDevices to true, feature is PreAlpha at emulated version 1.32").
+		// Also bump test/featuregates_linter/test_data/versioned_feature_list.yaml
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRAResourceClaimDeviceStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DynamicResourceAllocation: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	KubeletCrashLoopBackOffMax: {
