@@ -4,8 +4,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 use (
 	.
 	./staging/src/k8s.io/api
