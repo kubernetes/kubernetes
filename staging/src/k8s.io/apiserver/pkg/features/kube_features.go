@@ -149,6 +149,13 @@ const (
 	// to a chunking list request.
 	RemainingItemCount featuregate.Feature = "RemainingItemCount"
 
+	// owner: @stlaz
+	//
+	// Enable kube-apiserver to accept UIDs via request header authentication.
+	// This will also make the kube-apiserver's API aggregator add UIDs via standard
+	// headers when forwarding requests to the servers serving the aggregated API.
+	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
+
 	// owner: @wojtek-t
 	//
 	// Enables resilient watchcache initialization to avoid controlplane
@@ -357,6 +364,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	RemoteRequestHeaderUID: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ResilientWatchCacheInitialization: {

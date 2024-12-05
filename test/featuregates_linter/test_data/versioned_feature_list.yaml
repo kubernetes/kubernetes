@@ -1058,6 +1058,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.29"
+- name: RemoteRequestHeaderUID
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: ResilientWatchCacheInitialization
   versionedSpecs:
   - default: true
