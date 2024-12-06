@@ -1,7 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - andrewsykim
   - cheftako
   - deads2k
   - liggitt
@@ -9,7 +8,6 @@ approvers:
   - sttts
   - jpbetz
 reviewers:
-  - andrewsykim
   - cheftako
   - cici37
   - deads2k

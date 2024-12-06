@@ -2,12 +2,10 @@
 
 reviewers:
   - sig-network-reviewers
-  - andrewsykim
   - aroradaman
   - uablrek
 approvers:
   - sig-network-approvers
-  - andrewsykim
   - uablrek
 labels:
   - sig/network

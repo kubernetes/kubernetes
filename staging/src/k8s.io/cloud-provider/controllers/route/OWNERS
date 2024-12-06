@@ -3,11 +3,9 @@
 approvers:
   - wojtek-t
   - bowei
-  - andrewsykim
   - cheftako
 reviewers:
   - wojtek-t
-  - andrewsykim
   - cheftako
 emeritus_approvers:
   - gmarek

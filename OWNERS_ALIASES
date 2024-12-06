@@ -245,7 +245,6 @@ aliases:
     - krmayankk
     - matthyx
     - odinuge
-    - andrewsykim
     - mrunalp
     - SergeyKanzhelev
     - bobbypage
@@ -259,7 +258,6 @@ aliases:
     - ffromani
     - tallclair
   sig-network-approvers:
-    - andrewsykim
     - aojea
     - bowei
     - caseydavenport
@@ -271,7 +269,6 @@ aliases:
     - robscott
     - thockin
   sig-network-reviewers:
-    - andrewsykim
     - aojea
     - aroradaman
     - bowei
@@ -368,7 +365,6 @@ aliases:
     - smarterclayton
     - thockin
   sig-network-api-reviewers:
-    - andrewsykim
     - caseydavenport
     - danwinship
     - thockin
@@ -391,7 +387,6 @@ aliases:
     - thockin
     - liggitt
   api-reviewers:
-    - andrewsykim
     - smarterclayton
     - thockin
     - liggitt
@@ -496,7 +491,6 @@ aliases:
   dep-reviewers:
     - logicalhan
   feature-approvers:
-    - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
     - ardaguclu # CLI
     - aojea # Network, Testing

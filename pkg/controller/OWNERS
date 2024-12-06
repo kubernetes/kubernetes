@@ -6,10 +6,8 @@ approvers:
   - mikedanese
   - janetkuo
   - cheftako
-  - andrewsykim
   - sig-apps-approvers
 reviewers:
-  - andrewsykim
   - deads2k
   - cheftako
   - sig-apps-reviewers

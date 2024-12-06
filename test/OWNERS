@@ -13,7 +13,6 @@ reviewers:
   - thockin
   - wojtek-t
 approvers:
-  - andrewsykim
   - aojea
   - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go

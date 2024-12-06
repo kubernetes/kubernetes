@@ -4,7 +4,6 @@ approvers:
   - mikedanese
   - dims
   - wlan0
-  - andrewsykim
   - cheftako
 reviewers:
   - aojea
@@ -24,7 +23,6 @@ reviewers:
   - jingxu97
   - wlan0
   - cheftako
-  - andrewsykim
 labels:
   - sig/cloud-provider
   - area/cloudprovider
