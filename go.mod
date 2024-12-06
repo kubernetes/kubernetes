@@ -10,8 +10,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winreadlinkvolume=0
-
 godebug winsymlink=0
 
 require (
