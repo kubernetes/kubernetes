@@ -1430,7 +1430,9 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
       Linux)
         start_kubeproxy
-        wait_coredns_available
+        if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+          wait_coredns_available
+        fi
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
