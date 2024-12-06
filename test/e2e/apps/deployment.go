@@ -396,9 +396,6 @@ var _ = SIGDescribe("Deployment", func() {
 
 		ginkgo.By("patching the DeploymentStatus")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"labels": map[string]string{"test-deployment": "patched-status"},
-			},
 			"status": map[string]interface{}{
 				"readyReplicas":     testDeploymentNoReplicas,
 				"availableReplicas": testDeploymentAvailableReplicas,
@@ -416,7 +413,9 @@ var _ = SIGDescribe("Deployment", func() {
 			case watch.Modified:
 				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 					found := deployment.ObjectMeta.Name == testDeployment.Name &&
-						deployment.ObjectMeta.Labels["test-deployment-static"] == "true"
+						deployment.Status.ReadyReplicas == testDeploymentNoReplicas &&
+						deployment.Status.AvailableReplicas == testDeploymentAvailableReplicas
+
 					return found, nil
 				}
 			default:
