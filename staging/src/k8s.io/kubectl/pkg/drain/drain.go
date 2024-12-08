@@ -447,8 +447,8 @@ func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 	})
 
 	if err != nil {
-        return pods, wait.ErrorInterrupted(err)
-    }
+		return pods, wait.ErrorInterrupted(err)
+	}
 
 	return pods, err
 }

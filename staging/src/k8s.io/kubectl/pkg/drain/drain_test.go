@@ -180,11 +180,11 @@ func TestDeletePods(t *testing.T) {
 			}
 			pendingPods, err := waitForDelete(params)
 
-				if test.expectError {
-					if err == nil {
-						if !errors.Is(err, wait.ErrorInterrupted(test.expectedError)) {
-							t.Fatalf("%s: expected error %v, got %v", test.description, test.expectedError, err)
-	
+			if test.expectError {
+				if err == nil {
+					if !errors.Is(err, wait.ErrorInterrupted(test.expectedError)) {
+						t.Fatalf("%s: expected error %v, got %v", test.description, test.expectedError, err)
+
 					}
 				}
 			}
