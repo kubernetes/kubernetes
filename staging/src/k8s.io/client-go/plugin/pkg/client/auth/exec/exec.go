@@ -363,6 +363,7 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return r.base.RoundTrip(req)
 	}
 
+	ctx := req.Context()
 	creds, err := r.a.getCreds()
 	if err != nil {
 		return nil, fmt.Errorf("getting credentials: %v", err)
@@ -377,7 +378,7 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if res.StatusCode == http.StatusUnauthorized {
 		if err := r.a.maybeRefreshCreds(creds); err != nil {
-			klog.Errorf("refreshing credentials: %v", err)
+			klog.FromContext(ctx).Error(err, "Refreshing credentials failed")
 		}
 	}
 	return res, nil
