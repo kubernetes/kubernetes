@@ -47,22 +47,13 @@ func TestProbeAttachableVolumePlugins(t *testing.T) {
 	checkPlugins(t, plugins, []string{"kubernetes.io/csi", "kubernetes.io/fc", "kubernetes.io/iscsi"})
 }
 
-func TestProbeExpandableVolumePlugins(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	plugins, err := ProbeExpandableVolumePlugins(logger, getConfig())
-	if err != nil {
-		t.Fatalf("TestProbeExpandableVolumePlugins failed: %s", err)
-	}
-	checkPlugins(t, plugins, []string{"kubernetes.io/portworx-volume"})
-}
-
 func TestProbeControllerVolumePlugins(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	plugins, err := ProbeProvisionableRecyclableVolumePlugins(logger, getConfig())
 	if err != nil {
 		t.Fatalf("ProbeControllerVolumePlugins failed: %s", err)
 	}
-	checkPlugins(t, plugins, []string{"kubernetes.io/host-path", "kubernetes.io/nfs", "kubernetes.io/portworx-volume"})
+	checkPlugins(t, plugins, []string{"kubernetes.io/host-path", "kubernetes.io/nfs"})
 }
 
 func getConfig() persistentvolumeconfig.VolumeConfiguration {

@@ -1044,7 +1044,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+		return true
 	}
 	return false
 }

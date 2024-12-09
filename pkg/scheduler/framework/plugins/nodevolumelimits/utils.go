@@ -22,9 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
@@ -40,9 +38,7 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	case csilibplugins.AWSEBSInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx) {
-			return false
-		}
+		return true
 	case csilibplugins.GCEPDInTreePluginName:
 		return true
 	case csilibplugins.AzureDiskInTreePluginName:
