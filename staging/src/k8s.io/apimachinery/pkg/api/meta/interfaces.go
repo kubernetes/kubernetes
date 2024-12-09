@@ -17,6 +17,8 @@ limitations under the License.
 package meta
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -109,7 +111,7 @@ type RESTMapping struct {
 // to API groups. In other words, kinds and resources should not be assumed to be
 // unique across groups.
 //
-// TODO: split into sub-interfaces
+// Deprecated: use [RESTMapperWithContext] instead.
 type RESTMapper interface {
 	// KindFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
 	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
@@ -133,11 +135,112 @@ type RESTMapper interface {
 	ResourceSingularizer(resource string) (singular string, err error)
 }
 
+// RESTMapperWithContext allows clients to map resources to kind, and map kind and version
+// to interfaces for manipulating those objects. It is primarily intended for
+// consumers of Kubernetes compatible REST APIs as defined in docs/devel/api-conventions.md.
+//
+// The Kubernetes API provides versioned resources and object kinds which are scoped
+// to API groups. In other words, kinds and resources should not be assumed to be
+// unique across groups.
+type RESTMapperWithContext interface {
+	// KindFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
+	KindForWithContext(ctx context.Context, resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
+
+	// KindsFor takes a partial resource and returns the list of potential kinds in priority order
+	KindsForWithContext(ctx context.Context, resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error)
+
+	// ResourceFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
+	ResourceForWithContext(ctx context.Context, input schema.GroupVersionResource) (schema.GroupVersionResource, error)
+
+	// ResourcesFor takes a partial resource and returns the list of potential resource in priority order
+	ResourcesForWithContext(ctx context.Context, input schema.GroupVersionResource) ([]schema.GroupVersionResource, error)
+
+	// RESTMapping identifies a preferred resource mapping for the provided group kind.
+	RESTMappingWithContext(ctx context.Context, gk schema.GroupKind, versions ...string) (*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind if no
+	// version search is provided. Otherwise identifies a preferred resource mapping for
+	// the provided version(s).
+	RESTMappingsWithContext(ctx context.Context, gk schema.GroupKind, versions ...string) ([]*RESTMapping, error)
+
+	ResourceSingularizerWithContext(ctx context.Context, resource string) (singular string, err error)
+}
+
+func RESTMapper2Context(m RESTMapper) RESTMapperWithContext {
+	if m == nil {
+		return nil
+	}
+	if m, ok := m.(RESTMapperWithContext); ok {
+		return m
+	}
+	return &restMapperWrapper{
+		parent: m,
+	}
+}
+
+type restMapperWrapper struct {
+	parent RESTMapper
+}
+
+func (m restMapperWrapper) KindForWithContext(ctx context.Context, resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	return m.parent.KindFor(resource)
+}
+func (m restMapperWrapper) KindsForWithContext(ctx context.Context, resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return m.parent.KindsFor(resource)
+}
+func (m restMapperWrapper) ResourceForWithContext(ctx context.Context, input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return m.parent.ResourceFor(input)
+}
+func (m restMapperWrapper) ResourcesForWithContext(ctx context.Context, input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return m.parent.ResourcesFor(input)
+}
+func (m restMapperWrapper) RESTMappingWithContext(ctx context.Context, gk schema.GroupKind, versions ...string) (*RESTMapping, error) {
+	return m.parent.RESTMapping(gk, versions...)
+}
+func (m restMapperWrapper) RESTMappingsWithContext(ctx context.Context, gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
+	return m.parent.RESTMappings(gk, versions...)
+}
+func (m restMapperWrapper) ResourceSingularizerWithContext(ctx context.Context, resource string) (singular string, err error) {
+	return m.parent.ResourceSingularizer(resource)
+}
+
 // ResettableRESTMapper is a RESTMapper which is capable of resetting itself
 // from discovery.
 // All rest mappers that delegate to other rest mappers must implement this interface and dynamically
 // check if the delegate mapper supports the Reset() operation.
+//
+// Deprecated: use [ResettableRESTMapperWithContext] instead.
 type ResettableRESTMapper interface {
 	RESTMapper
 	Reset()
+}
+
+// ResettableRESTMapperWithContext is a RESTMapper which is capable of resetting itself
+// from discovery.
+// All rest mappers that delegate to other rest mappers must implement this interface and dynamically
+// check if the delegate mapper supports the Reset() operation.
+type ResettableRESTMapperWithContext interface {
+	RESTMapperWithContext
+	ResetWithContext(ctx context.Context)
+}
+
+func ResettableRESTMapper2Context(m ResettableRESTMapper) ResettableRESTMapperWithContext {
+	if m == nil {
+		return nil
+	}
+	if m, ok := m.(ResettableRESTMapperWithContext); ok {
+		return m
+	}
+	return &resettableRESTMapperWrapper{
+		RESTMapperWithContext: RESTMapper2Context(m),
+		parent:                m,
+	}
+}
+
+type resettableRESTMapperWrapper struct {
+	RESTMapperWithContext
+	parent ResettableRESTMapper
+}
+
+func (m resettableRESTMapperWrapper) ResetWithContext(ctx context.Context) {
+	m.parent.Reset()
 }
