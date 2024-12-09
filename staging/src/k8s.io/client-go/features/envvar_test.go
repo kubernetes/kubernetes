@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var defaultTestFeatures = map[Feature]FeatureSpec{
@@ -180,10 +181,11 @@ func TestEnvVarFeatureGatesEnabledPanic(t *testing.T) {
 }
 
 func TestHasAlreadyReadEnvVar(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	target := newEnvVarFeatureGates(nil)
 	require.False(t, target.hasAlreadyReadEnvVar())
 
-	_ = target.getEnabledMapFromEnvVar()
+	_ = target.getEnabledMapFromEnvVar(logger)
 	require.True(t, target.hasAlreadyReadEnvVar())
 }
 

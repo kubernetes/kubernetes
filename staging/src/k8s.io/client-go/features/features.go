@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 )
 
 // NOTE: types Feature, FeatureSpec, prerelease (and its values)
@@ -54,7 +55,25 @@ type FeatureSpec struct {
 // Gates indicates whether a given feature is enabled or not.
 type Gates interface {
 	// Enabled returns true if the key is enabled.
+	//
+	// Contextual logging: use [EnabledWithLogger] instead of Enabled in code which supports contextual logging.
 	Enabled(key Feature) bool
+}
+
+// GatesWithLogger extends the Gates interface with a method which supports contextual logging.
+type GatesWithLogger interface {
+	Gates
+	// EnabledWithLogger returns true if the key is enabled.
+	EnabledWithLogger(logger klog.Logger, key Feature) bool
+}
+
+// EnabledWithLogger returns true if the key is enabled. The logger is used
+// to print additional information if the Gates implementation supports that.
+func EnabledWithLogger(logger klog.Logger, gates Gates, key Feature) bool {
+	if gates, ok := gates.(GatesWithLogger); ok {
+		return gates.EnabledWithLogger(logger, key)
+	}
+	return gates.Enabled(key)
 }
 
 // Registry represents an external feature gates registry.
@@ -94,6 +113,9 @@ func AddFeaturesToExistingFeatureGates(registry Registry) error {
 // Useful for binaries that would like to have full control of the features
 // exposed by this library, such as allowing consumers of a binary
 // to interact with the features via a command line flag.
+//
+// If the [Gates] implementation logs anything, it should implement
+// [GatesWithLogger] to let the caller influence the logging.
 //
 // For example:
 //
